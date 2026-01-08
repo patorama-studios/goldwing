@@ -361,9 +361,9 @@ class NotificationService
     public static function sampleContext(string $key): array
     {
         $defaults = [
-            'reset_link' => 'https://example.org/reset?token=sample',
-            'payment_link' => 'https://example.org/pay',
-            'migration_link' => 'https://example.org/migrate?token=sample',
+            'reset_link' => self::sampleEmailUrl('/member/reset_password_confirm.php?token=sample', 'https://example.org/reset?token=sample'),
+            'payment_link' => self::sampleEmailUrl('/membership/payment', 'https://example.org/pay'),
+            'migration_link' => self::sampleEmailUrl('/migrate.php?token=sample', 'https://example.org/migrate?token=sample'),
             'member_name' => 'Member',
             'membership_type' => 'Member',
             'renewal_date' => '2025-07-31',
@@ -378,6 +378,15 @@ class NotificationService
             'expires_minutes' => '10',
         ];
         return $defaults;
+    }
+
+    private static function sampleEmailUrl(string $path, string $fallback): string
+    {
+        $link = BaseUrlService::emailLink($path);
+        if ($link !== '') {
+            return $link;
+        }
+        return $fallback;
     }
 
     public static function getAdminEmails(string $fallback = ''): array

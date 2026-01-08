@@ -245,17 +245,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'period_key' => $fullPeriodKey,
                             'price_cents' => $fullPriceCents,
                         ],
-                    'associate' => [
-                        'magazine_type' => $associatePricingMagazine,
-                        'period_key' => $associatePeriodKey,
-                        'price_cents' => $associatePriceCents,
+                        'associate' => [
+                            'magazine_type' => $associatePricingMagazine,
+                            'period_key' => $associatePeriodKey,
+                            'price_cents' => $associatePriceCents,
+                        ],
+                        'currency' => $pricingCurrency,
+                        'total_cents' => $totalCents,
                     ],
-                    'currency' => $pricingCurrency,
-                    'total_cents' => $totalCents,
-                ],
-                'requested_chapter_id' => $requestedChapterId ?: null,
-                'payment_method' => $paymentMethod,
-            ];
+                    'requested_chapter_id' => $requestedChapterId ?: null,
+                    'payment_method' => $paymentMethod,
+                ];
 
                 $notesJson = json_encode($applicationNotes, JSON_UNESCAPED_SLASHES);
 
