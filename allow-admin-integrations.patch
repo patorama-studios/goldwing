@@ -1,0 +1,48 @@
+From 8be12f8aee2ac019e67126d4d6b0677b7e4189c5 Mon Sep 17 00:00:00 2001
+From: Pat Lindley <patorama@Pats-MacBook-Pro.local>
+Date: Thu, 8 Jan 2026 19:48:22 +1100
+Subject: [PATCH] Allow admins to see integrations and update DB defaults
+
+---
+ config/database.php                  | 6 +++---
+ public_html/admin/settings/index.php | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/config/database.php b/config/database.php
+index e9a55a2..001131e 100644
+--- a/config/database.php
++++ b/config/database.php
+@@ -1,9 +1,9 @@
+ <?php
+ $host = getenv('DB_HOST') ?: 'localhost';
+ $port = getenv('DB_PORT') ?: 3306;
+-$database = getenv('DB_NAME') ?: 'patoramacom_wings2f';
+-$username = getenv('DB_USER') ?: 'patoramacom_winggy3';
+-$password = getenv('DB_PASS') ?: 'M)^bP{G2&sRb';
++$database = getenv('DB_NAME') ?: 'goldwing_wingggy3';
++$username = getenv('DB_USER') ?: 'goldwing_web2398';
++$password = getenv('DB_PASS') ?: '}.eb{(R${Q?#';
+ $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
+ 
+ return [
+diff --git a/public_html/admin/settings/index.php b/public_html/admin/settings/index.php
+index f5cbffc..1530c8e 100644
+--- a/public_html/admin/settings/index.php
++++ b/public_html/admin/settings/index.php
+@@ -23,12 +23,12 @@ $sections = [
+     'notifications' => ['label' => 'Notifications', 'roles' => ['admin']],
+     'accounts' => ['label' => 'Accounts & Roles', 'roles' => ['super_admin', 'admin']],
+     'security' => ['label' => 'Security & Authentication', 'roles' => ['super_admin', 'admin', 'committee']],
+-    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin']],
++    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin', 'admin']],
+     'media' => ['label' => 'Media & Files', 'roles' => ['admin']],
+     'events' => ['label' => 'Events', 'roles' => ['admin']],
+     'membership_pricing' => ['label' => 'Membership Settings', 'roles' => ['admin', 'store_manager', 'committee', 'treasurer']],
+-    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin']],
+-    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin']],
++    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin', 'admin']],
++    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin', 'admin']],
+ ];
+ 
+ function can_access_section(array $roles, array $allowed): bool
+

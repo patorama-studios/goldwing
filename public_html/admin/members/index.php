@@ -64,7 +64,7 @@ if ($statusFilter === 'cancelled') {
     $statusFilter = 'archived';
 }
 if ($filters['status'] === '') {
-    $filters['exclude_status'] = 'cancelled';
+    $filters['exclude_statuses'] = ['cancelled', 'pending'];
 }
 
 $result = MemberRepository::search($filters, $limit, $offset);

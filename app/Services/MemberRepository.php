@@ -398,9 +398,30 @@ class MemberRepository
         if (!empty($filters['status'])) {
             $parts[] = 'm.status = :status';
             $params['status'] = $filters['status'];
-        } elseif (!empty($filters['exclude_status'])) {
-            $parts[] = 'm.status <> :exclude_status';
-            $params['exclude_status'] = $filters['exclude_status'];
+        } else {
+            $excludeList = [];
+            if (!empty($filters['exclude_status'])) {
+                $excludeList[] = (string) $filters['exclude_status'];
+            }
+            if (isset($filters['exclude_statuses'])) {
+                if (is_array($filters['exclude_statuses'])) {
+                    foreach ($filters['exclude_statuses'] as $status) {
+                        $excludeList[] = (string) $status;
+                    }
+                } elseif ($filters['exclude_statuses'] !== '') {
+                    $excludeList[] = (string) $filters['exclude_statuses'];
+                }
+            }
+            $excludeList = array_values(array_filter(array_map('trim', $excludeList), static fn($value) => $value !== ''));
+            if ($excludeList !== []) {
+                $placeholders = [];
+                foreach ($excludeList as $index => $statusValue) {
+                    $key = 'exclude_status_' . $index;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $statusValue;
+                }
+                $parts[] = 'm.status NOT IN (' . implode(', ', $placeholders) . ')';
+            }
         }
         if (!empty($filters['role'])) {
             $parts[] = 'EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = m.user_id AND r.name = :role)';

@@ -349,6 +349,7 @@ $canEditRoles = AdminMemberAccess::isFullAccess($user);
 $canEditSettings = AdminMemberAccess::isFullAccess($user);
 
 $flash = $_SESSION['members_flash'] ?? null;
+$flashContext = $flash['context'] ?? null;
 unset($_SESSION['members_flash']);
 
 $memberRoles = [];
@@ -541,7 +542,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   <main class="flex-1 overflow-y-auto bg-background-light relative">
     <?php $topbarTitle = 'Members'; require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <?php if ($flash): ?>
+      <?php if ($flash && $flashContext !== 'account_access'): ?>
         <div class="rounded-2xl border border-gray-200 bg-white p-4 text-sm <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
           <?= e($flash['message']) ?>
         </div>
@@ -1439,6 +1440,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </div>
                   </div>
                   <div class="space-y-3">
+                    <?php if ($flash && $flashContext === 'account_access'): ?>
+                      <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
+                        <?= e($flash['message']) ?>
+                      </div>
+                    <?php endif; ?>
                     <?php if ($canResetPassword): ?>
                       <form method="post" action="/admin/members/actions.php">
                         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">

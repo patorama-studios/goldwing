@@ -37,7 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 function redirectWithFlash(int $memberId, string $tab, string $message, string $type = 'success', array $extraParams = []): void
 {
-    $_SESSION['members_flash'] = ['type' => $type, 'message' => $message];
+    $flash = ['type' => $type, 'message' => $message];
+    if (isset($extraParams['flash_context'])) {
+        $flash['context'] = $extraParams['flash_context'];
+        unset($extraParams['flash_context']);
+    }
+    $_SESSION['members_flash'] = $flash;
     $params = array_merge(['id' => $memberId, 'tab' => $tab], array_filter($extraParams, static fn($value) => $value !== null));
     header('Location: /admin/members/view.php?' . http_build_query($params));
     exit;
@@ -487,22 +492,22 @@ switch ($action) {
                 if (!AdminMemberAccess::canEditFullProfile($user)) {
                     respondWithJson(['success' => false, 'error' => '2FA toggles are restricted.'], 403);
                 }
-                $userId = (int) ($member['user_id'] ?? 0);
+                $userId = (int) ($inlineMember['user_id'] ?? 0);
                 if ($userId === 0) {
                     respondWithJson(['success' => false, 'error' => 'Missing linked user account.'], 400);
                 }
                 $desired = $inlineValue === '1' ? 'REQUIRED' : 'DEFAULT';
                 $currentOverride = SecurityPolicyService::getTwoFaOverride($userId);
-                    if ($currentOverride === $desired) {
-                        $label = $desired === 'REQUIRED' ? 'Required' : 'Optional';
-                        respondWithJson(['success' => true, 'label' => $label, 'state' => $desired === 'REQUIRED' ? '1' : '0']);
-                    }
-                    SecurityPolicyService::setTwoFaOverride($userId, $desired);
-                    ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.2fa_requirement_updated', [
-                        'from' => $currentOverride,
-                        'to' => $desired,
-                        'actor_roles' => $user['roles'] ?? [],
-                    ]);
+                if ($currentOverride === $desired) {
+                    $label = $desired === 'REQUIRED' ? 'Required' : 'Optional';
+                    respondWithJson(['success' => true, 'label' => $label, 'state' => $desired === 'REQUIRED' ? '1' : '0']);
+                }
+                SecurityPolicyService::setTwoFaOverride($userId, $desired);
+                ActivityLogger::log('admin', $user['id'] ?? null, $inlineMemberId, 'security.2fa_requirement_updated', [
+                    'from' => $currentOverride,
+                    'to' => $desired,
+                    'actor_roles' => $user['roles'] ?? [],
+                ]);
                 $label = $desired === 'REQUIRED' ? 'Required' : 'Optional';
                 respondWithJson(['success' => true, 'label' => $label, 'state' => $desired === 'REQUIRED' ? '1' : '0']);
 
@@ -561,10 +566,10 @@ switch ($action) {
         $adminResetCount = 0;
         $memberResetStmt = null;
         if ($actionKey === 'send_reset_link') {
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM activity_log WHERE action = "member.password_reset_link_sent" AND actor_type = "admin" AND actor_id = :actor_id AND created_at >= :window');
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND actor_type = 'admin' AND actor_id = :actor_id AND created_at >= :window");
             $stmt->execute(['actor_id' => $user['id'] ?? null, 'window' => $window]);
             $adminResetCount = (int) $stmt->fetchColumn();
-            $memberResetStmt = $pdo->prepare('SELECT COUNT(*) FROM activity_log WHERE action = "member.password_reset_link_sent" AND member_id = :member_id AND created_at >= :window');
+            $memberResetStmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND member_id = :member_id AND created_at >= :window");
         }
 
         foreach ($memberIds as $memberId) {
@@ -648,7 +653,7 @@ switch ($action) {
                     continue;
                 }
                 SecurityPolicyService::setTwoFaOverride($userId, 'REQUIRED');
-                ActivityLogger::log('admin', $user['id'] ?? null, $inlineMemberId, 'security.2fa_requirement_updated', [
+                ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.2fa_requirement_updated', [
                     'from' => $currentOverride,
                     'to' => 'REQUIRED',
                     'actor_roles' => $actorRoles,
@@ -1299,24 +1304,25 @@ switch ($action) {
         break;
 
     case 'send_reset_link':
+        $flashContext = ['flash_context' => 'account_access'];
         if (!AdminMemberAccess::canResetPassword($user)) {
-            redirectWithFlash($memberId, $tab, 'Password reset links are restricted.', 'error');
+            redirectWithFlash($memberId, $tab, 'Password reset links are restricted.', 'error', $flashContext);
         }
         $pdo = Database::connection();
         $userId = $member['user_id'] ?? null;
         if (!$userId || empty($member['email'])) {
-            redirectWithFlash($memberId, $tab, 'Member is not linked to a user account.', 'error');
+            redirectWithFlash($memberId, $tab, 'Member is not linked to a user account.', 'error', $flashContext);
         }
         $window = (new DateTimeImmutable('now'))->modify('-60 minutes')->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM activity_log WHERE action = "member.password_reset_link_sent" AND actor_type = "admin" AND actor_id = :actor_id AND created_at >= :window');
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND actor_type = 'admin' AND actor_id = :actor_id AND created_at >= :window");
         $stmt->execute(['actor_id' => $user['id'] ?? null, 'window' => $window]);
         if ((int) $stmt->fetchColumn() >= 3) {
-            redirectWithFlash($memberId, $tab, 'Rate limit reached for password reset links.', 'error');
+            redirectWithFlash($memberId, $tab, 'Rate limit reached for password reset links.', 'error', $flashContext);
         }
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM activity_log WHERE action = "member.password_reset_link_sent" AND member_id = :member_id AND created_at >= :window');
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND member_id = :member_id AND created_at >= :window");
         $stmt->execute(['member_id' => $memberId, 'window' => $window]);
         if ((int) $stmt->fetchColumn() >= 3) {
-            redirectWithFlash($memberId, $tab, 'Member has reached the reset limit.', 'error');
+            redirectWithFlash($memberId, $tab, 'Member has reached the reset limit.', 'error', $flashContext);
         }
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);
@@ -1333,28 +1339,29 @@ switch ($action) {
             'reset_link' => NotificationService::escape($link),
         ]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_reset_link_sent', ['user_id' => $userId]);
-        redirectWithFlash($memberId, $tab, 'Password reset link queued.');
+        redirectWithFlash($memberId, $tab, 'Password reset link queued.', 'success', $flashContext);
         break;
 
     case 'set_password':
+        $flashContext = ['flash_context' => 'account_access'];
         if (!AdminMemberAccess::canSetPassword($user)) {
-            redirectWithFlash($memberId, $tab, 'Password changes are restricted.', 'error');
+            redirectWithFlash($memberId, $tab, 'Password changes are restricted.', 'error', $flashContext);
         }
         $newPassword = trim($_POST['new_password'] ?? '');
         $confirm = trim($_POST['new_password_confirm'] ?? '');
         if ($newPassword === '' || $confirm === '') {
-            redirectWithFlash($memberId, $tab, 'Provide and confirm a new password.', 'error');
+            redirectWithFlash($memberId, $tab, 'Provide and confirm a new password.', 'error', $flashContext);
         }
         if ($newPassword !== $confirm) {
-            redirectWithFlash($memberId, $tab, 'Passwords do not match.', 'error');
+            redirectWithFlash($memberId, $tab, 'Passwords do not match.', 'error', $flashContext);
         }
         $policyErrors = PasswordPolicyService::validate($newPassword);
         if ($policyErrors) {
-            redirectWithFlash($memberId, $tab, $policyErrors[0], 'error');
+            redirectWithFlash($memberId, $tab, $policyErrors[0], 'error', $flashContext);
         }
         $userId = $member['user_id'] ?? null;
         if (!$userId) {
-            redirectWithFlash($memberId, $tab, 'User account missing; cannot set password.', 'error');
+            redirectWithFlash($memberId, $tab, 'User account missing; cannot set password.', 'error', $flashContext);
         }
         $hash = password_hash($newPassword, PASSWORD_DEFAULT);
         $pdo = Database::connection();
@@ -1363,7 +1370,7 @@ switch ($action) {
         $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash');
         $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_set_by_admin', ['user_id' => $userId]);
-        redirectWithFlash($memberId, $tab, 'Password updated.');
+        redirectWithFlash($memberId, $tab, 'Password updated.', 'success', $flashContext);
         break;
 
     case 'change_status':

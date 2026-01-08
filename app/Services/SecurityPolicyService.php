@@ -34,8 +34,15 @@ class SecurityPolicyService
             return 'DEFAULT';
         }
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT twofa_override FROM user_security_overrides WHERE user_id = :user_id LIMIT 1');
-        $stmt->execute(['user_id' => $userId]);
+        try {
+            $stmt = $pdo->prepare('SELECT twofa_override FROM user_security_overrides WHERE user_id = :user_id LIMIT 1');
+            $stmt->execute(['user_id' => $userId]);
+        } catch (\PDOException $e) {
+            if (self::isTableMissing($e)) {
+                return 'DEFAULT';
+            }
+            throw $e;
+        }
         $row = $stmt->fetch();
         return $row['twofa_override'] ?? 'DEFAULT';
     }
@@ -47,10 +54,22 @@ class SecurityPolicyService
             $override = 'DEFAULT';
         }
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO user_security_overrides (user_id, twofa_override, updated_at) VALUES (:user_id, :override, NOW()) ON DUPLICATE KEY UPDATE twofa_override = :override, updated_at = NOW()');
-        $stmt->execute([
-            'user_id' => $userId,
-            'override' => $override,
-        ]);
+        try {
+            $stmt = $pdo->prepare('INSERT INTO user_security_overrides (user_id, twofa_override, updated_at) VALUES (:user_id, :override, NOW()) ON DUPLICATE KEY UPDATE twofa_override = :override, updated_at = NOW()');
+            $stmt->execute([
+                'user_id' => $userId,
+                'override' => $override,
+            ]);
+        } catch (\PDOException $e) {
+            if (self::isTableMissing($e)) {
+                return;
+            }
+            throw $e;
+        }
+    }
+
+    private static function isTableMissing(\PDOException $exception): bool
+    {
+        return $exception->getCode() === '42S02';
     }
 }

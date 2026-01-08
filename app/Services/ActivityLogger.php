@@ -5,23 +5,30 @@ class ActivityLogger
 {
     public static function log(string $actorType, ?int $actorId, ?int $memberId, string $action, array $metadata = []): void
     {
-        $pdo = Database::connection();
         $metadataJson = self::metadataToJson($metadata);
         $targetType = $metadata['target_type'] ?? null;
         $targetId = $metadata['target_id'] ?? null;
-        $stmt = $pdo->prepare('INSERT INTO activity_log (actor_type, actor_id, member_id, user_id, action, target_type, target_id, metadata, ip_address, user_agent, created_at) VALUES (:actor_type, :actor_id, :member_id, :user_id, :action, :target_type, :target_id, :metadata, :ip, :user_agent, NOW())');
-        $stmt->execute([
-            'actor_type' => $actorType,
-            'actor_id' => $actorId,
-            'member_id' => $memberId,
-            'user_id' => $actorId,
-            'action' => $action,
-            'target_type' => $targetType,
-            'target_id' => $targetId,
-            'metadata' => $metadataJson,
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
-        ]);
+
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('INSERT INTO activity_log (actor_type, actor_id, member_id, user_id, action, target_type, target_id, metadata, ip_address, user_agent, created_at) VALUES (:actor_type, :actor_id, :member_id, :user_id, :action, :target_type, :target_id, :metadata, :ip, :user_agent, NOW())');
+            $stmt->execute([
+                'actor_type' => $actorType,
+                'actor_id' => $actorId,
+                'member_id' => $memberId,
+                'user_id' => $actorId,
+                'action' => $action,
+                'target_type' => $targetType,
+                'target_id' => $targetId,
+                'metadata' => $metadataJson,
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            $actorInfo = sprintf('actor_type=%s actor_id=%s member_id=%s', $actorType, $actorId ?? 'null', $memberId ?? 'null');
+            $detail = sprintf('%s %s', $action, $metadataJson ?? '');
+            error_log('[ActivityLogger] Failed to log ' . $detail . ' for ' . $actorInfo . ': ' . $e->getMessage());
+        }
     }
 
     private static function metadataToJson(array $metadata): ?string

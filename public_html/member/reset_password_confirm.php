@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $window = (int) $settings['login_ip_window_minutes'];
         $maxAttempts = (int) $settings['login_ip_max_attempts'];
         $pdo = db();
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM activity_log WHERE action = \"security.password_reset_attempt\" AND ip_address = :ip AND created_at >= DATE_SUB(NOW(), INTERVAL :window MINUTE)');
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'security.password_reset_attempt' AND ip_address = :ip AND created_at >= DATE_SUB(NOW(), INTERVAL :window MINUTE)");
         $stmt->bindValue(':ip', $ip);
         $stmt->bindValue(':window', $window, \PDO::PARAM_INT);
         $stmt->execute();

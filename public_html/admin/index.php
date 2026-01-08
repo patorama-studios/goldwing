@@ -76,7 +76,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($term === '' && $row['member_type'] === 'LIFE') {
                     $term = 'LIFE';
                 }
+                $stmt = $pdo->prepare("SELECT id, stripe_payment_id FROM payments WHERE member_id = :member_id AND type = 'membership' AND status = 'PAID' ORDER BY created_at DESC LIMIT 1");
+                $stmt->execute(['member_id' => $row['member_id']]);
+                $paidPayment = $stmt->fetch();
+                $paymentKey = '';
+                if ($paidPayment) {
+                    $paymentKey = trim((string) ($paidPayment['stripe_payment_id'] ?? ''));
+                    if ($paymentKey === '' && !empty($paidPayment['id'])) {
+                        $paymentKey = 'manual-' . $paidPayment['id'];
+                    }
+                }
                 $periodId = MembershipService::createMembershipPeriod((int) $row['member_id'], $term, date('Y-m-d'));
+                if ($paymentKey !== '') {
+                    MembershipService::markPaid($periodId, $paymentKey);
+                }
 
                 $stmt = $pdo->prepare('SELECT email, phone FROM members WHERE id = :id');
                 $stmt->execute(['id' => $row['member_id']]);
@@ -121,30 +134,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $priceKey = $row['member_type'] . '_' . $term;
-                $prices = SettingsService::getGlobal('payments.membership_prices', []);
-                $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
-                $session = null;
-                if ($priceId) {
-                    $session = StripeService::createCheckoutSession($priceId, $memberRow['email'] ?? '', [
-                        'period_id' => $periodId,
-                        'member_id' => $row['member_id'],
-                    ]);
-                }
+                $paymentNeeded = !$paidPayment;
+                if ($paymentNeeded) {
+                    $priceKey = $row['member_type'] . '_' . $term;
+                    $prices = SettingsService::getGlobal('payments.membership_prices', []);
+                    $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
+                    $session = null;
+                    if ($priceId) {
+                        $session = StripeService::createCheckoutSession($priceId, $memberRow['email'] ?? '', [
+                            'period_id' => $periodId,
+                            'member_id' => $row['member_id'],
+                        ]);
+                    }
 
-                $paymentLink = $session['url'] ?? BaseUrlService::buildUrl('/member/index.php?page=billing');
-                if (!empty($memberRow['email'])) {
-                    NotificationService::dispatch('membership_approved', [
-                        'primary_email' => $memberRow['email'],
-                        'admin_emails' => NotificationService::getAdminEmails(),
-                        'payment_link' => NotificationService::escape($paymentLink),
-                    ]);
-                }
-                if (!empty($memberRow['phone'])) {
-                    SmsService::send($memberRow['phone'], 'Membership approved. Pay now: ' . $paymentLink);
+                    $paymentLink = $session['url'] ?? BaseUrlService::buildUrl('/member/index.php?page=billing');
+                    if (!empty($memberRow['email'])) {
+                        NotificationService::dispatch('membership_approved', [
+                            'primary_email' => $memberRow['email'],
+                            'admin_emails' => NotificationService::getAdminEmails(),
+                            'payment_link' => NotificationService::escape($paymentLink),
+                        ]);
+                    }
+                    if (!empty($memberRow['phone'])) {
+                        SmsService::send($memberRow['phone'], 'Membership approved. Pay now: ' . $paymentLink);
+                    }
                 }
                 AuditService::log($user['id'], 'approve_application', 'Application #' . $appId . ' approved.');
-                $alerts[] = ['type' => 'success', 'message' => 'Application approved. Payment link generated.'];
+                $alerts[] = [
+                    'type' => 'success',
+                    'message' => $paymentNeeded
+                        ? 'Application approved. Payment link generated.'
+                        : 'Application approved. Payment already recorded; no payment email sent.',
+                ];
             }
         }
         if ($page === 'applications' && isset($_POST['reject_id'])) {
@@ -160,18 +181,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('SELECT a.member_id, m.email, m.phone FROM membership_applications a JOIN members m ON m.id = a.member_id WHERE a.id = :id');
             $stmt->execute(['id' => $appId]);
             $row = $stmt->fetch();
-                if ($row && !empty($row['email'])) {
+            if ($row && !empty($row['email'])) {
+                $stmt = $pdo->prepare("SELECT id FROM payments WHERE member_id = :member_id AND type = 'membership' AND status = 'PAID' ORDER BY created_at DESC LIMIT 1");
+                $stmt->execute(['member_id' => $row['member_id']]);
+                $paidPayment = $stmt->fetch();
+                if ($paidPayment) {
+                    $alerts[] = ['type' => 'success', 'message' => 'Payment already recorded; no approval email sent.'];
+                } else {
                     $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
-                NotificationService::dispatch('membership_approved', [
-                    'primary_email' => $row['email'],
-                    'admin_emails' => NotificationService::getAdminEmails(),
-                    'payment_link' => NotificationService::escape($paymentLink),
-                ]);
-                if (!empty($row['phone'])) {
-                    SmsService::send($row['phone'], 'Membership approved. Pay now: ' . $paymentLink);
+                    NotificationService::dispatch('membership_approved', [
+                        'primary_email' => $row['email'],
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'payment_link' => NotificationService::escape($paymentLink),
+                    ]);
+                    if (!empty($row['phone'])) {
+                        SmsService::send($row['phone'], 'Membership approved. Pay now: ' . $paymentLink);
+                    }
+                    AuditService::log($user['id'], 'resend_application_approval', 'Resent approval email for application #' . $appId . '.');
+                    $alerts[] = ['type' => 'success', 'message' => 'Approval email resent.'];
                 }
-                AuditService::log($user['id'], 'resend_application_approval', 'Resent approval email for application #' . $appId . '.');
-                $alerts[] = ['type' => 'success', 'message' => 'Approval email resent.'];
             } else {
                 $alerts[] = ['type' => 'error', 'message' => 'Unable to resend approval email. Missing member email.'];
             }
