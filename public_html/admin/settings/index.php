@@ -23,12 +23,12 @@ $sections = [
     'notifications' => ['label' => 'Notifications', 'roles' => ['admin']],
     'accounts' => ['label' => 'Accounts & Roles', 'roles' => ['super_admin', 'admin']],
     'security' => ['label' => 'Security & Authentication', 'roles' => ['super_admin', 'admin', 'committee']],
-    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin']],
+    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin', 'admin']],
     'media' => ['label' => 'Media & Files', 'roles' => ['admin']],
     'events' => ['label' => 'Events', 'roles' => ['admin']],
     'membership_pricing' => ['label' => 'Membership Settings', 'roles' => ['admin', 'store_manager', 'committee', 'treasurer']],
-    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin']],
-    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin']],
+    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin', 'admin']],
+    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin', 'admin']],
 ];
 
 function can_access_section(array $roles, array $allowed): bool
