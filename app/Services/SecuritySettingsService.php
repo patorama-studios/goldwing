@@ -11,15 +11,31 @@ class SecuritySettingsService
             return self::$cache;
         }
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM security_settings WHERE id = 1 LIMIT 1');
-        $stmt->execute();
+        $settings = self::defaults();
+        try {
+            $stmt = $pdo->prepare('SELECT * FROM security_settings WHERE id = 1 LIMIT 1');
+            $stmt->execute();
+        } catch (\PDOException $e) {
+            if (self::isTableMissing($e)) {
+                self::$cache = $settings;
+                return $settings;
+            }
+            throw $e;
+        }
         $row = $stmt->fetch();
         if (!$row) {
-            self::seedDefaults();
-            $stmt->execute();
-            $row = $stmt->fetch();
+            try {
+                self::seedDefaults();
+                $stmt->execute();
+                $row = $stmt->fetch();
+            } catch (\PDOException $e) {
+                if (self::isTableMissing($e)) {
+                    self::$cache = $settings;
+                    return $settings;
+                }
+                throw $e;
+            }
         }
-        $settings = self::defaults();
         if ($row) {
             $settings['enable_2fa'] = (int) $row['enable_2fa'] === 1;
             $settings['twofa_mode'] = $row['twofa_mode'] ?? $settings['twofa_mode'];
@@ -144,6 +160,11 @@ class SecuritySettingsService
             'webhook_alert_threshold' => (int) $defaults['webhook_alert_threshold'],
             'webhook_alert_window_minutes' => (int) $defaults['webhook_alert_window_minutes'],
         ]);
+    }
+
+    private static function isTableMissing(\PDOException $exception): bool
+    {
+        return $exception->getCode() === '42S02';
     }
 
     private static function decodeJsonList(string $value): array
