@@ -383,9 +383,26 @@ class MemberRepository
     {
         $parts = [];
         if (!empty($filters['q'])) {
-            $value = '%' . mb_strtolower((string) $filters['q']) . '%';
+            $raw = trim((string) $filters['q']);
+            $value = '%' . mb_strtolower($raw) . '%';
             $params['search'] = $value;
-            $parts[] = '(LOWER(m.first_name) LIKE :search OR LOWER(m.last_name) LIKE :search OR LOWER(m.email) LIKE :search OR LOWER(COALESCE(m.member_number, CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END))) LIKE :search)';
+            $pdo = Database::connection();
+            $memberNumberExpr = self::hasMemberNumberColumn($pdo)
+                ? 'COALESCE(m.member_number, CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END))'
+                : 'CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END)';
+            $searchParts = [
+                'LOWER(m.first_name) LIKE :search',
+                'LOWER(m.last_name) LIKE :search',
+                'LOWER(m.email) LIKE :search',
+                'LOWER(COALESCE(m.phone, \'\')) LIKE :search',
+                'LOWER(' . $memberNumberExpr . ') LIKE :search',
+                'CAST(m.id AS CHAR) LIKE :search',
+            ];
+            if ($raw !== '' && ctype_digit($raw)) {
+                $params['search_id'] = (int) $raw;
+                $searchParts[] = 'm.id = :search_id';
+            }
+            $parts[] = '(' . implode(' OR ', $searchParts) . ')';
         }
         if (!empty($filters['chapter_id'])) {
             $parts[] = 'm.chapter_id = :chapter_id';

@@ -48,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE id = :id');
                 $stmt->execute(['id' => $reset['id']]);
                 ActivityLogger::log('system', null, null, 'security.password_reset_completed', ['user_id' => $reset['user_id']]);
-                $message = 'Password updated. You can now log in.';
+                header('Location: /login.php?reset=1');
+                exit;
             } else {
                 $error = 'Invalid or expired token.';
             }

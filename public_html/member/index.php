@@ -110,6 +110,24 @@ function status_badge_classes(string $status): string
     };
 }
 
+function normalize_membership_price_term(string $term): string
+{
+    $clean = strtoupper(trim($term));
+    $map = [
+        'THREE_YEAR' => '3Y',
+        'THREE_YEARS' => '3Y',
+        '3YEAR' => '3Y',
+        '3YEARS' => '3Y',
+        'ONE_YEAR' => '1Y',
+        'ONE_YEARS' => '1Y',
+        '1YEAR' => '1Y',
+        '1YEARS' => '1Y',
+        'YEAR' => '1Y',
+        'ANNUAL' => '1Y',
+    ];
+    return $map[$clean] ?? $clean;
+}
+
 if ($user && $user['member_id']) {
     $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
     $stmt->execute(['id' => $user['member_id']]);
@@ -2270,9 +2288,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             }
             $renewalLink = null;
             if ($pendingPeriod && $member) {
-                $priceKey = $member['member_type'] . '_' . $pendingPeriod['term'];
+                $memberType = strtoupper((string) ($member['member_type'] ?? ''));
+                $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
                 $prices = SettingsService::getGlobal('payments.membership_prices', []);
-                $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
+                $priceKey = '';
+                if ($memberType === 'LIFE' || $termKey === 'LIFE') {
+                    $priceKey = 'LIFE';
+                } elseif ($memberType !== '' && $termKey !== '') {
+                    $priceKey = $memberType . '_' . $termKey;
+                }
+                $priceId = is_array($prices) && $priceKey !== '' ? ($prices[$priceKey] ?? '') : '';
+                if ($priceId === '' && $memberType !== '' && $memberType !== 'LIFE' && $termKey !== '1Y') {
+                    $fallbackKey = $memberType . '_1Y';
+                    $priceId = is_array($prices) ? ($prices[$fallbackKey] ?? '') : '';
+                }
                 if ($priceId) {
                     $session = StripeService::createCheckoutSession($priceId, $member['email'], [
                         'period_id' => $pendingPeriod['id'],

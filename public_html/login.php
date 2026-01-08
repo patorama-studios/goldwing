@@ -6,6 +6,10 @@ use App\Services\Csrf;
 use App\Services\Validator;
 
 $error = '';
+$success = '';
+if (isset($_GET['reset'])) {
+    $success = 'Password updated. Please log in.';
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!Csrf::verify($token)) {
@@ -18,6 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = AuthService::attemptLogin($identifier, $password);
             if ($result['status'] === 'ok') {
+                if (!empty($_SESSION['twofa_enroll_required'])) {
+                    header('Location: /member/2fa_enroll.php');
+                    exit;
+                }
                 $user = current_user();
                 $adminRoles = ['admin', 'committee', 'treasurer', 'chapter_leader', 'super_admin', 'store_manager'];
                 $isAdmin = false;
@@ -66,6 +74,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     <div class="container">
       <div class="page-card reveal form-card">
         <h1>Member Login</h1>
+        <?php if ($success): ?>
+          <div class="alert success"><?= e($success) ?></div>
+        <?php endif; ?>
         <?php if ($error): ?>
           <div class="alert error"><?= e($error) ?></div>
         <?php endif; ?>

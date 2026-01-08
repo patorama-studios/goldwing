@@ -31,6 +31,7 @@ $message = '';
 $recoveryCodes = [];
 $twofaRow = TwoFactorService::getUser((int) $userId);
 if ($twofaRow && !empty($twofaRow['enabled_at'])) {
+    unset($_SESSION['twofa_enroll_required']);
     header('Location: /member/index.php');
     exit;
 }
@@ -58,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $secret !== '') {
             $recoveryCodes = $result['recovery_codes'] ?? [];
             $message = 'Two-factor authentication is now enabled.';
             ActivityLogger::log('member', (int) $userId, null, 'security.2fa_enabled');
+            unset($_SESSION['twofa_enroll_required']);
             if ($pending) {
                 AuthService::completeTwoFactorLogin();
             }

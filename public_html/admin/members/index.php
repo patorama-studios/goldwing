@@ -285,7 +285,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="grid gap-4 lg:grid-cols-4">
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Search
-              <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email or phone">
+              <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, phone, or ID">
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Chapter
@@ -408,8 +408,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         <div data-bulk-message class="hidden px-5 py-3 text-sm text-gray-600"></div>
         <div data-members-config="<?= $membersListConfigJson ?>" class="hidden"></div>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm" data-members-table>
-            <thead class="text-left text-xs uppercase text-gray-500 border-b">
+          <table class="w-full text-sm block md:table" data-members-table>
+            <thead class="hidden md:table-header-group text-left text-xs uppercase text-gray-500 border-b">
               <tr>
                 <th class="py-3 px-4 w-10">
                   <label class="sr-only">Select all</label>
@@ -424,7 +424,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <th class="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y">
+            <tbody class="block divide-y md:table-row-group">
               <?php foreach ($members as $member): ?>
                 <?php
                   $memberRoles = [];
@@ -449,26 +449,37 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $statusLabelText = statusLabel($member['status']);
                   $twoFaRequired = $override === 'REQUIRED';
                 ?>
-                <tr data-member-row data-member-id="<?= e((int) $member['id']) ?>">
-                  <td class="py-3 px-4">
-                    <input type="checkbox" data-member-checkbox value="<?= e((int) $member['id']) ?>" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                <tr class="block md:table-row" data-member-row data-member-id="<?= e((int) $member['id']) ?>">
+                  <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Select</span>
+                    <div class="mt-1 md:mt-0">
+                      <input type="checkbox" data-member-checkbox value="<?= e((int) $member['id']) ?>" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                    </div>
                   </td>
-                  <td class="py-4 px-4">
-                    <div class="flex items-center gap-3">
+                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member</span>
+                    <div class="mt-1 flex items-center gap-3 md:mt-0">
                       <div class="h-10 w-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-sm font-semibold">
                         <?= e($initials) ?>
                       </div>
                       <div>
-                        <p class="text-sm font-semibold text-gray-900"><?= e($fullName !== '' ? $fullName : 'Member') ?></p>
+                        <a class="text-sm font-semibold text-gray-900 hover:text-primary" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
+                          <?= e($fullName !== '' ? $fullName : 'Member') ?>
+                        </a>
                         <p class="text-xs text-gray-500">ID: <?= e($member['member_number_display'] ?? '—') ?></p>
                       </div>
                     </div>
                   </td>
-                  <td class="py-4 px-4 text-gray-600">
-                    <p class="text-sm"><?= e($member['email']) ?></p>
-                    <p class="text-xs text-gray-500"><?= e($member['phone'] ?? '—') ?></p>
+                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Contact</span>
+                    <div class="mt-1 md:mt-0">
+                      <p class="text-sm"><?= e($member['email']) ?></p>
+                      <p class="text-xs text-gray-500"><?= e($member['phone'] ?? '—') ?></p>
+                    </div>
                   </td>
-                  <td class="py-4 px-4">
+                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Chapter</span>
+                    <div class="mt-1 md:mt-0">
                     <?php if ($canInlineEdit): ?>
                       <div class="space-y-2" data-inline-field data-field="chapter" data-member-id="<?= e((int) $member['id']) ?>">
                         <button type="button" class="flex items-center justify-between w-full rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm" data-inline-trigger>
@@ -493,8 +504,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <?= e($chapterLabel) ?>
                       </span>
                     <?php endif; ?>
+                    </div>
                   </td>
-                  <td class="py-4 px-4">
+                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Status</span>
+                    <div class="mt-1 md:mt-0">
                     <?php if ($canInlineEdit): ?>
                       <div class="space-y-2" data-inline-field data-field="status" data-member-id="<?= e((int) $member['id']) ?>">
                         <button type="button" class="flex items-center justify-between w-full rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm" data-inline-trigger>
@@ -517,8 +531,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <?php else: ?>
                       <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
                     <?php endif; ?>
+                    </div>
                   </td>
-                  <td class="py-4 px-4 text-xs">
+                  <td class="block px-4 py-3 text-xs md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">2FA</span>
+                    <div class="mt-1 md:mt-0">
                     <div class="space-y-1" data-inline-field data-field="twofa" data-member-id="<?= e((int) $member['id']) ?>" data-twofa-required="<?= $twoFaRequired ? '1' : '0' ?>">
                       <div class="flex items-center justify-between gap-2">
                         <p class="text-sm font-semibold <?= $member['twofa_enabled_at'] ? 'text-emerald-700' : 'text-gray-500' ?>" data-inline-value>
@@ -533,19 +550,26 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <p class="text-xs <?= $enforcement === 'Disabled' ? 'text-rose-500' : 'text-gray-500' ?>"><?= e($enforcement) ?></p>
                       <p class="text-xs text-gray-500 hidden" data-inline-feedback></p>
                     </div>
+                    </div>
                   </td>
-                  <td class="py-4 px-4 text-gray-600"><?= formatDate($member['created_at']) ?></td>
-                  <td class="py-4 px-4 text-right">
-                    <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
-                      View
-                      <span class="material-icons-outlined text-sm">chevron_right</span>
-                    </a>
+                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Created</span>
+                    <div class="mt-1 md:mt-0"><?= formatDate($member['created_at']) ?></div>
+                  </td>
+                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4 md:text-right">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Actions</span>
+                    <div class="mt-1 md:mt-0">
+                      <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
+                        View
+                        <span class="material-icons-outlined text-sm">chevron_right</span>
+                      </a>
+                    </div>
                   </td>
                 </tr>
               <?php endforeach; ?>
               <?php if (empty($members)): ?>
-                <tr>
-                  <td colspan="8" class="py-6 text-center text-gray-500">No members found.</td>
+                <tr class="block md:table-row">
+                  <td colspan="8" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
                 </tr>
               <?php endif; ?>
             </tbody>
