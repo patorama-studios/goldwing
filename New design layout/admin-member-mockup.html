@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Member Profile Mockup</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #f7f7f4;
+        --card: #ffffff;
+        --muted: #6d7280;
+        --border: #e8e8e8;
+        --primary: #f2c94c;
+        --primary-dark: #dcb212;
+        --accent: #2f7d32;
+        font-family: 'Inter', 'Noto Sans', system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--background);
+      }
+
+      .app {
+        display: flex;
+        min-height: 100vh;
+        gap: 1.5rem;
+      }
+
+      .sidebar {
+        width: 240px;
+        padding: 2rem 1.5rem;
+        background: #fff;
+        border-right: 1px solid rgba(17, 24, 39, 0.08);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .sidebar h2 {
+        margin: 0;
+        font-size: 0.9rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .sidebar nav {
+        margin-top: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .sidebar a {
+        color: #1f2937;
+        font-size: 0.95rem;
+        text-decoration: none;
+        padding: 0.5rem 0.75rem;
+        border-radius: 12px;
+        transition: background 0.2s ease;
+      }
+
+      .sidebar a.active {
+        background: #fef3c7;
+      }
+
+      .main {
+        flex: 1;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel {
+        background: var(--card);
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        padding: 1.5rem;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+      }
+
+      .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .header-row h1 {
+        font-size: clamp(2rem, 2.5vw, 2.4rem);
+        margin: 0;
+        font-family: 'Playfair Display', 'Times New Roman', serif;
+      }
+
+      .header-row .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-radius: 999px;
+        padding: 0.3rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+      }
+
+      .tabs {
+        margin-top: 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .tabs button {
+        padding: 0.55rem 1.2rem;
+        border-radius: 999px;
+        border: 1px solid #d1d5db;
+        background: #f9fafb;
+        font-size: 0.85rem;
+        color: #374151;
+      }
+
+      .tabs button.active {
+        background: #111827;
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .grid-two {
+        margin-top: 1.5rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .summary-card {
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        padding: 2rem;
+        background: #fff;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      }
+
+      .summary-card h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      .summary-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        margin-bottom: 1.25rem;
+      }
+
+      .summary-grid span {
+        display: block;
+        font-size: 0.75rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .summary-grid strong {
+        font-size: 1.05rem;
+        color: #111827;
+      }
+
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+
+      .detail-row p {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #1f2937;
+      }
+
+      .status-pill {
+        background: rgba(242, 201, 76, 0.2);
+        border-radius: 999px;
+        padding: 0.35rem 0.9rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #744210;
+      }
+
+      .actions-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .card-grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .card-grid .card {
+        background: #fff;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        padding: 1rem 1.25rem;
+        box-shadow: 0 12px 25px rgba(15, 23, 42, 0.06);
+      }
+
+      .card h3 {
+        margin-top: 0;
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+      }
+
+      .quick-actions button,
+      .status-actions button {
+        width: 100%;
+        text-align: left;
+        border: 1px solid #d1d5db;
+        border-radius: 999px;
+        padding: 0.65rem 1rem;
+        background: #f9fafb;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: border-color 0.2s ease;
+      }
+
+      .quick-actions button:hover,
+      .status-actions button:hover {
+        border-color: #111827;
+      }
+
+      .table-card {
+        background: #fff;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        padding: 1.5rem;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        color: #374151;
+      }
+
+      th,
+      td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #eef2ff;
+      }
+
+      th {
+        font-size: 0.7rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #9ca3af;
+      }
+
+      .vehicles-panel {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .vehicle-card,
+      .add-vehicle-card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        padding: 1.75rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+      }
+
+      .vehicle-card form {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .vehicle-card label,
+      .add-vehicle-card label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .vehicle-card input,
+      .vehicle-card select,
+      .add-vehicle-card input,
+      .add-vehicle-card select {
+        padding: 0.55rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        font-size: 0.9rem;
+      }
+
+      .vehicle-card-footer,
+      .add-vehicle-card-footer {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .vehicle-card-footer button,
+      .add-vehicle-card button {
+        border-radius: 999px;
+        border: 1px solid #d1d5db;
+        background: #f9fafb;
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div>
+          <h2>Goldwing Admin</h2>
+          <nav>
+            <a href="#">Dashboard</a>
+            <a href="#" class="active">Members</a>
+            <a href="#">Applications</a>
+            <a href="#">Payments</a>
+            <a href="#">Events</a>
+          </nav>
+        </div>
+        <div>
+          <strong>Admin User</strong>
+          <p class="muted">admin@goldwing.local</p>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel">
+          <div class="header-row">
+            <div>
+              <p class="muted" style="margin:0;font-size:0.75rem;letter-spacing:0.3em;text-transform:uppercase;">Member profile</p>
+              <h1>James Smith</h1>
+            </div>
+            <div>
+              <span class="badge">Pending</span>
+              <span class="badge" style="border-color: var(--primary); color: #924c00;">Full Member</span>
+            </div>
+          </div>
+          <div class="tabs">
+            <button class="active">Overview</button>
+            <button>Profile</button>
+            <button>Roles &amp; Access</button>
+            <button>Settings</button>
+            <button>Vehicles</button>
+            <button>Membership</button>
+            <button>Refunds</button>
+            <button>Activity</button>
+          </div>
+          <div class="grid-two">
+            <div class="summary-card">
+              <h2>Contact card</h2>
+              <div class="summary-grid">
+                <div>
+                  <span>Member #</span>
+                  <strong>1008</strong>
+                </div>
+                <div>
+                  <span>Chapter</span>
+                  <strong>Coastal Chapter</strong>
+                </div>
+                <div>
+                  <span>Joined</span>
+                  <strong>Jan 04, 2026</strong>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div>
+                  <p class="muted">Email</p>
+                  <p>test@testemail.com</p>
+                </div>
+                <div>
+                  <p class="muted">Phone</p>
+                  <p>0427 380 213</p>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div>
+                  <p class="muted">Primary vehicle</p>
+                  <p>Honda Goldwing GL1800 (2024)</p>
+                </div>
+                <div class="status-pill">Pending</div>
+              </div>
+              <div class="detail-row" style="flex-direction:column;gap:0.35rem;">
+                <p class="muted">Address</p>
+                <p style="font-size:0.9rem;line-height:1.4;">123 Motorcycle Way<br />Ride Free City, QLD 4000<br />Australia</p>
+              </div>
+            </div>
+            <div class="actions-column">
+              <div class="card quick-actions">
+                <h3>Quick actions</h3>
+                <div class="status-actions">
+                  <button>Send password reset link</button>
+                  <button>Set password (admin only)</button>
+                  <button>Force 2FA enrollment</button>
+                  <button>Exempt from 2FA</button>
+                </div>
+              </div>
+              <div class="card card-grid">
+                <div class="status-actions">
+                  <button>Activate member</button>
+                  <button>Suspend member</button>
+                  <button>Archive member</button>
+                  <button>Delete member</button>
+                </div>
+              </div>
+              <div class="card">
+                <p class="muted" style="margin:0;">Manual migration</p>
+                <p style="margin:0.25rem 0 0 0; font-size:0.85rem;">Status: Sent • Expires in 3 days</p>
+                <button style="margin-top:0.75rem;border-radius:12px;padding:0.55rem 0.9rem;background:#f7f4f0;border:1px solid #e2d8c5;font-weight:600;">Send manual migrate form</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-two" style="margin-top:1.5rem;">
+          <div class="table-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="margin:0;">Membership orders</h3>
+                <p class="muted" style="margin:0;font-size:0.8rem;">Showing 5 payments</p>
+              </div>
+              <div class="status-pill">Stripe</div>
+            </div>
+            <table style="margin-top:1rem;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Term</th>
+                  <th>Status</th>
+                  <th>Period</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2026-01-04</td>
+                  <td>A$150.00</td>
+                  <td>ANNUAL</td>
+                  <td><span class="status-pill" style="background:#dcfce7;color:#166534;border:none;">Paid</span></td>
+                  <td>2026-01-04 → 2026-07-31</td>
+                </tr>
+                <tr>
+                  <td>2025-07-15</td>
+                  <td>A$0.00</td>
+                  <td>LIFE</td>
+                  <td><span class="status-pill" style="background:#fee2e2;color:#b91c1c;border:none;">Refunded</span></td>
+                  <td>Lifetime</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-grid">
+            <div class="card">
+              <h3>Membership summary</h3>
+              <div class="detail-row">
+                <p>Last payment</p>
+                <p>2026-01-04</p>
+              </div>
+              <div class="detail-row">
+                <p>Renewal</p>
+                <p>2026-07-31</p>
+              </div>
+              <div class="detail-row">
+                <p>Payment method</p>
+                <p>Stripe</p>
+              </div>
+              <div class="detail-row">
+                <p>Order source</p>
+                <p>Stripe Portal</p>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Manual membership order</h3>
+              <div class="detail-row">
+                <p>Status</p>
+                <p>Pending</p>
+              </div>
+              <button style="width:100%;">Create manual order</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:1.5rem;">
+          <div class="header-row">
+            <div>
+              <p class="muted" style="margin:0;font-size:0.75rem;letter-spacing:0.3em;text-transform:uppercase;">Vehicles</p>
+              <h2 style="margin:0;">Primary Vehicle</h2>
+            </div>
+          </div>
+          <div class="vehicles-panel">
+            <div class="vehicle-card">
+              <div class="detail-row">
+                <div>
+                  <p class="muted">Make</p>
+                  <p>Honda</p>
+                </div>
+                <div>
+                  <p class="muted">Model</p>
+                  <p>Goldwing GL1800</p>
+                </div>
+                <div>
+                  <p class="muted">Year</p>
+                  <p>2024</p>
+                </div>
+              </div>
+              <form>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                  <label style="flex:1 1 150px;">
+                    Make
+                    <input type="text" value="Honda" />
+                  </label>
+                  <label style="flex:1 1 150px;">
+                    Model
+                    <input type="text" value="Goldwing GL1800" />
+                  </label>
+                  <label style="flex:1 1 120px;">
+                    Type
+                    <select>
+                      <option>Motorcycle</option>
+                    </select>
+                  </label>
+                  <label style="flex:1 1 120px;">
+                    Year
+                    <input type="number" value="2024" />
+                  </label>
+                </div>
+                <div class="vehicle-card-footer">
+                  <button style="background:var(--primary);
+                    color:#1f2937;
+                    border:none;">Save vehicle</button>
+                  <button style="border-color:#ef4444;color:#b91c1c;">Delete vehicle</button>
+                </div>
+              </form>
+            </div>
+            <div class="add-vehicle-card">
+              <h3 style="margin-top:0;">Add another vehicle</h3>
+              <form>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                  <label style="flex:1 1 150px;">
+                    Make
+                    <input type="text" />
+                  </label>
+                  <label style="flex:1 1 150px;">
+                    Model
+                    <input type="text" />
+                  </label>
+                  <label style="flex:1 1 120px;">
+                    Type
+                    <select>
+                      <option>Motorcycle</option>
+                    </select>
+                  </label>
+                  <label style="flex:1 1 120px;">
+                    Year
+                    <input type="number" />
+                  </label>
+                </div>
+                <div class="add-vehicle-card-footer" style="margin-top:0.5rem;">
+                  <label style="display:flex;align-items:center;gap:0.3rem;">
+                    <input type="checkbox" /> Set as primary
+                  </label>
+                  <button style="background:var(--primary);
+                    color:#1f2937;
+                    border:none;">Add vehicle</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

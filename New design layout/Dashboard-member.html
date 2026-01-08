@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Goldwing Association Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#F59E0B", // Amber 500
+                        secondary: "#10B981", // Emerald 500 for the green accents
+                        "background-light": "#FDFBF7", // Warm off-white from image
+                        "background-dark": "#111827", // Gray 900
+                        "card-light": "#FFFFFF",
+                        "card-dark": "#1F2937", // Gray 800
+                    },
+                    fontFamily: {
+                        display: ["Playfair Display", "serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 font-sans transition-colors duration-300">
+<div class="flex h-screen overflow-hidden">
+<aside class="w-64 flex-col hidden md:flex bg-card-light dark:bg-card-dark border-r border-gray-200 dark:border-gray-700 shadow-sm z-10 transition-colors duration-300">
+<div class="h-20 flex items-center px-8 border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-2 text-gray-900 dark:text-white font-display font-bold text-xl">
+<span class="material-icons-outlined text-primary text-3xl">flight</span>
+<span>Goldwing</span>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-icons-outlined">dashboard</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors" href="#">
+<span class="material-icons-outlined">flight_takeoff</span>
+                    Wings
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors" href="#">
+<span class="material-icons-outlined">storefront</span>
+                    Store
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors" href="#">
+<span class="material-icons-outlined">campaign</span>
+                    Notice Board
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors" href="#">
+<span class="material-icons-outlined">person</span>
+                    Profile
+                </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-3 px-4 py-3">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs">
+                        FM
+                    </div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 dark:text-white truncate">Full Member</p>
+<p class="text-xs text-gray-500 dark:text-gray-400 truncate">ID: 1001</p>
+</div>
+</div>
+<button class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors">
+<span class="material-icons-outlined text-lg">logout</span>
+                    Logout
+                </button>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark relative">
+<div class="md:hidden h-16 bg-card-light dark:bg-card-dark flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
+<span class="font-display font-bold text-lg text-gray-900 dark:text-white">Goldwing</span>
+<button class="text-gray-600 dark:text-gray-300">
+<span class="material-icons-outlined">menu</span>
+</button>
+</div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+<span class="material-icons-outlined text-9xl text-primary transform rotate-12">verified</span>
+</div>
+<div class="relative z-10">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+<div>
+<h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                                    Welcome back, <span class="text-primary">Full Member</span>
+</h1>
+<p class="text-gray-500 dark:text-gray-400">Manage your membership, view events, and stay updated.</p>
+</div>
+<span class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-white shadow-sm self-start md:self-center">
+                                FULL Member
+                            </span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 dark:border-gray-700 pt-6">
+<div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Membership #</p>
+<p class="text-lg font-semibold text-gray-900 dark:text-white">1001</p>
+</div>
+<div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Status</p>
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+<p class="text-lg font-semibold text-gray-900 dark:text-white">ACTIVE</p>
+</div>
+</div>
+<div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Expiry Date</p>
+<p class="text-lg font-semibold text-gray-900 dark:text-white">2026-07-31</p>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
+<span class="material-icons-outlined">bolt</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Quick Actions</h2>
+</div>
+<div class="space-y-3 flex-1">
+<button class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200">
+<span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-700 dark:group-hover:text-green-400">Edit membership details</span>
+<span class="material-icons-outlined text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 text-sm">arrow_forward_ios</span>
+</button>
+<button class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200">
+<span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-700 dark:group-hover:text-green-400">Billing &amp; payments</span>
+<span class="material-icons-outlined text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 text-sm">arrow_forward_ios</span>
+</button>
+<button class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200">
+<span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-700 dark:group-hover:text-green-400">Membership history</span>
+<span class="material-icons-outlined text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 text-sm">arrow_forward_ios</span>
+</button>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+<span class="material-icons-outlined">group</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Associates</h2>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 flex-1">
+<ul class="space-y-4">
+<li class="flex items-start gap-3">
+<span class="w-2 h-2 mt-2 rounded-full bg-blue-500"></span>
+<div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">Associate Member (1001.1)</p>
+<span class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">ACTIVE</span>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+<span class="material-icons-outlined">receipt_long</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Billing Summary</h2>
+</div>
+<div class="space-y-4 flex-1">
+<div>
+<p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Last Payment</p>
+<p class="text-gray-900 dark:text-white font-medium mt-1">2026-01-03 <span class="text-gray-400 text-sm font-normal">15:54:19</span></p>
+</div>
+<div>
+<p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">Status</p>
+<p class="text-green-600 dark:text-green-400 font-medium mt-1 flex items-center gap-1">
+<span class="material-icons-outlined text-sm">check_circle</span> ACTIVE
+                                </p>
+</div>
+</div>
+<button class="mt-6 w-full py-2.5 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary hover:text-white dark:hover:bg-secondary dark:hover:text-white transition-all font-medium text-sm">
+                            Update payment method
+                        </button>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-1">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600 dark:text-orange-400">
+<span class="material-icons-outlined">badge</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Snapshot</h2>
+</div>
+<div class="space-y-3 text-sm">
+<div class="flex flex-col pb-3 border-b border-gray-100 dark:border-gray-700">
+<span class="text-gray-500 dark:text-gray-400 text-xs uppercase">Email</span>
+<span class="font-medium text-gray-900 dark:text-white truncate">full.member@goldwing.local</span>
+</div>
+<div class="flex flex-col pb-3 border-b border-gray-100 dark:border-gray-700">
+<span class="text-gray-500 dark:text-gray-400 text-xs uppercase">Phone</span>
+<span class="font-medium text-gray-900 dark:text-white">0400 111 111</span>
+</div>
+<div class="flex justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+<span class="text-gray-500 dark:text-gray-400">Chapter</span>
+<span class="font-medium text-gray-900 dark:text-white">Capital Chapter</span>
+</div>
+<div class="flex justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+<span class="text-gray-500 dark:text-gray-400">Wings</span>
+<span class="font-medium text-gray-900 dark:text-white">digital</span>
+</div>
+<div class="flex justify-between pb-3">
+<span class="text-gray-500 dark:text-gray-400">Directory</span>
+<span class="font-medium text-gray-900 dark:text-white">A</span>
+</div>
+</div>
+<button class="mt-4 w-full py-2 px-4 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-medium text-sm">
+                            Edit Profile
+                        </button>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-1">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400">
+<span class="material-icons-outlined">menu_book</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Wings Magazine</h2>
+</div>
+<div class="flex flex-col h-full justify-between">
+<div>
+<p class="text-lg font-medium text-gray-900 dark:text-white">Wings Issue 1</p>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-4">Released: 2026-01-03</p>
+<div class="bg-gray-100 dark:bg-gray-800 rounded-lg h-32 w-full flex items-center justify-center mb-6">
+<span class="material-icons-outlined text-gray-400 text-5xl">image</span>
+</div>
+</div>
+<button class="w-full py-2.5 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary hover:text-white dark:hover:bg-secondary dark:hover:text-white transition-all font-medium text-sm">
+                                View Latest Issue
+                            </button>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-1">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-lg text-teal-600 dark:text-teal-400">
+<span class="material-icons-outlined">event</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Events</h2>
+</div>
+<div class="space-y-4">
+<div class="flex gap-4 items-start group cursor-pointer">
+<div class="flex-shrink-0 w-12 h-12 bg-teal-50 dark:bg-teal-900/20 rounded-lg flex flex-col items-center justify-center text-teal-700 dark:text-teal-400 group-hover:bg-teal-100 dark:group-hover:bg-teal-900/40 transition-colors">
+<span class="text-xs font-bold uppercase">Jan</span>
+<span class="text-lg font-bold">17</span>
+</div>
+<div>
+<h3 class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-teal-600 transition-colors">Spring Ride</h3>
+<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">2026-01-17 • 14:37</p>
+</div>
+</div>
+<div class="pt-4 border-t border-gray-100 dark:border-gray-700 text-center">
+<a class="text-sm font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700" href="#">View Calendar →</a>
+</div>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-2">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg text-yellow-600 dark:text-yellow-400">
+<span class="material-icons-outlined">campaign</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Notice Board</h2>
+</div>
+<div class="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-4 border border-yellow-100 dark:border-yellow-900/20">
+<ul class="space-y-2">
+<li class="flex gap-3">
+<span class="material-icons-outlined text-yellow-600 dark:text-yellow-500 text-sm mt-1">info</span>
+<p class="text-sm text-gray-800 dark:text-gray-300">Welcome Members to the new dashboard experience.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-1">
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+<span class="material-icons-outlined">shopping_bag</span>
+</div>
+<h2 class="font-display text-xl font-bold text-gray-900 dark:text-white">Orders</h2>
+</div>
+<div class="flex flex-col items-center justify-center py-8 text-center">
+<div class="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-3">
+<span class="material-icons-outlined text-gray-400 text-2xl">remove_shopping_cart</span>
+</div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">No payments yet</p>
+<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Your order history will appear here.</p>
+</div>
+</div>
+</div>
+<footer class="mt-12 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-xs text-gray-500 dark:text-gray-400">
+<p>© 2026 Goldwing Association. All rights reserved.</p>
+</footer>
+</div>
+</main>
+</div>
+
+</body></html>

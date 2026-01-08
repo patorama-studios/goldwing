@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Goldwing Admin - Navigation Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#EAB308", // Gold/Amber
+                        secondary: "#4F46E5", // Indigo for AI features
+                        "background-light": "#F3F4F6",
+                        "background-dark": "#0F172A",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E293B",
+                        "border-light": "#E5E7EB",
+                        "border-dark": "#334155",
+                    },
+                    fontFamily: {
+                        display: ["Plus Jakarta Sans", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        .drag-ghost {
+            opacity: 0.5;
+            background: #fef3c7;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-body text-gray-700 dark:text-gray-300 antialiased h-screen overflow-hidden flex transition-colors duration-300">
+<aside class="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark flex flex-col justify-between flex-shrink-0 z-20">
+<div>
+<div class="h-16 flex items-center px-6 border-b border-border-light dark:border-border-dark">
+<span class="material-icons-round text-primary text-3xl mr-2">flight</span>
+<div>
+<h1 class="font-display font-bold text-lg text-gray-900 dark:text-white leading-tight">Goldwing</h1>
+<span class="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide uppercase">Admin</span>
+</div>
+</div>
+<nav class="p-4 space-y-1 overflow-y-auto">
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">people</span>
+<span class="font-medium text-sm">Members</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">assignment</span>
+<span class="font-medium text-sm">Applications</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">card_membership</span>
+<span class="font-medium text-sm">Memberships</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">payments</span>
+<span class="font-medium text-sm">Payments</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">event</span>
+<span class="font-medium text-sm">Events</span>
+</a>
+<div class="pt-4 pb-2">
+<p class="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Content</p>
+</div>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">article</span>
+<span class="font-medium text-sm">Pages</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg bg-primary/10 dark:bg-primary/20 text-primary transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-primary">menu_open</span>
+<span class="font-medium text-sm">Navigation</span>
+</a>
+<a class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors group" href="#">
+<span class="material-icons-round text-xl mr-3 text-gray-400 group-hover:text-primary transition-colors">campaign</span>
+<span class="font-medium text-sm">Notices</span>
+</a>
+</nav>
+</div>
+<div class="p-4 border-t border-border-light dark:border-border-dark">
+<div class="flex items-center gap-3 px-2">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs">
+                    AD
+                </div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 dark:text-white truncate">Admin User</p>
+<p class="text-xs text-gray-500 dark:text-gray-400 truncate">admin@goldwing.local</p>
+</div>
+<button class="text-gray-400 hover:text-red-500 transition-colors">
+<span class="material-icons-round text-xl">logout</span>
+</button>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+<header class="h-16 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark flex items-center justify-between px-6 z-10">
+<div>
+<nav aria-label="Breadcrumb" class="flex text-xs text-gray-500 dark:text-gray-400 mb-1">
+<ol class="flex items-center space-x-2">
+<li><span>Admin</span></li>
+<li class="material-icons-round text-sm">chevron_right</li>
+<li class="font-medium text-gray-900 dark:text-white">Menus</li>
+</ol>
+</nav>
+<h2 class="text-xl font-display font-bold text-gray-900 dark:text-white">Navigation</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<select class="pl-3 pr-10 py-2 text-sm bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg focus:ring-primary focus:border-primary shadow-sm">
+<option>Primary Menu</option>
+<option>Footer Menu</option>
+<option>Social Links</option>
+</select>
+</div>
+<button class="flex items-center gap-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md">
+<span class="material-icons-round text-sm">add</span>
+                    Create Menu
+                </button>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<section class="flex-1 overflow-y-auto p-8 relative">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Menu Structure</h3>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Drag items to reorder. Use icons to manage nesting and settings.</p>
+</div>
+<div class="flex gap-2">
+<button class="text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg font-medium transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-800">
+                            Delete Menu
+                        </button>
+<button class="bg-primary hover:bg-yellow-500 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2">
+<span class="material-icons-round text-sm">save</span>
+                            Save Menu
+                        </button>
+</div>
+</div>
+<div class="space-y-3 max-w-4xl">
+<div class="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+<span class="material-icons-round text-lg">home</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Home</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Page: Welcome to Goldwing Association</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+<div class="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-green-50 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
+<span class="material-icons-round text-lg">info</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">About</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Page: About the Association</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+<div class="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-orange-600 dark:text-orange-400">
+<span class="material-icons-round text-lg">calendar_month</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Ride Calendar</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Page: Ride Calendar</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+<div class="group ml-12 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3 relative before:content-[''] before:absolute before:-left-6 before:top-1/2 before:w-4 before:h-px before:bg-gray-300 dark:before:bg-gray-600 before:-translate-y-1/2 before:block">
+<div class="absolute -left-6 -top-10 bottom-1/2 w-px bg-gray-300 dark:bg-gray-600"></div>
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-gray-50 dark:bg-slate-700 rounded-lg text-gray-600 dark:text-gray-300">
+<span class="material-icons-round text-lg">two_wheeler</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Upcoming Rides</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Custom Link: /upcoming</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+<div class="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+<span class="material-icons-round text-lg">card_membership</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Membership</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Page: Membership Selection</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+<div class="group bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+<span class="material-icons-round text-gray-400 cursor-grab hover:text-gray-600 dark:hover:text-gray-200">drag_indicator</span>
+<div class="p-2 bg-pink-50 dark:bg-pink-900/30 rounded-lg text-pink-600 dark:text-pink-400">
+<span class="material-icons-round text-lg">lock</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Member Login</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Link: /login.php</p>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-secondary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="AI Page Edit">
+<span class="material-icons-round text-lg">auto_awesome</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Add Sub-page">
+<span class="material-icons-round text-lg">add_circle_outline</span>
+</button>
+<button class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Settings">
+<span class="material-icons-round text-lg">edit</span>
+</button>
+<button class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Remove">
+<span class="material-icons-round text-lg">delete_outline</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<aside class="w-80 bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark overflow-y-auto z-10 p-5 flex flex-col gap-6">
+<div class="space-y-3">
+<h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Menu Settings</h4>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Menu Name</label>
+<div class="flex gap-2">
+<input class="flex-1 rounded-lg border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-primary focus:border-primary" type="text" value="Primary Menu"/>
+<button class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-gray-300 p-2 rounded-lg transition-colors">
+<span class="material-icons-round text-lg">save</span>
+</button>
+</div>
+</div>
+</div>
+<div class="space-y-3">
+<h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Locations</h4>
+<div class="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3 border border-border-light dark:border-border-dark space-y-3">
+<div class="flex items-center justify-between">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Primary Nav</label>
+<span class="text-xs text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Active</span>
+</div>
+<div class="flex items-center justify-between">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Footer</label>
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+</div>
+<div class="flex items-center justify-between">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Mobile Panel</label>
+<input checked="" class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+</div>
+</div>
+</div>
+<div class="space-y-3 flex-1">
+<h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Add to Menu</h4>
+<div class="border border-border-light dark:border-border-dark rounded-lg overflow-hidden">
+<details class="group" open="">
+<summary class="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 dark:bg-slate-800 text-sm text-gray-900 dark:text-white">
+<span>Recent Pages</span>
+<span class="transition group-open:rotate-180">
+<span class="material-icons-round text-sm">expand_more</span>
+</span>
+</summary>
+<div class="p-3 bg-white dark:bg-slate-800/50 max-h-48 overflow-y-auto space-y-2">
+<label class="flex items-center space-x-2 cursor-pointer p-1 hover:bg-gray-50 dark:hover:bg-slate-700 rounded">
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+<span class="text-sm text-gray-600 dark:text-gray-300">Constitution</span>
+</label>
+<label class="flex items-center space-x-2 cursor-pointer p-1 hover:bg-gray-50 dark:hover:bg-slate-700 rounded">
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+<span class="text-sm text-gray-600 dark:text-gray-300">Events Gallery</span>
+</label>
+<label class="flex items-center space-x-2 cursor-pointer p-1 hover:bg-gray-50 dark:hover:bg-slate-700 rounded">
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+<span class="text-sm text-gray-600 dark:text-gray-300">President's Address</span>
+</label>
+<label class="flex items-center space-x-2 cursor-pointer p-1 hover:bg-gray-50 dark:hover:bg-slate-700 rounded">
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" type="checkbox"/>
+<span class="text-sm text-gray-600 dark:text-gray-300">Join Us</span>
+</label>
+</div>
+<div class="p-3 border-t border-border-light dark:border-border-dark bg-gray-50 dark:bg-slate-800 flex justify-end">
+<button class="text-xs bg-primary text-white px-3 py-1.5 rounded-md hover:bg-yellow-600 transition">Add Selected</button>
+</div>
+</details>
+</div>
+<div class="border border-border-light dark:border-border-dark rounded-lg overflow-hidden">
+<details class="group">
+<summary class="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 dark:bg-slate-800 text-sm text-gray-900 dark:text-white">
+<span>Custom Link</span>
+<span class="transition group-open:rotate-180">
+<span class="material-icons-round text-sm">expand_more</span>
+</span>
+</summary>
+<div class="p-3 bg-white dark:bg-slate-800/50 space-y-3">
+<div>
+<label class="block text-xs text-gray-500 mb-1">URL</label>
+<input class="w-full text-sm rounded-lg border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white focus:ring-primary focus:border-primary" placeholder="https://" type="text"/>
+</div>
+<div>
+<label class="block text-xs text-gray-500 mb-1">Link Text</label>
+<input class="w-full text-sm rounded-lg border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white focus:ring-primary focus:border-primary" placeholder="Menu Item Label" type="text"/>
+</div>
+<div class="flex items-center space-x-2">
+<input class="rounded text-primary border-gray-300 focus:ring-primary bg-white dark:bg-slate-700" id="newtab" type="checkbox"/>
+<label class="text-xs text-gray-600 dark:text-gray-400" for="newtab">Open in new tab</label>
+</div>
+<button class="w-full text-xs bg-gray-800 dark:bg-slate-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 dark:hover:bg-slate-500 transition mt-2">Add to Menu</button>
+</div>
+</details>
+</div>
+</div>
+</aside>
+</div>
+</main>
+
+</body></html>

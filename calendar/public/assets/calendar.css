@@ -1,0 +1,82 @@
+.calendar-header {
+    margin-bottom: 20px;
+}
+
+.calendar-filters {
+    margin-bottom: 20px;
+}
+
+.filter-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.filter-form label {
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    min-width: 140px;
+}
+
+.filter-form input,
+.filter-form select {
+    padding: 8px 10px;
+    border: 1px solid var(--gw-border);
+    border-radius: 6px;
+}
+
+.filter-form .search {
+    flex: 1;
+    min-width: 180px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+#calendar {
+    border: 1px solid var(--gw-border);
+    padding: 12px;
+    border-radius: 12px;
+}
+
+.upcoming-list {
+    border: 1px solid var(--gw-border);
+    padding: 12px;
+    border-radius: 12px;
+    background: #f9fafc;
+}
+
+.upcoming-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.upcoming-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gw-border);
+}
+
+.fc .fc-button-primary {
+    background: var(--gw-primary);
+    border-color: var(--gw-primary);
+}
+
+.fc .fc-button-primary:disabled {
+    background: #90a4b8;
+    border-color: #90a4b8;
+}
+
+.fc-daygrid-event.cancelled {
+    opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+    .calendar-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,26 @@
+-- Member of the Year nominations
+CREATE TABLE IF NOT EXISTS member_of_year_nominations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  submission_year INT NOT NULL,
+  submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  submitted_by_user_id INT NULL,
+  nominator_first_name VARCHAR(100) NOT NULL,
+  nominator_last_name VARCHAR(100) NOT NULL,
+  nominator_email VARCHAR(255) NOT NULL,
+  nominee_first_name VARCHAR(100) NOT NULL,
+  nominee_last_name VARCHAR(100) NOT NULL,
+  nominee_chapter VARCHAR(150) NOT NULL,
+  nomination_details TEXT NOT NULL,
+  status ENUM('new','reviewed','shortlisted','winner') NOT NULL DEFAULT 'new',
+  admin_notes TEXT NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent VARCHAR(255) NULL,
+  INDEX idx_member_of_year_year (submission_year),
+  INDEX idx_member_of_year_submitted_at (submitted_at),
+  INDEX idx_member_of_year_submitted_by (submitted_by_user_id),
+  INDEX idx_member_of_year_nominator_email (nominator_email),
+  INDEX idx_member_of_year_nominee_chapter (nominee_chapter),
+  INDEX idx_member_of_year_status (status),
+  UNIQUE KEY uniq_member_of_year_nomination (submission_year, nominator_email, nominee_first_name, nominee_last_name),
+  FOREIGN KEY (submitted_by_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

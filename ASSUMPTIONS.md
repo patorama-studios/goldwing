@@ -1,0 +1,10 @@
+- Default timezone is UTC unless changed in server php.ini or config.
+- Admin seed account uses email `admin@goldwing.local` with password `Admin123!`.
+- Outbound email uses PHP `mail()` and logs to `email_log`; SMS is logged to `sms_log` only.
+- Stripe price IDs are configured in `config/app.php` and can be replaced without code changes.
+- Membership application form is public at `/apply.php` and creates a pending member record.
+- Member profile editing, store purchases, and refund processing are stubbed UI placeholders for V1.
+- Renewal reminders default to generating 1-year renewal links unless a different term is manually created.
+- Chapter scope in events uses `all` or a chapter ID string; member filtering matches this value.
+- About section content is built from non-gambling public pages on the source site; chapter representative contact details are placeholders.
+- Constitution PDF link assumes a file at `/public_html/uploads/about/constitution.pdf` will be uploaded later.

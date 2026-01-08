@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Goldwing Association - Media Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ink: "rgb(var(--ink) / <alpha-value>)",
+                        sand: "rgb(var(--sand) / <alpha-value>)",
+                        paper: "rgb(var(--paper) / <alpha-value>)",
+                        line: "rgb(var(--line) / <alpha-value>)",
+                        primary: "rgb(var(--gold) / <alpha-value>)",
+                        "primary-strong": "rgb(var(--gold-deep) / <alpha-value>)",
+                        ocean: "rgb(var(--ocean) / <alpha-value>)",
+                        ember: "rgb(var(--ember) / <alpha-value>)",
+                    },
+                    fontFamily: {
+                        display: ["Playfair Display", "serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        xl: "1.25rem",
+                        "2xl": "1.5rem",
+                    },
+                    boxShadow: {
+                        soft: "0 10px 26px rgba(15, 28, 46, 0.08)",
+                        card: "0 18px 40px rgba(15, 28, 46, 0.12)",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        :root {
+            --ink: 17 24 39;
+            --sand: 247 247 244;
+            --paper: 255 255 255;
+            --line: 229 231 235;
+            --gold: 242 201 76;
+            --gold-deep: 207 160 50;
+            --ocean: 47 125 50;
+            --ember: 196 114 59;
+        }
+
+        .bg-atmosphere {
+            background:
+                radial-gradient(1200px 600px at 85% -15%, rgba(242, 201, 76, 0.2), transparent 60%),
+                radial-gradient(900px 500px at -10% 15%, rgba(47, 125, 50, 0.16), transparent 65%),
+                rgb(var(--sand));
+        }
+
+        @keyframes fade-up {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float-in {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .animate-fade-up {
+            animation: fade-up 0.7s ease-out both;
+        }
+
+        .animate-float-in {
+            animation: float-in 0.7s ease-out both;
+        }
+
+        .stagger-1 {
+            animation-delay: 0.08s;
+        }
+
+        .stagger-2 {
+            animation-delay: 0.16s;
+        }
+
+        .stagger-3 {
+            animation-delay: 0.24s;
+        }
+
+        .stagger-4 {
+            animation-delay: 0.32s;
+        }
+    </style>
+</head>
+<body class="bg-atmosphere font-sans text-ink antialiased h-screen flex overflow-hidden">
+<aside class="w-64 bg-paper border-r border-line flex-shrink-0 hidden md:flex flex-col z-20 shadow-soft">
+<div class="h-16 flex items-center px-6 border-b border-line">
+<span class="text-primary material-icons-outlined mr-2">two_wheeler</span>
+<span class="font-display font-bold text-lg text-ink">GWA Admin</span>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-sand/70 group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-slate-400 group-hover:text-primary">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-sand/70 group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-slate-400 group-hover:text-primary">article</span>
+                Posts
+            </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary/15 text-ink group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-primary">perm_media</span>
+                Media Library
+            </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-sand/70 group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-slate-400 group-hover:text-primary">people</span>
+                Members
+            </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-sand/70 group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-slate-400 group-hover:text-primary">event</span>
+                Events
+            </a>
+<a class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-sand/70 group transition-colors" href="#">
+<span class="material-icons-outlined mr-3 text-slate-400 group-hover:text-primary">settings</span>
+                Settings
+            </a>
+</nav>
+<div class="p-4 border-t border-line">
+<div class="flex items-center">
+<img alt="Admin User" class="h-8 w-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzlvuRfGVlt8vFoPsdgtpkM2yGXQfWtoA88T7mqjZ-h2WOjaIrQpDRmHs2aksTvl8Wt9C0QxnSXkAc5Slw4Qs-X33ABXXslDiq3z-_Xl9vMumNkrXk-4xbj67-YUBNp-toqqHIvSm7J4U2xJ0BxGSuun3MaPqg5N20wxtiWspefB74WZbfk6piLoWfr7bvC3lVxcw4MeUR2Q6GZlAhfXK9WvvINILo-80L_K6MDEkcVvxyOXBsrq40HNRTsohMBZFXeitZzbzQsEU"/>
+<div class="ml-3">
+<p class="text-sm font-medium text-ink">Admin User</p>
+<p class="text-xs text-slate-500">View Profile</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+<div class="pointer-events-none absolute inset-0">
+<div class="absolute -top-24 right-0 h-56 w-56 rounded-full bg-primary/20 blur-3xl"></div>
+<div class="absolute bottom-10 left-24 h-64 w-64 rounded-full bg-ocean/20 blur-3xl"></div>
+</div>
+<header class="h-16 bg-paper/80 backdrop-blur border-b border-line flex items-center justify-between px-6 relative z-10">
+<div>
+<p class="text-[10px] uppercase tracking-[0.35em] text-ocean/80">Library</p>
+<h1 class="font-display text-2xl text-ink">Media Library</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative hidden md:block">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+<span class="material-icons-outlined text-lg">search</span>
+</span>
+<input class="w-64 pl-10 pr-4 py-2 text-sm bg-white/80 border border-line rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary placeholder-slate-400 text-ink" placeholder="Search files, tags..." type="text"/>
+</div>
+<button class="bg-ink hover:bg-primary-strong text-paper px-4 py-2 rounded-lg text-sm font-medium flex items-center shadow-soft transition-colors">
+<span class="material-icons-outlined text-lg mr-2">cloud_upload</span>
+                    Upload
+                </button>
+<button class="hidden sm:inline-flex items-center px-3 py-2 rounded-lg border border-line text-sm text-slate-600 hover:border-primary hover:text-ink transition-colors">
+<span class="material-icons-outlined text-lg">tune</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-6 relative">
+<div class="flex flex-col gap-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-up">
+<nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+<a class="flex items-center gap-1 hover:text-ink transition-colors" href="#">
+<span class="material-icons-outlined text-lg">home</span>
+                                Home
+                            </a>
+<span class="material-icons-outlined text-lg text-slate-400">chevron_right</span>
+<a class="hover:text-ink font-medium transition-colors" href="#">Uploads</a>
+<span class="material-icons-outlined text-lg text-slate-400">chevron_right</span>
+<span class="text-slate-600">2023 Rally</span>
+</nav>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-3 py-2 text-sm bg-paper border border-line rounded-lg text-slate-600 hover:border-primary hover:text-ink transition-colors">
+<span class="material-icons-outlined text-lg text-primary">create_new_folder</span>
+                        New Folder
+                    </button>
+<div class="flex items-center rounded-lg border border-line bg-paper p-1 shadow-soft">
+<button class="p-1.5 rounded-md bg-primary/15 text-ink">
+<span class="material-icons-outlined text-lg">grid_view</span>
+</button>
+<button class="p-1.5 rounded-md text-slate-400 hover:text-ink">
+<span class="material-icons-outlined text-lg">view_list</span>
+</button>
+</div>
+</div>
+</div>
+<div class="grid lg:grid-cols-[280px_1fr] gap-6">
+<aside class="space-y-6">
+<div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in">
+<div class="flex items-center justify-between">
+<h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Storage</h2>
+<span class="text-xs font-medium text-ink">68% used</span>
+</div>
+<div class="mt-4 h-2 rounded-full bg-sand">
+<div class="h-2 rounded-full bg-gradient-to-r from-primary to-ember" style="width: 68%"></div>
+</div>
+<div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+<span>27.4 GB of 40 GB</span>
+<a class="text-ocean font-semibold hover:text-ink transition-colors" href="#">Manage</a>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-1">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Folders</h2>
+<button class="text-slate-400 hover:text-ink">
+<span class="material-icons-outlined text-lg">more_horiz</span>
+</button>
+</div>
+<div class="space-y-2">
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-sand/70 hover:bg-sand transition-colors">
+<span class="flex items-center gap-2 text-sm font-medium text-ink">
+<span class="material-icons-outlined text-primary">folder</span>
+                                    Event Photos
+                                </span>
+<span class="text-xs text-slate-500">12</span>
+</button>
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-sand/70 transition-colors">
+<span class="flex items-center gap-2 text-sm font-medium text-ink">
+<span class="material-icons-outlined text-primary">folder</span>
+                                    Documents
+                                </span>
+<span class="text-xs text-slate-500">45</span>
+</button>
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-sand/70 transition-colors">
+<span class="flex items-center gap-2 text-sm font-medium text-ink">
+<span class="material-icons-outlined text-primary">folder</span>
+                                    Videos
+                                </span>
+<span class="text-xs text-slate-500">8</span>
+</button>
+</div>
+<button class="mt-3 w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-ocean hover:text-ink transition-colors">
+<span class="material-icons-outlined text-lg">add</span>
+                        New Collection
+                    </button>
+</div>
+<div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-2">
+<h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 mb-3">Collections</h2>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Rallies</span>
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Leadership</span>
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Press</span>
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Sponsors</span>
+</div>
+<p class="mt-4 text-xs text-slate-500"><span class="font-semibold text-ink">14</span> shared albums</p>
+</div>
+</aside>
+<section class="space-y-6">
+<div class="grid md:grid-cols-3 gap-4 animate-fade-up">
+<div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+<div>
+<p class="text-xs uppercase tracking-[0.24em] text-slate-500">Items</p>
+<p class="mt-2 text-2xl font-semibold text-ink">42</p>
+<p class="text-xs text-slate-500">Across 6 folders</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+<span class="material-icons-outlined">perm_media</span>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+<div>
+<p class="text-xs uppercase tracking-[0.24em] text-slate-500">New</p>
+<p class="mt-2 text-2xl font-semibold text-ink">7</p>
+<p class="text-xs text-slate-500">Uploaded this week</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-ember/15 text-ember flex items-center justify-center">
+<span class="material-icons-outlined">bolt</span>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+<div>
+<p class="text-xs uppercase tracking-[0.24em] text-slate-500">Shared</p>
+<p class="mt-2 text-2xl font-semibold text-ink">12</p>
+<p class="text-xs text-slate-500">With board members</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-ocean/15 text-ocean flex items-center justify-center">
+<span class="material-icons-outlined">group</span>
+</div>
+</div>
+</div>
+<div class="relative overflow-hidden bg-gradient-to-br from-paper via-sand to-white border border-line rounded-2xl p-6 shadow-card animate-fade-up stagger-1">
+<div class="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/20 blur-2xl"></div>
+<div class="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-ocean/15 blur-2xl"></div>
+<div class="relative">
+<p class="text-xs uppercase tracking-[0.3em] text-slate-500">Quick Upload</p>
+<h2 class="mt-2 font-display text-xl text-ink">Drop media to add it to 2023 Rally</h2>
+<p class="mt-1 text-sm text-slate-500">SVG, PNG, JPG or MP4 up to 2 GB.</p>
+<div class="mt-4 flex flex-wrap items-center gap-3">
+<button class="bg-ink hover:bg-primary-strong text-paper px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+<span class="material-icons-outlined text-lg">cloud_upload</span>
+                                Upload Files
+                            </button>
+<button class="text-sm font-medium text-ocean hover:text-ink transition-colors">Browse from Drive</button>
+</div>
+</div>
+<div class="mt-6 border-2 border-dashed border-primary/40 rounded-xl p-4 text-center bg-white/70">
+<p class="text-sm text-slate-500">Or drag and drop here</p>
+</div>
+</div>
+<div class="bg-paper border border-line rounded-2xl p-5 shadow-soft animate-fade-up stagger-2">
+<div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+<div class="flex flex-wrap items-center gap-2">
+<button class="px-3 py-1.5 rounded-full bg-primary/15 text-ink text-xs font-semibold">All</button>
+<button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Photos</button>
+<button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Videos</button>
+<button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Docs</button>
+</div>
+<div class="flex items-center gap-2">
+<select class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
+<option>Sort by: Newest</option>
+<option>Sort by: Name</option>
+<option>Sort by: Size</option>
+</select>
+</div>
+</div>
+<div class="grid sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-sand">
+<img alt="Motorcycle Rally" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDk3me24NbXjt_Q768SH8h1tdu-aKlNgmU62UOzCuCBPOUjMJsSMNN5xNI6xq8dgJaJuo6I_5UW_oiolf8HlIUGNXteeqiwlJ4IjLg6M2Ml_2vFYUiiMNfnFOVFlEAKtgTC9bS6Hm6hBmlbMeThgDlhfZNeye7jqUnnX2qNE2utQ1HGrWmAbBKiD4Yhfq4wfvobAjom_dUznTq-FllI3tg2cFpNoUcRx2xFIp_YytHigFZBe83Ax3LROthC02wgvBV_N2K3iDMQQSQ"/>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">JPG</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate" title="Goldwing_Rally_2023_Start.jpg">GW_Rally_Start.jpg</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>2.4 MB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    2d ago
+                                </span>
+</div>
+</div>
+</div>
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-sand">
+<img alt="Meeting Hall" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyem1Ev_RWdLTi7d-4Iy5HqtWhjpE_VfLYCdTffyUo_J124CbuwA1MEo3CFtvz90u4hsGycqvJVc3DJzgKp-NseFc55S4OEfubwlLx4qPtB95A4AcYShqRfVxudNzPM71GkDQEcunO4Xra6xsi-EYMWXkQZwqwV2stWy5Oxh45Vflao9L2VTZ6vEQVYWHZRStuHyNe8uVw6nxiyLesHQrHyAZLA6xR-S328rfnDxKWULQnADjzrtwgUSywNEya7k3Ojp7lHcvzr7Q"/>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">PNG</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate">Annual_Meeting.png</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>1.8 MB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    4d ago
+                                </span>
+</div>
+</div>
+</div>
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-paper flex items-center justify-center">
+<span class="material-icons-outlined text-5xl text-ember">picture_as_pdf</span>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">PDF</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate">Meeting_Minutes.pdf</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>450 KB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    1w ago
+                                </span>
+</div>
+</div>
+</div>
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-sand">
+<img alt="Award Ceremony" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtozRO4ShSjyszongeM6ezyQGii3kQhkdSKOqAvnZMLyp-OyBB4He8sEoG46_hGodeh9uUWT-UI7dHUWj_tj9yB-prcWtpmDL-eRdC6mdupH3A4UfkobX5Dve-5VsMbcgJsCdoCsNJa-saETQUYFKpJ-1Nufiy8xMF5f0jvxMUd2dxXxUgNZtb41WURnSjRJBfLlAMnCMJNqd8SX2y5khZN0740gyA-aOeq3kOoWtqDGpepI7E31kLZssMyY-fqyXzxV6oZ18fe2M"/>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">JPG</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate">Awards_2023.jpg</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>3.1 MB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    2w ago
+                                </span>
+</div>
+</div>
+</div>
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-ink flex items-center justify-center">
+<img alt="Video Thumb" class="absolute inset-0 w-full h-full object-cover opacity-60" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA01D1mvY1gKWqWvXXABV2ol-qoRcV2D64Oi4Vz242hiInH8IrhpWvjAcwSf2jeefvZMLVue4qvBSuTkSTGVoeuDrENGlpHs0k_XiDNPajYouhD1yXOVECGdMlhQHmDyhv7Bwm6PEh2B13_kdJJOV3SJmxoyU111IXSWoz1RbxRnr0qx1PdG-o8GU91LsRh-vYjBcPQ05GiRbqaqj1idciQG-GJFfW8ptxLTXRmDw-fchDOlPj8RiuJ3AFNvecWn40qOjgUDtF-jis"/>
+<span class="material-icons-outlined text-4xl text-paper relative z-10">play_circle</span>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">MP4</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate">Parade_Footage.mp4</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>125 MB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    3w ago
+                                </span>
+</div>
+</div>
+</div>
+<div class="group bg-white border border-line rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+<div class="relative h-36 bg-sand">
+<img alt="Group Shot" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfkn4HJyRlT1ajcRjeCqfuf6VQT3fPUVs7rXsodHWZKmj1wI1svOokl1OuVYSq6Ugpm67W0_HMxLndf7A_b_exMJ3SkpvSkPkfTuBYUAOvFXdNXvpiYOHcwp76dju0ctKZGUAG3AgzdyRT8q7qM1v7Yj7CXHrQ9FUFLODmPxsv9sRryrxG2zR3OUDANPaxwqd3nqWCHo-GTrtrR1OaOLbk4HwUOSxivJX8uPBPt5ABDYPNsKRP6-KrFeUQ8NokdvDxpBbqGyMSx3o"/>
+<div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">JPG</div>
+<div class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-primary shadow-soft" title="Preview">
+<span class="material-icons-outlined text-sm">visibility</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ocean shadow-soft" title="Edit">
+<span class="material-icons-outlined text-sm">edit</span>
+</button>
+<button class="p-1.5 bg-paper/90 rounded-full text-ink hover:text-ember shadow-soft" title="Delete">
+<span class="material-icons-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<div class="p-3">
+<p class="text-sm font-medium text-ink truncate">Chapter_Group_Photo.jpg</p>
+<div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+<span>4.2 MB</span>
+<span class="flex items-center gap-1">
+<span class="material-icons-outlined text-sm">schedule</span>
+                                    1mo ago
+                                </span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between border-t border-line mt-6 pt-4">
+<p class="text-sm text-slate-500">
+                        Showing <span class="font-medium text-ink">1</span> to <span class="font-medium text-ink">6</span> of <span class="font-medium text-ink">42</span> results
+                    </p>
+<nav aria-label="Pagination" class="inline-flex rounded-md shadow-soft -space-x-px bg-paper">
+<a class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-line bg-paper text-sm font-medium text-slate-500 hover:bg-sand" href="#">
+<span class="sr-only">Previous</span>
+<span class="material-icons-outlined text-sm">chevron_left</span>
+</a>
+<a aria-current="page" class="z-10 bg-primary/15 border-primary text-ink relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">1</a>
+<a class="bg-paper border-line text-slate-500 hover:bg-sand relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">2</a>
+<a class="bg-paper border-line text-slate-500 hover:bg-sand relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">3</a>
+<a class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-line bg-paper text-sm font-medium text-slate-500 hover:bg-sand" href="#">
+<span class="sr-only">Next</span>
+<span class="material-icons-outlined text-sm">chevron_right</span>
+</a>
+</nav>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>
