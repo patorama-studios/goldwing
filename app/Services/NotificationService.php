@@ -504,7 +504,7 @@ class NotificationService
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return '';
         }
-        if (!str_ends_with(strtolower($email), '@goldwing.org.au')) {
+        if (!preg_match('/@([a-z0-9-]+\\.)*goldwing\\.org\\.au$/i', $email)) {
             return '';
         }
         return $email;
