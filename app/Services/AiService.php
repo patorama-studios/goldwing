@@ -39,7 +39,7 @@ class AiService
             return $fallback;
         }
 
-        $systemPrompt = 'You are an assistant for the Goldwing Association admin. '
+        $systemPrompt = 'You are an assistant for the Australian Goldwing Association admin. '
             . 'Return ONLY valid JSON with keys: target_type (page|notice|event), target_id or slug, '
             . 'proposed_html or proposed_text, change_summary. '
             . 'Never suggest role/permission changes. Never output PHP or server code. Only content edits.';

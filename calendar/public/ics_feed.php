@@ -97,7 +97,7 @@ $lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
-    'PRODID:-//Goldwing Association//Calendar Feed//EN',
+    'PRODID:-//Australian Goldwing Association//Calendar Feed//EN',
 ];
 
 foreach ($items as $item) {

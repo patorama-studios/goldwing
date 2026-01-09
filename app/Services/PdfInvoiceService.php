@@ -27,7 +27,7 @@ class PdfInvoiceService
         $pdf->SetAutoPageBreak(true, 20);
 
         $pdf->SetFont('Arial', 'B', 16);
-        $pdf->Cell(0, 10, SettingsService::getGlobal('site.name', 'Goldwing Association'), 0, 1);
+        $pdf->Cell(0, 10, SettingsService::getGlobal('site.name', 'Australian Goldwing Association'), 0, 1);
         $pdf->SetFont('Arial', '', 11);
         $pdf->Cell(0, 6, 'Tax Invoice', 0, 1);
         $pdf->Ln(2);

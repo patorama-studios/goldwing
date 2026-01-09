@@ -35,7 +35,7 @@ $stmt->execute($params);
 $products = $stmt->fetchAll();
 
 $pageTitle = $settings['store_name'] ?? 'Store';
-$heroLead = 'Members-only store for official Goldwing Association gear, apparel, and accessories.';
+$heroLead = 'Members-only store for official Australian Goldwing Association gear, apparel, and accessories.';
 ?>
 <div class="store-shell">
   <form class="store-filters" method="get">

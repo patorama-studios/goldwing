@@ -1,7 +1,7 @@
 <?php
 return [
     'app_key' => getenv('APP_KEY') ?: '',
-    'app_name' => 'Goldwing Association',
+    'app_name' => 'Australian Goldwing Association',
     'base_url' => rtrim((string) (getenv('APP_BASE_URL') ?: ''), '/'),
     'env' => 'production',
     'session' => [
@@ -12,7 +12,7 @@ return [
     ],
     'email' => [
         'from' => 'no-reply@example.com',
-        'from_name' => 'Goldwing Association',
+        'from_name' => 'Australian Goldwing Association',
     ],
     'stripe' => [
         'secret_key' => '',

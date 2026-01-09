@@ -4,7 +4,7 @@ require_once __DIR__ . '/utils.php';
 function calendar_send_email(string $to, string $subject, string $htmlBody, string $textBody = ''): bool
 {
     $fromEmail = calendar_config('mail.from_email', 'noreply@example.com');
-    $fromName = calendar_config('mail.from_name', 'Goldwing Association');
+    $fromName = calendar_config('mail.from_name', 'Australian Goldwing Association');
     $headers = [];
     $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
     $headers[] = 'MIME-Version: 1.0';

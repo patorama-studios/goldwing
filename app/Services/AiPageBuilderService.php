@@ -10,7 +10,7 @@ class AiPageBuilderService
         $pageSlug = $page['slug'] ?? 'page';
         $pagePath = 'pages/' . $pageSlug . '.html';
         $systemPrompt = implode("\n", [
-            'You are an expert web page editor for the Goldwing Association admin.',
+            'You are an expert web page editor for the Australian Goldwing Association admin.',
             'Return a unified diff patch ONLY along with a short summary line.',
             'Format your response exactly as:',
             'Summary: <short summary>',

@@ -1,4 +1,4 @@
-# Goldwing Association Member Guide
+# Australian Goldwing Association Member Guide
 
 ## Logging in
 - Visit `/login.php` and sign in with your member credentials.

@@ -293,7 +293,7 @@ INSERT INTO store_settings (
   created_at
 ) VALUES (
   1,
-  'Goldwing Association Store',
+  'Australian Goldwing Association Store',
   'store',
   1,
   '',
@@ -307,7 +307,7 @@ INSERT INTO store_settings (
   0,
   'Pickup from Canberra -- we will email instructions.',
   NULL,
-  'Thanks for supporting the Goldwing Association.',
+  'Thanks for supporting the Australian Goldwing Association.',
   NULL,
   NOW()
 ) ON DUPLICATE KEY UPDATE

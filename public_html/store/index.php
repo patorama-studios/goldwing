@@ -48,7 +48,7 @@ $viewContent = ob_get_clean();
 
 $pageTitle = $pageTitle ?? ($settings['store_name'] ?? 'Store');
 $heroTitle = $heroTitle ?? ($settings['store_name'] ?? 'Store');
-$heroLead = $heroLead ?? 'Members-only store for official Goldwing Association gear.';
+$heroLead = $heroLead ?? 'Members-only store for official Australian Goldwing Association gear.';
 
 require __DIR__ . '/../../app/Views/partials/header.php';
 require __DIR__ . '/../../app/Views/partials/nav_public.php';
@@ -56,7 +56,7 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
 <main class="site-main">
   <section class="hero hero--compact store-hero">
     <div class="container hero__inner">
-      <span class="hero__eyebrow">Goldwing Association</span>
+      <span class="hero__eyebrow">Australian Goldwing Association</span>
       <h1><?= e($heroTitle) ?></h1>
       <p class="hero__lead"><?= e($heroLead) ?></p>
     </div>

@@ -17,7 +17,7 @@ return [
     ],
     'mail' => [
         'from_email' => 'noreply@example.com',
-        'from_name' => 'Goldwing Association',
+        'from_name' => 'Australian Goldwing Association',
     ],
     'stripe' => [
         'secret_key' => '',

@@ -18,7 +18,7 @@ if ($user) {
         $cartSubtotal += (float) $item['unit_price'] * (int) $item['quantity'];
     }
 }
-$siteName = SettingsService::getGlobal('site.name', 'Goldwing Association');
+$siteName = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $tagline = SettingsService::getGlobal('site.tagline', 'Touring riders and community');
 $defaultLogo = '/uploads/library/2024/good-logo-cropped-white-notag.png';
 $logoUrl = trim((string) SettingsService::getGlobal('site.logo_url', ''));

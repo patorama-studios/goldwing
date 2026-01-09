@@ -7,7 +7,7 @@ $pageSlug = $_GET['page'] ?? 'home';
 $pageSlug = preg_replace('/[^a-z0-9-]/', '', strtolower($pageSlug));
 $page = PageService::getBySlug($pageSlug);
 
-$pageTitle = $page ? $page['title'] : 'Goldwing Association';
+$pageTitle = $page ? $page['title'] : 'Australian Goldwing Association';
 
 $canView = false;
 if ($page) {
@@ -20,7 +20,7 @@ if ($page) {
     }
 }
 
-$heroTitle = 'Welcome to the Goldwing Association';
+$heroTitle = 'Welcome to the Australian Goldwing Association';
 $heroLead = 'Rides, events, and member services for Goldwing riders across Australia.';
 if ($page && $canView) {
     $heroTitle = $page['title'];
@@ -70,7 +70,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           <h2>Members Only</h2>
           <p>Please <a href="/login.php">log in</a> to view this content.</p>
         <?php else: ?>
-          <h2>Welcome to the Goldwing Association</h2>
+          <h2>Welcome to the Australian Goldwing Association</h2>
           <p>We are building the home for rides, events, and member services. Please check back soon.</p>
         <?php endif; ?>
       </div>

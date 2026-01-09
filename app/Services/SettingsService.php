@@ -212,7 +212,7 @@ class SettingsService
 
         $appConfig = require __DIR__ . '/../../config/app.php';
         $siteDefaults = [
-            'site.name' => $appConfig['app_name'] ?? 'Goldwing Association',
+            'site.name' => $appConfig['app_name'] ?? 'Australian Goldwing Association',
             'notifications.from_email' => $appConfig['email']['from'] ?? '',
             'notifications.from_name' => $appConfig['email']['from_name'] ?? '',
         ];
@@ -342,7 +342,7 @@ class SettingsService
     {
         return [
             'site' => [
-                'name' => 'Goldwing Association',
+                'name' => 'Australian Goldwing Association',
                 'tagline' => 'Touring riders and community',
                 'logo_url' => '',
                 'favicon_url' => '',
@@ -364,7 +364,7 @@ class SettingsService
                 'base_url' => Env::get('APP_BASE_URL', ''),
             ],
             'store' => [
-                'name' => 'Goldwing Association Store',
+                'name' => 'Australian Goldwing Association Store',
                 'slug' => 'store',
                 'members_only' => true,
                 'shipping_region' => 'AU',
@@ -380,7 +380,7 @@ class SettingsService
                 'pickup_instructions' => 'Pickup from Canberra -- we will email instructions.',
                 'notification_emails' => '',
                 'email_logo_url' => '',
-                'email_footer_text' => 'Thanks for supporting the Goldwing Association.',
+                'email_footer_text' => 'Thanks for supporting the Australian Goldwing Association.',
                 'support_email' => '',
                 'order_paid_status' => 'paid',
             ],
@@ -405,7 +405,7 @@ class SettingsService
             ],
             'notifications' => [
                 'enabled' => true,
-                'from_name' => 'Goldwing Association',
+                'from_name' => 'Australian Goldwing Association',
                 'from_email' => 'no-reply@goldwing.org.au',
                 'reply_to' => 'webmaster@goldwing.org.au',
                 'admin_emails' => '',

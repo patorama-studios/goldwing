@@ -16,7 +16,7 @@ if (function_exists('can_access_path')) {
 ?>
 <nav class="navbar">
   <div class="container nav-links">
-    <div class="brand">Goldwing Association</div>
+    <div class="brand">Australian Goldwing Association</div>
     <?php foreach ($items as $item): ?>
       <a href="<?= e($item['href']) ?>"><?= e($item['label']) ?></a>
     <?php endforeach; ?>

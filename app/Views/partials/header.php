@@ -1,7 +1,7 @@
 <?php
 use App\Services\SettingsService;
 
-$appName = SettingsService::getGlobal('site.name', 'Goldwing Association');
+$appName = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $title = $pageTitle ?? $appName;
 $faviconUrl = SettingsService::getGlobal('site.favicon_url', '');
 $googleMapsApiKey = trim((string) getenv('GOOGLE_MAPS_API_KEY'));

@@ -1,7 +1,7 @@
 <?php
 use App\Services\SettingsService;
 
-$siteName = SettingsService::getGlobal('site.name', 'Goldwing Association');
+$siteName = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $showFooter = SettingsService::getGlobal('site.show_footer', true);
 $legal = SettingsService::getGlobal('site.legal_urls', []);
 $privacyUrl = is_array($legal) ? ($legal['privacy'] ?? '') : '';

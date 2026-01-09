@@ -43,7 +43,7 @@ $secret = TwoFactorService::getSecret((int) $userId);
 if ($secret === '') {
     $error = '2FA encryption is not configured. Contact support.';
 }
-$issuer = SettingsService::getGlobal('site.name', 'Goldwing Association');
+$issuer = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $otpAuthUrl = TotpService::getOtpAuthUrl($issuer, $userRow['email'], $secret);
 $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . rawurlencode($otpAuthUrl);
 

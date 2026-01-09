@@ -41,7 +41,7 @@ function ics_escape(string $text): string
 $lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Goldwing Association//Calendar//EN',
+    'PRODID:-//Australian Goldwing Association//Calendar//EN',
     'BEGIN:VEVENT',
     'UID:' . $uid,
     'DTSTAMP:' . gmdate('Ymd\THis\Z'),

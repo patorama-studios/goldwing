@@ -1,4 +1,4 @@
-# Goldwing Association Admin Guide
+# Australian Goldwing Association Admin Guide
 
 ## Access
 - Login at `/login.php` with your admin account.

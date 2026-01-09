@@ -109,7 +109,7 @@ function calendar_build_query(array $params): string
 function calendar_generate_ticket_pdf(string $filePath, array $ticket): bool
 {
     $lines = [
-        'Goldwing Association Ticket',
+        'Australian Goldwing Association Ticket',
         'Event: ' . ($ticket['event_title'] ?? ''),
         'Name: ' . ($ticket['user_name'] ?? ''),
         'Email: ' . ($ticket['user_email'] ?? ''),
@@ -121,7 +121,7 @@ function calendar_generate_ticket_pdf(string $filePath, array $ticket): bool
 
     $y = 740;
     $content = "BT\n/F1 16 Tf\n70 780 Td\n";
-    $content .= "(Goldwing Association Ticket) Tj\nET\n";
+    $content .= "(Australian Goldwing Association Ticket) Tj\nET\n";
     $content .= "BT\n/F1 12 Tf\n";
     foreach ($lines as $index => $line) {
         $line = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $line);

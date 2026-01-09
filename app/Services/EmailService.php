@@ -74,7 +74,7 @@ class EmailService
 
     public static function wrapHtml(string $subject, string $bodyHtml): string
     {
-        $siteName = (string) SettingsService::getGlobal('site.name', 'Goldwing Association');
+        $siteName = (string) SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
         $logoUrl = trim((string) SettingsService::getGlobal('site.logo_url', ''));
         if ($logoUrl === '') {
             $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
@@ -125,7 +125,7 @@ class EmailService
     {
         $fromName = trim((string) ($metadata['from_name'] ?? ''));
         if ($fromName === '') {
-            $fromName = (string) SettingsService::getGlobal('notifications.from_name', 'Goldwing Association');
+            $fromName = (string) SettingsService::getGlobal('notifications.from_name', 'Australian Goldwing Association');
         }
         $fromEmail = self::normalizeSenderEmail((string) ($metadata['from_email'] ?? ''));
         if ($fromEmail === '') {

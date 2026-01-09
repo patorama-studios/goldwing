@@ -68,7 +68,7 @@ function store_generate_order_number(): string
 function store_settings_defaults(): array
 {
     return [
-        'store_name' => 'Goldwing Association Store',
+        'store_name' => 'Australian Goldwing Association Store',
         'store_slug' => 'store',
         'members_only' => 1,
         'shipping_region' => 'AU',
@@ -84,7 +84,7 @@ function store_settings_defaults(): array
         'pickup_enabled' => 0,
         'pickup_instructions' => 'Pickup from Canberra -- we will email instructions.',
         'email_logo_url' => '',
-        'email_footer_text' => 'Thanks for supporting the Goldwing Association.',
+        'email_footer_text' => 'Thanks for supporting the Australian Goldwing Association.',
         'support_email' => '',
     ];
 }

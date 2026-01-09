@@ -16,7 +16,7 @@ if (!$product) {
 
 $pageTitle = $product['title'];
 $heroTitle = $product['title'];
-$heroLead = $product['description'] ? substr(strip_tags($product['description']), 0, 160) : 'Goldwing Association official merchandise.';
+$heroLead = $product['description'] ? substr(strip_tags($product['description']), 0, 160) : 'Australian Goldwing Association official merchandise.';
 
 $stmt = $pdo->prepare('SELECT * FROM store_product_images WHERE product_id = :id ORDER BY sort_order ASC, id ASC');
 $stmt->execute(['id' => $product['id']]);
