@@ -128,6 +128,27 @@ function tableExists(\PDO $pdo, string $table): bool
     return (bool) $stmt->fetchColumn();
 }
 
+function isMembershipApplicationApproved(\PDO $pdo, int $memberId): ?bool
+{
+    if ($memberId <= 0) {
+        return null;
+    }
+    if (!tableExists($pdo, 'membership_applications')) {
+        return null;
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT status FROM membership_applications WHERE member_id = :member_id ORDER BY created_at DESC LIMIT 1');
+        $stmt->execute(['member_id' => $memberId]);
+        $status = $stmt->fetchColumn();
+    } catch (\Throwable $e) {
+        return null;
+    }
+    if ($status === false) {
+        return null;
+    }
+    return strtoupper((string) $status) === 'APPROVED';
+}
+
 function memberBikeColumns(\PDO $pdo): array
 {
     static $columns = null;
@@ -306,7 +327,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'bike_add', 'bike_delete'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_delete'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -668,6 +689,11 @@ switch ($action) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'User account or email missing'];
                     continue;
                 }
+                $approved = isMembershipApplicationApproved($pdo, $memberId);
+                if ($approved === false) {
+                    $skipped[] = ['member_id' => $memberId, 'reason' => 'Application not approved'];
+                    continue;
+                }
                 if ($adminResetCount >= 3) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'Rate limit reached for admin'];
                     continue;
@@ -719,7 +745,7 @@ switch ($action) {
         if (!AdminMemberAccess::canEditFullProfile($user)) {
             redirectWithFlash($memberId, $tab, 'Chapter change requests are restricted.', 'error');
         }
-        $requestedChapter = (int) ($_POST['requested_chapter_id'] ?? 0);
+        $requestedChapter = (int) ($_POST['requested_chapter_id'] ?? ($_POST['chapter_id'] ?? 0));
         if ($requestedChapter <= 0) {
             redirectWithFlash($memberId, $tab, 'Select a chapter to request.', 'error');
         }
@@ -727,6 +753,42 @@ switch ($action) {
         $stmt = $pdo->prepare('INSERT INTO chapter_change_requests (member_id, requested_chapter_id, status, requested_at) VALUES (:member_id, :chapter_id, "PENDING", NOW())');
         $stmt->execute(['member_id' => $memberId, 'chapter_id' => $requestedChapter]);
         redirectWithFlash($memberId, $tab, 'Chapter change request submitted.');
+        break;
+
+    case 'assign_chapter':
+        if (!AdminMemberAccess::canEditFullProfile($user)) {
+            redirectWithFlash($memberId, $tab, 'Chapter assignments are restricted.', 'error');
+        }
+        $requestedChapter = (int) ($_POST['requested_chapter_id'] ?? 0);
+        if ($requestedChapter <= 0) {
+            redirectWithFlash($memberId, $tab, 'Select a chapter to apply.', 'error');
+        }
+        $targetMemberId = $memberId;
+        if (($member['member_type'] ?? '') === 'ASSOCIATE' && !empty($member['full_member_id'])) {
+            $targetMemberId = (int) $member['full_member_id'];
+        }
+        $currentChapter = (int) ($member['chapter_id'] ?? 0);
+        if ($targetMemberId !== $memberId) {
+            $targetMember = MemberRepository::findById($targetMemberId);
+            $currentChapter = (int) ($targetMember['chapter_id'] ?? 0);
+        }
+        if ($currentChapter === $requestedChapter && $targetMemberId === $memberId) {
+            redirectWithFlash($memberId, $tab, 'Member is already assigned to this chapter.', 'error');
+        }
+        if (!MemberRepository::update($targetMemberId, ['chapter_id' => $requestedChapter])) {
+            redirectWithFlash($memberId, $tab, 'Could not update chapter.', 'error');
+        }
+        if (in_array(($member['member_type'] ?? ''), ['FULL', 'LIFE'], true) || $targetMemberId !== $memberId) {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('UPDATE members SET chapter_id = :chapter_id WHERE full_member_id = :full_member_id');
+            $stmt->execute(['chapter_id' => $requestedChapter, 'full_member_id' => $targetMemberId]);
+        }
+        ActivityLogger::log('admin', $user['id'] ?? null, $targetMemberId, 'member.chapter_updated', [
+            'from' => $currentChapter,
+            'to' => $requestedChapter,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Chapter updated.');
         break;
 
     case 'chapter_request_decision':
@@ -793,6 +855,7 @@ switch ($action) {
         $year = (int) ($_POST['bike_year'] ?? 0);
         $rego = trim($_POST['bike_rego'] ?? '');
         $imageUrl = trim($_POST['bike_image_url'] ?? '');
+        $color = trim($_POST['bike_color'] ?? '');
         if ($make === '' || $model === '') {
             redirectWithFlash($memberId, $tab, 'Make and model are required.', 'error');
         }
@@ -814,6 +877,17 @@ switch ($action) {
             $columns[] = 'image_url';
             $placeholders[] = ':image_url';
             $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
+        }
+        if ($color !== '') {
+            if (memberBikeHasColumn($pdo, 'color')) {
+                $columns[] = 'color';
+                $placeholders[] = ':color';
+                $params['color'] = $color;
+            } elseif (memberBikeHasColumn($pdo, 'colour')) {
+                $columns[] = 'colour';
+                $placeholders[] = ':colour';
+                $params['colour'] = $color;
+            }
         }
         $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
         $stmt->execute($params);
@@ -1313,6 +1387,10 @@ switch ($action) {
         if (!$userId || empty($member['email'])) {
             redirectWithFlash($memberId, $tab, 'Member is not linked to a user account.', 'error', $flashContext);
         }
+        $approved = isMembershipApplicationApproved($pdo, $memberId);
+        if ($approved === false) {
+            redirectWithFlash($memberId, $tab, 'Password reset links are available after application approval.', 'error', $flashContext);
+        }
         $window = (new DateTimeImmutable('now'))->modify('-60 minutes')->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND actor_type = 'admin' AND actor_id = :actor_id AND created_at >= :window");
         $stmt->execute(['actor_id' => $user['id'] ?? null, 'window' => $window]);
@@ -1359,17 +1437,44 @@ switch ($action) {
         if ($policyErrors) {
             redirectWithFlash($memberId, $tab, $policyErrors[0], 'error', $flashContext);
         }
-        $userId = $member['user_id'] ?? null;
-        if (!$userId) {
-            redirectWithFlash($memberId, $tab, 'User account missing; cannot set password.', 'error', $flashContext);
-        }
         $hash = password_hash($newPassword, PASSWORD_DEFAULT);
         $pdo = Database::connection();
+        $targetUserId = null;
+        $userId = $member['user_id'] ?? null;
+        if ($userId) {
+            $stmt = $pdo->prepare('SELECT id, member_id, email FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $userId]);
+            $userRow = $stmt->fetch();
+            if ($userRow) {
+                $emailMatches = !empty($member['email']) && strcasecmp((string) $userRow['email'], (string) $member['email']) === 0;
+                $memberMatches = !empty($userRow['member_id']) && (int) $userRow['member_id'] === $memberId;
+                if ($emailMatches || $memberMatches) {
+                    $targetUserId = (int) $userRow['id'];
+                }
+            }
+        }
+        if (!$targetUserId) {
+            $stmt = $pdo->prepare('SELECT id FROM users WHERE member_id = :member_id LIMIT 1');
+            $stmt->execute(['member_id' => $memberId]);
+            $targetUserId = (int) $stmt->fetchColumn();
+        }
+        if (!$targetUserId && !empty($member['email'])) {
+            $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+            $stmt->execute(['email' => $member['email']]);
+            $targetUserId = (int) $stmt->fetchColumn();
+        }
+        if ($targetUserId <= 0) {
+            redirectWithFlash($memberId, $tab, 'User account missing; cannot set password.', 'error', $flashContext);
+        }
+        if ((int) ($member['user_id'] ?? 0) !== $targetUserId) {
+            $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+            $stmt->execute(['user_id' => $targetUserId, 'member_id' => $memberId]);
+        }
         $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['hash' => $hash, 'id' => $userId]);
+        $stmt->execute(['hash' => $hash, 'id' => $targetUserId]);
         $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash');
         $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_set_by_admin', ['user_id' => $userId]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_set_by_admin', ['user_id' => $targetUserId]);
         redirectWithFlash($memberId, $tab, 'Password updated.', 'success', $flashContext);
         break;
 

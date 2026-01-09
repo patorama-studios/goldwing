@@ -50,13 +50,32 @@ $filters = [
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
 ];
 
+$sortOptions = [
+    'created' => 'Created date',
+    'member' => 'Member name',
+    'member_id' => 'Member ID',
+    'chapter' => 'Chapter',
+    'status' => 'Status',
+];
+$sortBy = strtolower(trim((string) ($_GET['sort_by'] ?? 'created')));
+if (!array_key_exists($sortBy, $sortOptions)) {
+    $sortBy = 'created';
+}
+$sortDirInput = strtolower(trim((string) ($_GET['sort_dir'] ?? '')));
+$sortDir = $sortDirInput !== '' ? $sortDirInput : ($sortBy === 'created' ? 'desc' : 'asc');
+if (!in_array($sortDir, ['asc', 'desc'], true)) {
+    $sortDir = 'desc';
+}
+$filters['sort_by'] = $sortBy;
+$filters['sort_dir'] = $sortDir;
+
 if ($chapterRestriction !== null) {
     $filters['chapter_id'] = $chapterRestriction;
 } elseif (isset($_GET['chapter_id']) && $_GET['chapter_id'] !== '') {
     $filters['chapter_id'] = (int) $_GET['chapter_id'];
 }
 
-$statusFilter = $filters['status'];
+$statusFilter = strtolower(trim((string) $filters['status']));
 if ($statusFilter === 'archived') {
     $filters['status'] = 'cancelled';
 }
@@ -64,7 +83,7 @@ if ($statusFilter === 'cancelled') {
     $statusFilter = 'archived';
 }
 if ($filters['status'] === '') {
-    $filters['exclude_statuses'] = ['cancelled', 'pending'];
+    $filters['exclude_statuses'] = ['cancelled'];
 }
 
 $result = MemberRepository::search($filters, $limit, $offset);
@@ -108,9 +127,19 @@ function buildQuery(array $overrides = []): string
     return http_build_query($params);
 }
 
+function normalizeMemberStatus(string $status): string
+{
+    $clean = strtolower(trim($status));
+    return match ($clean) {
+        'inactive', 'cancelled', 'archived' => 'cancelled',
+        'lapsed', 'expired' => 'expired',
+        default => $clean,
+    };
+}
+
 function statusBadgeClasses(string $status): string
 {
-    return match ($status) {
+    return match (normalizeMemberStatus($status)) {
         'active' => 'bg-green-100 text-green-800',
         'pending' => 'bg-yellow-100 text-yellow-800',
         'expired' => 'bg-red-100 text-red-800',
@@ -122,6 +151,7 @@ function statusBadgeClasses(string $status): string
 
 function statusLabel(string $status): string
 {
+    $status = normalizeMemberStatus($status);
     if ($status === 'cancelled') {
         return 'Archived';
     }
@@ -196,7 +226,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <span class="material-icons-outlined text-base">check_circle</span>
           </div>
         </div>
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-amber-200 transition-colors <?= $stats['pending'] ? 'border-amber-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => 1])) ?>">
           <div>
             <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Pending</p>
             <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['pending']) ?></p>
@@ -204,7 +234,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="h-10 w-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
             <span class="material-icons-outlined text-base">hourglass_top</span>
           </div>
-        </div>
+        </a>
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Expired</p>
@@ -282,7 +312,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php if ($chapterRestriction !== null): ?>
             <input type="hidden" name="chapter_id" value="<?= e($chapterRestriction) ?>">
           <?php endif; ?>
-          <div class="grid gap-4 lg:grid-cols-4">
+          <div class="grid gap-4 lg:grid-cols-6">
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Search
               <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, phone, or ID">
@@ -312,6 +342,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php foreach (['pending', 'active', 'expired', 'suspended', 'archived'] as $statusOption): ?>
                   <option value="<?= e($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>><?= $statusOption === 'archived' ? 'Archived' : ucfirst($statusOption) ?></option>
                 <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              Sort by
+              <select name="sort_by" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <?php foreach ($sortOptions as $value => $label): ?>
+                  <option value="<?= e($value) ?>" <?= $sortBy === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              Order
+              <select name="sort_dir" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <option value="asc" <?= $sortDir === 'asc' ? 'selected' : '' ?>>Ascending</option>
+                <option value="desc" <?= $sortDir === 'desc' ? 'selected' : '' ?>>Descending</option>
               </select>
             </label>
           </div>
@@ -416,6 +461,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="checkbox" data-select-all>
                 </th>
                 <th class="py-3 px-4">Member</th>
+                <th class="py-3 px-4">Member ID</th>
                 <th class="py-3 px-4">Contact info</th>
                 <th class="py-3 px-4">Chapter</th>
                 <th class="py-3 px-4">Status</th>
@@ -448,6 +494,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $chapterLabel = $member['chapter_name'] ?? 'Unassigned';
                   $statusLabelText = statusLabel($member['status']);
                   $twoFaRequired = $override === 'REQUIRED';
+                  $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
                 ?>
                 <tr class="block md:table-row" data-member-row data-member-id="<?= e((int) $member['id']) ?>">
                   <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
@@ -466,9 +513,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <a class="text-sm font-semibold text-gray-900 hover:text-primary" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
                           <?= e($fullName !== '' ? $fullName : 'Member') ?>
                         </a>
-                        <p class="text-xs text-gray-500">ID: <?= e($member['member_number_display'] ?? '—') ?></p>
                       </div>
                     </div>
+                  </td>
+                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member ID</span>
+                    <div class="mt-1 text-sm text-gray-700 md:mt-0"><?= e($member['member_number_display'] ?? '—') ?></div>
                   </td>
                   <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
                     <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Contact</span>
@@ -520,7 +570,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <div class="hidden space-y-2" data-inline-editor>
                           <select class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/30" data-inline-input>
                             <?php foreach ($statusOptions as $statusOption): ?>
-                              <option value="<?= e($statusOption) ?>" <?= $statusOption === $member['status'] ? 'selected' : '' ?>>
+                              <option value="<?= e($statusOption) ?>" <?= $statusOption === $statusKey ? 'selected' : '' ?>>
                                 <?= e($statusOption === 'cancelled' ? 'Archived' : ucfirst($statusOption)) ?>
                               </option>
                             <?php endforeach; ?>
@@ -569,7 +619,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <?php endforeach; ?>
               <?php if (empty($members)): ?>
                 <tr class="block md:table-row">
-                  <td colspan="8" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
+                  <td colspan="9" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
                 </tr>
               <?php endif; ?>
             </tbody>

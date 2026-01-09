@@ -1197,12 +1197,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </div>
                     <div>
                       <h2 class="font-display text-lg font-bold text-gray-900">Chapter Change</h2>
-                      <p class="text-sm text-gray-500">Request a move to another chapter.</p>
+                      <p class="text-sm text-gray-500">Assign the member to a chapter.</p>
                     </div>
                   </div>
-                  <form method="post" class="space-y-3">
+                  <form method="post" action="/admin/members/actions.php" class="space-y-3">
                     <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                    <input type="hidden" name="action" value="request_chapter">
+                    <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                    <input type="hidden" name="tab" value="profile">
+                    <input type="hidden" name="action" value="assign_chapter">
                       <select name="requested_chapter_id" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Select chapter</option>
                         <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
@@ -1215,7 +1217,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <option value="<?= e((string) $chapter['id']) ?>"><?= e($chapterLabel) ?></option>
                         <?php endforeach; ?>
                       </select>
-                      <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors" type="submit">Submit request</button>
+                      <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors" type="submit">Apply chapter</button>
                     </form>
                     <?php if ($chapterRequests): ?>
                       <div class="mt-4 space-y-3 text-sm text-gray-600">
@@ -1287,9 +1289,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <div class="flex-1">
                               <p class="font-semibold text-gray-900"><?= e($bike['make'] . ' ' . $bike['model']) ?></p>
                               <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?></p>
-                              <?php if (!empty($bike['rego'])): ?>
-                                <span class="mt-2 inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-semibold text-yellow-700">Rego: <?= e($bike['rego']) ?></span>
-                              <?php endif; ?>
+                              <?php
+                                $bikeColor = $bike['color'] ?? ($bike['colour'] ?? '');
+                              ?>
+                              <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <?php if (!empty($bike['rego'])): ?>
+                                  <span class="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 font-semibold text-yellow-700">Rego: <?= e($bike['rego']) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($bikeColor)): ?>
+                                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Colour: <?= e($bikeColor) ?></span>
+                                <?php endif; ?>
+                              </div>
                             </div>
                             <?php if ($canManageVehicles): ?>
                               <form method="post" action="/admin/members/actions.php">
@@ -1317,6 +1327,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <input type="text" name="bike_make" placeholder="Make" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                       <input type="text" name="bike_model" placeholder="Model" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                       <input type="number" name="bike_year" placeholder="Year" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_color" placeholder="Colour" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                       <input type="text" name="bike_rego" placeholder="Rego" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                       <div class="flex items-center gap-3">
                         <div id="bike-image-preview" class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">

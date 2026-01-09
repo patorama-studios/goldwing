@@ -107,7 +107,8 @@ class MemberRepository
             $base .= ' WHERE ' . $whereClause;
         }
 
-        $base .= ' ORDER BY m.created_at DESC, m.last_name ASC LIMIT :limit OFFSET :offset';
+        $orderBy = self::buildOrderClause($filters, $pdo);
+        $base .= ' ORDER BY ' . $orderBy . ' LIMIT :limit OFFSET :offset';
 
         $stmt = $pdo->prepare($base);
         self::bindParams($stmt, $params);
@@ -158,11 +159,11 @@ class MemberRepository
         ];
 
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $status = $row['status'];
+            $status = self::normalizeStatusKey((string) ($row['status'] ?? ''));
             $count = (int) $row['c'];
             $result['total'] += $count;
             if (isset($result[$status])) {
-                $result[$status] = $count;
+                $result[$status] += $count;
             }
         }
 
@@ -379,6 +380,29 @@ class MemberRepository
         return $map[$value] ?? null;
     }
 
+    private static function normalizeStatusKey(string $status): string
+    {
+        $clean = strtolower(trim($status));
+        return match ($clean) {
+            'inactive', 'cancelled', 'archived' => 'cancelled',
+            'lapsed', 'expired' => 'expired',
+            default => $clean,
+        };
+    }
+
+    private static function expandStatusFilter(string $status): array
+    {
+        $clean = strtolower(trim($status));
+        return match ($clean) {
+            'pending' => ['pending'],
+            'active' => ['active'],
+            'expired' => ['expired', 'lapsed'],
+            'cancelled', 'archived' => ['cancelled', 'inactive', 'archived'],
+            'suspended' => ['suspended'],
+            default => [$clean],
+        };
+    }
+
     private static function buildWhereClause(array $filters, array &$params): string
     {
         $parts = [];
@@ -413,8 +437,14 @@ class MemberRepository
             $params['membership_type_id'] = (int) $filters['membership_type_id'];
         }
         if (!empty($filters['status'])) {
-            $parts[] = 'm.status = :status';
-            $params['status'] = $filters['status'];
+            $statusValues = self::expandStatusFilter((string) $filters['status']);
+            $placeholders = [];
+            foreach ($statusValues as $index => $statusValue) {
+                $key = 'status_' . $index;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $statusValue;
+            }
+            $parts[] = 'LOWER(m.status) IN (' . implode(', ', $placeholders) . ')';
         } else {
             $excludeList = [];
             if (!empty($filters['exclude_status'])) {
@@ -432,12 +462,19 @@ class MemberRepository
             $excludeList = array_values(array_filter(array_map('trim', $excludeList), static fn($value) => $value !== ''));
             if ($excludeList !== []) {
                 $placeholders = [];
-                foreach ($excludeList as $index => $statusValue) {
+                $expanded = [];
+                foreach ($excludeList as $statusValue) {
+                    $expanded = array_merge($expanded, self::expandStatusFilter($statusValue));
+                }
+                $expanded = array_values(array_unique(array_filter($expanded, static fn($value) => $value !== '')));
+                foreach ($expanded as $index => $statusValue) {
                     $key = 'exclude_status_' . $index;
                     $placeholders[] = ':' . $key;
-                    $params[$key] = $statusValue;
+                    $params[$key] = strtolower($statusValue);
                 }
-                $parts[] = 'm.status NOT IN (' . implode(', ', $placeholders) . ')';
+                if ($placeholders !== []) {
+                    $parts[] = 'LOWER(m.status) NOT IN (' . implode(', ', $placeholders) . ')';
+                }
             }
         }
         if (!empty($filters['role'])) {
@@ -511,6 +548,35 @@ class MemberRepository
         foreach ($params as $key => $value) {
             $stmt->bindValue(':' . $key, $value);
         }
+    }
+
+    private static function buildOrderClause(array $filters, PDO $pdo): string
+    {
+        $sortBy = strtolower(trim((string) ($filters['sort_by'] ?? 'created')));
+        $direction = strtolower(trim((string) ($filters['sort_dir'] ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+
+        $memberNumberBase = self::hasMemberColumn($pdo, 'member_number_base') ? 'm.member_number_base' : null;
+        $memberNumberOrder = $memberNumberBase
+            ?: (self::hasMemberNumberColumn($pdo) ? 'm.member_number' : 'm.id');
+        $memberNumberSuffix = self::hasMemberColumn($pdo, 'member_number_suffix') ? 'm.member_number_suffix' : null;
+
+        $map = [
+            'member' => ['m.last_name', 'm.first_name'],
+            'chapter' => ['c.name', 'm.last_name', 'm.first_name'],
+            'status' => ['LOWER(m.status)', 'm.last_name', 'm.first_name'],
+            'created' => ['m.created_at'],
+            'member_id' => array_values(array_filter([$memberNumberOrder, $memberNumberSuffix])),
+            'id' => ['m.id'],
+        ];
+
+        $columns = $map[$sortBy] ?? $map['created'];
+        $parts = [];
+        foreach ($columns as $column) {
+            $parts[] = $column . ' ' . $direction;
+        }
+
+        $parts[] = 'm.id DESC';
+        return implode(', ', $parts);
     }
 
     private static function countMembers(string $whereClause, array $params): int

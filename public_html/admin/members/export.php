@@ -33,6 +33,12 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
 ];
+if (isset($_GET['sort_by'])) {
+    $filters['sort_by'] = $_GET['sort_by'];
+}
+if (isset($_GET['sort_dir'])) {
+    $filters['sort_dir'] = $_GET['sort_dir'];
+}
 
 if ($chapterRestriction !== null) {
     $filters['chapter_id'] = $chapterRestriction;
@@ -44,7 +50,7 @@ if ($filters['status'] === 'archived') {
     $filters['status'] = 'cancelled';
 }
 if ($filters['status'] === '') {
-    $filters['exclude_statuses'] = ['cancelled', 'pending'];
+    $filters['exclude_statuses'] = ['cancelled'];
 }
 
 $result = MemberRepository::search($filters, 5000, 0);
