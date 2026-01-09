@@ -700,6 +700,9 @@ if ($resource === 'webhooks' && count($segments) >= 2 && $segments[1] === 'strip
         if (($event['type'] ?? '') === 'charge.refunded') {
             PaymentWebhookService::handleChargeRefunded($event);
         }
+        if (in_array($event['type'] ?? '', ['payment_intent.payment_failed', 'payment_intent.canceled'], true)) {
+            PaymentWebhookService::handlePaymentFailed($event);
+        }
         PaymentWebhookService::markProcessed($eventId, 'processed', null);
         PaymentSettingsService::updateWebhookStatus((int) $channel['id'], null);
     } catch (Throwable $e) {

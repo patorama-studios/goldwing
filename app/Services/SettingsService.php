@@ -394,6 +394,7 @@ class SettingsService
                 'stripe.generate_pdf' => false,
                 'stripe.invoice_prefix' => 'INV',
                 'stripe.invoice_email_template' => '',
+                'bank_transfer_instructions' => '',
                 'membership_prices' => [
                     'FULL_1Y' => '',
                     'FULL_3Y' => '',
@@ -467,6 +468,7 @@ class SettingsService
                 'member_number_suffix_padding' => 0,
                 'manual_migration_enabled' => true,
                 'manual_migration_expiry_days' => 14,
+                'order_prefix' => 'M',
             ],
             'advanced' => [
                 'maintenance_mode' => false,

@@ -815,6 +815,10 @@ textarea:focus {
   font-family: 'Noto Sans', 'Open Sans', sans-serif;
 }
 
+.form-card h1 {
+  color: var(--ink);
+}
+
 .form-card--wizard {
   max-width: 100%;
   margin: 0;

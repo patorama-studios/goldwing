@@ -33,12 +33,20 @@ if (!in_array($limit, $allowedLimits, true)) {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $offset = ($page - 1) * $limit;
 
+$memberIdFilter = isset($_GET['member_id']) && $_GET['member_id'] !== '' ? (int) $_GET['member_id'] : null;
+if ($memberIdFilter !== null && $memberIdFilter <= 0) {
+    $memberIdFilter = null;
+}
 $filters = [
     'q' => trim((string) ($_GET['q'] ?? '')),
+    'member_id' => $memberIdFilter,
     'membership_type_id' => isset($_GET['membership_type_id']) && $_GET['membership_type_id'] !== '' ? (int) $_GET['membership_type_id'] : null,
     'status' => $_GET['status'] ?? '',
     'role' => trim((string) ($_GET['role'] ?? '')),
     'directory_prefs' => $_GET['directory_pref'] ?? [],
+    'created_range' => trim((string) ($_GET['created_range'] ?? '')),
+    'created_from' => trim((string) ($_GET['created_from'] ?? '')),
+    'created_to' => trim((string) ($_GET['created_to'] ?? '')),
     'vehicle_type' => $_GET['vehicle_type'] ?? '',
     'vehicle_make' => trim((string) ($_GET['vehicle_make'] ?? '')),
     'vehicle_model' => trim((string) ($_GET['vehicle_model'] ?? '')),
@@ -52,8 +60,9 @@ $filters = [
 
 $sortOptions = [
     'created' => 'Created date',
+    'id' => 'Record ID',
     'member' => 'Member name',
-    'member_id' => 'Member ID',
+    'member_id' => 'Member #',
     'chapter' => 'Chapter',
     'status' => 'Status',
 ];
@@ -89,8 +98,7 @@ if ($filters['status'] === '') {
 $result = MemberRepository::search($filters, $limit, $offset);
 $members = $result['data'];
 $totalMembers = $result['total'];
-$statsChapter = $filters['chapter_id'] ?? null;
-$stats = MemberRepository::stats($statsChapter ?? null);
+$stats = MemberRepository::stats($filters);
 
 $pdo = Database::connection();
 $allChapters = ChapterRepository::listForSelection($pdo, false);
@@ -179,6 +187,8 @@ $hasAdvancedFilters = $filters['vehicle_type'] !== ''
     || $filters['vehicle_year_exact'] !== ''
     || $filters['vehicle_year_from'] !== ''
     || $filters['vehicle_year_to'] !== ''
+    || $filters['created_from'] !== ''
+    || $filters['created_to'] !== ''
     || !empty($filters['directory_prefs'])
     || filter_var($filters['has_trike'], FILTER_VALIDATE_BOOLEAN)
     || filter_var($filters['has_trailer'], FILTER_VALIDATE_BOOLEAN)
@@ -312,10 +322,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php if ($chapterRestriction !== null): ?>
             <input type="hidden" name="chapter_id" value="<?= e($chapterRestriction) ?>">
           <?php endif; ?>
-          <div class="grid gap-4 lg:grid-cols-6">
+          <div class="grid gap-4 lg:grid-cols-8">
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Search
               <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, phone, or ID">
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              Member ID
+              <input type="number" min="1" name="member_id" value="<?= e((string) ($filters['member_id'] ?? '')) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Record ID">
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Chapter
@@ -342,6 +356,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php foreach (['pending', 'active', 'expired', 'suspended', 'archived'] as $statusOption): ?>
                   <option value="<?= e($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>><?= $statusOption === 'archived' ? 'Archived' : ucfirst($statusOption) ?></option>
                 <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              Created
+              <select name="created_range" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <?php $createdRange = $filters['created_range'] ?? ''; ?>
+                <option value="" <?= $createdRange === '' ? 'selected' : '' ?>>Any time</option>
+                <option value="7d" <?= $createdRange === '7d' ? 'selected' : '' ?>>Last 7 days</option>
+                <option value="30d" <?= $createdRange === '30d' ? 'selected' : '' ?>>Last 30 days</option>
+                <option value="90d" <?= $createdRange === '90d' ? 'selected' : '' ?>>Last 90 days</option>
+                <option value="1y" <?= $createdRange === '1y' ? 'selected' : '' ?>>Last 12 months</option>
+                <option value="this_year" <?= $createdRange === 'this_year' ? 'selected' : '' ?>>This year</option>
               </select>
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
@@ -407,6 +433,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               </label>
             </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Created from
+                <input type="date" name="created_from" value="<?= e($filters['created_from']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Created to
+                <input type="date" name="created_to" value="<?= e($filters['created_to']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              </label>
+            </div>
             <div class="mt-4 flex flex-wrap gap-4">
               <?php foreach (['trike', 'trailer', 'sidecar'] as $type): ?>
                 <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -424,9 +460,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <?php endforeach; ?>
             </div>
           </details>
-          <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2">
             <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Apply filters</button>
             <a href="/admin/members" class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">Reset</a>
+            <a href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => 1])) ?>" class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+              Pending only
+            </a>
           </div>
         </form>
       </section>
@@ -461,7 +500,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="checkbox" data-select-all>
                 </th>
                 <th class="py-3 px-4">Member</th>
-                <th class="py-3 px-4">Member ID</th>
+                <th class="py-3 px-4">ID</th>
+                <th class="py-3 px-4">Member #</th>
                 <th class="py-3 px-4">Contact info</th>
                 <th class="py-3 px-4">Chapter</th>
                 <th class="py-3 px-4">Status</th>
@@ -496,7 +536,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $twoFaRequired = $override === 'REQUIRED';
                   $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
                 ?>
-                <tr class="block md:table-row" data-member-row data-member-id="<?= e((int) $member['id']) ?>">
+                <tr class="block md:table-row <?= $statusKey === 'pending' ? 'bg-amber-50/60' : '' ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>">
                   <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
                     <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Select</span>
                     <div class="mt-1 md:mt-0">
@@ -513,11 +553,20 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <a class="text-sm font-semibold text-gray-900 hover:text-primary" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
                           <?= e($fullName !== '' ? $fullName : 'Member') ?>
                         </a>
+                        <?php if ($statusKey === 'pending'): ?>
+                          <div class="mt-1">
+                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">Pending</span>
+                          </div>
+                        <?php endif; ?>
                       </div>
                     </div>
                   </td>
                   <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member ID</span>
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">ID</span>
+                    <div class="mt-1 text-sm text-gray-700 md:mt-0"><?= e((string) ($member['id'] ?? '—')) ?></div>
+                  </td>
+                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
+                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member #</span>
                     <div class="mt-1 text-sm text-gray-700 md:mt-0"><?= e($member['member_number_display'] ?? '—') ?></div>
                   </td>
                   <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
@@ -619,7 +668,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <?php endforeach; ?>
               <?php if (empty($members)): ?>
                 <tr class="block md:table-row">
-                  <td colspan="9" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
+                  <td colspan="10" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
                 </tr>
               <?php endif; ?>
             </tbody>

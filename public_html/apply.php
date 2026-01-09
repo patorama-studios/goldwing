@@ -197,24 +197,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $associateVehicles = [];
                 }
 
+                $bikeColumns = [];
+                $bikeHasRego = true;
+                $bikeHasColour = false;
+                try {
+                    $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+                    $bikeHasRego = in_array('rego', $bikeColumns, true);
+                    $bikeHasColour = in_array('colour', $bikeColumns, true) || in_array('color', $bikeColumns, true);
+                } catch (Throwable $e) {
+                    $bikeColumns = [];
+                    $bikeHasRego = true;
+                    $bikeHasColour = false;
+                }
+
                 foreach ($fullVehicles as $vehicle) {
                     $make = trim((string) ($vehicle['make'] ?? ''));
                     $model = trim((string) ($vehicle['model'] ?? ''));
                     $yearValue = trim((string) ($vehicle['year'] ?? ''));
                     $year = $yearValue !== '' && is_numeric($yearValue) ? (int) $yearValue : null;
                     $rego = trim((string) ($vehicle['rego'] ?? ''));
+                    $colour = trim((string) ($vehicle['colour'] ?? ($vehicle['color'] ?? '')));
                     if (strlen($rego) > 20) {
                         $rego = substr($rego, 0, 20);
                     }
                     if ($make !== '' && $model !== '') {
-                        $stmt = $pdo->prepare('INSERT INTO member_bikes (member_id, make, model, year, rego, created_at) VALUES (:member_id, :make, :model, :year, :rego, NOW())');
-                        $stmt->execute([
+                        $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
+                        $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
+                        $params = [
                             'member_id' => $memberId,
                             'make' => $make,
                             'model' => $model,
                             'year' => $year,
-                            'rego' => $rego !== '' ? $rego : null,
-                        ]);
+                        ];
+                        if ($bikeHasRego) {
+                            $columns[] = 'rego';
+                            $placeholders[] = ':rego';
+                            $params['rego'] = $rego !== '' ? $rego : null;
+                        }
+                        if ($bikeHasColour && $colour !== '') {
+                            if (in_array('colour', $bikeColumns, true)) {
+                                $columns[] = 'colour';
+                                $placeholders[] = ':colour';
+                                $params['colour'] = $colour;
+                            } elseif (in_array('color', $bikeColumns, true)) {
+                                $columns[] = 'color';
+                                $placeholders[] = ':color';
+                                $params['color'] = $colour;
+                            }
+                        }
+                        $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+                        $stmt->execute($params);
                     }
                 }
 

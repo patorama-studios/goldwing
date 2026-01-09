@@ -40,14 +40,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['token_hash' => $tokenHash]);
             $reset = $stmt->fetch();
             if ($reset) {
-                $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash WHERE id = :id');
+                $userId = (int) $reset['user_id'];
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
                 $stmt->execute([
-                    'hash' => password_hash($password, PASSWORD_DEFAULT),
-                    'id' => $reset['user_id'],
+                    'hash' => $hash,
+                    'id' => $userId,
                 ]);
-                $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE id = :id');
-                $stmt->execute(['id' => $reset['id']]);
-                ActivityLogger::log('system', null, null, 'security.password_reset_completed', ['user_id' => $reset['user_id']]);
+                $stmt = $pdo->prepare('SELECT member_id FROM users WHERE id = :id');
+                $stmt->execute(['id' => $userId]);
+                $memberId = (int) $stmt->fetchColumn();
+                if ($memberId > 0) {
+                    try {
+                        $hasMemberAuth = (bool) $pdo->query("SHOW TABLES LIKE 'member_auth'")->fetchColumn();
+                    } catch (Throwable $e) {
+                        $hasMemberAuth = false;
+                    }
+                    if ($hasMemberAuth) {
+                        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
+                        $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
+                    }
+                }
+                $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
+                $stmt->execute(['user_id' => $userId]);
+                try {
+                    $hasSessions = (bool) $pdo->query("SHOW TABLES LIKE 'sessions'")->fetchColumn();
+                    if ($hasSessions) {
+                        $stmt = $pdo->prepare('DELETE FROM sessions WHERE user_id = :user_id');
+                        $stmt->execute(['user_id' => $userId]);
+                    }
+                } catch (Throwable $e) {
+                    // Ignore if sessions table is unavailable.
+                }
+                try {
+                    $hasStepup = (bool) $pdo->query("SHOW TABLES LIKE 'stepup_tokens'")->fetchColumn();
+                    if ($hasStepup) {
+                        $stmt = $pdo->prepare('DELETE FROM stepup_tokens WHERE user_id = :user_id');
+                        $stmt->execute(['user_id' => $userId]);
+                    }
+                } catch (Throwable $e) {
+                    // Ignore if step-up tokens table is unavailable.
+                }
+                ActivityLogger::log('system', null, null, 'security.password_reset_completed', ['user_id' => $userId]);
                 header('Location: /login.php?reset=1');
                 exit;
             } else {

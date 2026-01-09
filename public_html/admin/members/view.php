@@ -133,15 +133,53 @@ try {
     $membershipPeriod = null;
 }
 
-$membershipPayments = [];
+$membershipOrders = [];
+$membershipOrderItems = [];
+$membershipPeriodById = [];
 try {
-    $stmt = $pdo->prepare('SELECT p.*, u.email AS admin_email FROM payments p LEFT JOIN users u ON u.id = p.created_by_user_id WHERE p.member_id = :member_id AND p.type = "membership" ORDER BY p.created_at DESC LIMIT 12');
+    $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC LIMIT 25');
     $stmt->execute(['member_id' => $memberId]);
-    $membershipPayments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $latestPayment = $membershipPayments[0] ?? null;
+    $membershipOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $latestPayment = $membershipOrders[0] ?? null;
+    $orderIds = array_column($membershipOrders, 'id');
+    if ($orderIds) {
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+        $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id IN (' . $placeholders . ') ORDER BY order_id ASC, id ASC');
+        $itemsStmt->execute($orderIds);
+        foreach ($itemsStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $membershipOrderItems[$item['order_id']][] = $item;
+        }
+    }
+    $periodIds = array_values(array_filter(array_unique(array_map(static fn($order) => (int) ($order['membership_period_id'] ?? 0), $membershipOrders))));
+    if ($periodIds) {
+        $periodPlaceholders = implode(',', array_fill(0, count($periodIds), '?'));
+        $periodStmt = $pdo->prepare('SELECT * FROM membership_periods WHERE id IN (' . $periodPlaceholders . ')');
+        $periodStmt->execute($periodIds);
+        foreach ($periodStmt->fetchAll(PDO::FETCH_ASSOC) as $period) {
+            $membershipPeriodById[(int) $period['id']] = $period;
+        }
+    }
 } catch (Throwable $e) {
-    $membershipPayments = [];
+    $membershipOrders = [];
+    $membershipOrderItems = [];
+    $membershipPeriodById = [];
     $latestPayment = null;
+}
+$selectedOrderId = (int) ($_GET['order_id'] ?? 0);
+$selectedMembershipOrder = null;
+$selectedMembershipOrderItems = [];
+$selectedMembershipPeriod = null;
+if ($selectedOrderId > 0 && $membershipOrders) {
+    foreach ($membershipOrders as $order) {
+        if ((int) ($order['id'] ?? 0) === $selectedOrderId) {
+            $selectedMembershipOrder = $order;
+            break;
+        }
+    }
+    if ($selectedMembershipOrder) {
+        $selectedMembershipOrderItems = $membershipOrderItems[$selectedOrderId] ?? [];
+        $selectedMembershipPeriod = $membershipPeriodById[(int) ($selectedMembershipOrder['membership_period_id'] ?? 0)] ?? null;
+    }
 }
 
 $userId = (int) ($member['user_id'] ?? 0);
@@ -153,17 +191,6 @@ $masterNotificationsEnabled = !empty($notificationPrefs['master_enabled']);
 $unsubscribeAll = !empty($notificationPrefs['unsubscribe_all_non_essential']);
 
 $membershipPeriodByPayment = [];
-if ($membershipPayments) {
-    $paymentKeys = array_filter(array_unique(array_map(fn($payment) => (string) ($payment['stripe_payment_id'] ?? ''), $membershipPayments)));
-    if ($paymentKeys) {
-        $placeholders = implode(',', array_fill(0, count($paymentKeys), '?'));
-        $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = ? AND payment_id IN (' . $placeholders . ')');
-        $stmt->execute(array_merge([(int) $memberId], $paymentKeys));
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $period) {
-            $membershipPeriodByPayment[$period['payment_id']] = $period;
-        }
-    }
-}
 
 $profileMessage = '';
 $profileError = '';
@@ -276,18 +303,12 @@ $memberStatusForSelect = match ($membershipStatusKey) {
     'inactive' => 'suspended',
     default => $membershipStatusKey,
 };
-$lastPaymentDateLabel = $latestPayment ? formatDateTime($latestPayment['created_at'] ?? null) : '—';
+$lastPaymentDateLabel = $latestPayment ? formatDateTime($latestPayment['paid_at'] ?? $latestPayment['created_at'] ?? null) : '—';
 $renewalDateLabel = (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : formatDate($membershipPeriod['end_date'] ?? null);
-$paymentMethodLabel = $latestPayment['payment_method'] ?? '';
-if ($paymentMethodLabel === '' && !empty($latestPayment['stripe_payment_id'])) {
-    $paymentMethodLabel = 'Stripe';
-}
-$paymentMethodLabel = $paymentMethodLabel !== '' ? $paymentMethodLabel : '—';
-$orderSourceLabel = $latestPayment['order_source'] ?? '';
-if ($orderSourceLabel === '' && !empty($latestPayment['stripe_payment_id'])) {
-    $orderSourceLabel = 'Stripe';
-}
-$orderSourceLabel = $orderSourceLabel !== '' ? $orderSourceLabel : '—';
+$paymentMethodLabel = $latestPayment ? ($latestPayment['payment_method'] ?? '') : '';
+$paymentMethodLabel = $paymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $paymentMethodLabel)) : '—';
+$paymentStatusLabel = $latestPayment ? ($latestPayment['payment_status'] ?? '') : '';
+$paymentStatusLabel = $paymentStatusLabel !== '' ? ucfirst(strtolower((string) $paymentStatusLabel)) : '—';
 
 $addressLines = array_filter([
     trim((string) ($member['address_line1'] ?? '')),
@@ -372,9 +393,9 @@ function statusBadgeClasses(string $status): string
 {
     $status = strtolower(trim($status));
     return match ($status) {
-        'active', 'paid', 'fulfilled' => 'bg-green-100 text-green-800',
+        'active', 'paid', 'fulfilled', 'accepted' => 'bg-green-100 text-green-800',
         'pending', 'processing' => 'bg-yellow-100 text-yellow-800',
-        'expired', 'lapsed', 'refunded' => 'bg-red-100 text-red-800',
+        'expired', 'lapsed', 'refunded', 'failed', 'rejected' => 'bg-red-100 text-red-800',
         'cancelled', 'inactive' => 'bg-gray-100 text-gray-800',
         'suspended' => 'bg-indigo-50 text-indigo-800',
         default => 'bg-slate-100 text-slate-800',
@@ -1219,7 +1240,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           </option>
                         <?php endforeach; ?>
                       </select>
-                      <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors" type="submit">Apply chapter</button>
+                      <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors" type="submit">Apply</button>
                     </form>
                     <?php if ($chapterRequests): ?>
                       <div class="mt-4 space-y-3 text-sm text-gray-600">
@@ -1263,85 +1284,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       </div>
                     <?php endif; ?>
                   </div>
-                  <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div class="flex items-center justify-between mb-4">
-                      <div class="flex items-center gap-3">
-                        <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600">
-                          <span class="material-icons-outlined">two_wheeler</span>
-                        </div>
-                        <div>
-                          <h2 class="font-display text-lg font-bold text-gray-900">My Bikes</h2>
-                          <p class="text-sm text-gray-500">Keep your garage up to date.</p>
-                        </div>
-                      </div>
-                      <span class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700"><?= count($bikes) ?> Bikes</span>
-                    </div>
-                  <?php if ($bikes): ?>
-                    <ul class="space-y-3 text-sm text-gray-700">
-                      <?php foreach ($bikes as $bike): ?>
-                        <li class="rounded-xl border border-gray-100 bg-white p-3">
-                          <div class="flex gap-3">
-                            <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
-                                <?php if (!empty($bike['image_url'])): ?>
-                                  <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>" class="h-full w-full object-cover">
-                                <?php else: ?>
-                                  <span class="material-icons-outlined text-gray-300">two_wheeler</span>
-                                <?php endif; ?>
-                              </div>
-                            <div class="flex-1">
-                              <p class="font-semibold text-gray-900"><?= e($bike['make'] . ' ' . $bike['model']) ?></p>
-                              <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?></p>
-                              <?php
-                                $bikeColor = $bike['color'] ?? ($bike['colour'] ?? '');
-                              ?>
-                              <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                                <?php if (!empty($bike['rego'])): ?>
-                                  <span class="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 font-semibold text-yellow-700">Rego: <?= e($bike['rego']) ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($bikeColor)): ?>
-                                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Colour: <?= e($bikeColor) ?></span>
-                                <?php endif; ?>
-                              </div>
-                            </div>
-                            <?php if ($canManageVehicles): ?>
-                              <form method="post" action="/admin/members/actions.php">
-                                <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                                <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                                <input type="hidden" name="tab" value="profile">
-                                <input type="hidden" name="action" value="bike_delete">
-                                <input type="hidden" name="bike_id" value="<?= e((string) $bike['id']) ?>">
-                                <button class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50" type="submit" onclick="return confirm('Remove this bike?');">Remove</button>
-                              </form>
-                            <?php endif; ?>
-                          </div>
-                        </li>
-                      <?php endforeach; ?>
-                    </ul>
-                  <?php else: ?>
-                    <p class="text-sm text-gray-500">No bikes saved yet.</p>
-                  <?php endif; ?>
-                  <?php if ($canManageVehicles): ?>
-                    <form method="post" action="/admin/members/actions.php" class="mt-4 space-y-2">
-                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                      <input type="hidden" name="tab" value="profile">
-                      <input type="hidden" name="action" value="bike_add">
-                      <input type="text" name="bike_make" placeholder="Make" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                      <input type="text" name="bike_model" placeholder="Model" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                      <input type="number" name="bike_year" placeholder="Year" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                      <input type="text" name="bike_color" placeholder="Colour" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                      <input type="text" name="bike_rego" placeholder="Rego" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                      <div class="flex items-center gap-3">
-                        <div id="bike-image-preview" class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
-                          <span class="material-icons-outlined">image</span>
-                        </div>
-                        <input type="hidden" name="bike_image_url" id="bike-image-url-input">
-                        <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input" data-upload-preview="bike-image-preview" data-upload-context="bikes">Upload bike image</button>
-                      </div>
-                      <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Add Bike</button>
-                    </form>
-                  <?php endif; ?>
-                </div>
               </div>
             </div>
             </div>
@@ -1571,6 +1513,85 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <span class="text-sm text-gray-500"><?= count($vehicles) ?> stored</span>
                   </div>
                 </div>
+                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                      <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600">
+                        <span class="material-icons-outlined">two_wheeler</span>
+                      </div>
+                      <div>
+                        <h2 class="font-display text-lg font-bold text-gray-900">My Bikes</h2>
+                        <p class="text-sm text-gray-500">Keep your garage up to date.</p>
+                      </div>
+                    </div>
+                    <span class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700"><?= count($bikes) ?> Bikes</span>
+                  </div>
+                  <?php if ($bikes): ?>
+                    <ul class="space-y-3 text-sm text-gray-700">
+                      <?php foreach ($bikes as $bike): ?>
+                        <li class="rounded-xl border border-gray-100 bg-white p-3">
+                          <div class="flex gap-3">
+                            <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
+                                <?php if (!empty($bike['image_url'])): ?>
+                                  <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>" class="h-full w-full object-cover">
+                                <?php else: ?>
+                                  <span class="material-icons-outlined text-gray-300">two_wheeler</span>
+                                <?php endif; ?>
+                              </div>
+                            <div class="flex-1">
+                              <p class="font-semibold text-gray-900"><?= e($bike['make'] . ' ' . $bike['model']) ?></p>
+                              <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?></p>
+                              <?php
+                                $bikeColor = $bike['color'] ?? ($bike['colour'] ?? '');
+                              ?>
+                              <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <?php if (!empty($bike['rego'])): ?>
+                                  <span class="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 font-semibold text-yellow-700">Rego: <?= e($bike['rego']) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($bikeColor)): ?>
+                                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Colour: <?= e($bikeColor) ?></span>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                            <?php if ($canManageVehicles): ?>
+                              <form method="post" action="/admin/members/actions.php">
+                                <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                <input type="hidden" name="tab" value="vehicles">
+                                <input type="hidden" name="action" value="bike_delete">
+                                <input type="hidden" name="bike_id" value="<?= e((string) $bike['id']) ?>">
+                                <button class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50" type="submit" onclick="return confirm('Remove this bike?');">Remove</button>
+                              </form>
+                            <?php endif; ?>
+                          </div>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php else: ?>
+                    <p class="text-sm text-gray-500">No bikes saved yet.</p>
+                  <?php endif; ?>
+                  <?php if ($canManageVehicles): ?>
+                    <form method="post" action="/admin/members/actions.php" class="mt-4 space-y-2">
+                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                      <input type="hidden" name="tab" value="vehicles">
+                      <input type="hidden" name="action" value="bike_add">
+                      <input type="text" name="bike_make" placeholder="Make" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_model" placeholder="Model" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="number" name="bike_year" placeholder="Year" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_color" placeholder="Colour" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_rego" placeholder="Rego" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <div class="flex items-center gap-3">
+                        <div id="bike-image-preview" class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
+                          <span class="material-icons-outlined">image</span>
+                        </div>
+                        <input type="hidden" name="bike_image_url" id="bike-image-url-input">
+                        <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input" data-upload-preview="bike-image-preview" data-upload-context="bikes">Upload bike image</button>
+                      </div>
+                      <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Add Bike</button>
+                    </form>
+                  <?php endif; ?>
+                </div>
                 <div class="space-y-4">
                   <?php foreach ($vehicles as $index => $vehicle): ?>
                     <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
@@ -1759,75 +1780,193 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <div class="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
                     <div class="flex items-center justify-between">
                       <h3 class="text-sm font-semibold text-gray-900">Membership orders</h3>
-                      <span class="text-xs font-semibold text-gray-500"><?= count($membershipPayments) ?> shown</span>
+                      <span class="text-xs font-semibold text-gray-500"><?= count($membershipOrders) ?> shown</span>
                     </div>
-                    <?php if ($membershipPayments): ?>
+                    <?php if ($selectedMembershipOrder): ?>
+                      <?php
+                        $selectedPaymentMethod = $selectedMembershipOrder['payment_method'] ?? '';
+                        $selectedPaymentMethod = $selectedPaymentMethod !== '' ? ucwords(str_replace('_', ' ', $selectedPaymentMethod)) : '—';
+                        $selectedStatus = strtolower((string) ($selectedMembershipOrder['payment_status'] ?? 'pending'));
+                        $selectedItems = $selectedMembershipOrderItems;
+                        $selectedPeriodLabel = '—';
+                        if ($selectedMembershipPeriod) {
+                          $selectedPeriodLabel = formatDate($selectedMembershipPeriod['start_date'] ?? null) . ' → ';
+                          $selectedPeriodLabel .= (($selectedMembershipPeriod['term'] ?? '') === 'LIFE' || empty($selectedMembershipPeriod['end_date'])) ? 'N/A' : formatDate($selectedMembershipPeriod['end_date']);
+                        }
+                      ?>
+                      <div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-700">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Order details</p>
+                            <p class="text-lg font-semibold text-gray-900"><?= e($selectedMembershipOrder['order_number'] ?? 'M-' . $selectedMembershipOrder['id']) ?></p>
+                          </div>
+                          <a class="text-xs font-semibold text-gray-600 underline" href="<?= e(buildTabUrl($memberId, 'orders', ['orders_section' => 'membership'])) ?>">Clear</a>
+                        </div>
+                        <div class="mt-3 grid gap-3 md:grid-cols-3">
+                          <div>
+                            <p class="text-xs text-gray-500">Status</p>
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($selectedStatus) ?>"><?= ucfirst($selectedStatus) ?></span>
+                          </div>
+                          <div>
+                            <p class="text-xs text-gray-500">Payment method</p>
+                            <p class="font-semibold text-gray-900"><?= e($selectedPaymentMethod) ?></p>
+                          </div>
+                          <div>
+                            <p class="text-xs text-gray-500">Period</p>
+                            <p class="font-semibold text-gray-900"><?= e($selectedPeriodLabel) ?></p>
+                          </div>
+                        </div>
+                        <?php if ($selectedItems): ?>
+                          <div class="mt-3">
+                            <p class="text-xs text-gray-500">Items</p>
+                            <ul class="mt-1 space-y-1 text-sm text-gray-700">
+                              <?php foreach ($selectedItems as $item): ?>
+                                <li><?= e($item['name']) ?> <span class="text-xs text-gray-500">x<?= e((string) ($item['quantity'] ?? 1)) ?></span></li>
+                              <?php endforeach; ?>
+                            </ul>
+                          </div>
+                        <?php endif; ?>
+                        <?php if (!empty($selectedMembershipOrder['internal_notes'])): ?>
+                          <div class="mt-3">
+                            <p class="text-xs text-gray-500">Internal notes</p>
+                            <p class="text-sm text-gray-700 whitespace-pre-line"><?= e($selectedMembershipOrder['internal_notes']) ?></p>
+                          </div>
+                        <?php endif; ?>
+                        <?php if ($canManualFix): ?>
+                          <div class="mt-3 grid gap-2 md:grid-cols-2">
+                            <form method="post" action="/admin/members/actions.php" class="space-y-2">
+                              <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                              <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                              <input type="hidden" name="tab" value="orders">
+                              <input type="hidden" name="orders_section" value="membership">
+                              <input type="hidden" name="action" value="membership_order_accept">
+                              <input type="hidden" name="order_id" value="<?= e($selectedMembershipOrder['id']) ?>">
+                              <label class="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">Payment reference (optional)</label>
+                              <input type="text" name="payment_reference" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Bank transfer ref">
+                              <button type="submit" class="w-full rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white">Approve payment</button>
+                            </form>
+                            <form method="post" action="/admin/members/actions.php" class="space-y-2">
+                              <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                              <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                              <input type="hidden" name="tab" value="orders">
+                              <input type="hidden" name="orders_section" value="membership">
+                              <input type="hidden" name="action" value="membership_order_reject">
+                              <input type="hidden" name="order_id" value="<?= e($selectedMembershipOrder['id']) ?>">
+                              <label class="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">Rejection reason</label>
+                              <input type="text" name="reject_reason" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Reason">
+                              <button type="submit" class="w-full rounded-full border border-rose-200 text-rose-700 px-4 py-2 text-xs font-semibold">Reject order</button>
+                            </form>
+                          </div>
+                        <?php endif; ?>
+                      </div>
+                    <?php endif; ?>
+                    <?php if ($membershipOrders): ?>
                       <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                           <thead class="text-left text-xs uppercase text-gray-500">
                             <tr>
+                              <th class="px-3 py-2">Order #</th>
                               <th class="px-3 py-2">Date</th>
-                              <th class="px-3 py-2">Amount</th>
-                              <th class="px-3 py-2">Term</th>
-                              <th class="px-3 py-2">Period</th>
-                              <th class="px-3 py-2">Status</th>
-                              <th class="px-3 py-2">Source</th>
-                              <th class="px-3 py-2">Reference / notes</th>
+                              <th class="px-3 py-2">Items</th>
+                              <th class="px-3 py-2">Total</th>
+                              <th class="px-3 py-2">Payment method</th>
+                              <th class="px-3 py-2">Payment status</th>
+                              <th class="px-3 py-2">Actions</th>
                             </tr>
                           </thead>
                           <tbody class="divide-y">
-                            <?php foreach ($membershipPayments as $payment): ?>
+                            <?php foreach ($membershipOrders as $order): ?>
                               <?php
-                                $paymentKey = (string) ($payment['stripe_payment_id'] ?? '');
-                                $period = $paymentKey !== '' ? ($membershipPeriodByPayment[$paymentKey] ?? null) : null;
-                                $termLabel = $period['term'] ?? ($payment['description'] ?? '');
-                                $displayTerm = $termLabel !== '' ? strtoupper($termLabel) : '—';
-                                $startDate = $period['start_date'] ?? null;
-                                $endDate = $period['end_date'] ?? null;
-                                $periodLabel = '—';
-                                if ($period) {
-                                  $periodLabel = formatDate($startDate) . ' → ';
-                                  $periodLabel .= ($termLabel === 'LIFE' || $endDate === null) ? 'N/A' : formatDate($endDate);
-                                }
-                                $statusKey = strtolower((string) ($payment['status'] ?? 'unknown'));
-                                $sourceLabel = $payment['order_source'] ?? '';
-                                if ($sourceLabel === '' && $paymentKey !== '') {
-                                  $sourceLabel = 'Stripe';
-                                }
-                                if ($sourceLabel === '') {
-                                  $sourceLabel = 'Manual';
-                                }
-                                $referenceLines = [];
-                                if (!empty($payment['order_reference'])) {
-                                  $referenceLines[] = 'Ref: ' . $payment['order_reference'];
-                                }
-                                if (!empty($payment['internal_notes'])) {
-                                  $referenceLines[] = $payment['internal_notes'];
-                                }
+                                $orderItems = $membershipOrderItems[$order['id']] ?? [];
+                                $paymentMethod = $order['payment_method'] ?? '';
+                                $paymentMethodLabel = $paymentMethod !== '' ? ucwords(str_replace('_', ' ', $paymentMethod)) : '—';
+                                $paymentStatus = strtolower((string) ($order['payment_status'] ?? 'pending'));
+                                $orderNumber = $order['order_number'] ?? ('M-' . $order['id']);
                               ?>
-                              <tr>
-                                <td class="px-3 py-2 text-gray-600"><?= e(formatDate($payment['created_at'])) ?></td>
-                                <td class="px-3 py-2 text-gray-600"><?= e(formatCurrency((int) round(($payment['amount'] ?? 0) * 100))) ?></td>
-                                <td class="px-3 py-2 text-gray-600"><?= e($displayTerm) ?></td>
-                                <td class="px-3 py-2 text-gray-600"><?= e($periodLabel) ?></td>
-                                <td class="px-3 py-2">
-                                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($statusKey) ?>"><?= ucfirst($statusKey) ?></span>
-                                </td>
-                                <td class="px-3 py-2 text-gray-600"><?= e($sourceLabel) ?></td>
-                                <td class="px-3 py-2 text-gray-600 space-y-1">
-                                  <?php if ($referenceLines): ?>
-                                    <?php foreach ($referenceLines as $line): ?>
-                                      <p class="text-xs text-gray-500"><?= e($line) ?></p>
-                                    <?php endforeach; ?>
+                              <tr class="<?= $paymentStatus === 'pending' ? 'bg-yellow-50/40' : '' ?>">
+                                <td class="px-3 py-2 text-gray-600"><?= e($orderNumber) ?></td>
+                                <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'] ?? null)) ?></td>
+                                <td class="px-3 py-2 text-gray-600">
+                                  <?php if ($orderItems): ?>
+                                    <div class="space-y-1">
+                                      <?php foreach ($orderItems as $item): ?>
+                                        <div><?= e($item['name']) ?> <span class="text-xs text-gray-500">x<?= e((string) ($item['quantity'] ?? 1)) ?></span></div>
+                                      <?php endforeach; ?>
+                                    </div>
                                   <?php else: ?>
                                     <span class="text-xs text-gray-400">—</span>
                                   <?php endif; ?>
+                                </td>
+                                <td class="px-3 py-2 text-gray-600"><?= e(formatCurrency((int) round(((float) ($order['total'] ?? 0)) * 100))) ?></td>
+                                <td class="px-3 py-2 text-gray-600"><?= e($paymentMethodLabel) ?></td>
+                                <td class="px-3 py-2">
+                                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($paymentStatus) ?>"><?= ucfirst($paymentStatus) ?></span>
+                                </td>
+                                <td class="px-3 py-2 text-gray-600">
+                                  <div class="flex flex-wrap gap-2">
+                                    <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="<?= e(buildTabUrl($memberId, 'orders', ['orders_section' => 'membership', 'order_id' => $order['id']])) ?>">View</a>
+                                    <?php if ($canManualFix && in_array($paymentStatus, ['pending', 'failed'], true) && ($paymentMethod === '' || $paymentMethod === 'stripe')): ?>
+                                      <form method="post" action="/admin/members/actions.php">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="membership">
+                                        <input type="hidden" name="action" value="membership_order_send_link">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <button class="inline-flex items-center rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700" type="submit">Send checkout link</button>
+                                      </form>
+                                    <?php endif; ?>
+                                    <?php if ($canManualFix && $paymentStatus === 'pending' && in_array($paymentMethod, ['bank_transfer', 'manual', 'cash', 'complimentary'], true)): ?>
+                                      <form method="post" action="/admin/members/actions.php">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="membership">
+                                        <input type="hidden" name="action" value="membership_order_accept">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <button class="inline-flex items-center rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700" type="submit">Accept</button>
+                                      </form>
+                                      <form method="post" action="/admin/members/actions.php">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="membership">
+                                        <input type="hidden" name="action" value="membership_order_reject">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <button class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700" type="submit">Reject</button>
+                                      </form>
+                                    <?php endif; ?>
+                                  </div>
                                 </td>
                               </tr>
                             <?php endforeach; ?>
                           </tbody>
                         </table>
                       </div>
+                      <?php if ($canManualFix): ?>
+                        <form method="post" action="/admin/members/actions.php" class="mt-4 grid gap-3 md:grid-cols-3">
+                          <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                          <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                          <input type="hidden" name="tab" value="orders">
+                          <input type="hidden" name="orders_section" value="membership">
+                          <input type="hidden" name="action" value="membership_order_note">
+                          <label class="text-sm font-medium text-gray-700 md:col-span-1">
+                            Order
+                            <select name="order_id" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                              <?php foreach ($membershipOrders as $order): ?>
+                                <option value="<?= e($order['id']) ?>"><?= e($order['order_number'] ?? ('M-' . $order['id'])) ?></option>
+                              <?php endforeach; ?>
+                            </select>
+                          </label>
+                          <label class="text-sm font-medium text-gray-700 md:col-span-2">
+                            Internal note
+                            <input type="text" name="note" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Add internal note">
+                          </label>
+                          <div class="md:col-span-3">
+                            <button class="rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700" type="submit">Save note</button>
+                          </div>
+                        </form>
+                      <?php endif; ?>
                     <?php else: ?>
                       <p class="text-sm text-gray-500">No membership orders recorded yet.</p>
                     <?php endif; ?>
@@ -1839,7 +1978,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Membership summary</p>
                           <p class="text-sm text-gray-500">Latest membership status and payment history.</p>
                         </div>
-                        <span class="text-xs font-semibold text-gray-500"><?= count($membershipPayments) ?> payments</span>
+                        <span class="text-xs font-semibold text-gray-500"><?= count($membershipOrders) ?> orders</span>
                       </div>
                       <div class="space-y-3 text-sm text-gray-700">
                         <div class="flex items-center justify-between">
@@ -1863,8 +2002,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <span class="font-semibold text-gray-900"><?= e($paymentMethodLabel) ?></span>
                         </div>
                         <div class="flex items-center justify-between">
-                          <span>Order source</span>
-                          <span class="font-semibold text-gray-900"><?= e($orderSourceLabel) ?></span>
+                          <span>Payment status</span>
+                          <span class="font-semibold text-gray-900"><?= e($paymentStatusLabel) ?></span>
                         </div>
                       </div>
                       <?php if ($canEditFullProfile): ?>

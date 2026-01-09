@@ -131,20 +131,20 @@ class MemberRepository
         return ['data' => $rows, 'total' => $total];
     }
 
-    public static function stats(?int $chapterId = null): array
+    public static function stats(array $filters = []): array
     {
         $pdo = Database::connection();
-        $sql = 'SELECT status, COUNT(*) as c FROM members';
         $params = [];
-        if ($chapterId !== null) {
-            $sql .= ' WHERE chapter_id = :chapter_id';
-            $params['chapter_id'] = $chapterId;
+        $whereClause = self::buildWhereClause($filters, $params);
+        $chapterId = $filters['chapter_id'] ?? null;
+
+        $sql = 'SELECT status, COUNT(*) as c FROM members m';
+        if ($whereClause !== '') {
+            $sql .= ' WHERE ' . $whereClause;
         }
         $sql .= ' GROUP BY status';
         $stmt = $pdo->prepare($sql);
-        if ($chapterId !== null) {
-            $stmt->bindValue(':chapter_id', $chapterId, PDO::PARAM_INT);
-        }
+        self::bindParams($stmt, $params);
         $stmt->execute();
 
         $result = [
@@ -168,17 +168,16 @@ class MemberRepository
         }
 
         $recent = (new DateTimeImmutable('now'))->modify('-30 days')->format('Y-m-d H:i:s');
-        $recentSql = 'SELECT COUNT(*) FROM members WHERE created_at >= :recent';
-        $recentParams = ['recent' => $recent];
-        if ($chapterId !== null) {
-            $recentSql .= ' AND chapter_id = :chapter_id';
-            $recentParams['chapter_id'] = $chapterId;
+        $recentSql = 'SELECT COUNT(*) FROM members m';
+        $recentParams = $params;
+        if ($whereClause !== '') {
+            $recentSql .= ' WHERE ' . $whereClause . ' AND m.created_at >= :recent';
+        } else {
+            $recentSql .= ' WHERE m.created_at >= :recent';
         }
+        $recentParams['recent'] = $recent;
         $stmt = $pdo->prepare($recentSql);
-        foreach ($recentParams as $key => $value) {
-            $paramType = $key === 'chapter_id' ? PDO::PARAM_INT : PDO::PARAM_STR;
-            $stmt->bindValue(':' . $key, $value, $paramType);
-        }
+        self::bindParams($stmt, $recentParams);
         $stmt->execute();
         $result['new_last_30_days'] = (int) $stmt->fetchColumn();
 
@@ -428,6 +427,10 @@ class MemberRepository
             }
             $parts[] = '(' . implode(' OR ', $searchParts) . ')';
         }
+        if (!empty($filters['member_id'])) {
+            $parts[] = 'm.id = :member_id';
+            $params['member_id'] = (int) $filters['member_id'];
+        }
         if (!empty($filters['chapter_id'])) {
             $parts[] = 'm.chapter_id = :chapter_id';
             $params['chapter_id'] = (int) $filters['chapter_id'];
@@ -480,6 +483,43 @@ class MemberRepository
         if (!empty($filters['role'])) {
             $parts[] = 'EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = m.user_id AND r.name = :role)';
             $params['role'] = $filters['role'];
+        }
+
+        $createdRange = trim((string) ($filters['created_range'] ?? ''));
+        $createdFromInput = trim((string) ($filters['created_from'] ?? ''));
+        $createdToInput = trim((string) ($filters['created_to'] ?? ''));
+        $createdFrom = null;
+        $createdTo = null;
+        if ($createdFromInput !== '') {
+            $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $createdFromInput);
+            if ($parsed instanceof DateTimeImmutable) {
+                $createdFrom = $parsed->format('Y-m-d');
+            }
+        }
+        if ($createdToInput !== '') {
+            $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $createdToInput);
+            if ($parsed instanceof DateTimeImmutable) {
+                $createdTo = $parsed->format('Y-m-d');
+            }
+        }
+        if ($createdRange !== '' && !$createdFrom && !$createdTo) {
+            $today = new DateTimeImmutable('today');
+            $createdFrom = match ($createdRange) {
+                '7d' => $today->modify('-7 days')->format('Y-m-d'),
+                '30d' => $today->modify('-30 days')->format('Y-m-d'),
+                '90d' => $today->modify('-90 days')->format('Y-m-d'),
+                '1y' => $today->modify('-1 year')->format('Y-m-d'),
+                'this_year' => $today->modify('first day of January')->format('Y-m-d'),
+                default => null,
+            };
+        }
+        if ($createdFrom) {
+            $parts[] = 'm.created_at >= :created_from';
+            $params['created_from'] = $createdFrom . ' 00:00:00';
+        }
+        if ($createdTo) {
+            $parts[] = 'm.created_at <= :created_to';
+            $params['created_to'] = $createdTo . ' 23:59:59';
         }
 
         $prefList = self::normalizeDirectoryPreferences($filters['directory_prefs'] ?? []);

@@ -147,6 +147,7 @@ class PaymentWebhookService
         ]);
 
         if (($order['order_type'] ?? '') === 'membership') {
+            MembershipOrderService::markOrderRefunded($order, 'Stripe refund received.');
             $stmt = $pdo->prepare('UPDATE memberships SET status = "unpaid", updated_at = NOW() WHERE order_id = :order_id');
             $stmt->execute(['order_id' => $order['id']]);
         }
@@ -154,6 +155,42 @@ class PaymentWebhookService
         if ($paymentIntentId !== '') {
             $stmt = $pdo->prepare('UPDATE store_orders SET status = "refunded", updated_at = NOW() WHERE stripe_payment_intent_id = :payment_intent_id');
             $stmt->execute(['payment_intent_id' => $paymentIntentId]);
+        }
+    }
+
+    public static function handlePaymentFailed(array $event): void
+    {
+        $intent = $event['data']['object'] ?? [];
+        $paymentIntentId = $intent['id'] ?? '';
+        if ($paymentIntentId === '') {
+            return;
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_payment_intent_id = :payment_intent_id LIMIT 1');
+        $stmt->execute(['payment_intent_id' => $paymentIntentId]);
+        $order = $stmt->fetch();
+        if (!$order) {
+            return;
+        }
+        $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "failed", updated_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $order['id']]);
+
+        if (($order['order_type'] ?? '') === 'membership' && !empty($order['member_id'])) {
+            $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $order['member_id']]);
+            $member = $stmt->fetch();
+            $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+            NotificationService::dispatch('membership_payment_failed', [
+                'primary_email' => $member['email'] ?? '',
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                'order_number' => $order['order_number'] ?? '',
+                'payment_link' => NotificationService::escape($paymentLink),
+            ]);
+            ActivityLogger::log('system', null, (int) $order['member_id'], 'membership.payment_failed', [
+                'order_id' => $order['id'],
+                'payment_intent' => $paymentIntentId,
+            ]);
         }
     }
 
@@ -305,6 +342,30 @@ class PaymentWebhookService
 
     private static function markMembershipPaid(array $order, array $metadata): void
     {
+        $memberId = (int) ($order['member_id'] ?? 0);
+        $periodId = (int) ($order['membership_period_id'] ?? 0);
+        if ($periodId <= 0) {
+            $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
+        }
+        if ($memberId > 0 && $periodId > 0) {
+            $activated = MembershipOrderService::activateMembershipForOrder($order, [
+                'payment_reference' => $order['stripe_payment_intent_id'] ?? ($metadata['payment_intent'] ?? ''),
+                'period_id' => $periodId,
+            ]);
+            if ($activated) {
+                $stmt = Database::connection()->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $memberId]);
+                $member = $stmt->fetch();
+                NotificationService::dispatch('membership_payment_received', [
+                    'primary_email' => $member['email'] ?? '',
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                    'order_number' => $order['order_number'] ?? '',
+                ]);
+            }
+            return;
+        }
+
         $pdo = Database::connection();
         $year = isset($metadata['membership_year']) ? (int) $metadata['membership_year'] : (int) date('Y');
         $stmt = $pdo->prepare('SELECT id FROM memberships WHERE user_id = :user_id AND year = :year LIMIT 1');

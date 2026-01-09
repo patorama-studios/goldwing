@@ -74,7 +74,7 @@ class OrderService
     public static function markPaid(int $orderId, string $paymentIntentId, ?string $chargeId): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE orders SET status = "paid", stripe_payment_intent_id = :payment_intent_id, stripe_charge_id = :charge_id, paid_at = NOW(), updated_at = NOW() WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE orders SET status = "paid", payment_status = "accepted", payment_method = CASE WHEN payment_method IS NULL OR payment_method = "" THEN "stripe" ELSE payment_method END, stripe_payment_intent_id = :payment_intent_id, stripe_charge_id = :charge_id, paid_at = NOW(), updated_at = NOW() WHERE id = :id');
         $stmt->execute([
             'payment_intent_id' => $paymentIntentId,
             'charge_id' => $chargeId,
@@ -85,7 +85,7 @@ class OrderService
     public static function markRefunded(int $orderId): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE orders SET status = "refunded", refunded_at = NOW(), updated_at = NOW() WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE orders SET status = "refunded", payment_status = "refunded", refunded_at = NOW(), updated_at = NOW() WHERE id = :id');
         $stmt->execute(['id' => $orderId]);
     }
 }

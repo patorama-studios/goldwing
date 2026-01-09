@@ -9,6 +9,8 @@ use App\Services\MemberRepository;
 use App\Services\MembershipMigrationService;
 use App\Services\MembershipPricingService;
 use App\Services\MembershipService;
+use App\Services\MembershipOrderService;
+use App\Services\OrderService;
 use App\Services\NotificationService;
 use App\Services\SettingsService;
 use App\Services\StripeService;
@@ -170,18 +172,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'end_date' => null,
                     'status' => 'ACTIVE',
                 ]);
+                $periodId = (int) $pdo->lastInsertId();
 
-                $stmt = $pdo->prepare('INSERT INTO payments (member_id, type, description, amount, status, payment_method, order_source, order_reference, created_at) VALUES (:member_id, :type, :description, :amount, :status, :payment_method, :order_source, :order_reference, NOW())');
-                $stmt->execute([
-                    'member_id' => $member['id'],
-                    'type' => 'membership',
-                    'description' => 'Life membership activation',
-                    'amount' => 0,
-                    'status' => 'PAID',
-                    'payment_method' => 'Life Member',
-                    'order_source' => 'Manual Migration',
-                    'order_reference' => null,
+                $order = MembershipOrderService::createMembershipOrder((int) $member['id'], $periodId, 0, [
+                    'payment_method' => 'complimentary',
+                    'payment_status' => 'accepted',
+                    'fulfillment_status' => 'active',
+                    'item_name' => 'Life membership activation',
+                    'internal_notes' => 'Manual migration',
                 ]);
+                if ($order && !empty($order['order_number'])) {
+                    $stmt = $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id');
+                    $stmt->execute([
+                        'payment_id' => $order['order_number'],
+                        'id' => $periodId,
+                    ]);
+                }
 
                 MembershipMigrationService::markUsed((int) $tokenRow['id']);
 
@@ -226,20 +232,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($priceId === '') {
                     $error = 'Membership pricing is not configured. Please contact support.';
                 } else {
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE membership_period_id = :period_id AND member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC LIMIT 1');
+                    $stmt->execute(['period_id' => $periodId, 'member_id' => $member['id']]);
+                    $order = $stmt->fetch();
+                    if (!$order) {
+                        $pricingPeriodKey = $term === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
+                        $priceCents = MembershipPricingService::getPriceCents($magazineType, $selectedTypeCode === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL', $pricingPeriodKey) ?? 0;
+                        $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+                        $amount = round($priceCents / 100, 2);
+                        $order = MembershipOrderService::createMembershipOrder((int) $member['id'], $periodId, $amount, [
+                            'payment_method' => 'stripe',
+                            'payment_status' => 'pending',
+                            'fulfillment_status' => 'pending',
+                            'currency' => $pricingCurrency,
+                            'item_name' => 'Membership renewal ' . $term,
+                            'term' => $term,
+                            'internal_notes' => 'Manual migration',
+                        ]);
+                        if ($order && !empty($order['order_number'])) {
+                            $stmt = $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id');
+                            $stmt->execute([
+                                'payment_id' => $order['order_number'],
+                                'id' => $periodId,
+                            ]);
+                        }
+                        if ($order) {
+                            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+                            $stmt->execute(['id' => $order['id'] ?? 0]);
+                            $order = $stmt->fetch();
+                        }
+                    }
                     $successUrl = BaseUrlService::buildUrl('/migrate.php?token=' . urlencode($token) . '&success=1');
                     $cancelUrl = BaseUrlService::buildUrl('/migrate.php?token=' . urlencode($token) . '&cancel=1');
                     $session = StripeService::createCheckoutSessionForPrice($priceId, $email, $successUrl, $cancelUrl, [
                         'period_id' => $periodId,
                         'member_id' => $member['id'],
+                        'order_id' => $order['id'] ?? null,
+                        'order_type' => 'membership',
                     ]);
 
                     if (!$session || empty($session['url'])) {
                         $error = 'Unable to start payment. Please try again later.';
                     } else {
+                        if (!empty($session['id']) && !empty($order['id'])) {
+                            OrderService::updateStripeSession((int) $order['id'], $session['id']);
+                        }
                         MembershipMigrationService::markUsed((int) $tokenRow['id']);
                         ActivityLogger::log('member', null, $member['id'], 'membership.migration_started', [
                             'membership_type' => $selectedTypeCode,
                             'period_id' => $periodId,
+                            'order_id' => $order['id'] ?? null,
                             'source' => 'manual_migration',
                         ]);
                         header('Location: ' . $session['url']);

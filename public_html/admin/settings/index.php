@@ -229,6 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $invoicePrefix = normalize_text($_POST['stripe_invoice_prefix'] ?? 'INV');
                 $invoiceTemplate = normalize_text($_POST['stripe_invoice_email_template'] ?? '');
                 $generatePdf = isset($_POST['stripe_generate_pdf']) ? 1 : 0;
+                $bankTransferInstructions = trim((string) ($_POST['bank_transfer_instructions'] ?? ''));
 
                 $channel = PaymentSettingsService::getChannelByCode('primary');
                 PaymentSettingsService::updateSettings((int) $channel['id'], [
@@ -252,6 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SettingsService::setGlobal((int) $user['id'], 'payments.stripe.generate_pdf', $generatePdf === 1);
                 SettingsService::setGlobal((int) $user['id'], 'payments.stripe.invoice_prefix', $invoicePrefix);
                 SettingsService::setGlobal((int) $user['id'], 'payments.stripe.invoice_email_template', $invoiceTemplate);
+                SettingsService::setGlobal((int) $user['id'], 'payments.bank_transfer_instructions', $bankTransferInstructions);
                 $prices = [
                     'FULL_1Y' => normalize_text($_POST['price_full_1y'] ?? ''),
                     'FULL_3Y' => normalize_text($_POST['price_full_3y'] ?? ''),
@@ -888,6 +890,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $secretLast4 = !empty($paymentSettings['secret_key']) ? substr($paymentSettings['secret_key'], -4) : '';
               $webhookLast4 = !empty($paymentSettings['webhook_secret']) ? substr($paymentSettings['webhook_secret'], -4) : '';
               $prices = SettingsService::getGlobal('payments.membership_prices', []);
+              $bankTransferInstructions = SettingsService::getGlobal('payments.bank_transfer_instructions', '');
             ?>
             <form method="post" class="space-y-6">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
@@ -979,6 +982,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php if (!SettingsService::isFeatureEnabled('payments.secondary_stripe')): ?>
                   <div class="text-xs text-slate-500">Secondary Stripe account (AGM) is disabled. Enable via feature flags.</div>
                 <?php endif; ?>
+              </div>
+
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                <h2 class="font-display text-lg font-bold text-gray-900">Bank Transfer Instructions</h2>
+                <p class="text-sm text-slate-600">Shown on membership billing screens and sent in membership order emails.</p>
+                <label class="text-sm text-slate-600">Instructions
+                  <textarea name="bank_transfer_instructions" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e((string) $bankTransferInstructions) ?></textarea>
+                </label>
               </div>
 
               <div class="flex items-center justify-between">

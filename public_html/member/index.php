@@ -3,10 +3,13 @@ require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\Csrf;
 use App\Services\MembershipService;
+use App\Services\MembershipOrderService;
+use App\Services\MembershipPricingService;
 use App\Services\ChapterRepository;
 use App\Services\StripeService;
 use App\Services\PaymentSettingsService;
 use App\Services\SettingsService;
+use App\Services\BaseUrlService;
 use App\Services\DomSnapshotService;
 use App\Services\EmailService;
 use App\Services\NotificationPreferenceService;
@@ -15,6 +18,7 @@ use App\Services\ActivityRepository;
 use App\Services\MemberRepository;
 use App\Services\SecurityPolicyService;
 use App\Services\TwoFactorService;
+use App\Services\OrderService;
 
 $require_once = require_once __DIR__ . '/../../calendar/lib/calendar_occurrences.php';
 
@@ -58,7 +62,9 @@ $upcomingEvents = [];
 $dashboardNotices = [];
 $noticeBoardNotices = [];
 $wingsLatest = null;
-$membershipPayments = [];
+$membershipOrders = [];
+$membershipOrderItems = [];
+$membershipOrderItemsById = [];
 $storeOrders = [];
 $storeOrderItems = [];
 $orderHistory = [];
@@ -81,6 +87,14 @@ $profileMessage = '';
 $profileError = '';
 $memberActivity = [];
 
+if ($page === 'billing') {
+    if (isset($_GET['success'])) {
+        $billingMessage = 'Payment completed. Your membership will update shortly.';
+    } elseif (isset($_GET['cancel'])) {
+        $billingError = 'Checkout cancelled. You can try again when ready.';
+    }
+}
+
 function format_date(?string $value): string
 {
     if (!$value) {
@@ -101,9 +115,9 @@ function status_badge_classes(string $status): string
 {
     $clean = strtolower(trim($status));
     return match ($clean) {
-        'active', 'paid', 'fulfilled' => 'bg-green-100 text-green-800',
+        'active', 'paid', 'fulfilled', 'accepted' => 'bg-green-100 text-green-800',
         'pending', 'processing' => 'bg-yellow-100 text-yellow-800',
-        'expired', 'lapsed', 'refunded' => 'bg-red-100 text-red-800',
+        'expired', 'lapsed', 'refunded', 'failed', 'rejected' => 'bg-red-100 text-red-800',
         'cancelled', 'inactive' => 'bg-gray-100 text-gray-800',
         'suspended' => 'bg-indigo-50 text-indigo-800',
         default => 'bg-slate-100 text-slate-800',
@@ -389,6 +403,115 @@ if ($user && $user['member_id']) {
                     }
 
                     $billingMessage = 'Shipping address updated.';
+                }
+            } elseif ($_POST['action'] === 'membership_order_pay') {
+                $orderId = (int) ($_POST['order_id'] ?? 0);
+                if (!$member || $orderId <= 0) {
+                    $billingError = 'Unable to start payment for this order.';
+                } else {
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND member_id = :member_id AND order_type = "membership" LIMIT 1');
+                    $stmt->execute(['id' => $orderId, 'member_id' => $member['id']]);
+                    $order = $stmt->fetch();
+                    if (!$order) {
+                        $billingError = 'Unable to locate the selected order.';
+                    } elseif (!empty($order['payment_method']) && $order['payment_method'] !== 'stripe') {
+                        $billingError = 'This order requires manual payment approval.';
+                    } else {
+                        $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = :order_id ORDER BY id ASC');
+                        $itemsStmt->execute(['order_id' => $orderId]);
+                        $items = $itemsStmt->fetchAll();
+                        $lineItems = [];
+                        foreach ($items as $item) {
+                            $lineItems[] = [
+                                'name' => $item['name'],
+                                'unit_amount' => (int) round(((float) $item['unit_price']) * 100),
+                                'quantity' => (int) ($item['quantity'] ?? 1),
+                                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+                            ];
+                        }
+                        if (!$lineItems) {
+                            $lineItems[] = [
+                                'name' => 'Membership',
+                                'unit_amount' => (int) round(((float) ($order['total'] ?? 0)) * 100),
+                                'quantity' => 1,
+                                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+                            ];
+                        }
+                        $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+                        $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+                        $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, [
+                            'order_id' => (string) $orderId,
+                            'order_type' => 'membership',
+                            'member_id' => (string) $member['id'],
+                            'period_id' => (string) ($order['membership_period_id'] ?? ''),
+                            'channel_id' => (string) ($order['channel_id'] ?? ''),
+                        ]);
+                        if (!$session || empty($session['id'])) {
+                            $billingError = 'Unable to start checkout for this order.';
+                        } else {
+                            OrderService::updateStripeSession($orderId, $session['id']);
+                            $stmt = $pdo->prepare('UPDATE orders SET payment_method = "stripe", payment_status = "pending", status = "pending", updated_at = NOW() WHERE id = :id');
+                            $stmt->execute(['id' => $orderId]);
+                            header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
+                            exit;
+                        }
+                    }
+                }
+            } elseif ($_POST['action'] === 'membership_renew') {
+                if (!$member) {
+                    $billingError = 'Unable to start renewal.';
+                } elseif (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
+                    $billingError = 'Life members do not need to renew.';
+                } else {
+                    $stmt = $pdo->prepare('SELECT id FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status = "pending" ORDER BY created_at DESC LIMIT 1');
+                    $stmt->execute(['member_id' => $member['id']]);
+                    $pendingOrderId = (int) $stmt->fetchColumn();
+                    if ($pendingOrderId > 0) {
+                        $billingMessage = 'You already have a pending membership order.';
+                    } else {
+                        $term = '1Y';
+                        $periodId = MembershipService::createMembershipPeriod((int) $member['id'], $term, date('Y-m-d'));
+                        $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+                        $membershipTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+                        $pricingPeriodKey = $term === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
+                        $priceCents = MembershipPricingService::getPriceCents($magazineType, $membershipTypeKey, $pricingPeriodKey) ?? 0;
+                        $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+                        $amount = round($priceCents / 100, 2);
+                        $order = MembershipOrderService::createMembershipOrder((int) $member['id'], $periodId, $amount, [
+                            'payment_method' => 'stripe',
+                            'payment_status' => 'pending',
+                            'fulfillment_status' => 'pending',
+                            'currency' => $pricingCurrency,
+                            'item_name' => 'Membership renewal ' . $term,
+                            'term' => $term,
+                        ]);
+                        if (!$order) {
+                            $billingError = 'Unable to create a renewal order.';
+                        } else {
+                            $priceKey = $membershipTypeKey . '_' . $term;
+                            $prices = SettingsService::getGlobal('payments.membership_prices', []);
+                            $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
+                            if ($priceId === '') {
+                                $billingError = 'Membership pricing is not configured. Please contact support.';
+                            } else {
+                                $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+                                $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+                                $session = StripeService::createCheckoutSessionForPrice($priceId, $member['email'] ?? '', $successUrl, $cancelUrl, [
+                                    'period_id' => $periodId,
+                                    'member_id' => $member['id'],
+                                    'order_id' => $order['id'] ?? null,
+                                    'order_type' => 'membership',
+                                ]);
+                                if (!$session || empty($session['id'])) {
+                                    $billingError = 'Unable to start renewal payment.';
+                                } else {
+                                    OrderService::updateStripeSession((int) ($order['id'] ?? 0), $session['id']);
+                                    header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
+                                    exit;
+                                }
+                            }
+                        }
+                    }
                 }
             } elseif ($_POST['action'] === 'create_notice') {
                 $title = trim($_POST['notice_title'] ?? '');
@@ -729,9 +852,22 @@ if ($user && $user['member_id']) {
         $stmt->execute();
         $wingsLatest = $stmt->fetch();
 
-        $stmt = $pdo->prepare('SELECT * FROM payments WHERE member_id = :member_id AND type = "membership" ORDER BY created_at DESC');
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC');
         $stmt->execute(['member_id' => $member['id']]);
-        $membershipPayments = $stmt->fetchAll();
+        $membershipOrders = $stmt->fetchAll();
+        $membershipOrderItemsById = [];
+        if ($membershipOrders) {
+            $membershipOrderIds = array_column($membershipOrders, 'id');
+            if ($membershipOrderIds) {
+                $placeholders = implode(',', array_fill(0, count($membershipOrderIds), '?'));
+                $stmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id IN (' . $placeholders . ') ORDER BY order_id ASC, id ASC');
+                $stmt->execute($membershipOrderIds);
+                $membershipOrderItems = $stmt->fetchAll();
+                foreach ($membershipOrderItems as $item) {
+                    $membershipOrderItemsById[$item['order_id']][] = $item;
+                }
+            }
+        }
 
         $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE user_id = :user_id ORDER BY created_at DESC');
         $stmt->execute(['user_id' => $user['id']]);
@@ -750,7 +886,7 @@ if ($user && $user['member_id']) {
             $storeItemsByOrder[$item['order_id']][] = $item;
         }
 
-        foreach ($membershipPayments as $payment) {
+        foreach ($membershipOrders as $order) {
             $daysRemainingLabel = null;
             if (!empty($membershipPeriod['end_date'])) {
                 $daysRemaining = (int) ceil((strtotime($membershipPeriod['end_date']) - time()) / 86400);
@@ -758,26 +894,34 @@ if ($user && $user['member_id']) {
             } elseif (!empty($member['member_type']) && $member['member_type'] === 'LIFE') {
                 $daysRemainingLabel = 'No expiry';
             }
-            $paymentSource = trim((string) ($payment['order_source'] ?? ''));
-            $paymentMethod = trim((string) ($payment['payment_method'] ?? ''));
-            $isManual = false;
-            if ($paymentSource !== '' && stripos($paymentSource, 'manual') !== false) {
-                $isManual = true;
+            $paymentMethod = trim((string) ($order['payment_method'] ?? ''));
+            $paymentMethodKey = strtolower(str_replace(' ', '_', $paymentMethod));
+            $isManual = in_array($paymentMethodKey, ['manual', 'bank_transfer', 'cash', 'complimentary', 'life_member'], true);
+            $orderItems = $membershipOrderItemsById[$order['id']] ?? [];
+            $itemList = [];
+            foreach ($orderItems as $item) {
+                $itemList[] = [
+                    'label' => $item['name'],
+                    'quantity' => $item['quantity'],
+                ];
             }
-            if (!$isManual && $paymentMethod !== '' && in_array(strtolower($paymentMethod), ['manual', 'bank transfer', 'cash', 'complimentary', 'life member'], true)) {
-                $isManual = true;
+            if (!$itemList) {
+                $itemList[] = ['label' => 'Membership order', 'quantity' => 1];
             }
             $orderHistory[] = [
                 'type' => 'membership',
-                'date' => $payment['created_at'],
-                'title' => $payment['description'] ?? 'Membership payment',
-                'status' => $payment['status'],
-                'amount' => $payment['amount'],
-                'items' => [['label' => $payment['description'] ?? 'Membership payment', 'quantity' => 1]],
+                'date' => $order['created_at'],
+                'title' => 'Membership order ' . ($order['order_number'] ?? ''),
+                'status' => $order['payment_status'] ?? $order['status'],
+                'amount' => number_format((float) ($order['total'] ?? 0), 2),
+                'items' => $itemList,
                 'days_remaining_label' => $daysRemainingLabel,
                 'is_manual' => $isManual,
-                'source' => $paymentSource !== '' ? $paymentSource : null,
+                'source' => $order['payment_method'] ?? null,
                 'payment_method' => $paymentMethod !== '' ? $paymentMethod : null,
+                'order_id' => $order['id'] ?? null,
+                'order_number' => $order['order_number'] ?? null,
+                'payment_status' => $order['payment_status'] ?? null,
             ];
         }
 
@@ -891,7 +1035,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php
                     $welcomeName = trim((string) ($member['first_name'] ?? ''));
                     if ($welcomeName === '') {
-                        $welcomeName = $user['name'] ?? 'Member';
+                        $displayName = trim((string) ($user['name'] ?? ''));
+                        if ($displayName === '' || strcasecmp($displayName, 'member') === 0) {
+                            $displayName = trim((string) ($member['last_name'] ?? ''));
+                        }
+                        $welcomeName = $displayName !== '' ? $displayName : 'there';
                     }
                   ?>
                   Welcome back, <span class="text-primary"><?= e($welcomeName) ?></span>
@@ -1195,13 +1343,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               $stmt->execute(['member_id' => $profileMemberId]);
               $profileMembershipPeriod = $stmt->fetch();
           }
-          $profileMembershipPayments = $membershipPayments;
+          $profileMembershipOrders = $membershipOrders;
           if ($profileMemberId !== $member['id']) {
-              $stmt = $pdo->prepare('SELECT * FROM payments WHERE member_id = :member_id AND type = "membership" ORDER BY created_at DESC');
+              $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC');
               $stmt->execute(['member_id' => $profileMemberId]);
-              $profileMembershipPayments = $stmt->fetchAll();
+              $profileMembershipOrders = $stmt->fetchAll();
           }
-          $profileLatestPayment = $profileMembershipPayments[0] ?? null;
+          $profileLatestOrder = $profileMembershipOrders[0] ?? null;
           $profileMemberNumber = '—';
           if (!empty($profileMember['member_number_base'])) {
               $profileMemberNumber = MembershipService::displayMembershipNumber((int) $profileMember['member_number_base'], (int) ($profileMember['member_number_suffix'] ?? 0));
@@ -1228,12 +1376,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           $primaryBikeYearLabel = $primaryBike['year'] ?? '—';
           $primaryBikeRegoLabel = $primaryBike['rego'] ?? '—';
           $profileRenewalLabel = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'LIFE' ? 'N/A' : format_date($profileMembershipPeriod['end_date'] ?? null);
-          $profileLastPaymentLabel = $profileLatestPayment ? format_datetime($profileLatestPayment['created_at'] ?? null) : '—';
-          $profilePaymentMethodLabel = $profileLatestPayment['payment_method'] ?? '';
-          if ($profilePaymentMethodLabel === '' && !empty($profileLatestPayment['stripe_payment_id'])) {
-              $profilePaymentMethodLabel = 'Stripe';
-          }
-          $profilePaymentMethodLabel = $profilePaymentMethodLabel !== '' ? $profilePaymentMethodLabel : '—';
+          $profileLastPaymentLabel = $profileLatestOrder ? format_datetime($profileLatestOrder['paid_at'] ?? $profileLatestOrder['created_at'] ?? null) : '—';
+          $profilePaymentMethodLabel = $profileLatestOrder ? ($profileLatestOrder['payment_method'] ?? '') : '';
+          $profilePaymentMethodLabel = $profilePaymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $profilePaymentMethodLabel)) : '—';
           $profileStatusClasses = status_badge_classes($profileMembershipStatusKey);
           $currentStatusLabel = strtoupper((string) ($profileMember['status'] ?? 'pending'));
           $profileChapterName = $profileMember['chapter_name'] ?? 'Unassigned';
@@ -2309,34 +2454,44 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <?php endif; ?>
           <?php
             $pendingPeriod = null;
+            $pendingMembershipOrder = null;
+            $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
             if ($member) {
                 $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id AND status = "PENDING_PAYMENT" ORDER BY created_at DESC LIMIT 1');
                 $stmt->execute(['member_id' => $member['id']]);
                 $pendingPeriod = $stmt->fetch();
+                $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
+                $stmt->execute(['member_id' => $member['id']]);
+                $pendingMembershipOrder = $stmt->fetch();
             }
-            $renewalLink = null;
-            if ($pendingPeriod && $member) {
-                $memberType = strtoupper((string) ($member['member_type'] ?? ''));
+            if (!$pendingMembershipOrder && $pendingPeriod && $member) {
                 $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
-                $prices = SettingsService::getGlobal('payments.membership_prices', []);
-                $priceKey = '';
-                if ($memberType === 'LIFE' || $termKey === 'LIFE') {
-                    $priceKey = 'LIFE';
-                } elseif ($memberType !== '' && $termKey !== '') {
-                    $priceKey = $memberType . '_' . $termKey;
+                $memberTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+                $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+                $pricingPeriodKey = $termKey === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
+                $priceCents = MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, $pricingPeriodKey) ?? 0;
+                $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+                $amount = round($priceCents / 100, 2);
+                $order = MembershipOrderService::createMembershipOrder((int) $member['id'], (int) ($pendingPeriod['id'] ?? 0), $amount, [
+                    'payment_method' => 'stripe',
+                    'payment_status' => 'pending',
+                    'fulfillment_status' => 'pending',
+                    'currency' => $pricingCurrency,
+                    'term' => $termKey,
+                    'item_name' => 'Membership renewal ' . $termKey,
+                ]);
+                if ($order) {
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+                    $stmt->execute(['id' => $order['id'] ?? 0]);
+                    $pendingMembershipOrder = $stmt->fetch();
                 }
-                $priceId = is_array($prices) && $priceKey !== '' ? ($prices[$priceKey] ?? '') : '';
-                if ($priceId === '' && $memberType !== '' && $memberType !== 'LIFE' && $termKey !== '1Y') {
-                    $fallbackKey = $memberType . '_1Y';
-                    $priceId = is_array($prices) ? ($prices[$fallbackKey] ?? '') : '';
-                }
-                if ($priceId) {
-                    $session = StripeService::createCheckoutSession($priceId, $member['email'], [
-                        'period_id' => $pendingPeriod['id'],
-                        'member_id' => $member['id'],
-                    ]);
-                    $renewalLink = $session['url'] ?? null;
-                }
+            }
+            $renewEligible = false;
+            if ($member && strtoupper((string) ($member['member_type'] ?? '')) !== 'LIFE' && !empty($membershipPeriod['end_date'])) {
+                $renewEligible = strtotime((string) $membershipPeriod['end_date']) <= strtotime('+60 days');
+            }
+            if (!empty($membershipPeriod['status']) && strtoupper((string) $membershipPeriod['status']) === 'LAPSED') {
+                $renewEligible = true;
             }
           ?>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2346,19 +2501,76 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <span class="material-icons-outlined">credit_card</span>
                 </div>
                 <div>
-                  <h3 class="font-display text-lg font-bold text-gray-900">Payment & Membership</h3>
-                  <p class="text-sm text-gray-500">Update payment methods and track membership payments.</p>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Membership status</h3>
+                  <p class="text-sm text-gray-500">Track membership status and pending payments.</p>
                 </div>
               </div>
-              <?php if ($pendingPeriod): ?>
-                <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  Pending payment for term <?= e($pendingPeriod['term']) ?> (<?= e($pendingPeriod['status']) ?>).
-                  <?php if ($renewalLink): ?>
-                    <a class="ml-2 font-semibold underline" href="<?= e($renewalLink) ?>">Complete payment</a>
+              <?php
+                $billingMembershipTypeLabel = 'Member';
+                if ($member) {
+                    $memberTypeKey = strtoupper((string) ($member['member_type'] ?? ''));
+                    $billingMembershipTypeLabel = match ($memberTypeKey) {
+                        'FULL' => 'Full Member',
+                        'ASSOCIATE' => 'Associate Member',
+                        'LIFE' => 'Life Member',
+                        default => 'Member',
+                    };
+                }
+                $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
+                $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
+              ?>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-600">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Type</p>
+                  <p class="text-sm font-semibold text-gray-900"><?= e($billingMembershipTypeLabel) ?></p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Status</p>
+                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= status_badge_classes($billingStatusLabel) ?>"><?= e($billingStatusLabel) ?></span>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Expiry</p>
+                  <p class="text-sm font-semibold text-gray-900"><?= e($billingExpiryLabel) ?></p>
+                </div>
+              </div>
+              <?php if ($pendingMembershipOrder): ?>
+                <?php
+                  $pendingPaymentMethod = strtolower((string) ($pendingMembershipOrder['payment_method'] ?? 'stripe'));
+                  $pendingStatus = strtolower((string) ($pendingMembershipOrder['payment_status'] ?? 'pending'));
+                ?>
+                <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 space-y-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      Pending order <span class="font-semibold"><?= e($pendingMembershipOrder['order_number'] ?? '') ?></span>
+                    </div>
+                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
+                  </div>
+                  <?php if ($pendingPaymentMethod === 'stripe'): ?>
+                    <form method="post" class="mt-2">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="membership_order_pay">
+                      <input type="hidden" name="order_id" value="<?= e((string) $pendingMembershipOrder['id']) ?>">
+                      <button class="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900" type="submit">Pay now</button>
+                    </form>
+                  <?php elseif ($pendingPaymentMethod === 'bank_transfer'): ?>
+                    <?php if ($bankInstructions !== ''): ?>
+                      <div class="rounded-lg bg-white/80 px-3 py-2 text-xs text-gray-700 whitespace-pre-line"><?= e($bankInstructions) ?></div>
+                    <?php else: ?>
+                      <p class="text-xs text-gray-600">Bank transfer instructions will be emailed to you.</p>
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <p class="text-xs text-gray-600">Awaiting payment approval.</p>
                   <?php endif; ?>
                 </div>
               <?php else: ?>
                 <p class="text-sm text-gray-600">No pending membership payments.</p>
+              <?php endif; ?>
+              <?php if ($renewEligible && !$pendingMembershipOrder): ?>
+                <form method="post">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="membership_renew">
+                  <button class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700" type="submit">Renew membership</button>
+                </form>
               <?php endif; ?>
               <?php if (!$customerPortalEnabled): ?>
                 <p class="text-xs text-gray-500">Customer portal is disabled. Contact support for card updates.</p>
@@ -2433,7 +2645,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <?php endif; ?>
                         </td>
                         <td class="py-3 text-gray-600">
-                          <?php if ($order['type'] === 'store' && !empty($order['order_id'])): ?>
+                          <?php if ($order['type'] === 'membership' && in_array(strtolower((string) ($order['payment_status'] ?? $order['status'] ?? '')), ['pending', 'failed'], true) && in_array(strtolower((string) ($order['payment_method'] ?? 'stripe')), ['stripe', 'card', ''], true)): ?>
+                            <form method="post">
+                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                              <input type="hidden" name="action" value="membership_order_pay">
+                              <input type="hidden" name="order_id" value="<?= e((string) ($order['order_id'] ?? '')) ?>">
+                              <button class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary text-xs font-semibold text-primary hover:bg-primary/10" type="submit">Pay now</button>
+                            </form>
+                          <?php elseif ($order['type'] === 'store' && !empty($order['order_id'])): ?>
                             <form method="post" action="/store/cart">
                               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                               <input type="hidden" name="action" value="reorder">

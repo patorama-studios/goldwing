@@ -4,8 +4,10 @@ require_once __DIR__ . '/../../app/bootstrap.php';
 use App\Services\Csrf;
 use App\Services\AdminMemberAccess;
 use App\Services\MembershipService;
+use App\Services\MembershipOrderService;
 use App\Services\AuditService;
 use App\Services\StripeService;
+use App\Services\OrderService;
 use App\Services\NoticeService;
 use App\Services\EventService;
 use App\Services\NotificationService;
@@ -87,11 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 $periodId = MembershipService::createMembershipPeriod((int) $row['member_id'], $term, date('Y-m-d'));
-                if ($paymentKey !== '') {
-                    MembershipService::markPaid($periodId, $paymentKey);
-                }
 
-                $stmt = $pdo->prepare('SELECT email, phone FROM members WHERE id = :id');
+                $stmt = $pdo->prepare('SELECT first_name, last_name, email, phone FROM members WHERE id = :id');
                 $stmt->execute(['id' => $row['member_id']]);
                 $memberRow = $stmt->fetch();
 
@@ -134,25 +133,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $paymentNeeded = !$paidPayment;
-                if ($paymentNeeded) {
-                    $priceKey = $row['member_type'] . '_' . $term;
-                    $prices = SettingsService::getGlobal('payments.membership_prices', []);
-                    $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
-                    $session = null;
-                    if ($priceId) {
-                        $session = StripeService::createCheckoutSession($priceId, $memberRow['email'] ?? '', [
-                            'period_id' => $periodId,
-                            'member_id' => $row['member_id'],
-                        ]);
+                $paymentMethodRaw = strtolower(trim((string) ($notes['payment_method'] ?? 'card')));
+                $paymentMethod = $paymentMethodRaw === 'bank_transfer' ? 'bank_transfer' : 'stripe';
+                $currency = strtoupper((string) ($notes['membership']['currency'] ?? 'AUD'));
+                $totalCents = (int) ($notes['membership']['total_cents'] ?? 0);
+                if ($totalCents <= 0) {
+                    $totalCents = (int) ($notes['membership']['full']['price_cents'] ?? 0);
+                    $totalCents += (int) ($notes['membership']['associate']['price_cents'] ?? 0);
+                }
+                $amount = round($totalCents / 100, 2);
+                $paymentRecorded = (bool) $paidPayment || $amount <= 0;
+                $paymentStatus = $paymentRecorded ? 'accepted' : 'pending';
+                $fulfillmentStatus = $paymentRecorded ? 'active' : 'pending';
+
+                $items = [];
+                $fullSelected = !empty($notes['membership']['full_selected']);
+                $associateSelected = !empty($notes['membership']['associate_selected']) || !empty($notes['membership']['associate_add']);
+                if ($fullSelected) {
+                    $fullTerm = strtoupper((string) ($notes['membership']['full']['period_key'] ?? $term));
+                    $fullAmount = (int) ($notes['membership']['full']['price_cents'] ?? 0);
+                    $items[] = [
+                        'product_id' => null,
+                        'name' => 'Full membership ' . $fullTerm,
+                        'quantity' => 1,
+                        'unit_price' => round($fullAmount / 100, 2),
+                        'is_physical' => 0,
+                    ];
+                }
+                if ($associateSelected) {
+                    $associateTerm = strtoupper((string) ($notes['membership']['associate']['period_key'] ?? $term));
+                    $associateAmount = (int) ($notes['membership']['associate']['price_cents'] ?? 0);
+                    $items[] = [
+                        'product_id' => null,
+                        'name' => 'Associate membership ' . $associateTerm,
+                        'quantity' => 1,
+                        'unit_price' => round($associateAmount / 100, 2),
+                        'is_physical' => 0,
+                    ];
+                }
+                if (!$items) {
+                    $items[] = [
+                        'product_id' => null,
+                        'name' => 'Membership ' . $term,
+                        'quantity' => 1,
+                        'unit_price' => $amount,
+                        'is_physical' => 0,
+                    ];
+                }
+
+                $order = MembershipOrderService::createMembershipOrder((int) $row['member_id'], $periodId, $amount, [
+                    'payment_method' => $paymentMethod,
+                    'payment_status' => $paymentStatus,
+                    'fulfillment_status' => $fulfillmentStatus,
+                    'currency' => $currency !== '' ? $currency : 'AUD',
+                    'items' => $items,
+                    'actor_user_id' => $user['id'] ?? null,
+                    'term' => $term,
+                    'internal_notes' => 'Application approval',
+                ]);
+                if ($order && $paymentRecorded) {
+                    MembershipOrderService::activateMembershipForOrder($order, [
+                        'payment_reference' => $paymentKey !== '' ? $paymentKey : null,
+                        'period_id' => $periodId,
+                    ]);
+                }
+
+                $paymentNeeded = !$paymentRecorded && $amount > 0;
+                if ($paymentNeeded && $order) {
+                    $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+                    if ($paymentMethod === 'stripe') {
+                        $priceKey = $row['member_type'] . '_' . $term;
+                        $prices = SettingsService::getGlobal('payments.membership_prices', []);
+                        $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
+                        $session = null;
+                        if ($priceId) {
+                            $session = StripeService::createCheckoutSession($priceId, $memberRow['email'] ?? '', [
+                                'period_id' => $periodId,
+                                'member_id' => $row['member_id'],
+                                'order_id' => $order['id'] ?? null,
+                                'order_type' => 'membership',
+                            ]);
+                        }
+                        if ($session && !empty($session['id'])) {
+                            OrderService::updateStripeSession((int) ($order['id'] ?? 0), $session['id']);
+                            $paymentLink = $session['url'] ?? $paymentLink;
+                        }
                     }
 
-                    $paymentLink = $session['url'] ?? BaseUrlService::buildUrl('/member/index.php?page=billing');
+                    $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
                     if (!empty($memberRow['email'])) {
-                        NotificationService::dispatch('membership_approved', [
+                        NotificationService::dispatch('membership_order_created', [
                             'primary_email' => $memberRow['email'],
                             'admin_emails' => NotificationService::getAdminEmails(),
+                            'member_name' => trim(($memberRow['first_name'] ?? '') . ' ' . ($memberRow['last_name'] ?? '')),
+                            'order_number' => $order['order_number'] ?? '',
                             'payment_link' => NotificationService::escape($paymentLink),
+                            'payment_method' => $paymentMethod,
+                            'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+                        ]);
+                    }
+                    if ($paymentMethod === 'bank_transfer') {
+                        NotificationService::dispatch('membership_admin_pending_approval', [
+                            'primary_email' => '',
+                            'admin_emails' => NotificationService::getAdminEmails(),
+                            'order_number' => $order['order_number'] ?? '',
+                            'member_name' => trim(($memberRow['first_name'] ?? '') . ' ' . ($memberRow['last_name'] ?? '')),
                         ]);
                     }
                     if (!empty($memberRow['phone'])) {
@@ -163,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alerts[] = [
                     'type' => 'success',
                     'message' => $paymentNeeded
-                        ? 'Application approved. Payment link generated.'
+                        ? 'Application approved. Payment instructions sent.'
                         : 'Application approved. Payment already recorded; no payment email sent.',
                 ];
             }
@@ -178,22 +263,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($page === 'applications' && isset($_POST['resend_approval_id'])) {
             $appId = (int) $_POST['resend_approval_id'];
-            $stmt = $pdo->prepare('SELECT a.member_id, m.email, m.phone FROM membership_applications a JOIN members m ON m.id = a.member_id WHERE a.id = :id');
+            $stmt = $pdo->prepare('SELECT a.member_id, m.first_name, m.last_name, m.email, m.phone FROM membership_applications a JOIN members m ON m.id = a.member_id WHERE a.id = :id');
             $stmt->execute(['id' => $appId]);
             $row = $stmt->fetch();
             if ($row && !empty($row['email'])) {
-                $stmt = $pdo->prepare("SELECT id FROM payments WHERE member_id = :member_id AND type = 'membership' AND status = 'PAID' ORDER BY created_at DESC LIMIT 1");
+                $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
                 $stmt->execute(['member_id' => $row['member_id']]);
-                $paidPayment = $stmt->fetch();
-                if ($paidPayment) {
-                    $alerts[] = ['type' => 'success', 'message' => 'Payment already recorded; no approval email sent.'];
+                $order = $stmt->fetch();
+                if (!$order) {
+                    $alerts[] = ['type' => 'success', 'message' => 'No pending membership order found to resend.'];
                 } else {
                     $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
-                    NotificationService::dispatch('membership_approved', [
-                        'primary_email' => $row['email'],
-                        'admin_emails' => NotificationService::getAdminEmails(),
-                        'payment_link' => NotificationService::escape($paymentLink),
-                    ]);
+                    if (($order['payment_method'] ?? '') === 'bank_transfer') {
+                        $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+                        NotificationService::dispatch('membership_order_created', [
+                            'primary_email' => $row['email'],
+                            'admin_emails' => NotificationService::getAdminEmails(),
+                            'order_number' => $order['order_number'] ?? '',
+                            'payment_link' => NotificationService::escape($paymentLink),
+                            'payment_method' => 'bank_transfer',
+                            'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+                        ]);
+                        $memberName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+                        NotificationService::dispatch('membership_admin_pending_approval', [
+                            'primary_email' => '',
+                            'admin_emails' => NotificationService::getAdminEmails(),
+                            'order_number' => $order['order_number'] ?? '',
+                            'member_name' => $memberName !== '' ? $memberName : $row['email'],
+                        ]);
+                    } else {
+                        $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = :order_id ORDER BY id ASC');
+                        $itemsStmt->execute(['order_id' => (int) $order['id']]);
+                        $items = $itemsStmt->fetchAll();
+                        $lineItems = [];
+                        foreach ($items as $item) {
+                            $lineItems[] = [
+                                'name' => $item['name'],
+                                'unit_amount' => (int) round(((float) $item['unit_price']) * 100),
+                                'quantity' => (int) ($item['quantity'] ?? 1),
+                                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+                            ];
+                        }
+                        if (!$lineItems) {
+                            $lineItems[] = [
+                                'name' => 'Membership',
+                                'unit_amount' => (int) round(((float) ($order['total'] ?? 0)) * 100),
+                                'quantity' => 1,
+                                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+                            ];
+                        }
+                        $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+                        $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+                        $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $row['email'], $successUrl, $cancelUrl, [
+                            'order_id' => (string) $order['id'],
+                            'order_type' => 'membership',
+                            'member_id' => (string) $row['member_id'],
+                            'period_id' => (string) ($order['membership_period_id'] ?? ''),
+                            'channel_id' => (string) ($order['channel_id'] ?? ''),
+                        ]);
+                        if ($session && !empty($session['id'])) {
+                            OrderService::updateStripeSession((int) $order['id'], $session['id']);
+                            $paymentLink = $session['url'] ?? $paymentLink;
+                        }
+                        NotificationService::dispatch('membership_order_created', [
+                            'primary_email' => $row['email'],
+                            'admin_emails' => NotificationService::getAdminEmails(),
+                            'order_number' => $order['order_number'] ?? '',
+                            'payment_link' => NotificationService::escape($paymentLink),
+                            'payment_method' => 'stripe',
+                        ]);
+                    }
                     if (!empty($row['phone'])) {
                         SmsService::send($row['phone'], 'Membership approved. Pay now: ' . $paymentLink);
                     }

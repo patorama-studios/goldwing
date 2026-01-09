@@ -425,6 +425,7 @@ CREATE TABLE member_bikes (
   member_id INT NOT NULL,
   make VARCHAR(100) NOT NULL,
   model VARCHAR(100) NOT NULL,
+  colour VARCHAR(100) NULL,
   year INT NULL,
   rego VARCHAR(50) NULL,
   image_url VARCHAR(255) NULL,

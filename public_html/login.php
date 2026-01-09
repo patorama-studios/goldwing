@@ -8,7 +8,7 @@ use App\Services\Validator;
 $error = '';
 $success = '';
 if (isset($_GET['reset'])) {
-    $success = 'Password updated. Please log in.';
+    $success = 'Password updated. Please log in with your new password.';
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';

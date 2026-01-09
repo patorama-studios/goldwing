@@ -8,6 +8,7 @@ use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\MemberRepository;
 use App\Services\MembershipMigrationService;
+use App\Services\MembershipOrderService;
 use App\Services\OrderRepository;
 use App\Services\PasswordPolicyService;
 use App\Services\RefundService;
@@ -15,6 +16,7 @@ use App\Services\NotificationService;
 use App\Services\SecurityPolicyService;
 use App\Services\SettingsService;
 use App\Services\MembershipService;
+use App\Services\StripeService;
 use App\Services\NotificationPreferenceService;
 use App\Services\TwoFactorService;
 use App\Services\VehicleRepository;
@@ -327,7 +329,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_delete'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_delete'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -405,11 +407,9 @@ switch ($action) {
         $updated = MemberRepository::update($targetMemberId, $payload);
         if ($updated && $allowFullProfile && array_key_exists('chapter_id', $payload) && in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
             $chapterId = $payload['chapter_id'];
-            if ($chapterId !== null) {
-                $pdo = Database::connection();
-                $stmt = $pdo->prepare('UPDATE members SET chapter_id = :chapter_id WHERE full_member_id = :full_member_id');
-                $stmt->execute(['chapter_id' => $chapterId, 'full_member_id' => $memberId]);
-            }
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('UPDATE members SET chapter_id = :chapter_id WHERE full_member_id = :full_member_id');
+            $stmt->execute(['chapter_id' => $chapterId, 'full_member_id' => $memberId]);
         }
         if (!$updated) {
             redirectWithFlash($memberId, $tab, 'Failed to update profile.', 'error', $redirectExtras);
@@ -433,6 +433,13 @@ switch ($action) {
             ActivityLogger::log('admin', $user['id'] ?? null, $targetMemberId, 'member.status_changed', [
                 'from' => $changes['status']['before'],
                 'to' => $changes['status']['after'],
+                'actor_roles' => $user['roles'] ?? [],
+            ]);
+        }
+        if (isset($changes['chapter_id'])) {
+            ActivityLogger::log('admin', $user['id'] ?? null, $targetMemberId, 'member.chapter_updated', [
+                'from' => $changes['chapter_id']['before'],
+                'to' => $changes['chapter_id']['after'],
                 'actor_roles' => $user['roles'] ?? [],
             ]);
         }
@@ -1056,39 +1063,43 @@ switch ($action) {
         $periodId = (int) $pdo->lastInsertId();
 
         $paymentStatus = match ($membershipStatus) {
-            'pending' => 'PENDING',
-            'lapsed' => 'LAPSED',
-            default => 'PAID',
+            'pending' => 'pending',
+            'lapsed' => 'failed',
+            default => 'accepted',
         };
-        $reference = $orderNotes !== '' ? strtok($orderNotes, "\n") : null;
-        $stmt = $pdo->prepare('INSERT INTO payments (member_id, type, description, amount, status, payment_method, order_source, order_reference, internal_notes, created_by_user_id, created_at) VALUES (:member_id, :type, :description, :amount, :status, :payment_method, :order_source, :order_reference, :internal_notes, :created_by_user_id, NOW())');
-        $stmt->execute([
-            'member_id' => $memberId,
-            'type' => 'membership',
-            'description' => 'Manual membership entry',
-            'amount' => max(0, $costValue),
-            'status' => $paymentStatus,
-            'payment_method' => $paymentMethod !== '' ? $paymentMethod : 'Manual',
-            'order_source' => 'Admin Manual',
-            'order_reference' => $reference !== '' ? $reference : null,
+        $fulfillmentStatus = match ($membershipStatus) {
+            'pending' => 'pending',
+            'lapsed' => 'expired',
+            default => 'active',
+        };
+        $order = MembershipOrderService::createMembershipOrder($memberId, $periodId, max(0, $costValue), [
+            'payment_method' => $paymentMethod,
+            'payment_status' => $paymentStatus,
+            'fulfillment_status' => $fulfillmentStatus,
+            'actor_user_id' => $user['id'] ?? null,
+            'term' => $term,
+            'item_name' => ($membershipType['name'] ?? 'Membership') . ' membership',
+            'admin_notes' => $orderNotes !== '' ? $orderNotes : null,
             'internal_notes' => $orderNotes !== '' ? $orderNotes : null,
-            'created_by_user_id' => $user['id'] ?? null,
         ]);
-        $paymentId = (int) $pdo->lastInsertId();
-        $manualPaymentKey = 'manual-' . $paymentId;
-        $pdo->prepare('UPDATE payments SET stripe_payment_id = :stripe_payment_id WHERE id = :id')->execute([
-            'stripe_payment_id' => $manualPaymentKey,
-            'id' => $paymentId,
-        ]);
-        $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id')->execute([
-            'payment_id' => $manualPaymentKey,
-            'id' => $periodId,
-        ]);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Unable to create membership order.', 'error');
+        }
+
+        $orderNumber = (string) ($order['order_number'] ?? '');
+        if ($orderNumber !== '') {
+            $stmt = $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id');
+            $stmt->execute([
+                'payment_id' => $orderNumber,
+                'id' => $periodId,
+            ]);
+        }
 
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.manual_order_created', [
             'membership_type' => $memberTypeCode,
             'status' => $membershipStatus,
             'amount' => max(0, $costValue),
+            'order_number' => $orderNumber !== '' ? $orderNumber : null,
             'actor_roles' => $user['roles'] ?? [],
         ]);
 
@@ -1103,6 +1114,177 @@ switch ($action) {
         }
 
         redirectWithFlash($memberId, $tab, 'Manual membership order saved.');
+        break;
+
+    case 'membership_order_accept':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Order approvals are restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND member_id = :member_id AND order_type = "membership" LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $paymentReference = trim($_POST['payment_reference'] ?? '');
+        $activated = MembershipOrderService::activateMembershipForOrder($order, [
+            'payment_reference' => $paymentReference !== '' ? $paymentReference : null,
+            'period_id' => $order['membership_period_id'] ?? null,
+        ]);
+        if (!$activated) {
+            redirectWithFlash($memberId, $tab, 'Unable to activate membership for this order.', 'error');
+        }
+        if ($paymentReference !== '') {
+            $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END, updated_at = NOW() WHERE id = :id');
+            $stmt->execute([
+                'note' => 'Payment reference: ' . $paymentReference,
+                'id' => $orderId,
+            ]);
+        }
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_accepted', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'payment_reference' => $paymentReference !== '' ? $paymentReference : null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        NotificationService::dispatch('membership_order_approved', [
+            'primary_email' => $member['email'] ?? '',
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+            'order_number' => $order['order_number'] ?? '',
+        ]);
+        redirectWithFlash($memberId, $tab, 'Membership order approved.');
+        break;
+
+    case 'membership_order_reject':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Order approvals are restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $reason = trim($_POST['reject_reason'] ?? '');
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND member_id = :member_id AND order_type = "membership" LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        MembershipOrderService::markOrderRejected($orderId, $reason !== '' ? $reason : null);
+        if (!empty($order['membership_period_id'])) {
+            $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
+            $stmt->execute(['id' => (int) $order['membership_period_id']]);
+        }
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_rejected', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'reason' => $reason !== '' ? $reason : null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        NotificationService::dispatch('membership_order_rejected', [
+            'primary_email' => $member['email'] ?? '',
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+            'order_number' => $order['order_number'] ?? '',
+            'rejection_reason' => $reason !== '' ? $reason : 'No reason provided.',
+        ]);
+        redirectWithFlash($memberId, $tab, 'Membership order rejected.');
+        break;
+
+    case 'membership_order_send_link':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Order actions are restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND member_id = :member_id AND order_type = "membership" LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = :order_id ORDER BY id ASC');
+        $itemsStmt->execute(['order_id' => $orderId]);
+        $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+        $lineItems = [];
+        foreach ($items as $item) {
+            $lineItems[] = [
+                'name' => $item['name'],
+                'unit_amount' => (int) round(((float) $item['unit_price']) * 100),
+                'quantity' => (int) ($item['quantity'] ?? 1),
+                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+            ];
+        }
+        if (!$lineItems) {
+            $lineItems[] = [
+                'name' => 'Membership',
+                'unit_amount' => (int) round(((float) ($order['total'] ?? 0)) * 100),
+                'quantity' => 1,
+                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+            ];
+        }
+        $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+        $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+        $metadata = [
+            'order_id' => (string) $orderId,
+            'order_type' => 'membership',
+            'member_id' => (string) $memberId,
+            'period_id' => (string) ($order['membership_period_id'] ?? ''),
+            'channel_id' => (string) ($order['channel_id'] ?? ''),
+        ];
+        $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
+        if (!$session || empty($session['id'])) {
+            redirectWithFlash($memberId, $tab, 'Unable to create a checkout link.', 'error');
+        }
+        $stmt = $pdo->prepare('UPDATE orders SET stripe_session_id = :session_id, payment_method = "stripe", payment_status = "pending", status = "pending", updated_at = NOW() WHERE id = :id');
+        $stmt->execute(['session_id' => $session['id'], 'id' => $orderId]);
+        NotificationService::dispatch('membership_order_created', [
+            'primary_email' => $member['email'] ?? '',
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+            'order_number' => $order['order_number'] ?? '',
+            'payment_link' => NotificationService::escape($session['url'] ?? ''),
+        ]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_payment_link_sent', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Checkout link sent.');
+        break;
+
+    case 'membership_order_note':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Order notes are restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $note = trim($_POST['note'] ?? '');
+        if ($orderId <= 0 || $note === '') {
+            redirectWithFlash($memberId, $tab, 'Order note requires text and an order.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END, updated_at = NOW() WHERE id = :id AND member_id = :member_id');
+        $stmt->execute([
+            'note' => $note,
+            'id' => $orderId,
+            'member_id' => $memberId,
+        ]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_note_added', [
+            'order_id' => $orderId,
+            'note' => $note,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Order note saved.');
         break;
 
     case 'roles_update':
@@ -1472,10 +1654,31 @@ switch ($action) {
         }
         $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
         $stmt->execute(['hash' => $hash, 'id' => $targetUserId]);
-        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash');
+        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
         $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
+        $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
+        $stmt->execute(['user_id' => $targetUserId]);
+        try {
+            $hasSessions = (bool) $pdo->query("SHOW TABLES LIKE 'sessions'")->fetchColumn();
+            if ($hasSessions) {
+                $stmt = $pdo->prepare('DELETE FROM sessions WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $targetUserId]);
+            }
+        } catch (Throwable $e) {
+            // Ignore if sessions table is unavailable.
+        }
+        try {
+            $hasStepup = (bool) $pdo->query("SHOW TABLES LIKE 'stepup_tokens'")->fetchColumn();
+            if ($hasStepup) {
+                $stmt = $pdo->prepare('DELETE FROM stepup_tokens WHERE user_id = :user_id');
+                $stmt->execute(['user_id' => $targetUserId]);
+            }
+        } catch (Throwable $e) {
+            // Ignore if step-up tokens table is unavailable.
+        }
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_set_by_admin', ['user_id' => $targetUserId]);
-        redirectWithFlash($memberId, $tab, 'Password updated.', 'success', $flashContext);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.password_reset_admin', ['user_id' => $targetUserId]);
+        redirectWithFlash($memberId, $tab, 'Password updated. Active sessions have been signed out.', 'success', $flashContext);
         break;
 
     case 'change_status':
