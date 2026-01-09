@@ -1207,14 +1207,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <input type="hidden" name="action" value="assign_chapter">
                       <select name="requested_chapter_id" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Select chapter</option>
-                        <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
+                        <?php foreach ($chapters as $chapter): ?>
                           <?php
                             $chapterLabel = $chapter['name'];
                             if (!empty($chapter['state'])) {
                                 $chapterLabel .= ' (' . $chapter['state'] . ')';
                             }
                           ?>
-                          <option value="<?= e((string) $chapter['id']) ?>"><?= e($chapterLabel) ?></option>
+                          <option value="<?= e((string) $chapter['id']) ?>" <?= (int) ($member['chapter_id'] ?? 0) === (int) $chapter['id'] ? 'selected' : '' ?>>
+                            <?= e($chapterLabel) ?>
+                          </option>
                         <?php endforeach; ?>
                       </select>
                       <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors" type="submit">Apply chapter</button>
