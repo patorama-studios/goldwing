@@ -1392,6 +1392,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             'Content-Type': 'application/json',
             'X-CSRF-Token': csrfToken,
           },
+          credentials: 'include',
           body: JSON.stringify(requestBody),
         });
         data = await response.json();
@@ -1432,6 +1433,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       ajaxForm.set('ajax', '1');
       const response = await fetch(window.location.pathname, {
         method: 'POST',
+        credentials: 'include',
         body: ajaxForm,
       });
       const data = await response.json();
