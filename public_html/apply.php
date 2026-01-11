@@ -755,7 +755,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                 <div id="stripe-payment-error" class="form-alert error" hidden></div>
               </div>
 
-              <div class="payment-panel" data-payment-panel="bank" hidden>
+              <div class="payment-panel" data-payment-panel="bank_transfer" hidden>
                 <div id="bank-transfer-details" class="bank-transfer-instructions">
                   <?= nl2br(e($bankTransferInstructions)) ?>
                 </div>
@@ -909,7 +909,6 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     background: #fff;
   }
 </style>
-<script src="https://js.stripe.com/v3/"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.querySelector('[data-wizard]');
@@ -1210,6 +1209,31 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     };
 
     const paymentPanels = Array.from(document.querySelectorAll('[data-payment-panel]'));
+    const loadStripeJs = (() => {
+      let loader = null;
+      return () => {
+        if (window.Stripe) {
+          return Promise.resolve(window.Stripe);
+        }
+        if (loader) {
+          return loader;
+        }
+        loader = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://js.stripe.com/v3/';
+          script.onload = () => {
+            if (window.Stripe) {
+              resolve(window.Stripe);
+            } else {
+              reject(new Error('Stripe.js failed to initialize.'));
+            }
+          };
+          script.onerror = () => reject(new Error('Unable to load Stripe.js.'));
+          document.head.appendChild(script);
+        });
+        return loader;
+      };
+    })();
     const getSelectedPaymentMethod = () => {
       const methodInput = form.querySelector('input[name="payment_method"]:checked');
       return methodInput ? methodInput.value : '';
@@ -1309,6 +1333,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     };
 
     const initStripeElements = async (secret) => {
+      await loadStripeJs();
       const config = await loadStripeConfig();
       if (!config || !config.publishableKey) {
         throw new Error('Stripe is not configured.');
