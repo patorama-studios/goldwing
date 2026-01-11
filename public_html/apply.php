@@ -1652,6 +1652,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     form.querySelectorAll('input[name="payment_method"]').forEach((input) => {
       input.addEventListener('change', () => {
         updatePaymentPanels();
+        if (input.checked && input.value === 'card') {
+          prepareStripeForSummary();
+        }
       });
     });
 
