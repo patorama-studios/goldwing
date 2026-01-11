@@ -306,6 +306,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$bankTransferInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
+if ($bankTransferInstructions === '') {
+    $bankTransferInstructions = 'Bank transfer details will be provided once your application is submitted.';
+}
+
 $pageTitle = 'Membership Application';
 require __DIR__ . '/../app/Views/partials/header.php';
 require __DIR__ . '/../app/Views/partials/nav_public.php';
@@ -718,9 +723,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                     Bank Transfer
                   </label>
                 </div>
+                <div class="form-alert error" id="payment-method-error" role="alert" hidden></div>
               </div>
 
-              <div class="payment-panel" data-payment-panel="card" hidden>
+              <div class="payment-panel stripe-style" data-payment-panel="card" hidden>
+                <p id="stripe-payment-note" class="form-helper" hidden>Stripe payments are processed immediately through the Stripe Payment Element and your application will complete once the payment is confirmed.</p>
                 <div class="form-grid two">
                   <label class="form-field">
                     <span class="form-label">Cardholder Name</span>
@@ -745,7 +752,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
               </div>
 
               <div class="payment-panel" data-payment-panel="bank" hidden>
-                <p class="form-helper">Bank transfer instructions will be provided after submission.</p>
+                <div id="bank-transfer-details" class="bank-transfer-instructions">
+                  <?= nl2br(e($bankTransferInstructions)) ?>
+                </div>
               </div>
 
               <div class="form-actions">
@@ -864,6 +873,28 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
   </div>
 </main>
 <?php if (!$message): ?>
+<style>
+  .payment-panel.stripe-style {
+    background: #fdfdfd;
+    border: 1px solid #d1d5db;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  }
+  .payment-panel.stripe-style .form-field,
+  .payment-panel.stripe-style .form-grid {
+    margin-bottom: 0.75rem;
+  }
+  .bank-transfer-instructions {
+    background: #f8fafc;
+    border: 1px dashed #cbd5f5;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #0f172a;
+  }
+</style>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.querySelector('[data-wizard]');
@@ -896,6 +927,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       full: form.querySelector('[data-period-hint="full"]'),
       associate: form.querySelector('[data-period-hint="associate"]'),
     };
+    const paymentMethodError = document.getElementById('payment-method-error');
+    const bankTransferDetails = document.getElementById('bank-transfer-details');
+    const stripePaymentNote = document.getElementById('stripe-payment-note');
     const summaryFullPrice = document.querySelector('[data-summary-full-price]');
     const summaryFullDetail = document.querySelector('[data-summary-full-detail]');
     const summaryAssociatePrice = document.querySelector('[data-summary-associate-price]');
@@ -1143,12 +1177,40 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     };
 
     const paymentPanels = Array.from(document.querySelectorAll('[data-payment-panel]'));
-    const updatePaymentPanels = () => {
+    const getSelectedPaymentMethod = () => {
       const methodInput = form.querySelector('input[name="payment_method"]:checked');
-      const method = methodInput ? methodInput.value : '';
+      return methodInput ? methodInput.value : '';
+    };
+    const showPaymentMethodError = (message) => {
+      if (!paymentMethodError) {
+        return;
+      }
+      if (!message) {
+        paymentMethodError.textContent = '';
+        paymentMethodError.hidden = true;
+        return;
+      }
+      paymentMethodError.textContent = message;
+      paymentMethodError.hidden = false;
+    };
+    const updatePaymentExtras = () => {
+      const method = getSelectedPaymentMethod();
+      if (bankTransferDetails) {
+        bankTransferDetails.hidden = method !== 'bank_transfer';
+      }
+      if (stripePaymentNote) {
+        stripePaymentNote.hidden = method !== 'card';
+      }
+      if (method) {
+        showPaymentMethodError('');
+      }
+    };
+    const updatePaymentPanels = () => {
+      const method = getSelectedPaymentMethod();
       paymentPanels.forEach((panel) => {
         panel.hidden = panel.dataset.paymentPanel !== method;
       });
+      updatePaymentExtras();
     };
 
     const isFieldRequired = (field) => {
@@ -1294,8 +1356,13 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', (event) => {
       syncVehiclePayloads();
+      const method = getSelectedPaymentMethod();
+      if (!method) {
+        event.preventDefault();
+        showPaymentMethodError('Please select a payment method before submitting.');
+      }
     });
 
     form.querySelectorAll('[data-add-vehicle]').forEach((button) => {
