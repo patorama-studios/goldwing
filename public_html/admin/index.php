@@ -14,6 +14,7 @@ use App\Services\NotificationService;
 use App\Services\SmsService;
 use App\Services\EmailService;
 use App\Services\PaymentSettingsService;
+use App\Services\StripeSettingsService;
 use App\Services\SettingsService;
 use App\Services\ChapterRepository;
 use App\Services\DomSnapshotService;
@@ -1133,7 +1134,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <?php
           $channel = PaymentSettingsService::getChannelByCode('primary');
           $paymentSettings = PaymentSettingsService::getSettingsByChannelId((int) $channel['id']);
-          $isConnected = !empty($paymentSettings['secret_key']) && !empty($paymentSettings['publishable_key']);
+          $stripeSettings = StripeSettingsService::getSettings();
+          $activeKeys = StripeSettingsService::getActiveKeys();
+          $webhookHealth = StripeSettingsService::webhookHealth($paymentSettings);
+          $isConnected = !empty($activeKeys['secret_key']) && !empty($activeKeys['publishable_key']);
           $canRefund = AdminMemberAccess::canRefund($user);
           $orders = $pdo->query('SELECT o.*, u.name, u.email FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 50')->fetchAll();
           $webhookEvents = $pdo->query('SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 50')->fetchAll();
@@ -1161,23 +1165,23 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-slate-600">Mode</span>
-                  <span class="text-slate-800 font-semibold"><?= e($paymentSettings['mode'] ?? 'test') ?></span>
+                  <span class="text-slate-800 font-semibold"><?= e($activeKeys['mode'] ?? 'test') ?></span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-slate-600">Publishable key</span>
-                  <span class="text-slate-800 font-semibold"><?= $paymentSettings['publishable_key'] ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-800 font-semibold"><?= !empty($activeKeys['publishable_key']) ? 'Configured' : 'Not set' ?></span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-slate-600">Secret key</span>
-                  <span class="text-slate-800 font-semibold"><?= $paymentSettings['secret_key'] ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-800 font-semibold"><?= !empty($activeKeys['secret_key']) ? 'Configured' : 'Not set' ?></span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-slate-600">Webhook secret</span>
-                  <span class="text-slate-800 font-semibold"><?= $paymentSettings['webhook_secret'] ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-800 font-semibold"><?= !empty($stripeSettings['webhook_secret']) ? 'Configured' : 'Not set' ?></span>
                 </div>
                 <div class="pt-2 text-xs text-slate-500">
-                  Last webhook: <?= e($paymentSettings['last_webhook_received_at'] ?? 'Never') ?><br>
-                  Last error: <?= e($paymentSettings['last_webhook_error'] ?? 'None') ?>
+                  Last webhook: <?= e($webhookHealth['last_received_at'] ?? 'Never') ?><br>
+                  Last error: <?= e($webhookHealth['last_error'] ?? 'None') ?>
                 </div>
               </div>
             </div>
@@ -1506,7 +1510,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <p class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></p>
                           <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> • <?= e($notice['created_by_name'] ?? 'Member') ?></p>
                         </div>
-                        <span class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(date('M j, Y', strtotime($notice['published_at'] ?? $notice['created_at']))) ?></span>
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
                       </div>
                       <?php if (!empty($notice['attachment_url'])): ?>
                         <div class="mb-3 rounded-xl border border-gray-100 overflow-hidden">
@@ -1548,7 +1552,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </div>
                       <div class="p-4 space-y-2">
                         <h4 class="text-base font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
-                        <p class="text-xs text-gray-500"><?= e(date('M j, Y', strtotime($notice['published_at'] ?? $notice['created_at']))) ?></p>
+                    <p class="text-xs text-gray-500"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></p>
                         <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
                       </div>
                     </article>
@@ -1574,7 +1578,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <div>
                         <h4 class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
                         <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> • Requested by <?= e($notice['created_by_name'] ?? 'Member') ?><?= !empty($notice['created_by_email']) ? ' (' . e($notice['created_by_email']) . ')' : '' ?></p>
-                        <p class="text-xs text-gray-400 mt-1">Submitted <?= e(date('M j, Y', strtotime($notice['created_at']))) ?></p>
+                    <p class="text-xs text-gray-400 mt-1">Submitted <?= e(format_date_au($notice['created_at'])) ?></p>
                       </div>
                       <div class="flex items-center gap-2">
                         <form method="post">
@@ -1818,6 +1822,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <div class="border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?> (<?= e((string) $entry['year_of_passing']) ?>)</p>
+                    <?php if (!empty($entry['member_number'])): ?>
+                      <p class="text-xs text-gray-500 mt-1">Member #: <?= e($entry['member_number']) ?></p>
+                    <?php endif; ?>
                     <?php if (!empty($entry['tribute'])): ?>
                       <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
                     <?php endif; ?>
@@ -1848,7 +1855,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <ul class="divide-y">
                 <?php foreach ($approvedMemorials as $entry): ?>
                   <li class="py-3 flex items-center justify-between">
-                    <span class="text-sm text-gray-800"><?= e($entry['full_name']) ?></span>
+                    <div>
+                      <p class="text-sm text-gray-800"><?= e($entry['full_name']) ?></p>
+                      <?php if (!empty($entry['member_number'])): ?>
+                        <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
+                      <?php endif; ?>
+                    </div>
                     <span class="text-xs text-gray-500"><?= e((string) $entry['year_of_passing']) ?></span>
                   </li>
                 <?php endforeach; ?>
@@ -2073,7 +2085,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           $createdLabel = '';
                           if (!empty($item['created_at'])) {
                               $createdAt = strtotime($item['created_at']);
-                              $createdLabel = $createdAt ? date('M j, Y', $createdAt) : '';
+                              $createdLabel = $createdAt ? format_date_au(date('Y-m-d H:i:s', $createdAt)) : '';
                           }
                           $visibility = ucfirst($item['visibility'] ?? 'member');
                           $typeLabel = strtoupper($type);

@@ -437,6 +437,7 @@ CREATE TABLE fallen_wings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   full_name VARCHAR(150) NOT NULL,
   year_of_passing INT NOT NULL,
+  member_number VARCHAR(120) NULL,
   tribute TEXT NULL,
   status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
   submitted_by INT NULL,

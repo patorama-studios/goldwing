@@ -68,6 +68,8 @@ CREATE TABLE orders (
   total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   stripe_session_id VARCHAR(120) NULL,
   stripe_payment_intent_id VARCHAR(120) NULL,
+  stripe_subscription_id VARCHAR(120) NULL,
+  stripe_invoice_id VARCHAR(120) NULL,
   stripe_charge_id VARCHAR(120) NULL,
   channel_id INT NOT NULL,
   shipping_required TINYINT(1) NOT NULL DEFAULT 0,
@@ -89,6 +91,8 @@ CREATE TABLE orders (
   INDEX idx_orders_fulfillment_status (fulfillment_status),
   INDEX idx_orders_membership_period (membership_period_id),
   INDEX idx_orders_payment_intent (stripe_payment_intent_id),
+  INDEX idx_orders_subscription (stripe_subscription_id),
+  INDEX idx_orders_invoice (stripe_invoice_id),
   INDEX idx_orders_charge (stripe_charge_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

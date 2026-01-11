@@ -142,69 +142,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $slugBase = calendar_slugify($title) . '-' . date('Ymd', strtotime($startAt));
-        $slug = $slugBase;
-        $suffix = 1;
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM calendar_events WHERE slug = :slug');
-        while (true) {
-            $stmt->execute(['slug' => $slug]);
-            if ($stmt->fetchColumn() == 0) {
-                break;
+        $eventId = 0;
+        try {
+            $slugBase = calendar_slugify($title) . '-' . date('Ymd', strtotime($startAt));
+            $slug = $slugBase;
+            $suffix = 1;
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM calendar_events WHERE slug = :slug');
+            while (true) {
+                $stmt->execute(['slug' => $slug]);
+                if ($stmt->fetchColumn() == 0) {
+                    break;
+                }
+                $suffix++;
+                $slug = $slugBase . '-' . $suffix;
             }
-            $suffix++;
-            $slug = $slugBase . '-' . $suffix;
-        }
 
-        $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
-            VALUES (:title, :slug, :description, :media_id, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
-        $stmt->execute([
-            'title' => $title,
-            'slug' => $slug,
-            'description' => $description,
-            'media_id' => $mediaId ?: null,
-            'scope' => $scope,
-            'chapter_id' => $scope === 'CHAPTER' ? $chapterId : null,
-            'event_type' => $eventType,
-            'timezone' => $timezone,
-            'start_at' => date('Y-m-d H:i:s', strtotime($startAt)),
-            'end_at' => date('Y-m-d H:i:s', strtotime($endAt)),
-            'all_day' => $allDay,
-            'recurrence_rule' => $recurrenceRule,
-            'rsvp_enabled' => $rsvpEnabled,
-            'is_paid' => $isPaid,
-            'ticket_product_id' => $ticketProductId,
-            'capacity' => $capacity,
-            'sales_close_at' => $salesCloseAt ? date('Y-m-d H:i:s', strtotime($salesCloseAt)) : null,
-            'map_url' => $mapUrl ?: null,
-            'map_zoom' => $mapZoom,
-            'online_url' => $onlineUrl ?: null,
-            'meeting_point' => $meetingPoint ?: null,
-            'destination' => $destination ?: null,
-            'created_by' => $user['id'],
-        ]);
-
-        $eventId = (int) $pdo->lastInsertId();
-        $subject = 'New event created: ' . $title;
-        $body = '<p>A new event has been created.</p><p><strong>' . calendar_e($title) . '</strong></p>';
-        if ($scope === 'CHAPTER') {
-            $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
-            $stmt->execute(['chapter_id' => $chapterId]);
-        } else {
-            $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin", "chapter_leader")');
-            $stmt->execute();
-        }
-        $admins = $stmt->fetchAll();
-        foreach ($admins as $admin) {
-            calendar_send_email($admin['email'], $subject, $body);
-            $stmtQueue = $pdo->prepare('INSERT INTO calendar_event_notifications_queue (user_id, event_id, type, send_at, payload_json, status, sent_at, created_at) VALUES (:user_id, :event_id, "admin_new_event", NOW(), :payload, "sent", NOW(), NOW())');
-            $stmtQueue->execute([
-                'user_id' => $admin['id'],
-                'event_id' => $eventId,
-                'payload' => json_encode(['title' => $title]),
+            $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
+                VALUES (:title, :slug, :description, :media_id, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
+            $stmt->execute([
+                'title' => $title,
+                'slug' => $slug,
+                'description' => $description,
+                'media_id' => $mediaId ?: null,
+                'scope' => $scope,
+                'chapter_id' => $scope === 'CHAPTER' ? $chapterId : null,
+                'event_type' => $eventType,
+                'timezone' => $timezone,
+                'start_at' => date('Y-m-d H:i:s', strtotime($startAt)),
+                'end_at' => date('Y-m-d H:i:s', strtotime($endAt)),
+                'all_day' => $allDay,
+                'recurrence_rule' => $recurrenceRule,
+                'rsvp_enabled' => $rsvpEnabled,
+                'is_paid' => $isPaid,
+                'ticket_product_id' => $ticketProductId,
+                'capacity' => $capacity,
+                'sales_close_at' => $salesCloseAt ? date('Y-m-d H:i:s', strtotime($salesCloseAt)) : null,
+                'map_url' => $mapUrl ?: null,
+                'map_zoom' => $mapZoom,
+                'online_url' => $onlineUrl ?: null,
+                'meeting_point' => $meetingPoint ?: null,
+                'destination' => $destination ?: null,
+                'created_by' => $user['id'],
             ]);
-        }
 
-        $success = 'Event created successfully.';
+            $eventId = (int) $pdo->lastInsertId();
+            $subject = 'New event created: ' . $title;
+            $body = '<p>A new event has been created.</p><p><strong>' . calendar_e($title) . '</strong></p>';
+            if ($scope === 'CHAPTER') {
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
+                $stmt->execute(['chapter_id' => $chapterId]);
+            } else {
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin", "chapter_leader")');
+                $stmt->execute();
+            }
+            $admins = $stmt->fetchAll();
+            foreach ($admins as $admin) {
+                calendar_send_email($admin['email'], $subject, $body);
+                $stmtQueue = $pdo->prepare('INSERT INTO calendar_event_notifications_queue (user_id, event_id, type, send_at, payload_json, status, sent_at, created_at) VALUES (:user_id, :event_id, "admin_new_event", NOW(), :payload, "sent", NOW(), NOW())');
+                $stmtQueue->execute([
+                    'user_id' => $admin['id'],
+                    'event_id' => $eventId,
+                    'payload' => json_encode(['title' => $title]),
+                ]);
+            }
+
+            $success = 'Event created successfully.';
+        } catch (Throwable $e) {
+            error_log('[Calendar] Event creation failed: ' . $e->getMessage());
+            if ($eventId === 0) {
+                $errors[] = 'Unable to create event. Please try again later.';
+            } else {
+                $success = 'Event created successfully.';
+            }
+        }
     }
 }
 

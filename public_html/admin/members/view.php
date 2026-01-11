@@ -402,22 +402,6 @@ function statusBadgeClasses(string $status): string
     };
 }
 
-function formatDate(?string $value): string
-{
-    if (!$value) {
-        return '—';
-    }
-    return date('Y-m-d', strtotime($value));
-}
-
-function formatDateTime(?string $value): string
-{
-    if (!$value) {
-        return '—';
-    }
-    return date('Y-m-d H:i', strtotime($value));
-}
-
 function formatCurrency(?int $cents): string
 {
     $cents = $cents ?? 0;
@@ -725,13 +709,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <div class="space-y-2">
                                 <?php foreach ($associates as $assoc): ?>
                                   <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                    <div>
-                                      <p class="text-sm font-semibold text-gray-900"><?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?></p>
-                                      <p class="text-xs text-gray-500"><?= e(\App\Services\MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?></p>
-                                    </div>
-                                    <a class="text-xs font-semibold text-secondary" href="<?= e(buildTabUrl($memberId, 'profile', ['profile_member_id' => $assoc['id']])) ?>">View</a>
+                                  <div>
+                                    <p class="text-sm font-semibold text-gray-900"><?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?></p>
+                                    <p class="text-xs text-gray-500"><?= e(\App\Services\MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?></p>
                                   </div>
-                                <?php endforeach; ?>
+                                  <div class="flex items-center gap-3">
+                                    <a class="text-xs font-semibold text-secondary" href="<?= e(buildTabUrl($memberId, 'profile', ['profile_member_id' => $assoc['id']])) ?>">View</a>
+                                    <?php if ($canEditFullProfile): ?>
+                                      <button type="button" data-associate-unlink data-associate-id="<?= e((int) $assoc['id']) ?>" class="text-xs font-semibold text-rose-600 hover:text-rose-700">Unlink</button>
+                                    <?php endif; ?>
+                                  </div>
+                                </div>
+                              <?php endforeach; ?>
                               </div>
                             <?php else: ?>
                               <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 border-dashed">

@@ -405,14 +405,14 @@ class MemberRepository
     private static function buildWhereClause(array $filters, array &$params): string
     {
         $parts = [];
+        $pdo = Database::connection();
+        $memberNumberExpr = self::memberNumberExpression($pdo);
+        $memberNumberBaseExists = self::hasMemberColumn($pdo, 'member_number_base');
+        $memberNumberSuffixExists = self::hasMemberColumn($pdo, 'member_number_suffix');
         if (!empty($filters['q'])) {
             $raw = trim((string) $filters['q']);
             $value = '%' . mb_strtolower($raw) . '%';
             $params['search'] = $value;
-            $pdo = Database::connection();
-            $memberNumberExpr = self::hasMemberNumberColumn($pdo)
-                ? 'COALESCE(m.member_number, CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END))'
-                : 'CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END)';
             $searchParts = [
                 'LOWER(m.first_name) LIKE :search',
                 'LOWER(m.last_name) LIKE :search',
@@ -430,6 +430,27 @@ class MemberRepository
         if (!empty($filters['member_id'])) {
             $parts[] = 'm.id = :member_id';
             $params['member_id'] = (int) $filters['member_id'];
+        }
+        if (!empty($filters['member_number'])) {
+            $memberNumberRaw = trim((string) $filters['member_number']);
+            $normalizedNumber = mb_strtolower(preg_replace('/\\s+/', '', $memberNumberRaw));
+            if ($normalizedNumber !== '') {
+                $parsed = MembershipService::parseMemberNumberString($memberNumberRaw);
+                if ($parsed && $memberNumberBaseExists) {
+                    $parts[] = 'm.member_number_base = :member_number_base';
+                    $params['member_number_base'] = $parsed['base'];
+                    if ($memberNumberSuffixExists) {
+                        $parts[] = 'm.member_number_suffix = :member_number_suffix';
+                        $params['member_number_suffix'] = $parsed['suffix'];
+                    } elseif ($parsed['suffix'] > 0) {
+                        $params['member_number_search'] = '%' . $normalizedNumber . '%';
+                        $parts[] = 'LOWER(' . $memberNumberExpr . ') LIKE :member_number_search';
+                    }
+                } else {
+                    $params['member_number_search'] = '%' . $normalizedNumber . '%';
+                    $parts[] = 'LOWER(' . $memberNumberExpr . ') LIKE :member_number_search';
+                }
+            }
         }
         if (!empty($filters['chapter_id'])) {
             $parts[] = 'm.chapter_id = :chapter_id';
@@ -590,9 +611,31 @@ class MemberRepository
         }
     }
 
+    private static function memberNumberExpression(PDO $pdo): string
+    {
+        $suffixExists = self::hasMemberColumn($pdo, 'member_number_suffix');
+        $suffixPart = $suffixExists
+            ? 'CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END'
+            : "''";
+        if (!self::hasMemberColumn($pdo, 'member_number_base')) {
+            if (self::hasMemberNumberColumn($pdo)) {
+                return 'm.member_number';
+            }
+            return 'm.id';
+        }
+        $combined = 'CONCAT(m.member_number_base, ' . $suffixPart . ')';
+        if (self::hasMemberNumberColumn($pdo)) {
+            return 'COALESCE(m.member_number, ' . $combined . ')';
+        }
+        return $combined;
+    }
+
     private static function buildOrderClause(array $filters, PDO $pdo): string
     {
         $sortBy = strtolower(trim((string) ($filters['sort_by'] ?? 'created')));
+        if ($sortBy === 'member_id') {
+            $sortBy = 'member_number';
+        }
         $direction = strtolower(trim((string) ($filters['sort_dir'] ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
 
         $memberNumberBase = self::hasMemberColumn($pdo, 'member_number_base') ? 'm.member_number_base' : null;
@@ -605,7 +648,7 @@ class MemberRepository
             'chapter' => ['c.name', 'm.last_name', 'm.first_name'],
             'status' => ['LOWER(m.status)', 'm.last_name', 'm.first_name'],
             'created' => ['m.created_at'],
-            'member_id' => array_values(array_filter([$memberNumberOrder, $memberNumberSuffix])),
+            'member_number' => array_values(array_filter([$memberNumberOrder, $memberNumberSuffix])),
             'id' => ['m.id'],
         ];
 

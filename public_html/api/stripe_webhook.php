@@ -2,26 +2,23 @@
 require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\StripeService;
-use App\Services\MembershipService;
-use App\Services\AuditService;
-use App\Services\NotificationService;
-use App\Services\SettingsService;
+use App\Services\StripeSettingsService;
 use App\Services\PaymentSettingsService;
 use App\Services\PaymentWebhookService;
 
 $payload = file_get_contents('php://input');
 $signature = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
+$channel = PaymentSettingsService::getChannelByCode('primary');
+$channelId = (int) ($channel['id'] ?? 0);
+$secret = StripeSettingsService::getWebhookSecret();
 
-if (!StripeService::verifyWebhook($payload, $signature)) {
+$event = StripeService::constructEvent($payload, $signature, $secret);
+if (!$event) {
+    if ($channelId > 0) {
+        PaymentSettingsService::updateWebhookStatus($channelId, 'Invalid signature');
+    }
     http_response_code(400);
     echo 'Invalid signature';
-    exit;
-}
-
-$event = json_decode($payload, true);
-if (!$event) {
-    http_response_code(400);
-    echo 'Invalid payload';
     exit;
 }
 
@@ -32,58 +29,41 @@ if (!$isNew) {
     exit;
 }
 
-$pdo = db();
-
+$eventId = $event['id'] ?? '';
 try {
-    if (($event['type'] ?? '') === 'checkout.session.completed') {
-        $session = $event['data']['object'] ?? [];
-        $metadata = $session['metadata'] ?? [];
-        $orderId = isset($metadata['order_id']) ? (int) $metadata['order_id'] : 0;
-        if ($orderId > 0) {
-            $channel = PaymentSettingsService::getChannelByCode('primary');
-            PaymentWebhookService::handleCheckoutCompleted($event, (int) ($channel['id'] ?? 0));
-        } else {
-            $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
-            $memberId = isset($metadata['member_id']) ? (int) $metadata['member_id'] : 0;
-            $amount = isset($session['amount_total']) ? ((int) $session['amount_total'] / 100) : 0;
-            $customerId = $session['customer'] ?? null;
-
-            if ($periodId) {
-                MembershipService::markPaid($periodId, $session['payment_intent'] ?? '');
-            }
-
-            if ($memberId && $customerId) {
-                $stmt = $pdo->prepare('UPDATE members SET stripe_customer_id = :customer_id WHERE id = :id');
-                $stmt->execute(['customer_id' => $customerId, 'id' => $memberId]);
-            }
-
-            $stmt = $pdo->prepare('INSERT INTO payments (member_id, type, description, amount, status, payment_method, order_source, order_reference, stripe_payment_id, created_at) VALUES (:member_id, :type, :description, :amount, :status, :payment_method, :order_source, :order_reference, :stripe_payment_id, NOW())');
-            $stmt->execute([
-                'member_id' => $memberId,
-                'type' => 'membership',
-                'description' => 'Membership payment',
-                'amount' => $amount,
-                'status' => 'PAID',
-                'payment_method' => 'Stripe',
-                'order_source' => 'Stripe',
-                'order_reference' => $session['payment_intent'] ?? null,
-                'stripe_payment_id' => $session['payment_intent'] ?? '',
-            ]);
-
-            if ($memberId) {
-                AuditService::log(null, 'payment_received', 'Stripe payment received for member #' . $memberId . '.');
-            }
-        }
+    $type = $event['type'] ?? '';
+    if ($type === 'checkout.session.completed') {
+        PaymentWebhookService::handleCheckoutCompleted($event, $channelId);
     }
-    if (in_array($event['type'] ?? '', ['payment_intent.payment_failed', 'payment_intent.canceled'], true)) {
+    if ($type === 'payment_intent.succeeded') {
+        PaymentWebhookService::handlePaymentIntentSucceeded($event);
+    }
+    if (in_array($type, ['payment_intent.payment_failed', 'payment_intent.canceled'], true)) {
         PaymentWebhookService::handlePaymentFailed($event);
     }
-
-    PaymentWebhookService::markProcessed($event['id'] ?? '', 'processed', null);
+    if ($type === 'charge.refunded') {
+        PaymentWebhookService::handleChargeRefunded($event);
+    }
+    if ($type === 'invoice.paid') {
+        PaymentWebhookService::handleInvoicePaid($event);
+    }
+    if ($type === 'invoice.payment_failed') {
+        PaymentWebhookService::handleInvoicePaymentFailed($event);
+    }
+    if (in_array($type, ['customer.subscription.updated', 'customer.subscription.deleted'], true)) {
+        PaymentWebhookService::handleSubscriptionUpdated($event);
+    }
+    PaymentWebhookService::markProcessed($eventId, 'processed', null);
+    if ($channelId > 0) {
+        PaymentSettingsService::updateWebhookStatus($channelId, null);
+    }
     http_response_code(200);
     echo 'OK';
 } catch (Throwable $e) {
-    PaymentWebhookService::markProcessed($event['id'] ?? '', 'failed', $e->getMessage());
+    PaymentWebhookService::markProcessed($eventId, 'failed', $e->getMessage());
+    if ($channelId > 0) {
+        PaymentSettingsService::updateWebhookStatus($channelId, $e->getMessage());
+    }
     http_response_code(500);
     echo 'Webhook error';
 }

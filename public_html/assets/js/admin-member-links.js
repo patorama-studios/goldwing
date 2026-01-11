@@ -116,8 +116,9 @@
         const row = document.createElement('div');
         row.className = 'flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2';
         const info = document.createElement('div');
+        const displayName = item.display_name || item.name || 'Associate member';
         info.innerHTML = `
-          <p class="font-semibold text-gray-900">${item.name}</p>
+          <p class="font-semibold text-gray-900">${displayName}</p>
           <div class="text-xs text-gray-500">
             ${item.member_number ? `<span>Member #${item.member_number}</span>` : ''}
             ${item.email ? `<span class="ml-3">${item.email}</span>` : ''}
@@ -133,6 +134,61 @@
         resultsContainer.appendChild(row);
       });
     };
+
+    const unlinkAssociate = async (associateId, triggerButton) => {
+      if (!csrfToken || !memberId) {
+        showFeedback('Missing configuration.', 'text-rose-500');
+        return;
+      }
+      setBusy(true);
+      if (triggerButton) {
+        triggerButton.disabled = true;
+      }
+      try {
+        const form = new FormData();
+        form.append('csrf_token', csrfToken);
+        form.append('action', 'unlink_associate_member');
+        form.append('member_id', memberId);
+        form.append('associate_member_id', associateId.toString());
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: form,
+        });
+        const payload = await parseJsonResponse(response);
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error || 'Unable to unlink associate.');
+        }
+        showFeedback(payload.message || 'Associate unlinked. Reloading…', 'text-emerald-600');
+        window.setTimeout(() => window.location.reload(), 700);
+      } catch (error) {
+        showFeedback(error.message || 'Unable to unlink associate.', 'text-rose-500');
+      } finally {
+        if (triggerButton) {
+          triggerButton.disabled = false;
+        }
+        setBusy(false);
+      }
+    };
+
+    const attachUnlinkHandlers = () => {
+      const unlinkButtons = document.querySelectorAll('[data-associate-unlink]');
+      unlinkButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          if (isBusy) {
+            return;
+          }
+          const associateId = button.dataset.associateId;
+          if (!associateId) {
+            return;
+          }
+          if (!confirm('Remove this associate from the member?')) {
+            return;
+          }
+          unlinkAssociate(associateId, button);
+        });
+      });
+    };
+    attachUnlinkHandlers();
 
     const performSearch = async (query) => {
       if (!query) {

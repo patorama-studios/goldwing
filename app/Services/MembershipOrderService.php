@@ -120,7 +120,12 @@ class MembershipOrderService
                     $startDate = $activeEndDate->modify('+1 day')->format('Y-m-d');
                 }
             }
-            $termYears = $term === '3Y' ? 3 : 1;
+            $termYears = 1;
+            if ($term === '3Y') {
+                $termYears = 3;
+            } elseif ($term === '2Y') {
+                $termYears = 2;
+            }
             $endDate = MembershipService::calculateExpiry($startDate, $termYears);
         }
 

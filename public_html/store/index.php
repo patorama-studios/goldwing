@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../../app/bootstrap.php';
 
+use App\Services\StripeSettingsService;
+
 $pdo = db();
 $user = current_user();
 $settings = store_get_settings();
@@ -28,7 +30,19 @@ if ($page === 'orders' && $subPage) {
 }
 
 $membersOnly = !empty($settings['members_only']);
-if ($membersOnly || in_array($page, ['cart', 'checkout', 'orders', 'order'], true)) {
+$stripeSettings = StripeSettingsService::getSettings();
+$allowGuestCheckout = !empty($stripeSettings['allow_guest_checkout']);
+$requiresLogin = false;
+if (in_array($page, ['orders', 'order'], true)) {
+    $requiresLogin = true;
+}
+if ($membersOnly && !$allowGuestCheckout) {
+    $requiresLogin = true;
+}
+if (!$allowGuestCheckout && in_array($page, ['cart', 'checkout'], true)) {
+    $requiresLogin = true;
+}
+if ($requiresLogin) {
     require_login();
     $user = current_user();
 }

@@ -187,6 +187,28 @@ function store_calculate_shipping(float $subtotalAfterDiscount, array $settings,
 function store_get_open_cart(int $userId): array
 {
     $pdo = db();
+    $userId = (int) $userId;
+    if ($userId <= 0) {
+        $sessionCartId = (int) ($_SESSION['guest_cart_id'] ?? 0);
+        if ($sessionCartId > 0) {
+            $stmt = $pdo->prepare('SELECT * FROM store_carts WHERE id = :id AND user_id IS NULL AND status = "open" LIMIT 1');
+            $stmt->execute(['id' => $sessionCartId]);
+            $cart = $stmt->fetch();
+            if ($cart) {
+                return $cart;
+            }
+        }
+        $stmt = $pdo->prepare('INSERT INTO store_carts (user_id, status, created_at) VALUES (NULL, "open", NOW())');
+        $stmt->execute();
+        $cartId = (int) $pdo->lastInsertId();
+        $_SESSION['guest_cart_id'] = $cartId;
+        return [
+            'id' => $cartId,
+            'user_id' => null,
+            'status' => 'open',
+            'discount_code' => null,
+        ];
+    }
     $stmt = $pdo->prepare('SELECT * FROM store_carts WHERE user_id = :user_id AND status = "open" LIMIT 1');
     $stmt->execute(['user_id' => $userId]);
     $cart = $stmt->fetch();

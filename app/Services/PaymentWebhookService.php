@@ -161,6 +161,9 @@ class PaymentWebhookService
     public static function handlePaymentFailed(array $event): void
     {
         $intent = $event['data']['object'] ?? [];
+        if (!empty($intent['invoice'])) {
+            return;
+        }
         $paymentIntentId = $intent['id'] ?? '';
         if ($paymentIntentId === '') {
             return;
@@ -191,6 +194,204 @@ class PaymentWebhookService
                 'order_id' => $order['id'],
                 'payment_intent' => $paymentIntentId,
             ]);
+        }
+    }
+
+    public static function handlePaymentIntentSucceeded(array $event): void
+    {
+        $intent = $event['data']['object'] ?? [];
+        if (!empty($intent['invoice'])) {
+            return;
+        }
+        $paymentIntentId = $intent['id'] ?? '';
+        if ($paymentIntentId === '') {
+            return;
+        }
+
+        $metadata = $intent['metadata'] ?? [];
+        $orderId = isset($metadata['order_id']) ? (int) $metadata['order_id'] : 0;
+        if ($orderId <= 0) {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $order = self::getOrderForUpdate($orderId);
+            if (!$order) {
+                $pdo->rollBack();
+                return;
+            }
+            if (($order['status'] ?? '') !== 'paid') {
+                $chargeId = $intent['latest_charge'] ?? '';
+                if ($chargeId === '' && !empty($intent['charges']['data'][0]['id'])) {
+                    $chargeId = (string) $intent['charges']['data'][0]['id'];
+                }
+                OrderService::markPaid($orderId, $paymentIntentId, $chargeId !== '' ? $chargeId : null);
+            }
+
+            if (($order['order_type'] ?? '') === 'store') {
+                $storeOrderId = isset($metadata['store_order_id']) ? (int) $metadata['store_order_id'] : 0;
+                if ($storeOrderId > 0) {
+                    self::markStoreOrderPaid($storeOrderId, $paymentIntentId, null);
+                }
+            }
+
+            if (!self::invoiceExists($orderId)) {
+                $updatedOrder = OrderService::getOrderById($orderId);
+                if ($updatedOrder) {
+                    $order = $updatedOrder;
+                }
+                InvoiceService::createForOrder($order);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public static function handleInvoicePaid(array $event): void
+    {
+        $invoice = $event['data']['object'] ?? [];
+        $invoiceId = $invoice['id'] ?? '';
+        $subscriptionId = $invoice['subscription'] ?? '';
+        $paymentIntentId = $invoice['payment_intent'] ?? '';
+        if ($invoiceId === '' && $subscriptionId === '') {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $order = null;
+        if ($invoiceId !== '') {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_invoice_id = :invoice_id LIMIT 1');
+            $stmt->execute(['invoice_id' => $invoiceId]);
+            $order = $stmt->fetch();
+        }
+        if (!$order && $subscriptionId !== '') {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_subscription_id = :subscription_id LIMIT 1');
+            $stmt->execute(['subscription_id' => $subscriptionId]);
+            $order = $stmt->fetch();
+        }
+        if (!$order && !empty($invoice['metadata']['order_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $invoice['metadata']['order_id']]);
+            $order = $stmt->fetch();
+        }
+        if (!$order) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = CASE WHEN stripe_payment_intent_id IS NULL OR stripe_payment_intent_id = "" THEN :payment_intent_id ELSE stripe_payment_intent_id END, stripe_invoice_id = :invoice_id, stripe_subscription_id = CASE WHEN stripe_subscription_id IS NULL OR stripe_subscription_id = "" THEN :subscription_id ELSE stripe_subscription_id END, updated_at = NOW() WHERE id = :id');
+        $stmt->execute([
+            'payment_intent_id' => $paymentIntentId,
+            'invoice_id' => $invoiceId !== '' ? $invoiceId : ($order['stripe_invoice_id'] ?? ''),
+            'subscription_id' => $subscriptionId !== '' ? $subscriptionId : ($order['stripe_subscription_id'] ?? ''),
+            'id' => (int) ($order['id'] ?? 0),
+        ]);
+
+        if (($order['order_type'] ?? '') !== 'membership') {
+            return;
+        }
+
+        MembershipOrderService::activateMembershipForOrder($order, [
+            'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+            'period_id' => $order['membership_period_id'] ?? null,
+        ]);
+
+        $internal = json_decode((string) ($order['internal_notes'] ?? ''), true);
+        if (is_array($internal)) {
+            $associatePeriodId = (int) ($internal['associate_period_id'] ?? 0);
+            if ($associatePeriodId > 0) {
+                MembershipService::markPaid($associatePeriodId, $paymentIntentId !== '' ? $paymentIntentId : $invoiceId);
+            }
+            $associateMemberId = (int) ($internal['associate_member_id'] ?? 0);
+            if ($associateMemberId > 0 && $associatePeriodId <= 0) {
+                $stmt = $pdo->prepare('UPDATE members SET status = "ACTIVE", updated_at = NOW() WHERE id = :id');
+                $stmt->execute(['id' => $associateMemberId]);
+            }
+        }
+
+        if (!empty($order['user_id'])) {
+            $stmt = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = :id AND is_active = 0');
+            $stmt->execute(['id' => (int) $order['user_id']]);
+        }
+    }
+
+    public static function handleInvoicePaymentFailed(array $event): void
+    {
+        $invoice = $event['data']['object'] ?? [];
+        $invoiceId = $invoice['id'] ?? '';
+        $subscriptionId = $invoice['subscription'] ?? '';
+        if ($invoiceId === '' && $subscriptionId === '') {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $order = null;
+        if ($invoiceId !== '') {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_invoice_id = :invoice_id LIMIT 1');
+            $stmt->execute(['invoice_id' => $invoiceId]);
+            $order = $stmt->fetch();
+        }
+        if (!$order && $subscriptionId !== '') {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_subscription_id = :subscription_id LIMIT 1');
+            $stmt->execute(['subscription_id' => $subscriptionId]);
+            $order = $stmt->fetch();
+        }
+        if (!$order && !empty($invoice['metadata']['order_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $invoice['metadata']['order_id']]);
+            $order = $stmt->fetch();
+        }
+        if (!$order) {
+            return;
+        }
+
+        MembershipOrderService::markOrderFailed((int) ($order['id'] ?? 0), 'Stripe invoice payment failed.');
+        $periodId = (int) ($order['membership_period_id'] ?? 0);
+        if ($periodId > 0) {
+            $stmt = $pdo->prepare('UPDATE membership_periods SET status = "PENDING_PAYMENT" WHERE id = :id');
+            $stmt->execute(['id' => $periodId]);
+        }
+    }
+
+    public static function handleSubscriptionUpdated(array $event): void
+    {
+        $subscription = $event['data']['object'] ?? [];
+        $subscriptionId = $subscription['id'] ?? '';
+        if ($subscriptionId === '') {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_subscription_id = :subscription_id LIMIT 1');
+        $stmt->execute(['subscription_id' => $subscriptionId]);
+        $order = $stmt->fetch();
+        if (!$order) {
+            return;
+        }
+
+        $status = strtolower((string) ($subscription['status'] ?? ''));
+        if ($status === 'past_due') {
+            $stmt = $pdo->prepare('UPDATE orders SET payment_status = "failed", updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => (int) ($order['id'] ?? 0)]);
+        }
+        if (in_array($status, ['canceled', 'unpaid', 'incomplete_expired'], true)) {
+            $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "failed", updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => (int) ($order['id'] ?? 0)]);
+
+            $periodId = (int) ($order['membership_period_id'] ?? 0);
+            if ($periodId > 0) {
+                $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
+                $stmt->execute(['id' => $periodId]);
+            }
+            $memberId = (int) ($order['member_id'] ?? 0);
+            if ($memberId > 0) {
+                $stmt = $pdo->prepare('UPDATE members SET status = "INACTIVE", updated_at = NOW() WHERE id = :id');
+                $stmt->execute(['id' => $memberId]);
+            }
         }
     }
 

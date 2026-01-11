@@ -442,6 +442,7 @@ CREATE TABLE fallen_wings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   full_name VARCHAR(150) NOT NULL,
   year_of_passing INT NOT NULL,
+  member_number VARCHAR(120) NULL,
   tribute TEXT NULL,
   status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
   submitted_by INT NULL,
@@ -744,7 +745,7 @@ CREATE TABLE store_variant_option_values (
 
 CREATE TABLE store_carts (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
+  user_id INT NULL,
   status ENUM('open','converted','abandoned') NOT NULL DEFAULT 'open',
   discount_code VARCHAR(50) NULL,
   created_at DATETIME NOT NULL,
@@ -788,7 +789,7 @@ CREATE TABLE store_discounts (
 CREATE TABLE store_orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   order_number VARCHAR(30) UNIQUE NOT NULL,
-  user_id INT NOT NULL,
+  user_id INT NULL,
   member_id INT NULL,
   status ENUM('pending','paid','fulfilled','cancelled','refunded') NOT NULL DEFAULT 'pending',
   subtotal DECIMAL(10,2) NOT NULL,
@@ -1277,6 +1278,8 @@ CREATE TABLE orders (
   total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   stripe_session_id VARCHAR(120) NULL,
   stripe_payment_intent_id VARCHAR(120) NULL,
+  stripe_subscription_id VARCHAR(120) NULL,
+  stripe_invoice_id VARCHAR(120) NULL,
   stripe_charge_id VARCHAR(120) NULL,
   channel_id INT NOT NULL,
   shipping_required TINYINT(1) NOT NULL DEFAULT 0,
@@ -1298,6 +1301,8 @@ CREATE TABLE orders (
   INDEX idx_orders_fulfillment_status (fulfillment_status),
   INDEX idx_orders_membership_period (membership_period_id),
   INDEX idx_orders_payment_intent (stripe_payment_intent_id),
+  INDEX idx_orders_subscription (stripe_subscription_id),
+  INDEX idx_orders_invoice (stripe_invoice_id),
   INDEX idx_orders_charge (stripe_charge_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -1731,6 +1736,7 @@ CREATE TABLE IF NOT EXISTS fallen_wings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   full_name VARCHAR(150) NOT NULL,
   year_of_passing INT NOT NULL,
+  member_number VARCHAR(120) NULL,
   tribute TEXT NULL,
   status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
   submitted_by INT NULL,

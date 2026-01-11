@@ -40,6 +40,7 @@ if ($memberIdFilter !== null && $memberIdFilter <= 0) {
 $filters = [
     'q' => trim((string) ($_GET['q'] ?? '')),
     'member_id' => $memberIdFilter,
+    'member_number' => trim((string) ($_GET['member_number'] ?? '')),
     'membership_type_id' => isset($_GET['membership_type_id']) && $_GET['membership_type_id'] !== '' ? (int) $_GET['membership_type_id'] : null,
     'status' => $_GET['status'] ?? '',
     'role' => trim((string) ($_GET['role'] ?? '')),
@@ -62,11 +63,14 @@ $sortOptions = [
     'created' => 'Created date',
     'id' => 'Record ID',
     'member' => 'Member name',
-    'member_id' => 'Member #',
+    'member_number' => 'Membership #',
     'chapter' => 'Chapter',
     'status' => 'Status',
 ];
 $sortBy = strtolower(trim((string) ($_GET['sort_by'] ?? 'created')));
+if ($sortBy === 'member_id') {
+    $sortBy = 'member_number';
+}
 if (!array_key_exists($sortBy, $sortOptions)) {
     $sortBy = 'created';
 }
@@ -171,14 +175,6 @@ function memberInitials(string $firstName, string $lastName): string
     $first = mb_substr($firstName, 0, 1);
     $last = mb_substr($lastName, 0, 1);
     return strtoupper($first . $last);
-}
-
-function formatDate(?string $value): string
-{
-    if (!$value) {
-        return '—';
-    }
-    return date('Y-m-d', strtotime($value));
 }
 
 $hasAdvancedFilters = $filters['vehicle_type'] !== ''
@@ -322,14 +318,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php if ($chapterRestriction !== null): ?>
             <input type="hidden" name="chapter_id" value="<?= e($chapterRestriction) ?>">
           <?php endif; ?>
-          <div class="grid gap-4 lg:grid-cols-8">
+          <div class="grid gap-4 lg:grid-cols-7">
             <label class="flex flex-col text-sm font-medium text-gray-700">
-              Search
-              <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, phone, or ID">
+              Member
+              <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, or phone">
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
-              Member ID
-              <input type="number" min="1" name="member_id" value="<?= e((string) ($filters['member_id'] ?? '')) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Record ID">
+              Membership #
+              <input type="text" name="member_number" value="<?= e($filters['member_number'] ?? '') ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="e.g. 12345 or 12345.1">
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
               Chapter
@@ -337,15 +333,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <option value="">All chapters</option>
                 <?php foreach ($availableChapters as $chapter): ?>
                   <option value="<?= e($chapter['id']) ?>" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === (int) $chapter['id'] ? 'selected' : '' ?>><?= e($chapter['name']) ?> (<?= e($chapter['state']) ?>)</option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700">
-              Membership type
-              <select name="membership_type_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                <option value="">All types</option>
-                <?php foreach ($membershipTypes as $type): ?>
-                  <option value="<?= e($type['id']) ?>" <?= isset($filters['membership_type_id']) && (int) $filters['membership_type_id'] === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
                 <?php endforeach; ?>
               </select>
             </label>
@@ -393,6 +380,19 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </summary>
             <div class="mt-4 grid gap-4 md:grid-cols-3">
               <label class="flex flex-col text-sm font-medium text-gray-700">
+                Member ID
+                <input type="number" min="1" name="member_id" value="<?= e((string) ($filters['member_id'] ?? '')) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Record ID">
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Membership type
+                <select name="membership_type_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">All types</option>
+                  <?php foreach ($membershipTypes as $type): ?>
+                    <option value="<?= e($type['id']) ?>" <?= isset($filters['membership_type_id']) && (int) $filters['membership_type_id'] === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
                 User role
                 <select name="role" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
                   <option value="">All roles</option>
@@ -402,6 +402,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php endforeach; ?>
                 </select>
               </label>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-3">
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Vehicle type
                 <select name="vehicle_type" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
@@ -415,12 +417,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 Make
                 <input type="text" name="vehicle_make" value="<?= e($filters['vehicle_make']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
               </label>
-            </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-3">
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Model
                 <input type="text" name="vehicle_model" value="<?= e($filters['vehicle_model']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
               </label>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-3">
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Year exact
                 <input type="number" min="1900" max="2100" name="vehicle_year_exact" value="<?= e($filters['vehicle_year_exact']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
@@ -501,7 +503,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </th>
                 <th class="py-3 px-4">Member</th>
                 <th class="py-3 px-4">ID</th>
-                <th class="py-3 px-4">Member #</th>
+                <th class="py-3 px-4">Membership #</th>
                 <th class="py-3 px-4">Contact info</th>
                 <th class="py-3 px-4">Chapter</th>
                 <th class="py-3 px-4">Status</th>

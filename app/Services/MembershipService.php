@@ -128,7 +128,12 @@ class MembershipService
     {
         $expiry = null;
         if ($term !== 'LIFE') {
-            $termYears = $term === '3Y' ? 3 : 1;
+            $termYears = 1;
+            if ($term === '3Y') {
+                $termYears = 3;
+            } elseif ($term === '2Y') {
+                $termYears = 2;
+            }
             $expiry = self::calculateExpiry($startDate, $termYears);
         }
         $pdo = Database::connection();

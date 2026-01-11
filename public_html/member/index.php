@@ -95,22 +95,6 @@ if ($page === 'billing') {
     }
 }
 
-function format_date(?string $value): string
-{
-    if (!$value) {
-        return '—';
-    }
-    return date('Y-m-d', strtotime($value));
-}
-
-function format_datetime(?string $value): string
-{
-    if (!$value) {
-        return '—';
-    }
-    return date('Y-m-d H:i', strtotime($value));
-}
-
 function status_badge_classes(string $status): string
 {
     $clean = strtolower(trim($status));
@@ -132,6 +116,10 @@ function normalize_membership_price_term(string $term): string
         'THREE_YEARS' => '3Y',
         '3YEAR' => '3Y',
         '3YEARS' => '3Y',
+        'TWO_YEAR' => '2Y',
+        'TWO_YEARS' => '2Y',
+        '2YEAR' => '2Y',
+        '2YEARS' => '2Y',
         'ONE_YEAR' => '1Y',
         'ONE_YEARS' => '1Y',
         '1YEAR' => '1Y',
@@ -148,6 +136,8 @@ if ($user && $user['member_id']) {
     $member = $stmt->fetch();
 
     if ($member) {
+        $ordersMemberColumn = orders_member_column($pdo);
+        $ordersMemberValue = $ordersMemberColumn ? orders_member_value($member, $user ?? [], $ordersMemberColumn) : null;
         $memberActivity = ActivityRepository::listByMember((int) $member['id'], [], 60);
         $memberActivity = array_values(array_filter($memberActivity, function ($entry) {
             if (empty($entry['metadata'])) {
@@ -463,9 +453,12 @@ if ($user && $user['member_id']) {
                 } elseif (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
                     $billingError = 'Life members do not need to renew.';
                 } else {
-                    $stmt = $pdo->prepare('SELECT id FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status = "pending" ORDER BY created_at DESC LIMIT 1');
-                    $stmt->execute(['member_id' => $member['id']]);
-                    $pendingOrderId = (int) $stmt->fetchColumn();
+                    $pendingOrderId = 0;
+                    if ($ordersMemberColumn && $ordersMemberValue) {
+                        $stmt = $pdo->prepare('SELECT id FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND payment_status = "pending" ORDER BY created_at DESC LIMIT 1');
+                        $stmt->execute(['value' => $ordersMemberValue]);
+                        $pendingOrderId = (int) $stmt->fetchColumn();
+                    }
                     if ($pendingOrderId > 0) {
                         $billingMessage = 'You already have a pending membership order.';
                     } else {
@@ -635,6 +628,8 @@ if ($user && $user['member_id']) {
                 $dateOfPassing = trim($_POST['fallen_date'] ?? '');
                 $yearInput = trim($_POST['fallen_year'] ?? '');
                 $tribute = trim($_POST['fallen_tribute'] ?? '');
+                $memberNumberRaw = trim($_POST['fallen_member_number'] ?? '');
+                $memberNumberNormalized = $memberNumberRaw !== '' ? preg_replace('/\\s+/', '', $memberNumberRaw) : '';
 
                 $year = 0;
                 if ($dateOfPassing !== '') {
@@ -651,11 +646,14 @@ if ($user && $user['member_id']) {
                     $fallenError = 'Fallen Wings table not found. Please run the migration to enable submissions.';
                 } elseif ($fullName === '' || $year <= 0) {
                     $fallenError = 'Please include a name and date of passing.';
+                } elseif ($memberNumberNormalized !== '' && !preg_match('/^[A-Za-z0-9\\.\\-]+$/', $memberNumberNormalized)) {
+                    $fallenError = 'Member number may only contain letters, numbers, dots, or dashes.';
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO fallen_wings (full_name, year_of_passing, tribute, status, submitted_by, created_at) VALUES (:full_name, :year_of_passing, :tribute, "PENDING", :submitted_by, NOW())');
+                    $stmt = $pdo->prepare('INSERT INTO fallen_wings (full_name, year_of_passing, member_number, tribute, status, submitted_by, created_at) VALUES (:full_name, :year_of_passing, :member_number, :tribute, "PENDING", :submitted_by, NOW())');
                     $stmt->execute([
                         'full_name' => $fullName,
                         'year_of_passing' => $year,
+                        'member_number' => $memberNumberNormalized !== '' ? $memberNumberNormalized : null,
                         'tribute' => $tribute !== '' ? $tribute : null,
                         'submitted_by' => $user['id'],
                     ]);
@@ -673,6 +671,9 @@ if ($user && $user['member_id']) {
                         $body = '<p>A new Fallen Wings submission is awaiting review.</p>'
                             . '<p><strong>Name:</strong> ' . e($fullName) . '<br>'
                             . '<strong>Year:</strong> ' . e((string) $year) . '</p>';
+                        if ($memberNumberNormalized !== '') {
+                            $body .= '<p><strong>Member number:</strong> ' . e($memberNumberNormalized) . '</p>';
+                        }
                         foreach ($committeeEmails as $email) {
                             EmailService::send($email, $subject, $body);
                         }
@@ -852,9 +853,12 @@ if ($user && $user['member_id']) {
         $stmt->execute();
         $wingsLatest = $stmt->fetch();
 
-        $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC');
-        $stmt->execute(['member_id' => $member['id']]);
-        $membershipOrders = $stmt->fetchAll();
+        $membershipOrders = [];
+        if ($ordersMemberColumn && $ordersMemberValue) {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC');
+            $stmt->execute(['value' => $ordersMemberValue]);
+            $membershipOrders = $stmt->fetchAll();
+        }
         $membershipOrderItemsById = [];
         if ($membershipOrders) {
             $membershipOrderIds = array_column($membershipOrders, 'id');
@@ -1345,9 +1349,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           }
           $profileMembershipOrders = $membershipOrders;
           if ($profileMemberId !== $member['id']) {
-              $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC');
-              $stmt->execute(['member_id' => $profileMemberId]);
-              $profileMembershipOrders = $stmt->fetchAll();
+              $profileOrdersValue = $ordersMemberColumn ? orders_member_value($profileMember ?? [], $user ?? [], $ordersMemberColumn) : null;
+              if ($ordersMemberColumn && $profileOrdersValue) {
+                  $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC');
+                  $stmt->execute(['value' => $profileOrdersValue]);
+                  $profileMembershipOrders = $stmt->fetchAll();
+              } else {
+                  $profileMembershipOrders = [];
+              }
           }
           $profileLatestOrder = $profileMembershipOrders[0] ?? null;
           $profileMemberNumber = '—';
@@ -1950,7 +1959,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               ?>
               <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-gray-500">
-                  <span><?= e(date('M j, Y g:i A', strtotime($entry['created_at'] ?? 'now'))) ?></span>
+                  <span><?= e(format_datetime_au($entry['created_at'] ?? 'now')) ?></span>
                   <span><?= e(ucfirst($entry['actor_type'] ?? 'system')) ?></span>
                 </div>
                 <p class="mt-2 text-sm font-semibold text-gray-900"><?= e($label) ?></p>
@@ -2000,7 +2009,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-gray-900">Latest Issue</span>
                     <?php if (!empty($latestIssue['published_at'])): ?>
-                      <span>Released <?= e(date('F j, Y', strtotime($latestIssue['published_at']))) ?></span>
+                      <span>Released <?= e(format_date_au($latestIssue['published_at'])) ?></span>
                     <?php endif; ?>
                   </div>
                   <div>
@@ -2056,7 +2065,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     $publishedLabel = '';
                     $publishedYear = '';
                     if (!empty($issue['published_at'])) {
-                        $publishedLabel = date('M j, Y', strtotime($issue['published_at']));
+                        $publishedLabel = format_date_au($issue['published_at']);
                         $publishedYear = date('Y', strtotime($issue['published_at']));
                     }
                     $issueTitle = strtolower($issue['title'] ?? '');
@@ -2295,7 +2304,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <p class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></p>
                         <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> • <?= e($notice['created_by_name'] ?? 'Member') ?></p>
                       </div>
-                      <span class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(date('M j, Y', strtotime($notice['published_at'] ?? $notice['created_at']))) ?></span>
+                      <span class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
                     </div>
                     <?php if (!empty($notice['attachment_url'])): ?>
                       <div class="mb-3 rounded-xl border border-gray-100 overflow-hidden">
@@ -2337,7 +2346,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </div>
                     <div class="p-4 space-y-2">
                       <h4 class="text-base font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
-                      <p class="text-xs text-gray-500"><?= e(date('M j, Y', strtotime($notice['published_at'] ?? $notice['created_at']))) ?></p>
+                      <p class="text-xs text-gray-500"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></p>
                       <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
                     </div>
                   </article>
@@ -2390,11 +2399,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </div>
               <?php if ($fallenWings): ?>
                 <ul class="divide-y">
-                  <?php foreach ($fallenWings as $entry): ?>
+                          <?php foreach ($fallenWings as $entry): ?>
                     <li class="py-4">
                       <div class="flex items-center justify-between gap-4">
                         <div>
                           <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?></p>
+                          <?php if (!empty($entry['member_number'])): ?>
+                            <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
+                          <?php endif; ?>
                           <?php if (!empty($entry['tribute'])): ?>
                             <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
                           <?php endif; ?>
@@ -2423,6 +2435,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <input type="hidden" name="action" value="submit_fallen_wings">
                 <input type="text" name="fallen_name" placeholder="Member full name" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
                 <input type="date" name="fallen_date" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900-01-01" max="<?= e(date('Y-m-d')) ?>" required>
+                <input type="text" name="fallen_member_number" maxlength="120" placeholder="Member number (optional)" value="<?= e($_POST['fallen_member_number'] ?? '') ?>" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\\-]+">
                 <textarea name="fallen_tribute" rows="4" placeholder="Optional tribute or note" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"></textarea>
                 <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Submit request</button>
               </form>
@@ -2460,9 +2473,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id AND status = "PENDING_PAYMENT" ORDER BY created_at DESC LIMIT 1');
                 $stmt->execute(['member_id' => $member['id']]);
                 $pendingPeriod = $stmt->fetch();
-                $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
-                $stmt->execute(['member_id' => $member['id']]);
-                $pendingMembershipOrder = $stmt->fetch();
+                $pendingMembershipOrder = null;
+                if ($ordersMemberColumn && $ordersMemberValue) {
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
+                    $stmt->execute(['value' => $ordersMemberValue]);
+                    $pendingMembershipOrder = $stmt->fetch();
+                }
             }
             if (!$pendingMembershipOrder && $pendingPeriod && $member) {
                 $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
@@ -2514,8 +2530,48 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         'ASSOCIATE' => 'Associate Member',
                         'LIFE' => 'Life Member',
                         default => 'Member',
-                    };
-                }
+    };
+}
+
+function orders_member_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'member_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'member_id';
+            return $column;
+        }
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'user_id';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = '';
+    return $column;
+}
+
+function orders_member_value(array $member, array $user, string $column): ?int
+{
+    if ($column === 'member_id') {
+        return !empty($member['id']) ? (int) $member['id'] : null;
+    }
+    if ($column === 'user_id') {
+        if (!empty($member['user_id'])) {
+            return (int) $member['user_id'];
+        }
+        if (!empty($user['id'])) {
+            return (int) $user['id'];
+        }
+    }
+    return null;
+}
                 $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
                 $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
               ?>

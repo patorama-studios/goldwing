@@ -8,6 +8,7 @@ use App\Services\PaymentSettingsService;
 use App\Services\NotificationService;
 use App\Services\SecuritySettingsService;
 use App\Services\SettingsService;
+use App\Services\StripeSettingsService;
 use App\Services\ChapterRepository;
 use App\Services\Validator;
 
@@ -223,46 +224,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SettingsService::setGlobal((int) $user['id'], 'store.order_paid_status', normalize_text($_POST['store_order_paid_status'] ?? 'paid'));
                 $toast = 'Store settings saved.';
             } elseif ($section === 'payments') {
-                $publishableKey = normalize_text($_POST['stripe_publishable_key'] ?? '');
-                $secretKey = normalize_text($_POST['stripe_secret_key'] ?? '');
-                $webhookSecret = normalize_text($_POST['stripe_webhook_secret'] ?? '');
-                $invoicePrefix = normalize_text($_POST['stripe_invoice_prefix'] ?? 'INV');
-                $invoiceTemplate = normalize_text($_POST['stripe_invoice_email_template'] ?? '');
-                $generatePdf = isset($_POST['stripe_generate_pdf']) ? 1 : 0;
-                $bankTransferInstructions = trim((string) ($_POST['bank_transfer_instructions'] ?? ''));
-
-                $channel = PaymentSettingsService::getChannelByCode('primary');
-                PaymentSettingsService::updateSettings((int) $channel['id'], [
-                    'publishable_key' => $publishableKey,
-                    'secret_key' => $secretKey,
-                    'webhook_secret' => $webhookSecret,
-                    'invoice_prefix' => $invoicePrefix,
-                    'invoice_email_template' => $invoiceTemplate,
-                    'generate_pdf' => $generatePdf,
-                ]);
-
-                $settings = PaymentSettingsService::getSettingsByChannelId((int) $channel['id']);
-                SettingsService::setGlobal((int) $user['id'], 'payments.stripe.mode', $settings['mode'] ?? 'test');
-                SettingsService::setGlobal((int) $user['id'], 'payments.stripe.publishable_key', $publishableKey);
-                if ($secretKey !== '') {
-                    SettingsService::setGlobal((int) $user['id'], 'payments.stripe.secret_key', $secretKey, ['encrypt' => true]);
+                StripeSettingsService::saveAdminSettings((int) $user['id'], $_POST, $errors);
+                if (!$errors) {
+                    $toast = 'Stripe settings saved.';
                 }
-                if ($webhookSecret !== '') {
-                    SettingsService::setGlobal((int) $user['id'], 'payments.stripe.webhook_secret', $webhookSecret, ['encrypt' => true]);
-                }
-                SettingsService::setGlobal((int) $user['id'], 'payments.stripe.generate_pdf', $generatePdf === 1);
-                SettingsService::setGlobal((int) $user['id'], 'payments.stripe.invoice_prefix', $invoicePrefix);
-                SettingsService::setGlobal((int) $user['id'], 'payments.stripe.invoice_email_template', $invoiceTemplate);
-                SettingsService::setGlobal((int) $user['id'], 'payments.bank_transfer_instructions', $bankTransferInstructions);
-                $prices = [
-                    'FULL_1Y' => normalize_text($_POST['price_full_1y'] ?? ''),
-                    'FULL_3Y' => normalize_text($_POST['price_full_3y'] ?? ''),
-                    'ASSOCIATE_1Y' => normalize_text($_POST['price_associate_1y'] ?? ''),
-                    'ASSOCIATE_3Y' => normalize_text($_POST['price_associate_3y'] ?? ''),
-                    'LIFE' => normalize_text($_POST['price_life'] ?? ''),
-                ];
-                SettingsService::setGlobal((int) $user['id'], 'payments.membership_prices', $prices);
-                $toast = 'Stripe settings saved.';
             } elseif ($section === 'notifications') {
                 $fromName = normalize_text($_POST['notify_from_name'] ?? '');
                 $fromEmail = normalize_text($_POST['notify_from_email'] ?? '');
@@ -887,10 +852,24 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <?php
               $paymentChannel = PaymentSettingsService::getChannelByCode('primary');
               $paymentSettings = PaymentSettingsService::getSettingsByChannelId((int) ($paymentChannel['id'] ?? 0));
-              $secretLast4 = !empty($paymentSettings['secret_key']) ? substr($paymentSettings['secret_key'], -4) : '';
-              $webhookLast4 = !empty($paymentSettings['webhook_secret']) ? substr($paymentSettings['webhook_secret'], -4) : '';
-              $prices = SettingsService::getGlobal('payments.membership_prices', []);
+              $stripeSettings = StripeSettingsService::getSettings();
+              $activeKeys = StripeSettingsService::getActiveKeys();
+              $activeMode = $activeKeys['mode'] ?? 'test';
+              $testPublishableMask = StripeSettingsService::maskValue($stripeSettings['test_publishable_key'] ?? '');
+              $testSecretMask = StripeSettingsService::maskValue($stripeSettings['test_secret_key'] ?? '');
+              $livePublishableMask = StripeSettingsService::maskValue($stripeSettings['live_publishable_key'] ?? '');
+              $liveSecretMask = StripeSettingsService::maskValue($stripeSettings['live_secret_key'] ?? '');
+              $webhookMask = StripeSettingsService::maskValue($stripeSettings['webhook_secret'] ?? '');
+              $webhookHealth = StripeSettingsService::webhookHealth($paymentSettings);
+              $prices = $stripeSettings['membership_prices'] ?? [];
+              if (!is_array($prices)) {
+                  $prices = [];
+              }
               $bankTransferInstructions = SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+              $webhookUrl = BaseUrlService::buildUrl('/api/stripe/webhook');
+              $fromEmail = (string) SettingsService::getGlobal('notifications.from_email', '');
+              $defaultTerm = (string) ($stripeSettings['membership_default_term'] ?? '12M');
+              $dashboardUrl = $activeMode === 'test' ? 'https://dashboard.stripe.com/test' : 'https://dashboard.stripe.com';
             ?>
             <form method="post" class="space-y-6">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
@@ -899,54 +878,121 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
               <div class="grid gap-6 lg:grid-cols-2">
                 <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Stripe Connection</h2>
+                  <h2 class="font-display text-lg font-bold text-gray-900">Stripe Mode &amp; Keys</h2>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_use_test_mode" class="rounded border-gray-200" <?= !empty($stripeSettings['use_test_mode']) ? 'checked' : '' ?>>
+                    Use Test Mode
+                  </label>
                   <div class="flex items-center justify-between text-sm text-slate-600">
-                    <span>Status</span>
-                    <span class="font-semibold <?= !empty($paymentSettings['secret_key']) && !empty($paymentSettings['publishable_key']) ? 'text-green-600' : 'text-red-600' ?>">
-                      <?= !empty($paymentSettings['secret_key']) && !empty($paymentSettings['publishable_key']) ? 'Connected' : 'Not connected' ?>
-                    </span>
+                    <span>Active mode</span>
+                    <span class="font-semibold text-slate-900"><?= e($activeMode) ?></span>
                   </div>
-                  <div class="flex items-center justify-between text-sm text-slate-600">
-                    <span>Mode</span>
-                    <span class="font-semibold text-slate-900"><?= e($paymentSettings['mode'] ?? 'test') ?></span>
-                  </div>
-                  <label class="text-sm text-slate-600">Publishable key
-                    <input name="stripe_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($paymentSettings['publishable_key'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Secret key
-                    <input name="stripe_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $secretLast4 !== '' ? 'Configured (last 4: ' . e($secretLast4) . ')' : 'Not configured' ?>">
-                    <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
-                  </label>
-                  <label class="text-sm text-slate-600">Webhook secret
-                    <input name="stripe_webhook_secret" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $webhookLast4 !== '' ? 'Configured (last 4: ' . e($webhookLast4) . ')' : 'Not configured' ?>">
-                  </label>
-                  <div class="text-xs text-slate-500">
-                    Last webhook: <?= e($paymentSettings['last_webhook_received_at'] ?? 'Never') ?><br>
-                    Last error: <?= e($paymentSettings['last_webhook_error'] ?? 'None') ?>
+                  <div class="grid gap-4">
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+                      <h3 class="text-sm font-semibold text-slate-900">Test keys</h3>
+                      <label class="text-xs text-slate-600">Publishable key
+                        <input name="stripe_test_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $testPublishableMask['configured'] ? 'Configured (last 4: ' . e($testPublishableMask['last4']) . ')' : 'Not configured' ?>">
+                      </label>
+                      <label class="text-xs text-slate-600">Secret key
+                        <input name="stripe_test_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $testSecretMask['configured'] ? 'Configured (last 4: ' . e($testSecretMask['last4']) . ')' : 'Not configured' ?>">
+                        <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
+                      </label>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+                      <h3 class="text-sm font-semibold text-slate-900">Live keys</h3>
+                      <label class="text-xs text-slate-600">Publishable key
+                        <input name="stripe_live_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $livePublishableMask['configured'] ? 'Configured (last 4: ' . e($livePublishableMask['last4']) . ')' : 'Not configured' ?>">
+                      </label>
+                      <label class="text-xs text-slate-600">Secret key
+                        <input name="stripe_live_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $liveSecretMask['configured'] ? 'Configured (last 4: ' . e($liveSecretMask['last4']) . ')' : 'Not configured' ?>">
+                        <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Checkout Rules (Locked)</h2>
-                  <div class="text-sm text-slate-600 space-y-2">
+                  <h2 class="font-display text-lg font-bold text-gray-900">Webhook &amp; Health</h2>
+                  <label class="text-sm text-slate-600">Webhook endpoint URL
+                    <input class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($webhookUrl) ?>" readonly>
+                  </label>
+                  <label class="text-sm text-slate-600">Webhook secret
+                    <input name="stripe_webhook_secret" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $webhookMask['configured'] ? 'Configured (last 4: ' . e($webhookMask['last4']) . ')' : 'Not configured' ?>">
+                  </label>
+                  <div class="rounded-lg border border-gray-100 bg-white p-4 text-sm">
                     <div class="flex items-center justify-between">
-                      <span>Stripe Checkout</span>
-                      <span class="font-semibold text-slate-900">On</span>
+                      <span class="text-slate-600">Status</span>
+                      <?php
+                        $statusClasses = $webhookHealth['status'] === 'ok' ? 'text-green-600' : ($webhookHealth['status'] === 'failing' ? 'text-red-600' : 'text-amber-600');
+                        $statusLabel = $webhookHealth['status'] === 'ok' ? 'OK' : ($webhookHealth['status'] === 'failing' ? 'Failing' : 'Stale');
+                      ?>
+                      <span class="font-semibold <?= $statusClasses ?>"><?= $statusLabel ?></span>
                     </div>
-                    <div class="flex items-center justify-between">
-                      <span>Members-only checkout</span>
-                      <span class="font-semibold text-slate-900">On</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span>Currency</span>
-                      <span class="font-semibold text-slate-900">AUD</span>
+                    <div class="mt-2 text-xs text-slate-500">
+                      Last webhook: <?= e($webhookHealth['last_received_at'] ?? 'Never') ?><br>
+                      Last error: <?= e($webhookHealth['last_error'] ?? 'None') ?>
                     </div>
                   </div>
-                  <div class="pt-4 text-xs text-slate-500">Shipping rules follow Store Settings.</div>
+                  <div class="flex items-center gap-3">
+                    <button type="button" id="stripe-test-connection" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-slate-700">Test connection</button>
+                    <a class="text-xs text-blue-600" href="<?= e($dashboardUrl) ?>" target="_blank" rel="noopener">Open Stripe Dashboard</a>
+                  </div>
+                  <div id="stripe-test-result" class="text-xs text-slate-500"></div>
+                </div>
+              </div>
+
+              <div class="grid gap-6 lg:grid-cols-2">
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                  <h2 class="font-display text-lg font-bold text-gray-900">Checkout Behavior</h2>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_checkout_enabled" class="rounded border-gray-200" <?= !empty($stripeSettings['checkout_enabled']) ? 'checked' : '' ?>>
+                    Enable Stripe checkout
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_allow_guest_checkout" class="rounded border-gray-200" <?= !empty($stripeSettings['allow_guest_checkout']) ? 'checked' : '' ?>>
+                    Allow guest checkout
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_require_shipping_for_physical" class="rounded border-gray-200" <?= !empty($stripeSettings['require_shipping_for_physical']) ? 'checked' : '' ?>>
+                    Require shipping address for physical items
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_digital_only_minimal" class="rounded border-gray-200" <?= !empty($stripeSettings['digital_only_minimal']) ? 'checked' : '' ?>>
+                    Digital-only checkout requires only email + name
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_customer_portal_enabled" class="rounded border-gray-200" <?= !empty($stripeSettings['customer_portal_enabled']) ? 'checked' : '' ?>>
+                    Enable customer portal (members)
+                  </label>
+                  <div class="pt-3 text-xs text-slate-500">Currency is fixed to AUD. Shipping rules follow Store Settings.</div>
+                </div>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                  <h2 class="font-display text-lg font-bold text-gray-900">Payment Methods</h2>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_enable_apple_pay" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_apple_pay']) ? 'checked' : '' ?>>
+                    Enable Apple Pay
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_enable_google_pay" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_google_pay']) ? 'checked' : '' ?>>
+                    Enable Google Pay
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="stripe_enable_bnpl" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_bnpl']) ? 'checked' : '' ?>>
+                    Enable BNPL methods (if supported)
+                  </label>
                 </div>
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Tax Invoices</h2>
+                <h2 class="font-display text-lg font-bold text-gray-900">Receipts &amp; Invoices</h2>
+                <label class="flex items-center gap-3 text-sm text-slate-600">
+                  <input type="checkbox" name="stripe_send_receipts" class="rounded border-gray-200" <?= !empty($stripeSettings['send_receipts']) ? 'checked' : '' ?>>
+                  Send Stripe receipts
+                </label>
+                <label class="flex items-center gap-3 text-sm text-slate-600">
+                  <input type="checkbox" name="stripe_save_invoice_refs" class="rounded border-gray-200" <?= !empty($stripeSettings['save_invoice_refs']) ? 'checked' : '' ?>>
+                  Save invoice references to the database
+                </label>
+                <div class="text-xs text-slate-500">Email from: <?= $fromEmail !== '' ? e($fromEmail) : 'Not configured' ?></div>
                 <label class="flex items-center gap-3 text-sm text-slate-600">
                   <input type="checkbox" name="stripe_generate_pdf" class="rounded border-gray-200" <?= !empty($paymentSettings['generate_pdf']) ? 'checked' : '' ?>>
                   Generate PDF invoices
@@ -963,19 +1009,45 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
                 <h2 class="font-display text-lg font-bold text-gray-900">Membership Price IDs</h2>
                 <div class="grid gap-4 md:grid-cols-2">
-                  <label class="text-sm text-slate-600">FULL 1Y
+                  <label class="text-sm text-slate-600">Full member 12m
+                    <input name="price_full_12" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_12'] ?? '') ?>">
+                  </label>
+                  <label class="text-sm text-slate-600">Associate member 12m
+                    <input name="price_associate_12" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_12'] ?? '') ?>">
+                  </label>
+                  <label class="text-sm text-slate-600">Full member 24m
+                    <input name="price_full_24" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_24'] ?? '') ?>">
+                  </label>
+                  <label class="text-sm text-slate-600">Associate member 24m
+                    <input name="price_associate_24" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_24'] ?? '') ?>">
+                  </label>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2 pt-2">
+                  <label class="text-sm text-slate-600">Default membership term
+                    <select name="membership_default_term" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                      <option value="12M" <?= $defaultTerm === '12M' ? 'selected' : '' ?>>12 months</option>
+                      <option value="24M" <?= $defaultTerm === '24M' ? 'selected' : '' ?>>24 months</option>
+                    </select>
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600 mt-7">
+                    <input type="checkbox" name="membership_allow_both_types" class="rounded border-gray-200" <?= !empty($stripeSettings['membership_allow_both_types']) ? 'checked' : '' ?>>
+                    Allow selecting both membership types
+                  </label>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2 pt-2">
+                  <label class="text-sm text-slate-600">Legacy FULL 1Y
                     <input name="price_full_1y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_1Y'] ?? '') ?>">
                   </label>
-                  <label class="text-sm text-slate-600">FULL 3Y
+                  <label class="text-sm text-slate-600">Legacy FULL 3Y
                     <input name="price_full_3y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_3Y'] ?? '') ?>">
                   </label>
-                  <label class="text-sm text-slate-600">ASSOCIATE 1Y
+                  <label class="text-sm text-slate-600">Legacy ASSOCIATE 1Y
                     <input name="price_associate_1y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_1Y'] ?? '') ?>">
                   </label>
-                  <label class="text-sm text-slate-600">ASSOCIATE 3Y
+                  <label class="text-sm text-slate-600">Legacy ASSOCIATE 3Y
                     <input name="price_associate_3y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_3Y'] ?? '') ?>">
                   </label>
-                  <label class="text-sm text-slate-600">LIFE
+                  <label class="text-sm text-slate-600">Legacy LIFE
                     <input name="price_life" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['LIFE'] ?? '') ?>">
                   </label>
                 </div>
@@ -997,6 +1069,39 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
               </div>
             </form>
+            <script>
+              document.addEventListener('DOMContentLoaded', () => {
+                const testButton = document.getElementById('stripe-test-connection');
+                const result = document.getElementById('stripe-test-result');
+                if (!testButton || !result) {
+                  return;
+                }
+                testButton.addEventListener('click', async () => {
+                  result.textContent = 'Testing connection...';
+                  try {
+                    const response = await fetch('/api/admin/settings/stripe/test-connection', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '<?= e(Csrf::token()) ?>'
+                      },
+                      body: JSON.stringify({}),
+                    });
+                    const data = await response.json();
+                    if (!response.ok || data.error) {
+                      result.textContent = data.error || 'Connection test failed.';
+                      return;
+                    }
+                    const account = data.account || {};
+                    const label = account.name || 'Stripe Account';
+                    const suffix = account.id_last4 ? `•••• ${account.id_last4}` : 'Unknown';
+                    result.textContent = `Connected: ${label} (${suffix}) [${data.mode || 'unknown'}]`;
+                  } catch (error) {
+                    result.textContent = 'Connection test failed.';
+                  }
+                });
+              });
+            </script>
           <?php elseif ($section === 'notifications'): ?>
             <form method="post" class="space-y-6">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">

@@ -10,8 +10,13 @@ $navItems = NavigationService::getNavigationTree('primary', $user);
 $cartCount = 0;
 $cartItems = [];
 $cartSubtotal = 0.0;
+$cart = null;
 if ($user) {
     $cart = store_get_open_cart((int) $user['id']);
+} elseif (!empty($_SESSION['guest_cart_id'])) {
+    $cart = store_get_open_cart(0);
+}
+if ($cart) {
     $cartItems = store_get_cart_items((int) $cart['id']);
     foreach ($cartItems as $item) {
         $cartCount += (int) $item['quantity'];

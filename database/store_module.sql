@@ -140,7 +140,7 @@ CREATE TABLE store_variant_option_values (
 
 CREATE TABLE store_carts (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
+  user_id INT NULL,
   status ENUM('open','converted','abandoned') NOT NULL DEFAULT 'open',
   discount_code VARCHAR(50) NULL,
   created_at DATETIME NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE store_discounts (
 CREATE TABLE store_orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   order_number VARCHAR(30) UNIQUE NOT NULL,
-  user_id INT NOT NULL,
+  user_id INT NULL,
   member_id INT NULL,
   status ENUM('pending','paid','fulfilled','cancelled','refunded') NOT NULL DEFAULT 'pending',
   subtotal DECIMAL(10,2) NOT NULL,

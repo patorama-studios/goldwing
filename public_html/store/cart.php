@@ -1,8 +1,11 @@
 <?php
 use App\Services\Csrf;
+use App\Services\StripeSettingsService;
 
-$cart = store_get_open_cart((int) $user['id']);
-$checkoutEnabled = true;
+$userId = (int) ($user['id'] ?? 0);
+$cart = store_get_open_cart($userId);
+$stripeSettings = StripeSettingsService::getSettings();
+$checkoutEnabled = !empty($stripeSettings['checkout_enabled']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
@@ -97,103 +100,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'reorder') {
-            $orderId = (int) ($_POST['order_id'] ?? 0);
-            if ($orderId <= 0) {
-                echo '<div class="alert error">Invalid order.</div>';
+            if (!$userId) {
+                echo '<div class="alert error">Please log in to reorder past purchases.</div>';
             } else {
-                $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id AND user_id = :user_id');
-                $stmt->execute(['id' => $orderId, 'user_id' => $user['id']]);
-                $order = $stmt->fetch();
-                if (!$order) {
-                    echo '<div class="alert error">Order not found.</div>';
+                $orderId = (int) ($_POST['order_id'] ?? 0);
+                if ($orderId <= 0) {
+                    echo '<div class="alert error">Invalid order.</div>';
                 } else {
-                    $stmt = $pdo->prepare('SELECT * FROM store_order_items WHERE order_id = :order_id');
-                    $stmt->execute(['order_id' => $orderId]);
-                    $items = $stmt->fetchAll();
-                    $addedCount = 0;
-                    $skippedCount = 0;
+                    $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id AND user_id = :user_id');
+                    $stmt->execute(['id' => $orderId, 'user_id' => $userId]);
+                    $order = $stmt->fetch();
+                    if (!$order) {
+                        echo '<div class="alert error">Order not found.</div>';
+                    } else {
+                        $stmt = $pdo->prepare('SELECT * FROM store_order_items WHERE order_id = :order_id');
+                        $stmt->execute(['order_id' => $orderId]);
+                        $items = $stmt->fetchAll();
+                        $addedCount = 0;
+                        $skippedCount = 0;
 
-                    foreach ($items as $item) {
-                        if (empty($item['product_id'])) {
-                            $skippedCount++;
-                            continue;
-                        }
-                        $productId = (int) $item['product_id'];
-                        $variantId = (int) ($item['variant_id'] ?? 0);
-                        $quantity = max(1, (int) ($item['quantity'] ?? 1));
-
-                        $stmt = $pdo->prepare('SELECT * FROM store_products WHERE id = :id AND is_active = 1');
-                        $stmt->execute(['id' => $productId]);
-                        $product = $stmt->fetch();
-                        if (!$product) {
-                            $skippedCount++;
-                            continue;
-                        }
-
-                        $variant = null;
-                        $variantLabel = $item['variant_snapshot'] ?? '';
-                        $skuSnapshot = $item['sku_snapshot'] ?? ($product['sku'] ?? '');
-                        if ($variantId) {
-                            $stmt = $pdo->prepare('SELECT * FROM store_product_variants WHERE id = :id AND product_id = :product_id AND is_active = 1');
-                            $stmt->execute(['id' => $variantId, 'product_id' => $productId]);
-                            $variant = $stmt->fetch();
-                            if (!$variant) {
-                                $variantId = 0;
-                                $variantLabel = '';
-                            } else {
-                                $skuSnapshot = $variant['sku'] ?? $skuSnapshot;
+                        foreach ($items as $item) {
+                            if (empty($item['product_id'])) {
+                                $skippedCount++;
+                                continue;
                             }
-                        }
+                            $productId = (int) $item['product_id'];
+                            $variantId = (int) ($item['variant_id'] ?? 0);
+                            $quantity = max(1, (int) ($item['quantity'] ?? 1));
 
-                        $unitPrice = (float) $product['base_price'];
-                        if ($variant && $variant['price_override'] !== null) {
-                            $unitPrice = (float) $variant['price_override'];
-                        }
+                            $stmt = $pdo->prepare('SELECT * FROM store_products WHERE id = :id AND is_active = 1');
+                            $stmt->execute(['id' => $productId]);
+                            $product = $stmt->fetch();
+                            if (!$product) {
+                                $skippedCount++;
+                                continue;
+                            }
 
-                        $stockOk = true;
-                        if ((int) $product['track_inventory'] === 1) {
+                            $variant = null;
+                            $variantLabel = $item['variant_snapshot'] ?? '';
+                            $skuSnapshot = $item['sku_snapshot'] ?? ($product['sku'] ?? '');
                             if ($variantId) {
-                                $stockOk = (int) ($variant['stock_quantity'] ?? 0) >= $quantity;
-                            } else {
-                                $stockOk = (int) ($product['stock_quantity'] ?? 0) >= $quantity;
+                                $stmt = $pdo->prepare('SELECT * FROM store_product_variants WHERE id = :id AND product_id = :product_id AND is_active = 1');
+                                $stmt->execute(['id' => $variantId, 'product_id' => $productId]);
+                                $variant = $stmt->fetch();
+                                if (!$variant) {
+                                    $variantId = 0;
+                                    $variantLabel = '';
+                                } else {
+                                    $skuSnapshot = $variant['sku'] ?? $skuSnapshot;
+                                }
                             }
-                        }
-                        if (!$stockOk) {
-                            $skippedCount++;
-                            continue;
+
+                            $unitPrice = (float) $product['base_price'];
+                            if ($variant && $variant['price_override'] !== null) {
+                                $unitPrice = (float) $variant['price_override'];
+                            }
+
+                            $stockOk = true;
+                            if ((int) $product['track_inventory'] === 1) {
+                                if ($variantId) {
+                                    $stockOk = (int) ($variant['stock_quantity'] ?? 0) >= $quantity;
+                                } else {
+                                    $stockOk = (int) ($product['stock_quantity'] ?? 0) >= $quantity;
+                                }
+                            }
+                            if (!$stockOk) {
+                                $skippedCount++;
+                                continue;
+                            }
+
+                            $stmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND product_id = :product_id AND variant_id <=> :variant_id');
+                            $stmt->execute(['cart_id' => $cart['id'], 'product_id' => $productId, 'variant_id' => $variantId ?: null]);
+                            $existing = $stmt->fetch();
+                            if ($existing) {
+                                $newQty = $existing['quantity'] + $quantity;
+                                $stmt = $pdo->prepare('UPDATE store_cart_items SET quantity = :quantity, updated_at = NOW() WHERE id = :id');
+                                $stmt->execute(['quantity' => $newQty, 'id' => $existing['id']]);
+                            } else {
+                                $stmt = $pdo->prepare('INSERT INTO store_cart_items (cart_id, product_id, variant_id, quantity, unit_price, title_snapshot, variant_snapshot, sku_snapshot, created_at) VALUES (:cart_id, :product_id, :variant_id, :quantity, :unit_price, :title_snapshot, :variant_snapshot, :sku_snapshot, NOW())');
+                                $stmt->execute([
+                                    'cart_id' => $cart['id'],
+                                    'product_id' => $productId,
+                                    'variant_id' => $variantId ?: null,
+                                    'quantity' => $quantity,
+                                    'unit_price' => $unitPrice,
+                                    'title_snapshot' => $product['title'],
+                                    'variant_snapshot' => $variantLabel,
+                                    'sku_snapshot' => $skuSnapshot,
+                                ]);
+                            }
+                            $addedCount++;
                         }
 
-                        $stmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND product_id = :product_id AND variant_id <=> :variant_id');
-                        $stmt->execute(['cart_id' => $cart['id'], 'product_id' => $productId, 'variant_id' => $variantId ?: null]);
-                        $existing = $stmt->fetch();
-                        if ($existing) {
-                            $newQty = $existing['quantity'] + $quantity;
-                            $stmt = $pdo->prepare('UPDATE store_cart_items SET quantity = :quantity, updated_at = NOW() WHERE id = :id');
-                            $stmt->execute(['quantity' => $newQty, 'id' => $existing['id']]);
-                        } else {
-                            $stmt = $pdo->prepare('INSERT INTO store_cart_items (cart_id, product_id, variant_id, quantity, unit_price, title_snapshot, variant_snapshot, sku_snapshot, created_at) VALUES (:cart_id, :product_id, :variant_id, :quantity, :unit_price, :title_snapshot, :variant_snapshot, :sku_snapshot, NOW())');
-                            $stmt->execute([
-                                'cart_id' => $cart['id'],
-                                'product_id' => $productId,
-                                'variant_id' => $variantId ?: null,
-                                'quantity' => $quantity,
-                                'unit_price' => $unitPrice,
-                                'title_snapshot' => $product['title'],
-                                'variant_snapshot' => $variantLabel,
-                                'sku_snapshot' => $skuSnapshot,
-                            ]);
+                        $stmt = $pdo->prepare('UPDATE store_carts SET updated_at = NOW() WHERE id = :id');
+                        $stmt->execute(['id' => $cart['id']]);
+
+                        if ($addedCount > 0) {
+                            echo '<div class="alert success">Reorder added ' . $addedCount . ' item(s) to your cart.</div>';
                         }
-                        $addedCount++;
-                    }
-
-                    $stmt = $pdo->prepare('UPDATE store_carts SET updated_at = NOW() WHERE id = :id');
-                    $stmt->execute(['id' => $cart['id']]);
-
-                    if ($addedCount > 0) {
-                        echo '<div class="alert success">Reorder added ' . $addedCount . ' item(s) to your cart.</div>';
-                    }
-                    if ($skippedCount > 0) {
-                        echo '<div class="alert warning">' . $skippedCount . ' item(s) could not be added.</div>';
+                        if ($skippedCount > 0) {
+                            echo '<div class="alert warning">' . $skippedCount . ' item(s) could not be added.</div>';
+                        }
                     }
                 }
             }
@@ -262,7 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$cart = store_get_open_cart((int) $user['id']);
+$cart = store_get_open_cart($userId);
 $items = store_get_cart_items((int) $cart['id']);
 $discount = null;
 if (!empty($cart['discount_code'])) {
@@ -380,7 +387,7 @@ $pageTitle = 'Your Cart';
         </table>
         <p style="margin-top:1rem;">
           <?php if ($checkoutEnabled): ?>
-            <a class="button primary" href="/store/checkout">Proceed to checkout</a>
+            <a class="button primary" href="/checkout">Proceed to checkout</a>
           <?php else: ?>
             <span class="text-sm text-gray-500">Checkout is currently unavailable.</span>
           <?php endif; ?>

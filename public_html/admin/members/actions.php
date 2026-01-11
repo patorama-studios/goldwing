@@ -301,7 +301,12 @@ function deleteMemberPermanently(\PDO $pdo, array $user, array $member): bool
     }
 }
 
+$action = $_POST['action'] ?? '';
+$jsonActions = ['member_inline_update', 'bulk_member_action', 'associate_search', 'link_associate_member', 'unlink_associate_member'];
 if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
+    if (in_array($action, $jsonActions, true)) {
+        respondWithJson(['success' => false, 'error' => 'Invalid CSRF token.'], 403);
+    }
     if ($memberId > 0) {
         redirectWithFlash($memberId, $tab, 'Invalid CSRF token.', 'error');
     }
@@ -309,8 +314,6 @@ if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     header('Location: /admin/members');
     exit;
 }
-
-$action = $_POST['action'] ?? '';
 $requiresMemberContext = !in_array($action, ['member_inline_update', 'bulk_member_action'], true);
 $member = null;
 $chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
@@ -1648,16 +1651,38 @@ switch ($action) {
         if ($targetUserId <= 0) {
             redirectWithFlash($memberId, $tab, 'User account missing; cannot set password.', 'error', $flashContext);
         }
-        if ((int) ($member['user_id'] ?? 0) !== $targetUserId) {
-            $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
-            $stmt->execute(['user_id' => $targetUserId, 'member_id' => $memberId]);
+        try {
+            $pdo->beginTransaction();
+            if ((int) ($member['user_id'] ?? 0) !== $targetUserId) {
+                $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+                if (!$stmt->execute(['user_id' => $targetUserId, 'member_id' => $memberId])) {
+                    throw new \RuntimeException('Unable to link user account.');
+                }
+            }
+            $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
+            if (!$stmt->execute(['hash' => $hash, 'id' => $targetUserId])) {
+                throw new \RuntimeException('Unable to update user password.');
+            }
+            $stmt = $pdo->query("SHOW TABLES LIKE 'member_auth'");
+            $hasMemberAuth = (bool) $stmt->fetchColumn();
+            if ($hasMemberAuth) {
+                $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
+                if (!$stmt->execute(['member_id' => $memberId, 'hash' => $hash])) {
+                    throw new \RuntimeException('Unable to update member auth record.');
+                }
+            }
+            $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
+            if (!$stmt->execute(['user_id' => $targetUserId])) {
+                throw new \RuntimeException('Unable to update password reset log.');
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('[Admin] Password reset failed for member #' . $memberId . ': ' . $e->getMessage());
+            redirectWithFlash($memberId, $tab, 'Unable to reset password. Please try again.', 'error', $flashContext);
         }
-        $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['hash' => $hash, 'id' => $targetUserId]);
-        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
-        $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
-        $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
-        $stmt->execute(['user_id' => $targetUserId]);
         try {
             $hasSessions = (bool) $pdo->query("SHOW TABLES LIKE 'sessions'")->fetchColumn();
             if ($hasSessions) {
@@ -1766,26 +1791,41 @@ switch ($action) {
         if (!AdminMemberAccess::canEditFullProfile($user)) {
             respondWithJson(['success' => false, 'error' => 'Permission denied.'], 403);
         }
-        $searchTerm = trim($_POST['query'] ?? '');
-        $pdo = Database::connection();
-        $term = '%' . mb_strtolower($searchTerm) . '%';
-        $numberTerm = '%' . ($searchTerm === '' ? '' : str_replace(' ', '', $searchTerm)) . '%';
-        $stmt = $pdo->prepare('SELECT id, first_name, last_name, email, member_number_base, member_number_suffix FROM members WHERE member_type = "ASSOCIATE" AND (full_member_id IS NULL OR full_member_id = 0 OR full_member_id <> :member_id) AND (LOWER(CONCAT(first_name, " ", last_name)) LIKE :term OR LOWER(email) LIKE :term OR COALESCE(CONCAT(member_number_base, CASE WHEN member_number_suffix > 0 THEN CONCAT(".", member_number_suffix) ELSE "" END), "") LIKE :number) ORDER BY last_name ASC, first_name ASC LIMIT 12');
-        $stmt->execute([
-            'member_id' => $memberId,
-            'term' => $term,
-            'number' => $numberTerm,
-        ]);
-        $results = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $results[] = [
-                'id' => (int) ($row['id'] ?? 0),
-                'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
-                'member_number' => MembershipService::displayMembershipNumber((int) ($row['member_number_base'] ?? 0), (int) ($row['member_number_suffix'] ?? 0)),
-                'email' => $row['email'] ?? '',
-            ];
+        try {
+            $searchTerm = trim($_POST['query'] ?? '');
+            $term = '%' . mb_strtolower($searchTerm) . '%';
+            $numberTerm = '%' . ($searchTerm === '' ? '' : str_replace(' ', '', $searchTerm)) . '%';
+            $stmt = Database::connection()->prepare('SELECT id, first_name, last_name, email, member_number_base, member_number_suffix FROM members WHERE member_type = "ASSOCIATE" AND (full_member_id IS NULL OR full_member_id = 0 OR full_member_id <> :member_id) AND (LOWER(CONCAT(first_name, " ", last_name)) LIKE :term OR LOWER(email) LIKE :term OR COALESCE(CONCAT(member_number_base, CASE WHEN member_number_suffix > 0 THEN CONCAT(".", member_number_suffix) ELSE "" END), "") LIKE :number) ORDER BY last_name ASC, first_name ASC LIMIT 12');
+            $stmt->execute([
+                'member_id' => $memberId,
+                'term' => $term,
+                'number' => $numberTerm,
+            ]);
+            $results = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $firstName = trim($row['first_name'] ?? '');
+                $lastName = trim($row['last_name'] ?? '');
+                if ($lastName !== '' && $firstName !== '') {
+                    $displayName = $lastName . ', ' . $firstName;
+                } elseif ($lastName !== '') {
+                    $displayName = $lastName;
+                } elseif ($firstName !== '') {
+                    $displayName = $firstName;
+                } else {
+                    $displayName = $row['email'] ?? 'Associate member';
+                }
+                $results[] = [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'display_name' => $displayName,
+                    'member_number' => MembershipService::displayMembershipNumber((int) ($row['member_number_base'] ?? 0), (int) ($row['member_number_suffix'] ?? 0)),
+                    'email' => $row['email'] ?? '',
+                ];
+            }
+            respondWithJson(['success' => true, 'results' => $results]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] Associate search failed for member #' . $memberId . ': ' . $e->getMessage());
+            respondWithJson(['success' => false, 'error' => 'Unable to search associates.']);
         }
-        respondWithJson(['success' => true, 'results' => $results]);
         break;
 
     case 'link_associate_member':
@@ -1802,6 +1842,13 @@ switch ($action) {
         $associate = MemberRepository::findById($associateId);
         if (!$associate || ($associate['member_type'] ?? '') !== 'ASSOCIATE') {
             respondWithJson(['success' => false, 'error' => 'Member is not an associate.'], 400);
+        }
+        $existingLink = (int) ($associate['full_member_id'] ?? 0);
+        if ($existingLink > 0 && $existingLink !== $memberId) {
+            respondWithJson(['success' => false, 'error' => 'Associate is already linked to another member.'], 400);
+        }
+        if ($existingLink === $memberId) {
+            respondWithJson(['success' => true, 'message' => 'Associate already linked.']);
         }
         if (!MemberRepository::update($associateId, ['full_member_id' => $memberId])) {
             respondWithJson(['success' => false, 'error' => 'Unable to link associate.']);
@@ -1827,6 +1874,38 @@ switch ($action) {
                 'email' => $associate['email'] ?? '',
             ],
         ]);
+        break;
+
+    case 'unlink_associate_member':
+        if (!AdminMemberAccess::canEditFullProfile($user)) {
+            respondWithJson(['success' => false, 'error' => 'Permission denied.'], 403);
+        }
+        $associateId = (int) ($_POST['associate_member_id'] ?? 0);
+        if ($associateId <= 0) {
+            respondWithJson(['success' => false, 'error' => 'Invalid associate selection.'], 400);
+        }
+        $associate = MemberRepository::findById($associateId);
+        if (!$associate || ($associate['member_type'] ?? '') !== 'ASSOCIATE') {
+            respondWithJson(['success' => false, 'error' => 'Member is not an associate.'], 400);
+        }
+        if ((int) ($associate['full_member_id'] ?? 0) !== $memberId) {
+            respondWithJson(['success' => false, 'error' => 'Associate is not linked to this member.'], 400);
+        }
+        if (!MemberRepository::update($associateId, ['full_member_id' => null])) {
+            respondWithJson(['success' => false, 'error' => 'Unable to unlink associate.']);
+        }
+        $associateName = trim(($associate['first_name'] ?? '') . ' ' . ($associate['last_name'] ?? ''));
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.associate_removed', [
+            'associate_id' => $associateId,
+            'associate_name' => $associateName,
+            'associate_member_number' => MembershipService::displayMembershipNumber((int) ($associate['member_number_base'] ?? 0), (int) ($associate['member_number_suffix'] ?? 0)),
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $associateId, 'member.unlinked_from_full_member', [
+            'full_member_id' => $memberId,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        respondWithJson(['success' => true, 'message' => 'Associate unlinked. Reloading…']);
         break;
 
     case 'resend_notification':

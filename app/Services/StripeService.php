@@ -8,6 +8,7 @@ use Stripe\Exception\SignatureVerificationException;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 use App\Services\PaymentSettingsService;
+use App\Services\StripeSettingsService;
 
 class StripeService
 {
@@ -16,13 +17,14 @@ class StripeService
         return new StripeClient($secretKey);
     }
 
+    private static function activeSecretKey(): string
+    {
+        return StripeSettingsService::getActiveSecretKey();
+    }
+
     public static function createCheckoutSession(string $priceId, string $customerEmail, array $metadata): ?array
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['secret_key'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.secret_key', '');
-        }
+        $secret = self::activeSecretKey();
         if ($secret === '') {
             return null;
         }
@@ -53,11 +55,7 @@ class StripeService
 
     public static function createCheckoutSessionForPrice(string $priceId, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata): ?array
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['secret_key'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.secret_key', '');
-        }
+        $secret = self::activeSecretKey();
         if ($secret === '') {
             return null;
         }
@@ -85,11 +83,7 @@ class StripeService
 
     public static function createCheckoutSessionWithLineItems(array $lineItems, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata = []): ?array
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['secret_key'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.secret_key', '');
-        }
+        $secret = self::activeSecretKey();
         if ($secret === '') {
             return null;
         }
@@ -143,6 +137,16 @@ class StripeService
         return $customer->toArray();
     }
 
+    public static function retrieveAccount(string $secretKey): ?array
+    {
+        try {
+            $account = self::client($secretKey)->accounts->retrieve();
+        } catch (ApiErrorException $e) {
+            return null;
+        }
+        return $account->toArray();
+    }
+
     public static function updateCustomer(string $secretKey, string $customerId, array $payload): array
     {
         $customer = self::client($secretKey)->customers->update($customerId, $payload);
@@ -151,11 +155,7 @@ class StripeService
 
     public static function createRefund(string $paymentIntentId, int $amountCents = 0): ?array
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['secret_key'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.secret_key', '');
-        }
+        $secret = self::activeSecretKey();
         if ($secret === '') {
             return null;
         }
@@ -176,11 +176,7 @@ class StripeService
 
     public static function retrievePaymentIntent(string $paymentIntentId): ?array
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['secret_key'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.secret_key', '');
-        }
+        $secret = self::activeSecretKey();
         if ($secret === '') {
             return null;
         }
@@ -202,15 +198,68 @@ class StripeService
 
     public static function verifyWebhook(string $payload, string $signature): bool
     {
-        $settings = PaymentSettingsService::getSettingsByChannelCode('primary');
-        $secret = $settings['webhook_secret'] ?? '';
-        if ($secret === '') {
-            $secret = SettingsService::getGlobal('payments.stripe.webhook_secret', '');
-        }
+        $secret = StripeSettingsService::getWebhookSecret();
         if ($secret === '') {
             return false;
         }
         return self::constructEvent($payload, $signature, $secret) !== null;
+    }
+
+    public static function createPaymentIntent(array $payload, ?string $idempotencyKey = null): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        $options = [];
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            $options['idempotency_key'] = $idempotencyKey;
+        }
+        try {
+            $intent = self::client($secret)->paymentIntents->create($payload, $options);
+        } catch (ApiErrorException $e) {
+            return null;
+        }
+        return $intent->toArray();
+    }
+
+    public static function createSubscription(array $payload): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $subscription = self::client($secret)->subscriptions->create($payload);
+        } catch (ApiErrorException $e) {
+            return null;
+        }
+        return $subscription->toArray();
+    }
+
+    public static function findCustomerByEmail(string $email): ?array
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $results = self::client($secret)->customers->search([
+                'query' => "email:'" . addslashes($email) . "'",
+                'limit' => 1,
+            ]);
+        } catch (ApiErrorException $e) {
+            return null;
+        }
+        $data = $results->data ?? [];
+        if (!$data) {
+            return null;
+        }
+        return $data[0]->toArray();
     }
 
     public static function constructEvent(string $payload, string $signature, string $secret): ?array

@@ -32,14 +32,6 @@ unset($_SESSION['member_of_year_flash']);
 
 $statusOptions = ['new', 'reviewed', 'shortlisted', 'winner'];
 
-function format_datetime(?string $value): string
-{
-    if (!$value) {
-        return 'N/A';
-    }
-    return date('Y-m-d H:i', strtotime($value));
-}
-
 function status_badge_classes(string $status): string
 {
     return match ($status) {

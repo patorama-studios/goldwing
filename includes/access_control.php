@@ -168,6 +168,22 @@ function access_control_default_registry(): array
             'roles' => array_merge(['public'], $memberRoles),
         ],
         [
+            'page_key' => 'checkout',
+            'label' => 'Checkout',
+            'path_pattern' => '/checkout',
+            'match_type' => 'prefix',
+            'nav_group' => 'Public',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
+            'page_key' => 'become_member',
+            'label' => 'Become a Member',
+            'path_pattern' => '/become-a-member',
+            'match_type' => 'prefix',
+            'nav_group' => 'Public',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
             'page_key' => 'auth_callbacks',
             'label' => 'Auth Callbacks',
             'path_pattern' => '/auth/*',
@@ -245,7 +261,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/store/*',
             'match_type' => 'prefix',
             'nav_group' => 'Store',
-            'roles' => $memberRoles,
+            'roles' => array_merge(['public'], $memberRoles),
         ],
         [
             'page_key' => 'calendar_admin',

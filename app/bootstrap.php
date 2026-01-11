@@ -196,6 +196,7 @@ function render_media_shortcodes(string $html): string
     }, $html);
 }
 
+require_once __DIR__ . '/../includes/date_helpers.php';
 require_once __DIR__ . '/../includes/store_helpers.php';
 require_once __DIR__ . '/../includes/access_control.php';
 
