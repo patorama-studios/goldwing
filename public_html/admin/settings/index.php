@@ -860,6 +860,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $livePublishableMask = StripeSettingsService::maskValue($stripeSettings['live_publishable_key'] ?? '');
               $liveSecretMask = StripeSettingsService::maskValue($stripeSettings['live_secret_key'] ?? '');
               $webhookMask = StripeSettingsService::maskValue($stripeSettings['webhook_secret'] ?? '');
+              $testPublishableDisplay = $testPublishableMask['configured'] ? 'pk_test_****' . $testPublishableMask['last4'] : '';
+              $testSecretDisplay = $testSecretMask['configured'] ? 'sk_test_****' . $testSecretMask['last4'] : '';
+              $livePublishableDisplay = $livePublishableMask['configured'] ? 'pk_live_****' . $livePublishableMask['last4'] : '';
+              $liveSecretDisplay = $liveSecretMask['configured'] ? 'sk_live_****' . $liveSecretMask['last4'] : '';
+              $webhookDisplay = $webhookMask['configured'] ? 'whsec_****' . $webhookMask['last4'] : '';
               $webhookHealth = StripeSettingsService::webhookHealth($paymentSettings);
               $prices = $stripeSettings['membership_prices'] ?? [];
               if (!is_array($prices)) {
@@ -871,7 +876,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $defaultTerm = (string) ($stripeSettings['membership_default_term'] ?? '12M');
               $dashboardUrl = $activeMode === 'test' ? 'https://dashboard.stripe.com/test' : 'https://dashboard.stripe.com';
             ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6" id="stripe-settings-form">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="payments">
@@ -891,20 +896,20 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
                       <h3 class="text-sm font-semibold text-slate-900">Test keys</h3>
                       <label class="text-xs text-slate-600">Publishable key
-                        <input name="stripe_test_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $testPublishableMask['configured'] ? 'Configured (last 4: ' . e($testPublishableMask['last4']) . ')' : 'Not configured' ?>">
+                        <input name="stripe_test_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($testPublishableDisplay) ?>" data-mask-value="<?= e($testPublishableDisplay) ?>" placeholder="<?= $testPublishableMask['configured'] ? 'Configured (last 4: ' . e($testPublishableMask['last4']) . ')' : 'Not configured' ?>">
                       </label>
                       <label class="text-xs text-slate-600">Secret key
-                        <input name="stripe_test_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $testSecretMask['configured'] ? 'Configured (last 4: ' . e($testSecretMask['last4']) . ')' : 'Not configured' ?>">
+                        <input name="stripe_test_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($testSecretDisplay) ?>" data-mask-value="<?= e($testSecretDisplay) ?>" placeholder="<?= $testSecretMask['configured'] ? 'Configured (last 4: ' . e($testSecretMask['last4']) . ')' : 'Not configured' ?>">
                         <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
                       </label>
                     </div>
                     <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
                       <h3 class="text-sm font-semibold text-slate-900">Live keys</h3>
                       <label class="text-xs text-slate-600">Publishable key
-                        <input name="stripe_live_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $livePublishableMask['configured'] ? 'Configured (last 4: ' . e($livePublishableMask['last4']) . ')' : 'Not configured' ?>">
+                        <input name="stripe_live_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($livePublishableDisplay) ?>" data-mask-value="<?= e($livePublishableDisplay) ?>" placeholder="<?= $livePublishableMask['configured'] ? 'Configured (last 4: ' . e($livePublishableMask['last4']) . ')' : 'Not configured' ?>">
                       </label>
                       <label class="text-xs text-slate-600">Secret key
-                        <input name="stripe_live_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $liveSecretMask['configured'] ? 'Configured (last 4: ' . e($liveSecretMask['last4']) . ')' : 'Not configured' ?>">
+                        <input name="stripe_live_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($liveSecretDisplay) ?>" data-mask-value="<?= e($liveSecretDisplay) ?>" placeholder="<?= $liveSecretMask['configured'] ? 'Configured (last 4: ' . e($liveSecretMask['last4']) . ')' : 'Not configured' ?>">
                         <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
                       </label>
                     </div>
@@ -916,7 +921,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <input class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($webhookUrl) ?>" readonly>
                   </label>
                   <label class="text-sm text-slate-600">Webhook secret
-                    <input name="stripe_webhook_secret" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $webhookMask['configured'] ? 'Configured (last 4: ' . e($webhookMask['last4']) . ')' : 'Not configured' ?>">
+                    <input name="stripe_webhook_secret" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($webhookDisplay) ?>" data-mask-value="<?= e($webhookDisplay) ?>" placeholder="<?= $webhookMask['configured'] ? 'Configured (last 4: ' . e($webhookMask['last4']) . ')' : 'Not configured' ?>">
                   </label>
                   <div class="rounded-lg border border-gray-100 bg-white p-4 text-sm">
                     <div class="flex items-center justify-between">
@@ -1071,6 +1076,26 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </form>
             <script>
               document.addEventListener('DOMContentLoaded', () => {
+                const form = document.getElementById('stripe-settings-form');
+                const maskedInputs = form ? Array.from(form.querySelectorAll('[data-mask-value]')) : [];
+                if (form && maskedInputs.length) {
+                  maskedInputs.forEach((input) => {
+                    const mask = input.dataset.maskValue || '';
+                    input.addEventListener('focus', () => {
+                      if (mask && input.value === mask) {
+                        input.value = '';
+                      }
+                    });
+                  });
+                  form.addEventListener('submit', () => {
+                    maskedInputs.forEach((input) => {
+                      const mask = input.dataset.maskValue || '';
+                      if (mask && input.value === mask) {
+                        input.value = '';
+                      }
+                    });
+                  });
+                }
                 const testButton = document.getElementById('stripe-test-connection');
                 const result = document.getElementById('stripe-test-result');
                 if (!testButton || !result) {

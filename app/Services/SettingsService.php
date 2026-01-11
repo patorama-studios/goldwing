@@ -295,6 +295,9 @@ class SettingsService
     {
         if (!empty($options['encrypt'])) {
             $encrypted = CryptoService::encrypt((string) $value);
+            if ($encrypted === null) {
+                return json_encode($value, JSON_UNESCAPED_SLASHES);
+            }
             $payload = [
                 'encrypted' => true,
                 'value' => $encrypted ?? '',

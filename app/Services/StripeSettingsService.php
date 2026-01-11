@@ -182,11 +182,11 @@ class StripeSettingsService
     public static function saveAdminSettings(int $actorUserId, array $payload, array &$errors): void
     {
         $useTestMode = !empty($payload['stripe_use_test_mode']);
-        $testPublishable = trim((string) ($payload['stripe_test_publishable_key'] ?? ''));
-        $testSecret = trim((string) ($payload['stripe_test_secret_key'] ?? ''));
-        $livePublishable = trim((string) ($payload['stripe_live_publishable_key'] ?? ''));
-        $liveSecret = trim((string) ($payload['stripe_live_secret_key'] ?? ''));
-        $webhookSecret = trim((string) ($payload['stripe_webhook_secret'] ?? ''));
+        $testPublishable = self::normalizeMaskedInput((string) ($payload['stripe_test_publishable_key'] ?? ''));
+        $testSecret = self::normalizeMaskedInput((string) ($payload['stripe_test_secret_key'] ?? ''));
+        $livePublishable = self::normalizeMaskedInput((string) ($payload['stripe_live_publishable_key'] ?? ''));
+        $liveSecret = self::normalizeMaskedInput((string) ($payload['stripe_live_secret_key'] ?? ''));
+        $webhookSecret = self::normalizeMaskedInput((string) ($payload['stripe_webhook_secret'] ?? ''));
         $invoicePrefix = trim((string) ($payload['stripe_invoice_prefix'] ?? 'INV'));
         $invoiceTemplate = trim((string) ($payload['stripe_invoice_email_template'] ?? ''));
         $generatePdf = !empty($payload['stripe_generate_pdf']) ? 1 : 0;
@@ -272,5 +272,17 @@ class StripeSettingsService
         if ($value !== '' && !str_starts_with($value, $prefix)) {
             $errors[] = $label . ' must start with ' . $prefix . '.';
         }
+    }
+
+    private static function normalizeMaskedInput(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        if (str_contains($value, '****')) {
+            return '';
+        }
+        return $value;
     }
 }
