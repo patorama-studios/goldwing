@@ -10,9 +10,21 @@ use App\Services\MembershipService;
 use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
 
+if (!function_exists('json_response')) {
+    function json_response(array $data, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
+}
+
 $pdo = db();
 $error = '';
 $message = '';
+$ajaxRequest = isset($_POST['ajax']) && $_POST['ajax'] === '1';
+$showSubmittedMessage = isset($_GET['submitted']) && $_GET['submitted'] === '1';
 $pricingData = MembershipPricingService::getMembershipPricing();
 $periodDefinitions = MembershipPricingService::periodDefinitions();
 $chapters = ChapterRepository::listForSelection($pdo, true);
@@ -303,12 +315,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Application submitted. We will confirm your membership and payment details shortly.';
             }
         }
+        if ($ajaxRequest) {
+            if ($error) {
+                json_response(['error' => $error], 422);
+            }
+            json_response(['ok' => true, 'message' => $message]);
+        }
     }
 }
 
 $bankTransferInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
 if ($bankTransferInstructions === '') {
     $bankTransferInstructions = 'Bank transfer details will be provided once your application is submitted.';
+}
+
+$successMessageText = $message;
+if ($showSubmittedMessage && $successMessageText === '') {
+    $successMessageText = 'Application submitted. We will confirm your membership and payment details shortly.';
 }
 
 $pageTitle = 'Membership Application';
@@ -322,10 +345,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <p>Complete the steps below to join the Goldwing community.</p>
     </div>
 
-    <?php if ($message): ?>
+    <?php if ($successMessageText): ?>
       <div class="form-card form-card--wizard">
         <h2>Thank you for your application</h2>
-        <p><?= e($message) ?></p>
+        <p><?= e($successMessageText) ?></p>
         <p>Our committee will review your details and contact you with the next steps.</p>
         <a class="form-button primary" href="/">Return to home</a>
       </div>
@@ -727,28 +750,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
               </div>
 
               <div class="payment-panel stripe-style" data-payment-panel="card" hidden>
-                <p id="stripe-payment-note" class="form-helper" hidden>Stripe payments are processed immediately through the Stripe Payment Element and your application will complete once the payment is confirmed.</p>
-                <div class="form-grid two">
-                  <label class="form-field">
-                    <span class="form-label">Cardholder Name</span>
-                    <input class="form-input" type="text" autocomplete="cc-name">
-                  </label>
-                  <label class="form-field">
-                    <span class="form-label">Card Number</span>
-                    <input class="form-input" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="•••• •••• •••• ••••">
-                  </label>
-                </div>
-                <div class="form-grid two">
-                  <label class="form-field">
-                    <span class="form-label">Expiry</span>
-                    <input class="form-input" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY">
-                  </label>
-                  <label class="form-field">
-                    <span class="form-label">CVC</span>
-                    <input class="form-input" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="CVC">
-                  </label>
-                </div>
-                <p class="form-helper">Card payments are securely processed by Stripe.</p>
+                <p id="stripe-payment-note" class="form-helper" hidden>The Stripe Payment Element handles card details securely. Complete it below to pay instantly.</p>
+                <div id="stripe-payment-element" class="mt-4 stripe-element" hidden></div>
+                <div id="stripe-payment-error" class="form-alert error" hidden></div>
               </div>
 
               <div class="payment-panel" data-payment-panel="bank" hidden>
@@ -872,7 +876,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     <?php endif; ?>
   </div>
 </main>
-<?php if (!$message): ?>
+<?php if (!$successMessageText): ?>
 <style>
   .payment-panel.stripe-style {
     background: #fdfdfd;
@@ -894,7 +898,18 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     line-height: 1.5;
     color: #0f172a;
   }
+  .payment-panel[hidden] {
+    display: none !important;
+  }
+  .stripe-element {
+    min-height: 48px;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #fff;
+  }
 </style>
+<script src="https://js.stripe.com/v3/"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.querySelector('[data-wizard]');
@@ -930,6 +945,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const paymentMethodError = document.getElementById('payment-method-error');
     const bankTransferDetails = document.getElementById('bank-transfer-details');
     const stripePaymentNote = document.getElementById('stripe-payment-note');
+    const paymentElementContainer = document.getElementById('stripe-payment-element');
+    const stripePaymentError = document.getElementById('stripe-payment-error');
+    const finalSubmitButton = form.querySelector('button[type="submit"]');
     const summaryFullPrice = document.querySelector('[data-summary-full-price]');
     const summaryFullDetail = document.querySelector('[data-summary-full-detail]');
     const summaryAssociatePrice = document.querySelector('[data-summary-associate-price]');
@@ -1044,6 +1062,18 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       label: meta.label || key,
       join_after: meta.join_after || null,
     }));
+    const setError = (message) => {
+      if (!membershipError) {
+        return;
+      }
+      if (!message) {
+        membershipError.textContent = '';
+        membershipError.hidden = true;
+        return;
+      }
+      membershipError.textContent = message;
+      membershipError.hidden = false;
+    };
 
     const getJoinAfterFilter = () => {
       const today = new Date();
@@ -1174,6 +1204,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         const total = (typeof fullPrice === 'number' ? fullPrice : 0) + (typeof associatePrice === 'number' ? associatePrice : 0);
         summaryTotal.textContent = `$${(total / 100).toFixed(2)}`;
       }
+      if (isCardMethod()) {
+        markPaymentIntentRefresh();
+      }
     };
 
     const paymentPanels = Array.from(document.querySelectorAll('[data-payment-panel]'));
@@ -1193,13 +1226,20 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       paymentMethodError.textContent = message;
       paymentMethodError.hidden = false;
     };
-    const updatePaymentExtras = () => {
-      const method = getSelectedPaymentMethod();
+    const updatePaymentExtras = (method) => {
+      const isCard = method === 'card';
       if (bankTransferDetails) {
         bankTransferDetails.hidden = method !== 'bank_transfer';
       }
       if (stripePaymentNote) {
-        stripePaymentNote.hidden = method !== 'card';
+        stripePaymentNote.hidden = !isCard;
+      }
+      if (paymentElementContainer) {
+        paymentElementContainer.hidden = !isCard;
+      }
+      if (stripePaymentError && !isCard) {
+        stripePaymentError.hidden = true;
+        stripePaymentError.textContent = '';
       }
       if (method) {
         showPaymentMethodError('');
@@ -1210,7 +1250,170 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       paymentPanels.forEach((panel) => {
         panel.hidden = panel.dataset.paymentPanel !== method;
       });
-      updatePaymentExtras();
+      updatePaymentExtras(method);
+    };
+
+    const cardPaymentPanel = form.querySelector('[data-payment-panel="card"]');
+    let stripe = null;
+    let elements = null;
+    let paymentElement = null;
+    let clientSecret = null;
+    let paymentIntentId = null;
+    let stripeConfig = null;
+    let needsPaymentIntentRefresh = true;
+    let stripeInitializing = false;
+    let processingStripePayment = false;
+
+    const createStripeRequestId = () => `apply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const buildStripePaymentIntentPayload = () => {
+      const fullMagazine = form.querySelector('input[name="full_magazine_type"]:checked')?.value || 'PRINTED';
+      const payload = {
+        membership_full: isFullSelected() ? 1 : 0,
+        membership_associate: isAssociateSelected() ? 1 : 0,
+        associate_add: getAssociateAddValue(),
+        full_magazine_type: fullMagazine,
+        full_period_key: periodSelects.full ? periodSelects.full.value : '',
+        associate_period_key: periodSelects.associate ? periodSelects.associate.value : '',
+        first_name: form.querySelector('input[name="first_name"]')?.value || '',
+        last_name: form.querySelector('input[name="last_name"]')?.value || '',
+        email: form.querySelector('input[name="email"]')?.value || '',
+      };
+      return payload;
+    };
+
+    const showStripeError = (message) => {
+      if (!stripePaymentError) {
+        return;
+      }
+      if (!message) {
+        stripePaymentError.textContent = '';
+        stripePaymentError.hidden = true;
+        return;
+      }
+      stripePaymentError.textContent = message;
+      stripePaymentError.hidden = false;
+    };
+
+    const loadStripeConfig = async () => {
+      if (stripeConfig) {
+        return stripeConfig;
+      }
+      const response = await fetch('/api/stripe/config');
+      if (!response.ok) {
+        throw new Error('Unable to load Stripe configuration.');
+      }
+      const data = await response.json();
+      stripeConfig = data;
+      return data;
+    };
+
+    const initStripeElements = async (secret) => {
+      const config = await loadStripeConfig();
+      if (!config || !config.publishableKey) {
+        throw new Error('Stripe is not configured.');
+      }
+      if (!stripe) {
+        stripe = Stripe(config.publishableKey);
+      }
+      if (!elements || clientSecret !== secret) {
+        if (paymentElement) {
+          paymentElement.unmount();
+        }
+        elements = stripe.elements({
+          clientSecret: secret,
+          appearance: { theme: 'stripe' },
+        });
+        const wallets = {
+          applePay: config.paymentMethods && config.paymentMethods.applePay ? 'auto' : 'never',
+          googlePay: config.paymentMethods && config.paymentMethods.googlePay ? 'auto' : 'never',
+        };
+        paymentElement = elements.create('payment', { wallets });
+        if (paymentElementContainer) {
+          paymentElement.mount(paymentElementContainer);
+        }
+      }
+      clientSecret = secret;
+    };
+
+    const markPaymentIntentRefresh = () => {
+      needsPaymentIntentRefresh = true;
+      if (paymentElementContainer) {
+        paymentElementContainer.hidden = true;
+      }
+    };
+
+    const ensureStripePaymentIntent = async () => {
+      if (!needsPaymentIntentRefresh && clientSecret) {
+        return paymentIntentId;
+      }
+      if (stripeInitializing) {
+        return paymentIntentId;
+      }
+      stripeInitializing = true;
+      showStripeError('');
+      const payload = buildStripePaymentIntentPayload();
+      const csrfToken = form.querySelector('input[name="csrf_token"]')?.value || '';
+      const requestBody = {
+        ...payload,
+        request_id: createStripeRequestId(),
+      };
+      let response;
+      let data;
+      try {
+        response = await fetch('/api/stripe/create-application-payment-intent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify(requestBody),
+        });
+        data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Unable to prepare Stripe payment.');
+        }
+      } finally {
+        stripeInitializing = false;
+      }
+      clientSecret = data.client_secret;
+      paymentIntentId = data.payment_intent_id || null;
+      await initStripeElements(clientSecret);
+      needsPaymentIntentRefresh = false;
+      if (paymentElementContainer) {
+        paymentElementContainer.hidden = false;
+      }
+      return paymentIntentId;
+    };
+
+    const isCardMethod = () => getSelectedPaymentMethod() === 'card';
+
+    const prepareStripeForSummary = () => {
+      if (!isCardMethod()) {
+        return;
+      }
+      if (stripeInitializing) {
+        return;
+      }
+      ensureStripePaymentIntent().catch((error) => {
+        showStripeError(error.message || 'Unable to initialize Stripe payment.');
+      });
+    };
+
+    const submitApplicationViaAjax = async (intentId) => {
+      const ajaxForm = new FormData(form);
+      ajaxForm.set('payment_method', 'card');
+      ajaxForm.set('payment_intent_id', intentId || '');
+      ajaxForm.set('ajax', '1');
+      const response = await fetch(window.location.pathname, {
+        method: 'POST',
+        body: ajaxForm,
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Unable to submit application.');
+      }
+      window.location.href = `${window.location.origin}${window.location.pathname}?submitted=1`;
     };
 
     const isFieldRequired = (field) => {
@@ -1300,6 +1503,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         submitButton.hidden = currentStepIndex !== visibleSteps.length - 1;
         submitButton.disabled = currentStepIndex !== visibleSteps.length - 1;
       }
+      prepareStripeForSummary();
     };
 
     const validateStep = () => {
@@ -1356,12 +1560,51 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       syncVehiclePayloads();
       const method = getSelectedPaymentMethod();
       if (!method) {
         event.preventDefault();
         showPaymentMethodError('Please select a payment method before submitting.');
+        return;
+      }
+      if (method === 'card') {
+        event.preventDefault();
+        showPaymentMethodError('');
+        showStripeError('');
+        if (processingStripePayment) {
+          return;
+        }
+        processingStripePayment = true;
+        if (finalSubmitButton) {
+          finalSubmitButton.disabled = true;
+          finalSubmitButton.dataset.originalText = finalSubmitButton.dataset.originalText || finalSubmitButton.textContent;
+          finalSubmitButton.textContent = 'Processing...';
+        }
+        try {
+          await ensureStripePaymentIntent();
+          if (!stripe || !elements) {
+            throw new Error('Stripe is not ready.');
+          }
+          const { error, paymentIntent } = await stripe.confirmPayment({
+            elements,
+            confirmParams: {
+              return_url: window.location.href,
+            },
+          });
+          if (error) {
+            throw error;
+          }
+          const intentId = (paymentIntent && paymentIntent.id) ? paymentIntent.id : paymentIntentId;
+          await submitApplicationViaAjax(intentId);
+        } catch (apiError) {
+          showStripeError((apiError && apiError.message) ? apiError.message : 'Stripe payment failed.');
+          if (finalSubmitButton) {
+            finalSubmitButton.disabled = false;
+            finalSubmitButton.textContent = finalSubmitButton.dataset.originalText || 'Submit application';
+          }
+          processingStripePayment = false;
+        }
       }
     });
 

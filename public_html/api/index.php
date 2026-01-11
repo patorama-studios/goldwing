@@ -14,6 +14,7 @@ use App\Services\StripeSettingsService;
 use App\Services\SettingsService;
 use App\Services\BaseUrlService;
 use App\Services\Validator;
+use App\Services\MembershipPricingService;
 
 header('Content-Type: application/json');
 
@@ -275,6 +276,99 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Method not allowed.'], 405);
         }
         json_response(StripeSettingsService::getPublicConfig());
+    }
+
+    if (count($segments) === 2 && $segments[1] === 'create-application-payment-intent') {
+        if ($method !== 'POST') {
+            json_response(['error' => 'Method not allowed.'], 405);
+        }
+        require_csrf_json($body);
+        $stripeSettings = require_stripe_checkout_enabled();
+        $activeKeys = StripeSettingsService::getActiveKeys();
+        if (empty($activeKeys['secret_key'])) {
+            json_response(['error' => 'Stripe is not configured.'], 422);
+        }
+        $fullSelected = !empty($body['membership_full']);
+        $associateSelected = !empty($body['membership_associate']);
+        if (!$fullSelected && !$associateSelected) {
+            json_response(['error' => 'Select at least one membership type.'], 422);
+        }
+        $associateAdd = $body['associate_add'] ?? '';
+        if ($associateSelected && $associateAdd !== 'yes') {
+            json_response(['error' => 'Associate details are required.'], 422);
+        }
+        $fullMagazineType = strtoupper(trim((string) ($body['full_magazine_type'] ?? '')));
+        if (!in_array($fullMagazineType, MembershipPricingService::MAGAZINE_TYPES, true)) {
+            $fullMagazineType = 'PRINTED';
+        }
+        $fullPeriodKey = strtoupper(trim((string) ($body['full_period_key'] ?? '')));
+        $associatePeriodKey = strtoupper(trim((string) ($body['associate_period_key'] ?? '')));
+
+        $fullPriceCents = null;
+        if ($fullSelected) {
+            if ($fullPeriodKey === '') {
+                json_response(['error' => 'Select a membership period for Full membership.'], 422);
+            }
+            $fullPriceCents = MembershipPricingService::getPriceCents($fullMagazineType, 'FULL', $fullPeriodKey);
+            if ($fullPriceCents === null) {
+                json_response(['error' => 'Unable to locate full membership pricing.'], 422);
+            }
+        }
+
+        $associatePriceCents = null;
+        if ($associateSelected) {
+            if ($associatePeriodKey === '') {
+                json_response(['error' => 'Select a membership period for the associate member.'], 422);
+            }
+            $associateMagazine = $fullSelected ? $fullMagazineType : 'PRINTED';
+            $associatePriceCents = MembershipPricingService::getPriceCents($associateMagazine, 'ASSOCIATE', $associatePeriodKey);
+            if ($associatePriceCents === null) {
+                json_response(['error' => 'Unable to locate associate membership pricing.'], 422);
+            }
+        }
+
+        $totalCents = (int) ($fullPriceCents ?? 0) + (int) ($associatePriceCents ?? 0);
+        if ($totalCents <= 0) {
+            json_response(['error' => 'Invalid membership amount.'], 422);
+        }
+
+        $firstName = trim((string) ($body['first_name'] ?? ''));
+        $lastName = trim((string) ($body['last_name'] ?? ''));
+        $email = trim((string) ($body['email'] ?? ''));
+        if ($firstName === '' || $lastName === '' || $email === '') {
+            json_response(['error' => 'Primary member name and email are required.'], 422);
+        }
+
+        $requestId = trim((string) ($body['request_id'] ?? ''));
+        $intentIdempotency = $requestId !== '' ? $requestId : 'membership_application_' . bin2hex(random_bytes(6));
+        $payload = [
+            'amount' => $totalCents,
+            'currency' => 'aud',
+            'automatic_payment_methods' => ['enabled' => true],
+            'metadata' => [
+                'purpose' => 'membership_application',
+                'membership_full' => $fullSelected ? '1' : '0',
+                'membership_associate' => $associateSelected ? '1' : '0',
+                'full_magazine_type' => $fullMagazineType,
+                'full_period_key' => $fullPeriodKey,
+                'associate_period_key' => $associatePeriodKey,
+                'associate_add' => $associateAdd,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+            ],
+        ];
+        if ($email !== '') {
+            $payload['receipt_email'] = $email;
+        }
+
+        $intent = StripeService::createPaymentIntent($payload, $intentIdempotency);
+        if (!$intent || empty($intent['client_secret'])) {
+            json_response(['error' => 'Unable to create Stripe payment.'], 500);
+        }
+        json_response([
+            'client_secret' => $intent['client_secret'],
+            'payment_intent_id' => $intent['id'] ?? null,
+        ]);
     }
 
     if (count($segments) === 2 && $segments[1] === 'create-payment-intent') {
