@@ -19,7 +19,9 @@ class SecurityHeadersService
         $scriptSrc = $allowFraming
             ? "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net {$googleScriptSources} {$stripeScriptSources}"
             : "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com {$googleScriptSources} {$stripeScriptSources}";
-        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://m.stripe.network; {$frameAncestors}";
+        $frameSrc = "frame-src 'self' https://js.stripe.com https://m.stripe.network";
+        $connectSrc = "connect-src 'self' https://api.stripe.com https://m.stripe.network https://maps.googleapis.com https://maps.gstatic.com";
+        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; {$frameSrc}; font-src 'self' data: https://fonts.gstatic.com; {$connectSrc}; {$frameAncestors}";
         header('Content-Security-Policy: ' . $csp);
         header('X-Frame-Options: ' . ($allowFraming ? 'SAMEORIGIN' : 'DENY'));
         header('X-Content-Type-Options: nosniff');
