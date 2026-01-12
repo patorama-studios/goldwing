@@ -15,10 +15,11 @@ class SecurityHeadersService
             ? "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net"
             : "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com";
         $googleScriptSources = 'https://maps.googleapis.com https://maps.gstatic.com';
+        $stripeScriptSources = 'https://js.stripe.com https://m.stripe.network';
         $scriptSrc = $allowFraming
-            ? "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net {$googleScriptSources}"
-            : "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com {$googleScriptSources}";
-        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; {$frameAncestors}";
+            ? "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net {$googleScriptSources} {$stripeScriptSources}"
+            : "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com {$googleScriptSources} {$stripeScriptSources}";
+        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://m.stripe.network; {$frameAncestors}";
         header('Content-Security-Policy: ' . $csp);
         header('X-Frame-Options: ' . ($allowFraming ? 'SAMEORIGIN' : 'DENY'));
         header('X-Content-Type-Options: nosniff');

@@ -384,6 +384,46 @@ function access_control_default_registry(): array
             'roles' => array_merge(['public'], $memberRoles),
         ],
         [
+            'page_key' => 'api_stripe_config',
+            'label' => 'Stripe Public Config',
+            'path_pattern' => '/api/stripe/config',
+            'match_type' => 'exact',
+            'nav_group' => 'API',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
+            'page_key' => 'api_stripe_payment_intent',
+            'label' => 'Stripe Payment Intent',
+            'path_pattern' => '/api/stripe/create-payment-intent',
+            'match_type' => 'exact',
+            'nav_group' => 'API',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
+            'page_key' => 'api_stripe_membership_intent',
+            'label' => 'Stripe Membership Intent',
+            'path_pattern' => '/api/stripe/create-application-payment-intent',
+            'match_type' => 'exact',
+            'nav_group' => 'API',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
+            'page_key' => 'api_stripe_subscription',
+            'label' => 'Stripe Membership Subscription',
+            'path_pattern' => '/api/stripe/create-subscription',
+            'match_type' => 'exact',
+            'nav_group' => 'API',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
+            'page_key' => 'api_stripe_webhook',
+            'label' => 'Stripe Webhook (Router)',
+            'path_pattern' => '/api/stripe/webhook',
+            'match_type' => 'exact',
+            'nav_group' => 'API',
+            'roles' => array_merge(['public'], $memberRoles),
+        ],
+        [
             'page_key' => 'api_admin',
             'label' => 'API',
             'path_pattern' => '/api/*',
@@ -574,6 +614,9 @@ function access_control_normalize_path(string $path): string
 function access_control_is_always_allowed(string $path): bool
 {
     $path = access_control_normalize_path($path);
+    if (str_starts_with($path, '/api/stripe/')) {
+        return true;
+    }
     foreach (access_control_always_allowed_paths() as $allowed) {
         if ($allowed === $path) {
             return true;
