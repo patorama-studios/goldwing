@@ -763,16 +763,23 @@ if ($user && $user['member_id']) {
         $memberStateRaw = strtoupper(trim($member['state'] ?? ''));
         $memberState = $stateNameMap[$memberStateRaw] ?? $memberStateRaw;
 
-        $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, c.name AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published" AND (e.scope = "NATIONAL"';
-        $eventsParams = [];
-        if (!empty($memberChapterId)) {
-            $eventsSql .= ' OR e.chapter_id = :chapter_id';
-            $eventsParams['chapter_id'] = (int) $memberChapterId;
+        $calendarEvents = [];
+        try {
+            if (calendar_table_exists($pdo, 'calendar_events')) {
+                $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, c.name AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published" AND (e.scope = "NATIONAL"';
+                $eventsParams = [];
+                if (!empty($memberChapterId)) {
+                    $eventsSql .= ' OR e.chapter_id = :chapter_id';
+                    $eventsParams['chapter_id'] = (int) $memberChapterId;
+                }
+                $eventsSql .= ')';
+                $stmt = $pdo->prepare($eventsSql);
+                $stmt->execute($eventsParams);
+                $calendarEvents = $stmt->fetchAll();
+            }
+        } catch (PDOException $e) {
+            $calendarEvents = [];
         }
-        $eventsSql .= ')';
-        $stmt = $pdo->prepare($eventsSql);
-        $stmt->execute($eventsParams);
-        $calendarEvents = $stmt->fetchAll();
 
         $rangeStart = new DateTime('now', new DateTimeZone('UTC'));
         $rangeEnd = (clone $rangeStart)->modify('+60 days');

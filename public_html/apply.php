@@ -1443,6 +1443,38 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       window.location.href = `${window.location.origin}${window.location.pathname}?submitted=1`;
     };
 
+    const handleStripeReturn = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const intentSecret = params.get('payment_intent_client_secret');
+      if (!intentSecret) {
+        return;
+      }
+      try {
+        const config = await loadStripeConfig();
+        if (!config || !config.publishableKey) {
+          throw new Error('Stripe is not configured.');
+        }
+        if (!stripe) {
+          stripe = Stripe(config.publishableKey);
+        }
+        const { paymentIntent } = await stripe.retrievePaymentIntent(intentSecret);
+        if (!paymentIntent) {
+          throw new Error('Unable to verify Stripe payment.');
+        }
+        if (paymentIntent.status === 'succeeded') {
+          await submitApplicationViaAjax(paymentIntent.id);
+          return;
+        }
+        if (paymentIntent.status === 'processing') {
+          showStripeError('Your payment is processing. Please wait a moment and try again.');
+          return;
+        }
+        showStripeError('Payment was not completed. Please try again.');
+      } catch (error) {
+        showStripeError(error.message || 'Unable to verify Stripe payment.');
+      }
+    };
+
     const isFieldRequired = (field) => {
       const condition = field.dataset.requiredWhen;
       if (!condition) {
@@ -1613,11 +1645,13 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           if (!stripe || !elements) {
             throw new Error('Stripe is not ready.');
           }
+          const returnUrl = `${window.location.origin}${window.location.pathname}`;
           const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-              return_url: window.location.href,
+              return_url: returnUrl,
             },
+            redirect: 'if_required',
           });
           if (error) {
             throw error;
@@ -1697,6 +1731,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     updateStep(0);
     updatePaymentPanels();
     updateSummary();
+    handleStripeReturn();
   });
 </script>
 <?php endif; ?>
