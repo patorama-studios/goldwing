@@ -130,6 +130,46 @@ function normalize_membership_price_term(string $term): string
     return $map[$clean] ?? $clean;
 }
 
+function orders_member_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'member_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'member_id';
+            return $column;
+        }
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'user_id';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = '';
+    return $column;
+}
+
+function orders_member_value(array $member, array $user, string $column): ?int
+{
+    if ($column === 'member_id') {
+        return !empty($member['id']) ? (int) $member['id'] : null;
+    }
+    if ($column === 'user_id') {
+        if (!empty($member['user_id'])) {
+            return (int) $member['user_id'];
+        }
+        if (!empty($user['id'])) {
+            return (int) $user['id'];
+        }
+    }
+    return null;
+}
+
 
 if ($user && $user['member_id']) {
     $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
@@ -2539,46 +2579,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         'LIFE' => 'Life Member',
                         default => 'Member',
     };
-}
-
-function orders_member_column(\PDO $pdo): string
-{
-    static $column = null;
-    if ($column !== null) {
-        return $column;
-    }
-    try {
-        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'member_id'");
-        if ($stmt && $stmt->fetchColumn()) {
-            $column = 'member_id';
-            return $column;
-        }
-        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
-        if ($stmt && $stmt->fetchColumn()) {
-            $column = 'user_id';
-            return $column;
-        }
-    } catch (\Throwable $e) {
-        // Ignore schema inspection errors.
-    }
-    $column = '';
-    return $column;
-}
-
-function orders_member_value(array $member, array $user, string $column): ?int
-{
-    if ($column === 'member_id') {
-        return !empty($member['id']) ? (int) $member['id'] : null;
-    }
-    if ($column === 'user_id') {
-        if (!empty($member['user_id'])) {
-            return (int) $member['user_id'];
-        }
-        if (!empty($user['id'])) {
-            return (int) $user['id'];
-        }
-    }
-    return null;
 }
                 $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
                 $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
