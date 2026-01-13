@@ -130,6 +130,7 @@ function normalize_membership_price_term(string $term): string
     return $map[$clean] ?? $clean;
 }
 
+
 if ($user && $user['member_id']) {
     $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
     $stmt->execute(['id' => $user['member_id']]);
