@@ -331,6 +331,17 @@ if ($resource === 'stripe') {
         if ($totalCents <= 0) {
             json_response(['error' => 'Invalid membership amount.'], 422);
         }
+        $storeSettings = store_get_settings();
+        $processingFee = 0.0;
+        if ((int) ($storeSettings['stripe_fee_enabled'] ?? 0) === 1) {
+            $processingFee = store_calculate_processing_fee(
+                $totalCents / 100,
+                (float) ($storeSettings['stripe_fee_percent'] ?? 0),
+                (float) ($storeSettings['stripe_fee_fixed'] ?? 0)
+            );
+        }
+        $processingFeeCents = (int) round($processingFee * 100);
+        $totalWithFeeCents = $totalCents + $processingFeeCents;
 
         $firstName = trim((string) ($body['first_name'] ?? ''));
         $lastName = trim((string) ($body['last_name'] ?? ''));
@@ -342,7 +353,7 @@ if ($resource === 'stripe') {
         $requestId = trim((string) ($body['request_id'] ?? ''));
         $intentIdempotency = $requestId !== '' ? $requestId : 'membership_application_' . bin2hex(random_bytes(6));
         $payload = [
-            'amount' => $totalCents,
+            'amount' => $totalWithFeeCents,
             'currency' => 'aud',
             'automatic_payment_methods' => ['enabled' => true],
             'metadata' => [
@@ -355,6 +366,8 @@ if ($resource === 'stripe') {
                 'associate_add' => $associateAdd,
                 'first_name' => $firstName,
                 'last_name' => $lastName,
+                'processing_fee_cents' => (string) $processingFeeCents,
+                'total_with_fee_cents' => (string) $totalWithFeeCents,
             ],
         ];
         if ($email !== '') {

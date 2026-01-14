@@ -27,6 +27,7 @@ $ajaxRequest = isset($_POST['ajax']) && $_POST['ajax'] === '1';
 $showSubmittedMessage = isset($_GET['submitted']) && $_GET['submitted'] === '1';
 $pricingData = MembershipPricingService::getMembershipPricing();
 $periodDefinitions = MembershipPricingService::periodDefinitions();
+$storeSettings = store_get_settings();
 $chapters = ChapterRepository::listForSelection($pdo, true);
 $requestedChapterId = 0;
 
@@ -162,6 +163,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $totalCents = (int) ($fullPriceCents ?? 0) + (int) ($associatePriceCents ?? 0);
+            $processingFeeCents = 0;
+            $totalWithFeeCents = $totalCents;
+            if ($paymentMethod === 'card' && (int) ($storeSettings['stripe_fee_enabled'] ?? 0) === 1) {
+                $processingFee = store_calculate_processing_fee(
+                    $totalCents / 100,
+                    (float) ($storeSettings['stripe_fee_percent'] ?? 0),
+                    (float) ($storeSettings['stripe_fee_fixed'] ?? 0)
+                );
+                $processingFeeCents = (int) round($processingFee * 100);
+                $totalWithFeeCents = $totalCents + $processingFeeCents;
+            }
 
             if (!$error) {
                 $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone, address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES (:member_type, :status, :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone, :address1, :address2, :city, :state, :postal, :country, :privacy, :assist_ute, :assist_phone, :assist_bed, :assist_tools, :exclude_printed, :exclude_electronic, NOW())');
@@ -296,6 +308,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ],
                         'currency' => $pricingCurrency,
                         'total_cents' => $totalCents,
+                        'processing_fee_cents' => $processingFeeCents,
+                        'total_with_fee_cents' => $totalWithFeeCents,
                     ],
                     'requested_chapter_id' => $requestedChapterId ?: null,
                     'payment_method' => $paymentMethod,
@@ -780,6 +794,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
               <strong data-summary-associate-price>Not selected</strong>
             </div>
             <div class="summary-detail" data-summary-associate-detail>Not selected</div>
+            <div class="summary-row" data-summary-processing-row hidden>
+              <span>Payment processing fee</span>
+              <strong data-summary-processing-fee>$0.00</strong>
+            </div>
             <div class="summary-row summary-total">
               <span>Total</span>
               <strong data-summary-total>$0.00</strong>
@@ -952,8 +970,15 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const summaryAssociatePrice = document.querySelector('[data-summary-associate-price]');
     const summaryAssociateDetail = document.querySelector('[data-summary-associate-detail]');
     const summaryTotal = document.querySelector('[data-summary-total]');
+    const summaryProcessingRow = document.querySelector('[data-summary-processing-row]');
+    const summaryProcessingFee = document.querySelector('[data-summary-processing-fee]');
     const pricingData = <?= json_encode($pricingData, JSON_UNESCAPED_SLASHES) ?>;
     const periodDefinitions = <?= json_encode($periodDefinitions, JSON_UNESCAPED_SLASHES) ?>;
+    const storeSettings = <?= json_encode([
+        'stripe_fee_enabled' => (int) ($storeSettings['stripe_fee_enabled'] ?? 0),
+        'stripe_fee_percent' => (float) ($storeSettings['stripe_fee_percent'] ?? 0),
+        'stripe_fee_fixed' => (float) ($storeSettings['stripe_fee_fixed'] ?? 0),
+    ], JSON_UNESCAPED_SLASHES) ?>;
     let currentStepIndex = 0;
 
     const updateVehicleIndices = (list) => {
@@ -1056,11 +1081,18 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const isFullSelected = () => Boolean(fullToggle && fullToggle.checked);
     const isAssociateSelected = () => Boolean(associateToggle && associateToggle.checked);
 
+    const periodOrder = ['ONE_THIRD', 'TWO_THIRDS', 'ONE_YEAR', 'TWO_ONE_THIRDS', 'TWO_TWO_THIRDS', 'THREE_YEARS'];
     const periodOptions = Object.entries(periodDefinitions || {}).map(([key, meta]) => ({
       key,
       label: meta.label || key,
       join_after: meta.join_after || null,
-    }));
+    })).sort((a, b) => {
+      const aIndex = periodOrder.indexOf(a.key);
+      const bIndex = periodOrder.indexOf(b.key);
+      const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+      return aRank - bRank;
+    });
     const setError = (message) => {
       if (!membershipError) {
         return;
@@ -1086,13 +1118,57 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       return null;
     };
 
-    const populatePeriodSelect = (select, hintEl) => {
+    const getAvailablePeriodKeys = (membershipType, magazineType) => {
+      const matrix = pricingData && pricingData.matrix ? pricingData.matrix : {};
+      if (magazineType && matrix[magazineType] && matrix[magazineType][membershipType]) {
+        return Object.keys(matrix[magazineType][membershipType]);
+      }
+      const keys = new Set();
+      Object.values(matrix).forEach((magazine) => {
+        if (magazine && magazine[membershipType]) {
+          Object.keys(magazine[membershipType]).forEach((key) => keys.add(key));
+        }
+      });
+      return Array.from(keys);
+    };
+
+    const getFullMagazineType = () => {
+      const selected = form.querySelector('input[name="full_magazine_type"]:checked');
+      if (selected && selected.value) {
+        return selected.value;
+      }
+      const matrix = pricingData && pricingData.matrix ? pricingData.matrix : {};
+      if (matrix.PRINTED) {
+        return 'PRINTED';
+      }
+      return Object.keys(matrix)[0] || 'PRINTED';
+    };
+
+    const getAssociateMagazineType = () => {
+      if (isFullSelected()) {
+        return getFullMagazineType();
+      }
+      const matrix = pricingData && pricingData.matrix ? pricingData.matrix : {};
+      if (matrix.PRINTED) {
+        return 'PRINTED';
+      }
+      return Object.keys(matrix)[0] || 'PRINTED';
+    };
+
+    const populatePeriodSelect = (select, hintEl, membershipType) => {
       if (!select) {
         return;
       }
+      const magazineType = membershipType === 'FULL' ? getFullMagazineType() : getAssociateMagazineType();
+      const availableKeys = getAvailablePeriodKeys(membershipType, magazineType);
       const joinAfter = getJoinAfterFilter();
       const previousValue = select.value;
-      const filtered = periodOptions.filter((option) => !option.join_after || option.join_after === joinAfter);
+      const filtered = periodOptions.filter((option) => {
+        if (availableKeys.length && !availableKeys.includes(option.key)) {
+          return false;
+        }
+        return !option.join_after || option.join_after === joinAfter;
+      });
       select.innerHTML = '<option value="">Select a period</option>';
       filtered.forEach((option) => {
         const opt = document.createElement('option');
@@ -1140,6 +1216,23 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         return 'Not selected';
       }
       return `$${(cents / 100).toFixed(2)}`;
+    };
+
+    const calculateProcessingFeeCents = (baseCents) => {
+      const enabled = storeSettings && storeSettings.stripe_fee_enabled === 1;
+      const percent = Number(storeSettings && storeSettings.stripe_fee_percent ? storeSettings.stripe_fee_percent : 0);
+      const fixed = Number(storeSettings && storeSettings.stripe_fee_fixed ? storeSettings.stripe_fee_fixed : 0);
+      if (!enabled || baseCents <= 0 || (percent <= 0 && fixed <= 0)) {
+        return 0;
+      }
+      const rate = percent / 100;
+      if (rate >= 1) {
+        return 0;
+      }
+      const baseDollars = baseCents / 100;
+      const fee = (rate * baseDollars + fixed) / (1 - rate);
+      const rounded = Math.round(fee * 100) / 100;
+      return Math.round(rounded * 100);
     };
 
     const updateSummary = () => {
@@ -1200,7 +1293,14 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         }
       }
       if (summaryTotal) {
-        const total = (typeof fullPrice === 'number' ? fullPrice : 0) + (typeof associatePrice === 'number' ? associatePrice : 0);
+        const baseTotal = (typeof fullPrice === 'number' ? fullPrice : 0)
+          + (typeof associatePrice === 'number' ? associatePrice : 0);
+        const processingFee = isCardMethod() ? calculateProcessingFeeCents(baseTotal) : 0;
+        if (summaryProcessingRow && summaryProcessingFee) {
+          summaryProcessingRow.hidden = processingFee <= 0;
+          summaryProcessingFee.textContent = processingFee > 0 ? `$${(processingFee / 100).toFixed(2)}` : '$0.00';
+        }
+        const total = baseTotal + processingFee;
         summaryTotal.textContent = `$${(total / 100).toFixed(2)}`;
       }
       if (isCardMethod()) {
@@ -1678,6 +1778,8 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     if (fullToggle) {
       fullToggle.addEventListener('change', () => {
         updateMembershipVisibility();
+        populatePeriodSelect(periodSelects.full, periodHints.full, 'FULL');
+        populatePeriodSelect(periodSelects.associate, periodHints.associate, 'ASSOCIATE');
         updateSummary();
         updateStep(currentStepIndex);
       });
@@ -1685,6 +1787,8 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     if (associateToggle) {
       associateToggle.addEventListener('change', () => {
         updateMembershipVisibility();
+        populatePeriodSelect(periodSelects.full, periodHints.full, 'FULL');
+        populatePeriodSelect(periodSelects.associate, periodHints.associate, 'ASSOCIATE');
         updateSummary();
         updateStep(currentStepIndex);
       });
@@ -1701,7 +1805,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     });
 
     form.querySelectorAll('input[name="full_magazine_type"]').forEach((input) => {
-      input.addEventListener('change', updateSummary);
+      input.addEventListener('change', () => {
+        populatePeriodSelect(periodSelects.full, periodHints.full, 'FULL');
+        populatePeriodSelect(periodSelects.associate, periodHints.associate, 'ASSOCIATE');
+        updateSummary();
+      });
     });
 
     Object.values(periodSelects).forEach((select) => {
@@ -1713,6 +1821,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     form.querySelectorAll('input[name="payment_method"]').forEach((input) => {
       input.addEventListener('change', () => {
         updatePaymentPanels();
+        updateSummary();
         if (input.checked && input.value === 'card') {
           prepareStripeForSummary();
         }
@@ -1725,8 +1834,8 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       }
     });
 
-    populatePeriodSelect(periodSelects.full, periodHints.full);
-    populatePeriodSelect(periodSelects.associate, periodHints.associate);
+    populatePeriodSelect(periodSelects.full, periodHints.full, 'FULL');
+    populatePeriodSelect(periodSelects.associate, periodHints.associate, 'ASSOCIATE');
     updateMembershipVisibility();
     updateStep(0);
     updatePaymentPanels();

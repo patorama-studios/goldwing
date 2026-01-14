@@ -12,29 +12,29 @@ class MembershipPricingService
     public static function periodDefinitions(): array
     {
         return [
-            'THREE_YEARS' => [
-                'label' => '3 Years (August to July)',
-                'join_after' => null,
-            ],
-            'TWO_TWO_THIRDS' => [
-                'label' => '2.2/3 Years (Join after 1st December)',
-                'join_after' => 'december',
-            ],
-            'TWO_ONE_THIRDS' => [
-                'label' => '2.1/3 Years (Join after 1st April)',
+            'ONE_THIRD' => [
+                'label' => '1/3 of a year',
                 'join_after' => 'april',
-            ],
-            'ONE_YEAR' => [
-                'label' => '1 Year (August to July)',
-                'join_after' => null,
             ],
             'TWO_THIRDS' => [
-                'label' => '2/3 of a Year (Join after 1st December)',
+                'label' => '2/3 of a year',
                 'join_after' => 'december',
             ],
-            'ONE_THIRD' => [
-                'label' => '1/3 of a Year (Join after 1st April)',
+            'ONE_YEAR' => [
+                'label' => '1 year',
+                'join_after' => null,
+            ],
+            'TWO_ONE_THIRDS' => [
+                'label' => '2.1/3 years',
                 'join_after' => 'april',
+            ],
+            'TWO_TWO_THIRDS' => [
+                'label' => '2.2/3 years',
+                'join_after' => 'december',
+            ],
+            'THREE_YEARS' => [
+                'label' => '3 years',
+                'join_after' => null,
             ],
         ];
     }
