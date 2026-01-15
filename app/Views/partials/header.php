@@ -6,6 +6,8 @@ $title = $pageTitle ?? $appName;
 $faviconUrl = SettingsService::getGlobal('site.favicon_url', '');
 $googleMapsApiKey = trim((string) getenv('GOOGLE_MAPS_API_KEY'));
 $loadGoogleMaps = $googleMapsApiKey !== '';
+$stylesPath = dirname(__DIR__, 4) . '/public_html/assets/styles.css';
+$stylesVersion = file_exists($stylesPath) ? (string) filemtime($stylesPath) : (string) time();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,7 +21,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
   <?php if ($faviconUrl): ?>
     <link rel="icon" href="<?= e($faviconUrl) ?>">
   <?php endif; ?>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v=<?= e($stylesVersion) ?>">
   <script src="/assets/navigation.js" defer></script>
   <?php if ($loadGoogleMaps): ?>
     <script src="/assets/js/address-autocomplete.js" defer></script>
