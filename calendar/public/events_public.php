@@ -80,6 +80,20 @@ $filterQuery = calendar_build_query($filters);
 $feedUrl = 'api_events_feed.php?' . $filterQuery;
 $hasAdvancedFilters = $filters['chapter_id'] !== '' || $filters['event_type'] !== '' || $filters['paid'] !== '' || $filters['timeframe'] !== 'upcoming';
 $noticeText = $filters['timeframe'] === 'past' ? 'There are no past events.' : 'There are no upcoming events.';
+$icsUrl = 'ics_feed.php?' . $filterQuery;
+$absoluteBaseUrl = '';
+$host = $_SERVER['HTTP_HOST'] ?? '';
+if ($host !== '') {
+    $scheme = calendar_is_https() ? 'https' : 'http';
+    $path = isset($_SERVER['SCRIPT_NAME']) ? rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') : '';
+    $absoluteBaseUrl = $scheme . '://' . $host . $path;
+}
+if ($absoluteBaseUrl === '') {
+    $absoluteBaseUrl = (string) calendar_config('base_url', '');
+}
+$absoluteIcsUrl = $absoluteBaseUrl !== '' ? rtrim($absoluteBaseUrl, '/') . '/' . ltrim($icsUrl, '/') : $icsUrl;
+$googleCalendarUrl = 'https://calendar.google.com/calendar/r?cid=' . urlencode($absoluteIcsUrl);
+$outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . urlencode($absoluteIcsUrl) . '&name=' . urlencode('Goldwing Ride Calendar');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -308,7 +322,10 @@ $noticeText = $filters['timeframe'] === 'past' ? 'There are no past events.' : '
         }
         .calendar-footer {
             display: flex;
-            justify-content: flex-end;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
         }
         .subscribe-button {
             display: inline-flex;
@@ -326,6 +343,20 @@ $noticeText = $filters['timeframe'] === 'past' ? 'There are no past events.' : '
         .subscribe-button:hover {
             color: var(--accent-strong);
             border-color: var(--accent-strong);
+        }
+        .calendar-subscribe-links {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .calendar-subscribe-links a {
+            color: var(--muted);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .calendar-subscribe-links a:hover {
+            color: var(--ink);
         }
         .sr-only {
             position: absolute;
@@ -491,12 +522,16 @@ $noticeText = $filters['timeframe'] === 'past' ? 'There are no past events.' : '
         </div>
 
         <div class="calendar-footer">
-            <a class="subscribe-button" href="ics_feed.php?<?php echo calendar_e($filterQuery); ?>">
+            <a class="subscribe-button" href="<?php echo calendar_e($icsUrl); ?>">
                 Subscribe to calendar
                 <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </a>
+            <div class="calendar-subscribe-links">
+                <a href="<?php echo calendar_e($googleCalendarUrl); ?>" target="_blank" rel="noopener">Add to Google Calendar</a>
+                <a href="<?php echo calendar_e($outlookCalendarUrl); ?>" target="_blank" rel="noopener">Add to Outlook</a>
+            </div>
         </div>
     </main>
 
@@ -543,6 +578,12 @@ document.addEventListener('DOMContentLoaded', function() {
         datesSet: function() {
             updateTitle();
             updateViewButtons();
+        },
+        eventClick: function(info) {
+            if (info.event.url) {
+                info.jsEvent.preventDefault();
+                window.top.location.href = info.event.url;
+            }
         },
         eventDidMount: function(info) {
             if (info.event.extendedProps.status === 'cancelled') {
