@@ -64,13 +64,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($page === 'applications' && isset($_POST['approve_id'])) {
             $appId = (int) $_POST['approve_id'];
-            $stmt = $pdo->prepare('UPDATE membership_applications SET status = "APPROVED", approved_by = :user_id, approved_at = NOW() WHERE id = :id');
-            $stmt->execute(['user_id' => $user['id'], 'id' => $appId]);
-
-            $stmt = $pdo->prepare('SELECT member_id, member_type, notes FROM membership_applications WHERE id = :id');
+            $stmt = $pdo->prepare('SELECT status, member_id, member_type, notes FROM membership_applications WHERE id = :id');
             $stmt->execute(['id' => $appId]);
             $row = $stmt->fetch();
-            if ($row) {
+            if (!$row) {
+                $alerts[] = ['type' => 'error', 'message' => 'Application not found.'];
+            } elseif ($row['status'] === 'APPROVED') {
+                $alerts[] = ['type' => 'error', 'message' => 'Application already approved.'];
+            } else {
+                $stmt = $pdo->prepare('UPDATE membership_applications SET status = "APPROVED", approved_by = :user_id, approved_at = NOW(), rejected_by = NULL, rejected_at = NULL, rejection_reason = NULL WHERE id = :id');
+                $stmt->execute(['user_id' => $user['id'], 'id' => $appId]);
+
                 $notes = json_decode($row['notes'] ?? '', true);
                 if (!is_array($notes)) {
                     $notes = [];
@@ -462,10 +466,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($page === 'applications' && isset($_POST['reject_id'])) {
             $appId = (int) $_POST['reject_id'];
             $reason = substr(trim($_POST['reason'] ?? ''), 0, 255);
-            $stmt = $pdo->prepare('UPDATE membership_applications SET status = "REJECTED", rejected_by = :user_id, rejected_at = NOW(), rejection_reason = :reason WHERE id = :id');
-            $stmt->execute(['user_id' => $user['id'], 'reason' => $reason, 'id' => $appId]);
-            AuditService::log($user['id'], 'reject_application', 'Application #' . $appId . ' rejected.');
-            $alerts[] = ['type' => 'success', 'message' => 'Application rejected.'];
+            $stmt = $pdo->prepare('SELECT status FROM membership_applications WHERE id = :id');
+            $stmt->execute(['id' => $appId]);
+            $status = $stmt->fetchColumn();
+            if (!$status) {
+                $alerts[] = ['type' => 'error', 'message' => 'Application not found.'];
+            } elseif ($status === 'APPROVED') {
+                $alerts[] = ['type' => 'error', 'message' => 'Approved applications cannot be rejected.'];
+            } elseif ($status === 'REJECTED') {
+                $alerts[] = ['type' => 'error', 'message' => 'Application already rejected.'];
+            } else {
+                $stmt = $pdo->prepare('UPDATE membership_applications SET status = "REJECTED", rejected_by = :user_id, rejected_at = NOW(), rejection_reason = :reason WHERE id = :id');
+                $stmt->execute(['user_id' => $user['id'], 'reason' => $reason, 'id' => $appId]);
+                AuditService::log($user['id'], 'reject_application', 'Application #' . $appId . ' rejected.');
+                $alerts[] = ['type' => 'success', 'message' => 'Application rejected.'];
+            }
         }
         if ($page === 'applications' && isset($_POST['resend_approval_id'])) {
             $appId = (int) $_POST['resend_approval_id'];
@@ -1187,6 +1202,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php
                     $application = $row['application'];
                     $statusMeta = $statusLabels[$application['status']] ?? ['label' => $application['status'], 'classes' => 'bg-slate-100 text-slate-800'];
+                    $canApprove = $application['status'] !== 'APPROVED';
+                    $canReject = $application['status'] === 'PENDING';
                     $requestedChapterName = '';
                     $requestedChapterId = $application['notes_data']['requested_chapter_id'] ?? null;
                     if ($requestedChapterId) {
@@ -1235,14 +1252,26 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </form>
                     </td>
                     <td class="py-4 pr-4">
-                      <button type="button" class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 h-9 w-9 hover:bg-emerald-100" data-approve-open data-app-id="<?= e((string) $application['id']) ?>" data-app-name="<?= e($row['display_name']) ?>">
-                        <span class="material-icons-outlined text-base">check</span>
-                      </button>
+                      <?php if ($canApprove): ?>
+                        <button type="button" class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 h-9 w-9 hover:bg-emerald-100" data-approve-open data-app-id="<?= e((string) $application['id']) ?>" data-app-name="<?= e($row['display_name']) ?>">
+                          <span class="material-icons-outlined text-base">check</span>
+                        </button>
+                      <?php else: ?>
+                        <span class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 h-9 w-9 opacity-50 cursor-not-allowed" title="Already approved">
+                          <span class="material-icons-outlined text-base">check</span>
+                        </span>
+                      <?php endif; ?>
                     </td>
                     <td class="py-4 pr-4">
-                      <button type="button" class="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 h-9 w-9 hover:bg-rose-100" data-reject-open data-app-id="<?= e((string) $application['id']) ?>" data-app-name="<?= e($row['display_name']) ?>">
-                        <span class="material-icons-outlined text-base">close</span>
-                      </button>
+                      <?php if ($canReject): ?>
+                        <button type="button" class="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 h-9 w-9 hover:bg-rose-100" data-reject-open data-app-id="<?= e((string) $application['id']) ?>" data-app-name="<?= e($row['display_name']) ?>">
+                          <span class="material-icons-outlined text-base">close</span>
+                        </button>
+                      <?php else: ?>
+                        <span class="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 h-9 w-9 opacity-50 cursor-not-allowed" title="Cannot reject">
+                          <span class="material-icons-outlined text-base">close</span>
+                        </span>
+                      <?php endif; ?>
                     </td>
                     <td class="py-4 pr-4">
                       <form method="post">
@@ -1344,7 +1373,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           $webhookHealth = StripeSettingsService::webhookHealth($paymentSettings);
           $isConnected = !empty($activeKeys['secret_key']) && !empty($activeKeys['publishable_key']);
           $canRefund = AdminMemberAccess::canRefund($user);
-          $orders = $pdo->query('SELECT o.*, u.name, u.email FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 50')->fetchAll();
+          $orders = $pdo->query('SELECT o.*, u.name, u.email FROM orders o LEFT JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 50')->fetchAll();
           $webhookEvents = $pdo->query('SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 50')->fetchAll();
         ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
@@ -1423,6 +1452,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <thead class="text-left text-xs uppercase text-gray-500 border-b">
                 <tr>
                   <th class="py-2 pr-3">Date</th>
+                  <th class="py-2 pr-3">Order</th>
                   <th class="py-2 pr-3">Customer</th>
                   <th class="py-2 pr-3">Type</th>
                   <th class="py-2 pr-3">Total</th>
@@ -1432,8 +1462,23 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </thead>
               <tbody class="divide-y">
                 <?php foreach ($orders as $order): ?>
+                  <?php
+                    $orderNumber = $order['order_number'] ?? ('ORD-' . $order['id']);
+                    $memberOrderUrl = null;
+                    if (!empty($order['member_id']) && ($order['order_type'] ?? '') === 'membership') {
+                        $memberOrderUrl = '/admin/members/view.php?id=' . urlencode((string) $order['member_id'])
+                            . '&tab=orders&orders_section=membership&order_id=' . urlencode((string) $order['id']);
+                    }
+                  ?>
                   <tr>
                     <td class="py-2 pr-3 text-gray-600"><?= e($order['created_at']) ?></td>
+                    <td class="py-2 pr-3 text-gray-600">
+                      <?php if ($memberOrderUrl): ?>
+                        <a class="text-xs font-semibold text-blue-600 underline" href="<?= e($memberOrderUrl) ?>">#<?= e($orderNumber) ?></a>
+                      <?php else: ?>
+                        <span class="text-xs font-semibold text-gray-600">#<?= e($orderNumber) ?></span>
+                      <?php endif; ?>
+                    </td>
                     <td class="py-2 pr-3 text-gray-900">
                       <?= e($order['name'] ?? 'Member') ?><br>
                       <span class="text-xs text-slate-500"><?= e($order['email'] ?? '') ?></span>

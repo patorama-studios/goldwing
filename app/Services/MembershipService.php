@@ -5,6 +5,35 @@ use DateTimeImmutable;
 
 class MembershipService
 {
+    private static function normalizeMembershipTerm(string $term): string
+    {
+        $clean = strtoupper(trim($term));
+        if ($clean === '') {
+            return '1Y';
+        }
+        $aliases = [
+            'THREE_YEAR' => '3Y',
+            'THREE_YEARS' => '3Y',
+            '3YEAR' => '3Y',
+            '3YEARS' => '3Y',
+            '36M' => '3Y',
+            'TWO_YEAR' => '2Y',
+            'TWO_YEARS' => '2Y',
+            '2YEAR' => '2Y',
+            '2YEARS' => '2Y',
+            '24M' => '2Y',
+            'ONE_YEAR' => '1Y',
+            'ONE_YEARS' => '1Y',
+            '1YEAR' => '1Y',
+            '1YEARS' => '1Y',
+            '12M' => '1Y',
+        ];
+        if (isset($aliases[$clean])) {
+            return $aliases[$clean];
+        }
+        return $clean;
+    }
+
     public static function calculateExpiry(string $startDate, int $termYears): string
     {
         $start = new DateTimeImmutable($startDate);
@@ -126,6 +155,7 @@ class MembershipService
 
     public static function createMembershipPeriod(int $memberId, string $term, string $startDate): int
     {
+        $term = self::normalizeMembershipTerm($term);
         $expiry = null;
         if ($term !== 'LIFE') {
             $termYears = 1;

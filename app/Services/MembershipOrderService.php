@@ -6,6 +6,24 @@ use PDO;
 
 class MembershipOrderService
 {
+    private static array $orderColumnCache = [];
+
+    private static function hasOrderColumn(PDO $pdo, string $column): bool
+    {
+        if (array_key_exists($column, self::$orderColumnCache)) {
+            return self::$orderColumnCache[$column];
+        }
+
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE " . $pdo->quote($column));
+            self::$orderColumnCache[$column] = (bool) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            self::$orderColumnCache[$column] = false;
+        }
+
+        return self::$orderColumnCache[$column];
+    }
+
     public static function createMembershipOrder(int $memberId, int $membershipPeriodId, float $amount, array $options = []): ?array
     {
         $pdo = Database::connection();
@@ -23,11 +41,13 @@ class MembershipOrderService
         $status = self::mapOrderStatus($paymentStatus);
 
         $orderNumber = (string) ($options['order_number'] ?? '');
-        if ($orderNumber === '') {
-            $orderNumber = self::nextOrderNumber($options['actor_user_id'] ?? null);
-        }
-        if ($orderNumber === '') {
-            return null;
+        if (self::hasOrderColumn($pdo, 'order_number')) {
+            if ($orderNumber === '') {
+                $orderNumber = self::nextOrderNumber($options['actor_user_id'] ?? null);
+            }
+            if ($orderNumber === '') {
+                return null;
+            }
         }
 
         $userId = isset($options['user_id']) ? (int) $options['user_id'] : self::lookupMemberUserId($pdo, $memberId);
@@ -38,23 +58,44 @@ class MembershipOrderService
         $adminNotes = self::sanitizeNotes($options['admin_notes'] ?? null);
         $internalNotes = self::sanitizeNotes($options['internal_notes'] ?? null);
 
-        $stmt = $pdo->prepare('INSERT INTO orders (order_number, user_id, member_id, status, payment_status, fulfillment_status, order_type, membership_period_id, payment_method, currency, subtotal, tax_total, shipping_total, total, channel_id, shipping_required, shipping_address_json, admin_notes, internal_notes, created_at) VALUES (:order_number, :user_id, :member_id, :status, :payment_status, :fulfillment_status, "membership", :membership_period_id, :payment_method, :currency, :subtotal, 0, 0, :total, :channel_id, 0, NULL, :admin_notes, :internal_notes, NOW())');
-        $stmt->execute([
+        $columns = [
             'order_number' => $orderNumber,
             'user_id' => $userId,
             'member_id' => $memberId,
             'status' => $status,
             'payment_status' => $paymentStatus,
             'fulfillment_status' => $fulfillmentStatus,
+            'order_type' => 'membership',
             'membership_period_id' => $membershipPeriodId > 0 ? $membershipPeriodId : null,
             'payment_method' => $paymentMethod !== '' ? $paymentMethod : null,
             'currency' => $currency,
             'subtotal' => $amount,
+            'tax_total' => 0,
+            'shipping_total' => 0,
             'total' => $amount,
             'channel_id' => $channelId,
+            'shipping_required' => 0,
+            'shipping_address_json' => null,
             'admin_notes' => $adminNotes,
             'internal_notes' => $internalNotes,
-        ]);
+        ];
+        $insertColumns = [];
+        $placeholders = [];
+        $params = [];
+        foreach ($columns as $column => $value) {
+            if (!self::hasOrderColumn($pdo, $column)) {
+                continue;
+            }
+            $insertColumns[] = $column;
+            $placeholders[] = ':' . $column;
+            $params[$column] = $value;
+        }
+        if (self::hasOrderColumn($pdo, 'created_at')) {
+            $insertColumns[] = 'created_at';
+            $placeholders[] = 'NOW()';
+        }
+        $stmt = $pdo->prepare('INSERT INTO orders (' . implode(', ', $insertColumns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+        $stmt->execute($params);
         $orderId = (int) $pdo->lastInsertId();
         if ($orderId <= 0) {
             return null;

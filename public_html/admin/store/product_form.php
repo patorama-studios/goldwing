@@ -372,143 +372,165 @@ if (!empty($optionsMatrix)) {
 
 $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new store product.';
 ?>
-<section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-  <form method="post" enctype="multipart/form-data" class="space-y-8">
+<section class="space-y-6">
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-primary">General Details</button>
+    <button type="button" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-primary">Inventory</button>
+    <button type="button" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-primary">Shipping</button>
+    <button type="button" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-primary">SEO</button>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
     <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
 
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Title</label>
-        <input name="title" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($product['title'] ?? '') ?>" required>
-      </div>
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Slug</label>
-        <input name="slug" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($product['slug'] ?? '') ?>">
-      </div>
-    </div>
-
-    <div>
-      <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Description</label>
-      <textarea name="description" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e($product['description'] ?? '') ?></textarea>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-3">
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Type</label>
-        <select name="type" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-          <option value="physical" <?= ($product['type'] ?? '') === 'physical' ? 'selected' : '' ?>>Physical</option>
-          <option value="ticket" <?= ($product['type'] ?? '') === 'ticket' ? 'selected' : '' ?>>Event Ticket</option>
-        </select>
-      </div>
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Base price</label>
-        <input name="base_price" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) ($product['base_price'] ?? '')) ?>" required>
-      </div>
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">SKU</label>
-        <input name="sku" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($product['sku'] ?? '') ?>">
-      </div>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Event name (tickets only)</label>
-        <input name="event_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($product['event_name'] ?? '') ?>">
-      </div>
-      <div class="flex items-center gap-4">
-        <label class="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" name="is_active" class="rounded border-gray-200" <?= !isset($product['is_active']) || $product['is_active'] ? 'checked' : '' ?>>
-          Active
-        </label>
-        <label class="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" name="track_inventory" class="rounded border-gray-200" <?= !empty($product['track_inventory']) ? 'checked' : '' ?>>
-          Track inventory
-        </label>
-      </div>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Stock quantity (no variants)</label>
-        <input name="stock_quantity" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) ($product['stock_quantity'] ?? '')) ?>">
-      </div>
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Low stock threshold</label>
-        <input name="low_stock_threshold" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) ($product['low_stock_threshold'] ?? '')) ?>">
-      </div>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Categories</label>
-        <div class="mt-2 grid gap-2">
-          <?php foreach ($categories as $category): ?>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" name="categories[]" value="<?= e((string) $category['id']) ?>" class="rounded border-gray-200" <?= in_array($category['id'], $selectedCategories, true) ? 'checked' : '' ?>>
-              <?= e($category['name']) ?>
-            </label>
-          <?php endforeach; ?>
-          <?php if (!$categories): ?>
-            <span class="text-sm text-slate-500">Add categories first.</span>
-          <?php endif; ?>
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-6 flex items-center gap-2 text-lg font-semibold">
+        <span class="material-icons-outlined text-secondary">info</span>
+        General Information
+      </h2>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Title</label>
+          <input name="title" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['title'] ?? '') ?>" required>
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Slug</label>
+          <input name="slug" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['slug'] ?? '') ?>">
+        </div>
+        <div class="md:col-span-2">
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Description</label>
+          <textarea name="description" rows="4" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"><?= e($product['description'] ?? '') ?></textarea>
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Product Type</label>
+          <select name="type" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="physical" <?= ($product['type'] ?? '') === 'physical' ? 'selected' : '' ?>>Physical Product</option>
+            <option value="ticket" <?= ($product['type'] ?? '') === 'ticket' ? 'selected' : '' ?>>Ticket / Event</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Event Name (tickets only)</label>
+          <input name="event_name" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['event_name'] ?? '') ?>">
         </div>
       </div>
-      <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Tags</label>
-        <div class="mt-2 grid gap-2">
-          <?php foreach ($tags as $tag): ?>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" name="tags[]" value="<?= e((string) $tag['id']) ?>" class="rounded border-gray-200" <?= in_array($tag['id'], $selectedTags, true) ? 'checked' : '' ?>>
-              <?= e($tag['name']) ?>
-            </label>
-          <?php endforeach; ?>
-          <?php if (!$tags): ?>
-            <span class="text-sm text-slate-500">Add tags first.</span>
-          <?php endif; ?>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <h2 class="flex items-center gap-2 text-lg font-semibold">
+          <span class="material-icons-outlined text-secondary">payments</span>
+          Pricing & Inventory
+        </h2>
+        <div class="flex flex-wrap gap-4">
+          <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <input type="checkbox" name="is_active" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= !isset($product['is_active']) || $product['is_active'] ? 'checked' : '' ?>>
+            Active
+          </label>
+          <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <input type="checkbox" name="track_inventory" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= !empty($product['track_inventory']) ? 'checked' : '' ?>>
+            Track Inventory
+          </label>
         </div>
       </div>
-    </div>
+      <div class="grid gap-6 md:grid-cols-4">
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Base Price ($)</label>
+          <input name="base_price" type="number" step="0.01" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['base_price'] ?? '')) ?>" required>
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">SKU</label>
+          <input name="sku" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['sku'] ?? '') ?>">
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Stock Quantity</label>
+          <input name="stock_quantity" type="number" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['stock_quantity'] ?? '')) ?>">
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Low Stock Alert</label>
+          <input name="low_stock_threshold" type="number" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['low_stock_threshold'] ?? '')) ?>">
+        </div>
+      </div>
+    </section>
 
-    <div>
-      <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Images</h3>
-      <input name="product_images[]" type="file" multiple class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-6 flex items-center gap-2 text-lg font-semibold">
+        <span class="material-icons-outlined text-secondary">label</span>
+        Categories & Tags
+      </h2>
+      <div class="grid gap-8 md:grid-cols-2">
+        <div>
+          <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Categories</h3>
+          <div class="space-y-3">
+            <?php foreach ($categories as $category): ?>
+              <label class="flex items-center gap-3 rounded-lg border border-slate-100 p-3 text-sm text-slate-600 hover:bg-slate-50">
+                <input type="checkbox" name="categories[]" value="<?= e((string) $category['id']) ?>" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= in_array($category['id'], $selectedCategories, true) ? 'checked' : '' ?>>
+                <?= e($category['name']) ?>
+              </label>
+            <?php endforeach; ?>
+            <?php if (!$categories): ?>
+              <span class="text-sm text-slate-500">Add categories first.</span>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div>
+          <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Tags</h3>
+          <div class="space-y-3">
+            <?php foreach ($tags as $tag): ?>
+              <label class="flex items-center gap-3 rounded-lg border border-slate-100 p-3 text-sm text-slate-600 hover:bg-slate-50">
+                <input type="checkbox" name="tags[]" value="<?= e((string) $tag['id']) ?>" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= in_array($tag['id'], $selectedTags, true) ? 'checked' : '' ?>>
+                <?= e($tag['name']) ?>
+              </label>
+            <?php endforeach; ?>
+            <?php if (!$tags): ?>
+              <span class="text-sm text-slate-500">Add tags first.</span>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-6 flex items-center gap-2 text-lg font-semibold">
+        <span class="material-icons-outlined text-secondary">image</span>
+        Images & Media
+      </h2>
+      <input name="product_images[]" type="file" multiple class="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm">
       <?php if ($images): ?>
-        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <?php foreach ($images as $image): ?>
-            <div class="border border-gray-200 rounded-lg p-2 text-center">
-              <img src="<?= e($image['image_url']) ?>" alt="Product image" class="w-full h-32 object-cover rounded">
-              <form method="post" class="mt-2">
-                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                <input type="hidden" name="action" value="delete_image">
-                <input type="hidden" name="image_id" value="<?= e((string) $image['id']) ?>">
-                <button type="submit" class="text-xs text-red-600">Remove</button>
-              </form>
+            <div class="group relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <img src="<?= e($image['image_url']) ?>" alt="Product image" class="h-32 w-full object-cover">
+              <div class="absolute inset-0 flex items-center justify-center gap-2 bg-slate-900/40 opacity-0 transition group-hover:opacity-100">
+                <button type="submit" form="delete-image-<?= e((string) $image['id']) ?>" class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-red-600 hover:bg-red-600 hover:text-white" title="Remove">
+                  <span class="material-icons-outlined">delete</span>
+                </button>
+              </div>
             </div>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
-    </div>
+    </section>
 
-    <div>
-      <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Variations</h3>
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-2 text-lg font-semibold">Variations</h2>
       <p class="text-sm text-slate-500">Add options and values, then generate variants to set pricing and stock.</p>
       <div id="option-list" class="mt-4 space-y-3">
         <?php foreach ($optionsInput as $index => $option): ?>
           <div class="grid gap-3 md:grid-cols-[1fr_2fr] option-row">
-            <input name="options[<?= e((string) $index) ?>][name]" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Option name (e.g. Size)" value="<?= e($option['name'] ?? '') ?>">
-            <input name="options[<?= e((string) $index) ?>][values]" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Values (comma separated)" value="<?= e($option['values'] ?? '') ?>">
+            <input name="options[<?= e((string) $index) ?>][name]" class="w-full rounded-lg bg-slate-50 px-4 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Option name (e.g. Size)" value="<?= e($option['name'] ?? '') ?>">
+            <input name="options[<?= e((string) $index) ?>][values]" class="w-full rounded-lg bg-slate-50 px-4 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Values (comma separated)" value="<?= e($option['values'] ?? '') ?>">
           </div>
         <?php endforeach; ?>
       </div>
-      <div class="mt-3 flex gap-2">
-        <button type="button" id="add-option" class="rounded-lg border border-gray-200 px-3 py-2 text-sm">Add option</button>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="button" id="add-option" class="rounded-lg border border-slate-200 px-3 py-2 text-sm">Add option</button>
         <button type="submit" name="action" value="generate_variants" class="rounded-lg bg-ink px-3 py-2 text-sm text-white">Generate variants</button>
       </div>
 
       <?php if ($variantRows): ?>
         <div class="mt-6 overflow-x-auto">
           <table class="min-w-full text-sm">
-            <thead class="text-left text-xs uppercase text-gray-500 border-b">
+            <thead class="text-left text-xs uppercase text-slate-500 border-b">
               <tr>
                 <th class="py-2 pr-3">Variant</th>
                 <th class="py-2 pr-3">SKU</th>
@@ -519,15 +541,15 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
             <tbody class="divide-y">
               <?php foreach ($variantRows as $row): ?>
                 <tr>
-                  <td class="py-2 pr-3 text-gray-700 font-medium"><?= e($row['label']) ?></td>
+                  <td class="py-2 pr-3 text-slate-700 font-medium"><?= e($row['label']) ?></td>
                   <td class="py-2 pr-3">
-                    <input name="variants[<?= e($row['hash']) ?>][sku]" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $row['sku']) ?>">
+                    <input name="variants[<?= e($row['hash']) ?>][sku]" class="w-full rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) $row['sku']) ?>">
                   </td>
                   <td class="py-2 pr-3">
-                    <input name="variants[<?= e($row['hash']) ?>][price_override]" type="number" step="0.01" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $row['price_override']) ?>">
+                    <input name="variants[<?= e($row['hash']) ?>][price_override]" type="number" step="0.01" class="w-full rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) $row['price_override']) ?>">
                   </td>
                   <td class="py-2 pr-3">
-                    <input name="variants[<?= e($row['hash']) ?>][stock_quantity]" type="number" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $row['stock_quantity']) ?>">
+                    <input name="variants[<?= e($row['hash']) ?>][stock_quantity]" type="number" class="w-full rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) $row['stock_quantity']) ?>">
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -535,12 +557,22 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
           </table>
         </div>
       <?php endif; ?>
-    </div>
+    </section>
 
     <div class="flex justify-end">
       <button type="submit" name="action" value="save_product" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save product</button>
     </div>
   </form>
+
+  <?php if ($images): ?>
+    <?php foreach ($images as $image): ?>
+      <form id="delete-image-<?= e((string) $image['id']) ?>" method="post" class="hidden">
+        <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+        <input type="hidden" name="action" value="delete_image">
+        <input type="hidden" name="image_id" value="<?= e((string) $image['id']) ?>">
+      </form>
+    <?php endforeach; ?>
+  <?php endif; ?>
 </section>
 
 <script>
@@ -555,8 +587,8 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
       const row = document.createElement('div');
       row.className = 'grid gap-3 md:grid-cols-[1fr_2fr] option-row';
       row.innerHTML = `
-        <input name="options[${index}][name]" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Option name (e.g. Size)">
-        <input name="options[${index}][values]" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Values (comma separated)">
+        <input name="options[${index}][name]" class="w-full rounded-lg bg-slate-50 px-4 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Option name (e.g. Size)">
+        <input name="options[${index}][values]" class="w-full rounded-lg bg-slate-50 px-4 py-2 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Values (comma separated)">
       `;
       optionList.appendChild(row);
     });

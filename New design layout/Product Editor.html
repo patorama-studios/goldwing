@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Product Editor | Goldwing Association Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#D4AF37", // Goldwing Gold
+                        secondary: "#005A32", // Goldwing Green
+                        "background-light": "#F8F9FA",
+                        "background-dark": "#111827",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex transition-colors duration-200">
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hidden lg:flex flex-col sticky top-0 h-screen">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
+<span class="material-icons-outlined text-primary">motorcycle</span>
+</div>
+<span class="font-bold text-xl tracking-tight">GW Association</span>
+</div>
+<nav class="flex-1 px-4 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-icons-outlined text-[20px]">dashboard</span>
+<span class="font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors" href="#">
+<span class="material-icons-outlined text-[20px]">shopping_bag</span>
+<span class="font-medium">Store</span>
+</a>
+<div class="pl-10 space-y-1">
+<a class="block py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-primary" href="#">Products</a>
+<a class="block py-2 text-sm text-primary font-medium" href="#">Add Product</a>
+<a class="block py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-primary" href="#">Orders</a>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-icons-outlined text-[20px]">people</span>
+<span class="font-medium">Members</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-icons-outlined text-[20px]">settings</span>
+<span class="font-medium">Settings</span>
+</a>
+</nav>
+<div class="p-4 mt-auto border-t border-slate-100 dark:border-slate-800">
+<button class="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-outlined text-sm">dark_mode</span>
+<span class="text-xs font-semibold">Toggle Theme</span>
+</button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col min-w-0">
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
+<div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+<a class="hover:text-primary" href="#">Admin</a>
+<span class="material-icons-outlined text-xs">chevron_right</span>
+<a class="hover:text-primary" href="#">Store</a>
+<span class="material-icons-outlined text-xs">chevron_right</span>
+<span class="text-slate-900 dark:text-white font-medium">Product Editor</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
+<span class="material-icons-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900"></span>
+</button>
+<div class="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold text-xs">JD</div>
+</div>
+</header>
+<div class="p-8 max-w-5xl mx-auto w-full mb-24">
+<div class="mb-8">
+<h1 class="text-3xl font-bold mb-2">Product Editor</h1>
+<p class="text-slate-500 dark:text-slate-400">Manage your store product details, inventory, and media gallery.</p>
+</div>
+<div class="flex flex-wrap gap-2 mb-8">
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium hover:border-primary transition-all shadow-sm">General Details</button>
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium hover:border-primary transition-all shadow-sm">Inventory</button>
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium hover:border-primary transition-all shadow-sm">Shipping</button>
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium hover:border-primary transition-all shadow-sm">SEO</button>
+</div>
+<div class="space-y-6">
+<section class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+<span class="material-icons-outlined text-secondary">info</span>
+                        General Information
+                    </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="md:col-span-1">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Title</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary transition-all outline-none" placeholder="e.g. Goldwing Patch" type="text" value="Acrylic Sticker"/>
+</div>
+<div class="md:col-span-1">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Slug</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary transition-all outline-none" placeholder="auto-generated-slug" type="text" value="acrylic-sticker"/>
+</div>
+<div class="md:col-span-2">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Description</label>
+<textarea class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary transition-all outline-none" placeholder="Enter product description..." rows="4">Australian Goldwing Association Acrylic Sticker. High quality weather-resistant finish suitable for motorcycles and panniers.</textarea>
+</div>
+<div class="md:col-span-1">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Product Type</label>
+<select class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary transition-all outline-none appearance-none">
+<option>Physical Product</option>
+<option>Digital Download</option>
+<option>Ticket/Event</option>
+</select>
+</div>
+</div>
+</section>
+<section class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-lg font-semibold flex items-center gap-2">
+<span class="material-icons-outlined text-secondary">payments</span>
+                            Pricing &amp; Inventory
+                        </h2>
+<div class="flex gap-4">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input checked="" class="w-4 h-4 text-secondary rounded border-slate-300 focus:ring-secondary" type="checkbox"/>
+<span class="text-sm font-medium group-hover:text-primary transition-colors">Active</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 text-secondary rounded border-slate-300 focus:ring-secondary" type="checkbox"/>
+<span class="text-sm font-medium group-hover:text-primary transition-colors">Track Inventory</span>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Base Price ($)</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" step="0.01" type="number" value="10.00"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">SKU</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" placeholder="GW-STK-001" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Stock Quantity</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" type="number" value="150"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Low Stock Alert</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" type="number" value="10"/>
+</div>
+</div>
+</section>
+<section class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+<span class="material-icons-outlined text-secondary">image</span>
+                        Images &amp; Media
+                    </h2>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+<div class="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+<img alt="Acrylic Sticker Image" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAE-gDfvfkiIAvFlJ0CebTVNsMDYRUm_x7vm12Ldldwz8eO8wJd5ri200u1TDN4XEZxsMnoin5aYEEH1rIxGzc09J_7c58rDu-xYJtNZpev2y1A0ZQqOx2HXGo3UAQAeKwprBIiyydgG0s6p278vFUpodsizVMCbNx1hA8qmJgw9qSonisEqdp_3Sq7GqqfpXb5YYjq05QRoB3fmpHhQXoktO57zYKLe5yHF13WQskr4vTQuJqSu0yHZuUgC796Eb9-bJcjnHlh3h8"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="p-2 bg-white text-slate-900 rounded-full hover:bg-red-50 hover:text-red-600 transition-colors">
+<span class="material-icons-outlined">delete</span>
+</button>
+<button class="p-2 bg-white text-slate-900 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors">
+<span class="material-icons-outlined">visibility</span>
+</button>
+</div>
+<div class="absolute top-2 left-2 bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">PRIMARY</div>
+</div>
+<button class="aspect-square rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary hover:border-primary transition-all bg-slate-50/50 dark:bg-slate-800/50">
+<span class="material-icons-outlined text-3xl">add_a_photo</span>
+<span class="text-xs font-medium">Add Photo</span>
+</button>
+</div>
+<p class="mt-4 text-xs text-slate-400">Recommended size: 1000x1000px. Max size: 5MB.</p>
+</section>
+<section class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div>
+<h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Categories</h2>
+<div class="space-y-3">
+<label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<input checked="" class="w-5 h-5 text-secondary rounded border-slate-300 focus:ring-secondary" type="checkbox"/>
+<span class="text-sm font-medium">Accessories</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<input class="w-5 h-5 text-secondary rounded border-slate-300 focus:ring-secondary" type="checkbox"/>
+<span class="text-sm font-medium">Clothing &amp; Apparel</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<input class="w-5 h-5 text-secondary rounded border-slate-300 focus:ring-secondary" type="checkbox"/>
+<span class="text-sm font-medium">Event Memorabilia</span>
+</label>
+</div>
+</div>
+<div>
+<h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Tags</h2>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold">
+                                    Sticker
+                                    <button class="material-icons-outlined text-xs hover:text-red-500">close</button>
+</span>
+<span class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold">
+                                    Goldwing
+                                    <button class="material-icons-outlined text-xs hover:text-red-500">close</button>
+</span>
+<span class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold">
+                                    Logo
+                                    <button class="material-icons-outlined text-xs hover:text-red-500">close</button>
+</span>
+</div>
+<div class="relative">
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" placeholder="Add a tag..." type="text"/>
+<button class="absolute right-2 top-2 p-1 text-primary hover:bg-primary/10 rounded-md transition-all">
+<span class="material-icons-outlined">add</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<section class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+<span class="material-icons-outlined text-secondary">layers</span>
+                        Product Variations
+                    </h2>
+<div class="space-y-4">
+<div class="flex flex-col md:flex-row gap-4">
+<div class="flex-1">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Option Name</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" placeholder="e.g. Size" type="text"/>
+</div>
+<div class="flex-[2]">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Option Values</label>
+<input class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary outline-none" placeholder="e.g. Small, Medium, Large" type="text"/>
+</div>
+<div class="flex items-end">
+<button class="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+<span class="material-icons-outlined">delete</span>
+</button>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 border border-primary text-primary hover:bg-primary/5 rounded-lg text-sm font-semibold transition-all">
+<span class="material-icons-outlined text-sm">add</span>
+                                Add another option
+                            </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:bg-slate-800 transition-all shadow-sm">
+<span class="material-icons-outlined text-sm">auto_fix_high</span>
+                                Generate Variants
+                            </button>
+</div>
+</div>
+</section>
+</div>
+</div>
+<footer class="fixed bottom-0 left-0 lg:left-64 right-0 h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-20">
+<div class="hidden sm:flex items-center gap-2">
+<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+<span class="text-xs text-slate-500 font-medium">Draft autosaved at 12:45 PM</span>
+</div>
+<div class="flex items-center gap-4 ml-auto w-full sm:w-auto">
+<button class="flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                    Discard Changes
+                </button>
+<button class="flex-1 sm:flex-none px-8 py-2.5 bg-primary hover:bg-primary/90 text-white dark:text-slate-900 rounded-lg font-bold shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+<span class="material-icons-outlined text-lg">save</span>
+                    Save Product
+                </button>
+</div>
+</footer>
+</main>
+
+</body></html>

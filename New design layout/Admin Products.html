@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Store Product Management - Goldwing Association</title>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#eab308", // Golden Yellow based on logo
+              "background-light": "#f9fafb",
+              "background-dark": "#111827",
+              secondary: "#1e293b",
+            },
+            fontFamily: {
+              display: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.5rem",
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-item-active { background-color: #fef9c3; color: #854d0e; }
+        .dark .sidebar-item-active { background-color: #3e3e10; color: #fde047; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex">
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0 hidden lg:flex flex-col">
+<div class="p-6 text-center border-b border-slate-100 dark:border-slate-800">
+<img alt="Association Logo Placeholder" class="w-24 h-24 mx-auto mb-4 rounded-full object-cover border-4 border-primary" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAksXWUTfUkEqebhUYsXqUbZKAYuUc6UO-VZmRkl_MfP5PFicr64LlXcYHvygv69jdI9Pfl2oYgKQP6aAx_Y343p8cJN4-_cVu7SqNhj0TgX0GhksrRI4u_vX4tszDWkY-8wirf9jt9aI8e0RJ_IsgiAGrvsSeGahE8yi3FYeBs6wAj5yGfHl2WAn8nX8Bc-1_zCAjf_KNHWPmsqNoZMHgA213FgCQWO5A87Y1A7qvN5izbJZr42yqZt-46aw_olmU2eQIz1CIi8eM"/>
+<h1 class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Admin Area</h1>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-widest">Goldwing Association</p>
+</div>
+<nav class="flex-1 overflow-y-auto p-4 space-y-1">
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">settings</span> Settings
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">group</span> Members
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">payments</span> Payments
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg sidebar-item-active" href="#">
+<span class="material-icons-outlined mr-3 text-lg">shopping_bag</span> Store
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">event</span> Calendar
+            </a>
+<a class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800" href="#">
+<span class="material-icons-outlined mr-3 text-lg">auto_awesome</span> AI Editor
+            </a>
+</nav>
+<div class="p-4 border-t border-slate-100 dark:border-slate-800">
+<div class="flex items-center p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs">JD</div>
+<div class="ml-3 overflow-hidden">
+<p class="text-xs font-semibold truncate">John Doe</p>
+<p class="text-[10px] text-slate-400 truncate">Administrator</p>
+</div>
+<button class="ml-auto text-slate-400 hover:text-slate-600"><span class="material-icons-outlined text-sm">logout</span></button>
+</div>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto">
+<header class="p-8 pb-4">
+<nav class="flex text-xs text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wider font-semibold">
+<a class="hover:text-primary" href="#">Admin</a>
+<span class="mx-2">/</span>
+<a class="hover:text-primary" href="#">Store</a>
+<span class="mx-2">/</span>
+<span class="text-slate-600 dark:text-slate-300">Store Products</span>
+</nav>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="text-3xl font-bold text-slate-900 dark:text-white">Store Products</h2>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Manage physical products, variants, and real-time inventory.</p>
+</div>
+<button class="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:bg-yellow-500 text-slate-900 font-bold rounded-lg transition-colors shadow-sm shadow-primary/20">
+<span class="material-icons-outlined mr-2">add</span> Add product
+                </button>
+</div>
+</header>
+<div class="px-8 mb-6 overflow-x-auto">
+<div class="flex items-center space-x-1 border-b border-slate-200 dark:border-slate-800">
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary">Settings</button>
+<button class="px-4 py-3 text-sm font-bold text-primary border-b-2 border-primary">Products</button>
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary">Categories</button>
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary">Tags</button>
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary">Discounts</button>
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary flex items-center">
+                    Orders <span class="ml-1.5 px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-full">12</span>
+</button>
+<button class="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary">Low Stock</button>
+</div>
+</div>
+<section class="px-8 mb-8">
+<div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-wrap items-center gap-4">
+<div class="flex-1 min-w-[240px]">
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+<span class="material-icons-outlined">search</span>
+</span>
+<input class="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm focus:ring-primary focus:border-primary dark:text-white" placeholder="Search products..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<select class="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium py-2 px-3 focus:ring-primary">
+<option>All types</option>
+<option>Physical</option>
+<option>Digital</option>
+</select>
+<select class="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium py-2 px-3 focus:ring-primary">
+<option>All categories</option>
+<option>Apparel</option>
+<option>Accessories</option>
+<option>Collectibles</option>
+</select>
+<div class="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1"></div>
+<button class="p-2 text-slate-400 hover:text-primary dark:hover:text-primary"><span class="material-icons-outlined">view_module</span></button>
+<button class="p-2 text-primary"><span class="material-icons-outlined">view_list</span></button>
+</div>
+</div>
+</section>
+<section class="px-8 pb-12">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="White T-shirt" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1NX1Sx8swun4W6lLURHJPzRUgoboVJvWUYF_HCq9VvqmSYKaBt7s2KzlpKrWE3OG7zvo16-LkC0rvleOw28GRHajzAJc6XGRDhYfuL1-AvbFcWq94743XqF-rgEuo43PeyCh8BIZg5r0QHUhysdUtsZ62PAgOdkM9uV8dbt1xJQvGo495gkVggNz0UPa6P5RTJ6m_u0IYYAfLPVpaMZrkWdsWJ12_sYU2kkafOA1T0gnG8deuYlYwE4Y1erO4P1jKgHn2rTpeGoY"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+<span class="px-2 py-1 bg-slate-900/80 backdrop-blur text-white text-[10px] font-bold rounded uppercase">Physical</span>
+</div>
+<div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors" title="Edit">
+<span class="material-icons-outlined text-xl">edit</span>
+</button>
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors" title="Duplicate">
+<span class="material-icons-outlined text-xl">content_copy</span>
+</button>
+<button class="w-10 h-10 bg-white text-red-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="Deactivate">
+<span class="material-icons-outlined text-xl">block</span>
+</button>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Chambray Shirt Black</h3>
+<span class="font-bold text-primary">$32.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold text-slate-700 dark:text-slate-300">42 units</span></span>
+</div>
+<span class="text-green-600 dark:text-green-400 font-medium">In stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="Baseball Cap" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9dpxAFzGoO5OW4zG8MQpdvMiBCkuXP1ByQn90VZdMZ5ZhOzogfqpzeHJ0Ry6FYjO_ZjSD93ZjbZ7WmJt9yrK_ouGohlNOjHZ2bWLec1xwftD68iA9LZbOA7SrlrqLlpO6Jdh5Bbv0IjEOSnY2ZOJxF3olBwn20XGWhTkQYjFoGGc6JNT4BSSkwvuJcv3vQqsJpoD4kJpjIDOmLjHoEgURrD2aD0XxLUPZVFpL1ihYEJVZISOkD-s-GpMLZWUN8rHbJ0eBkEmpMNo"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+</div>
+<div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">edit</span>
+</button>
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">content_copy</span>
+</button>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Baseball Cap</h3>
+<span class="font-bold text-primary">$20.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1 text-orange-500">warning_amber</span>
+<span>Stock: <span class="font-semibold text-orange-600 dark:text-orange-400">3 units</span></span>
+</div>
+<span class="text-orange-600 dark:text-orange-400 font-medium">Low stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group opacity-85">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="Bucket Hat" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRLk9ajj95lU9ZidIwFtQVNRwblbKJP7QXuUsolk_9QLHp9cVehGc0Q526T3zlGAvS_4W125B_L4Vjli2U1j818qiIUTgUG5XIxfbGTwvgmiLneBVtXanEFolEcOW0sjqSSqBwM8RHoRpQclkEevULAEhoO2VTL7mfWzU23m12r7Y2xE4OpmJbqTwAdYkwwtDiK1GaBRePTjr8qiG7FNOCf-7CerOgAoJel4fh6pYt7IkfjP_4BQbFShdHUMvs70MgKMnd0EaeKH0"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-slate-500 text-white text-[10px] font-bold rounded uppercase">Inactive</span>
+</div>
+<div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">check_circle</span>
+</button>
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">edit</span>
+</button>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Bucket Hat</h3>
+<span class="font-bold text-slate-400 dark:text-slate-500">$10.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold">0 units</span></span>
+</div>
+<span class="text-red-500 font-medium uppercase tracking-tight">Out of stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="Polo Jacket" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFGOVe97CoCRhsV3OiTf22u2yDEYy3xCTn8lE0zv47W9fpV-Mis9pBliLG-jjdksBquUnGTzB2fVxybd89dqDvp-fl5f3dihZ1sUuY23omYYk9PuDjkgjDMscsHSa4dEtrgUqfctxcfLBVDFEepKvX27mDHth5uDWdQp330uUM2-J046ViOi5PYFiiDKt6ll4w_gTGEdZqK7gD4Zu8lGgTkfc9m93Ba8T4SQoNWlxZaxf0iwNi7wJYPFb8GS6esVJWDb2xlPHxnwk"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+</div>
+<div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">edit</span>
+</button>
+<button class="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center hover:bg-primary transition-colors">
+<span class="material-icons-outlined text-xl">content_copy</span>
+</button>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Polo Fleece Jacket</h3>
+<span class="font-bold text-primary">$65.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold">18 units</span></span>
+</div>
+<span class="text-green-600 dark:text-green-400 font-medium">In stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="Embroidered Patch" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGRIRbSujgZiBGjAT8NFNNk8BZsOpEI1haEL4USi9fIHROiLbkjZQxYbV1E2Rceccr8C4PG0UimkD02yuosADxJ6SW1B5rDQr9KXv9okF7tvFtLp-_vr5DTVb8LMB2ns5cQC01XyJkFpJdFQ_uKkOcr6iMODklXuBHvNizf_94yJ22xDa-SVGgV2TA8Zz8y52scjCdSCbHUjJKkrjXpJFfkX6O47uRw1501_D8xOCgnpikPoHa8n-bGRpcw9A1y7p-RXfDoAwIWdg"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Embroidered Patch</h3>
+<span class="font-bold text-primary">$12.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold text-slate-700 dark:text-slate-300">120 units</span></span>
+</div>
+<span class="text-green-600 dark:text-green-400 font-medium">In stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+<img alt="Rugby Jersey" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4rVRAmq-JqYmLhwxJAQjlC13m1oNA7Uq9hVEAvQyrh4gsCecd0qAXXyKviJOFjsg6WzSVuUw91G1L-IKvLDXOjQHEtTlQuhJP5K6Rb2CKy4IFAxsthXTJKQMgD1cxiFj0-6fCOb4EZV86XZXep8mtNoOmIbOcs8oniksmVaLZ_zm6lAvkf2NSBA7tBduX7fdkxbqkSVPuElZZxmRNmx954Bw06cKJ_A-bc80_K8-JI-u2MjMMU8iRCW5gJriuMQ6aorYgeZhwOeo"/>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Rugby Jersey</h3>
+<span class="font-bold text-primary">$46.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold text-slate-700 dark:text-slate-300">8 units</span></span>
+</div>
+<span class="text-green-600 dark:text-green-400 font-medium">In stock</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+<div class="aspect-square bg-slate-100 dark:bg-slate-800 relative overflow-hidden text-slate-400 flex items-center justify-center italic text-xs">
+<span class="material-icons-outlined text-4xl mb-2">image_not_supported</span>
+<span>No image provided</span>
+<div class="absolute top-3 left-3 flex gap-1">
+<span class="px-2 py-1 bg-green-500 text-white text-[10px] font-bold rounded uppercase">Active</span>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-bold text-slate-900 dark:text-white truncate pr-2">AGA Enamel Badge</h3>
+<span class="font-bold text-primary">$5.00</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-icons-outlined text-sm mr-1">inventory_2</span>
+<span>Stock: <span class="font-semibold text-slate-700 dark:text-slate-300">250 units</span></span>
+</div>
+<span class="text-green-600 dark:text-green-400 font-medium">In stock</span>
+</div>
+</div>
+</div>
+<div class="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center p-8 group hover:border-primary transition-colors cursor-pointer bg-slate-50/50 dark:bg-slate-800/20">
+<div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-slate-900 transition-colors mb-4">
+<span class="material-icons-outlined text-2xl">add</span>
+</div>
+<p class="font-bold text-slate-700 dark:text-slate-300">New Product</p>
+<p class="text-xs text-slate-500 dark:text-slate-500 mt-1">Quick create from template</p>
+</div>
+</div>
+<div class="mt-12 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6">
+<p class="text-sm text-slate-500 dark:text-slate-400">Showing <span class="font-semibold">1</span> to <span class="font-semibold">8</span> of <span class="font-semibold">32</span> products</p>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" disabled="">Previous</button>
+<button class="px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm font-medium">1</button>
+<button class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">2</button>
+<button class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Next</button>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-6 right-6">
+<button class="w-12 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full shadow-lg flex items-center justify-center text-slate-600 dark:text-primary hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-outlined">dark_mode</span>
+</button>
+</div>
+
+</body></html>

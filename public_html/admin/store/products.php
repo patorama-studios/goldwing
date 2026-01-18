@@ -1,6 +1,7 @@
 <?php
 use App\Services\Csrf;
 
+$search = trim((string) ($_GET['q'] ?? ''));
 $typeFilter = $_GET['type'] ?? '';
 $categoryFilter = (int) ($_GET['category'] ?? 0);
 $stockFilter = $_GET['stock'] ?? '';
@@ -122,11 +123,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $pdo->query('SELECT p.*, (SELECT COUNT(*) FROM store_product_variants v WHERE v.product_id = p.id) as variant_count, (SELECT SUM(COALESCE(v.stock_quantity, 0)) FROM store_product_variants v WHERE v.product_id = p.id) as variant_stock FROM store_products p ORDER BY p.created_at DESC');
+$stmt = $pdo->query('SELECT p.*, (SELECT image_url FROM store_product_images i WHERE i.product_id = p.id ORDER BY i.sort_order ASC, i.id ASC LIMIT 1) as image_url, (SELECT COUNT(*) FROM store_product_variants v WHERE v.product_id = p.id) as variant_count, (SELECT SUM(COALESCE(v.stock_quantity, 0)) FROM store_product_variants v WHERE v.product_id = p.id) as variant_stock FROM store_products p ORDER BY p.created_at DESC');
 $products = $stmt->fetchAll();
 
 $filtered = [];
 foreach ($products as $product) {
+    if ($search !== '') {
+        $haystack = strtolower($product['title'] . ' ' . ($product['slug'] ?? ''));
+        if (strpos($haystack, strtolower($search)) === false) {
+            continue;
+        }
+    }
     if ($typeFilter && $product['type'] !== $typeFilter) {
         continue;
     }
@@ -166,15 +173,24 @@ foreach ($products as $product) {
 
 $pageSubtitle = 'Manage products, variants, and inventory.';
 ?>
-<section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+<section class="space-y-6">
   <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <a class="inline-flex items-center gap-2 rounded-lg bg-ink text-white px-4 py-2 text-sm font-medium" href="/admin/store/product/new">
-        <span class="material-icons-outlined text-base">add</span>
-        Add product
-      </a>
+    <div>
+      <h2 class="text-2xl font-semibold text-ink">Store Products</h2>
+      <p class="text-sm text-slate-500">Manage physical products, variants, and real-time inventory.</p>
     </div>
+    <a class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink shadow-sm shadow-primary/20 hover:bg-primary-strong" href="/admin/store/product/new">
+      <span class="material-icons-outlined text-base">add</span>
+      Add product
+    </a>
+  </div>
+
+  <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
     <form method="get" class="flex flex-wrap items-center gap-3 text-sm">
+      <div class="relative flex-1 min-w-[220px]">
+        <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">search</span>
+        <input name="q" value="<?= e($search) ?>" class="w-full rounded-lg border border-gray-200 bg-slate-50 px-9 py-2 text-sm" placeholder="Search products...">
+      </div>
       <select name="type" class="rounded-lg border border-gray-200 bg-white px-3 py-2">
         <option value="">All types</option>
         <option value="physical" <?= $typeFilter === 'physical' ? 'selected' : '' ?>>Physical</option>
@@ -201,50 +217,84 @@ $pageSubtitle = 'Manage products, variants, and inventory.';
     </form>
   </div>
 
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="text-left text-xs uppercase text-gray-500 border-b">
-        <tr>
-          <th class="py-2 pr-3">Product</th>
-          <th class="py-2 pr-3">Type</th>
-          <th class="py-2 pr-3">Price</th>
-          <th class="py-2 pr-3">Stock</th>
-          <th class="py-2 pr-3">Status</th>
-          <th class="py-2">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y">
-        <?php foreach ($filtered as $product): ?>
-          <tr>
-            <td class="py-2 pr-3 text-gray-900 font-medium"><?= e($product['title']) ?></td>
-            <td class="py-2 pr-3 text-gray-600"><?= e($product['type']) ?></td>
-            <td class="py-2 pr-3 text-gray-600">$<?= e(store_money((float) $product['base_price'])) ?></td>
-            <td class="py-2 pr-3 text-gray-600"><?= e($product['stock_display']) ?></td>
-            <td class="py-2 pr-3 text-gray-600"><?= $product['is_active'] ? 'Active' : 'Inactive' ?></td>
-            <td class="py-2 flex items-center gap-2">
-              <a class="text-sm text-blue-600" href="/admin/store/product/<?= e((string) $product['id']) ?>">Edit</a>
-              <form method="post">
-                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                <input type="hidden" name="action" value="duplicate_product">
-                <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
-                <button class="text-sm text-slate-600" type="submit">Duplicate</button>
-              </form>
-              <form method="post">
-                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                <input type="hidden" name="action" value="toggle_active">
-                <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
-                <input type="hidden" name="is_active" value="<?= $product['is_active'] ? '0' : '1' ?>">
-                <button class="text-sm text-<?= $product['is_active'] ? 'red' : 'green' ?>-600" type="submit"><?= $product['is_active'] ? 'Deactivate' : 'Activate' ?></button>
-              </form>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        <?php if (!$filtered): ?>
-          <tr>
-            <td colspan="6" class="py-4 text-center text-gray-500">No products found.</td>
-          </tr>
-        <?php endif; ?>
-      </tbody>
-    </table>
+  <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <?php foreach ($filtered as $product): ?>
+      <?php
+        $stockQuantity = $product['stock_display'] === 'Not tracked' ? null : (int) $product['stock_display'];
+        $stockLabel = 'Not tracked';
+        $stockTone = 'text-slate-500';
+        if ($stockQuantity !== null) {
+            $stockLabel = $stockQuantity <= 0 ? 'Out of stock' : 'In stock';
+            $stockTone = $stockQuantity <= 0 ? 'text-red-600' : 'text-green-600';
+            $threshold = (int) ($product['low_stock_threshold'] ?? 0);
+            if ($threshold > 0 && $stockQuantity <= $threshold && $stockQuantity > 0) {
+                $stockLabel = 'Low stock';
+                $stockTone = 'text-amber-600';
+            }
+        }
+        $typeLabel = $product['type'] === 'ticket' ? 'Ticket' : 'Physical';
+      ?>
+      <div class="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-card">
+        <div class="relative aspect-square bg-slate-100">
+          <?php if (!empty($product['image_url'])): ?>
+            <img src="<?= e($product['image_url']) ?>" alt="<?= e($product['title']) ?>" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105">
+          <?php else: ?>
+            <div class="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
+              <span class="material-icons-outlined text-4xl">photo</span>
+            </div>
+          <?php endif; ?>
+          <div class="absolute left-3 top-3 flex gap-2">
+            <span class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase <?= $product['is_active'] ? 'bg-green-500 text-white' : 'bg-slate-400 text-white' ?>">
+              <?= $product['is_active'] ? 'Active' : 'Inactive' ?>
+            </span>
+            <span class="rounded-full bg-slate-900/80 px-2 py-1 text-[10px] font-semibold uppercase text-white"><?= e($typeLabel) ?></span>
+          </div>
+          <div class="absolute inset-0 flex items-center justify-center gap-2 bg-slate-900/40 opacity-0 transition group-hover:opacity-100">
+            <a class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-900 hover:bg-primary" href="/admin/store/product/<?= e((string) $product['id']) ?>" title="Edit">
+              <span class="material-icons-outlined text-xl">edit</span>
+            </a>
+            <form method="post">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="duplicate_product">
+              <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
+              <button class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-900 hover:bg-primary" type="submit" title="Duplicate">
+                <span class="material-icons-outlined text-xl">content_copy</span>
+              </button>
+            </form>
+            <form method="post">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="toggle_active">
+              <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
+              <input type="hidden" name="is_active" value="<?= $product['is_active'] ? '0' : '1' ?>">
+              <button class="flex h-10 w-10 items-center justify-center rounded-full bg-white <?= $product['is_active'] ? 'text-red-600 hover:bg-red-600 hover:text-white' : 'text-green-600 hover:bg-green-600 hover:text-white' ?>" type="submit" title="<?= $product['is_active'] ? 'Deactivate' : 'Activate' ?>">
+                <span class="material-icons-outlined text-xl"><?= $product['is_active'] ? 'block' : 'check_circle' ?></span>
+              </button>
+            </form>
+          </div>
+        </div>
+        <div class="space-y-3 p-4">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="truncate text-sm font-semibold text-slate-900"><?= e($product['title']) ?></h3>
+            <span class="text-sm font-bold text-primary">$<?= e(store_money((float) $product['base_price'])) ?></span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-500">
+            <span class="inline-flex items-center gap-1">
+              <span class="material-icons-outlined text-sm">inventory_2</span>
+              Stock: <span class="font-semibold text-slate-700"><?= e($product['stock_display']) ?></span>
+            </span>
+            <span class="font-medium <?= $stockTone ?>"><?= e($stockLabel) ?></span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-500">
+            <span>Variants: <span class="font-semibold text-slate-700"><?= e((string) $product['variant_count']) ?></span></span>
+            <span class="text-slate-400">Updated <?= e(date('M j, Y', strtotime($product['updated_at'] ?? $product['created_at'] ?? 'now'))) ?></span>
+          </div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    <?php if (!$filtered): ?>
+      <div class="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-500">
+        No products found.
+      </div>
+    <?php endif; ?>
   </div>
 </section>
