@@ -6,10 +6,14 @@ class AiProviderKeyService
     public static function getKey(string $provider): ?string
     {
         $provider = strtolower($provider);
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT api_key_encrypted FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
-        $stmt->execute(['provider' => $provider]);
-        $row = $stmt->fetch();
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT api_key_encrypted FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
+            $stmt->execute(['provider' => $provider]);
+            $row = $stmt->fetch();
+        } catch (\PDOException $e) {
+            return null;
+        }
         if (!$row) {
             return null;
         }
@@ -19,10 +23,14 @@ class AiProviderKeyService
     public static function getMeta(string $provider): array
     {
         $provider = strtolower($provider);
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT api_key_encrypted FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
-        $stmt->execute(['provider' => $provider]);
-        $row = $stmt->fetch();
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT api_key_encrypted FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
+            $stmt->execute(['provider' => $provider]);
+            $row = $stmt->fetch();
+        } catch (\PDOException $e) {
+            return ['configured' => false, 'last4' => null];
+        }
         if (!$row) {
             return ['configured' => false, 'last4' => null];
         }
@@ -37,10 +45,14 @@ class AiProviderKeyService
     public static function upsertKey(string $provider, string $plaintext, int $userId): void
     {
         $provider = strtolower($provider);
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
-        $stmt->execute(['provider' => $provider]);
-        $existing = $stmt->fetch();
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT id FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
+            $stmt->execute(['provider' => $provider]);
+            $existing = $stmt->fetch();
+        } catch (\PDOException $e) {
+            return;
+        }
 
         if ($plaintext === '') {
             if ($existing) {
@@ -50,7 +62,11 @@ class AiProviderKeyService
             return;
         }
 
-        $encrypted = EncryptionService::encrypt($plaintext);
+        try {
+            $encrypted = EncryptionService::encrypt($plaintext);
+        } catch (\RuntimeException $e) {
+            return;
+        }
         if ($existing) {
             $stmt = $pdo->prepare('UPDATE ai_provider_keys SET api_key_encrypted = :api_key_encrypted, updated_by = :user_id, updated_at = NOW() WHERE provider = :provider');
             $stmt->execute([
@@ -72,9 +88,13 @@ class AiProviderKeyService
     public static function hasKey(string $provider): bool
     {
         $provider = strtolower($provider);
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT 1 FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
-        $stmt->execute(['provider' => $provider]);
-        return (bool) $stmt->fetch();
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT 1 FROM ai_provider_keys WHERE provider = :provider LIMIT 1');
+            $stmt->execute(['provider' => $provider]);
+            return (bool) $stmt->fetch();
+        } catch (\PDOException $e) {
+            return false;
+        }
     }
 }

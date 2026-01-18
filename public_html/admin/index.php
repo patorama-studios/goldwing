@@ -16,6 +16,7 @@ use App\Services\EmailService;
 use App\Services\PaymentSettingsService;
 use App\Services\StripeSettingsService;
 use App\Services\SettingsService;
+use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
 use App\Services\DomSnapshotService;
 use App\Services\BaseUrlService;
@@ -33,6 +34,10 @@ if ($page === 'menus') {
 }
 if ($page === 'pages') {
     header('Location: /admin/navigation.php');
+    exit;
+}
+if ($page === 'ai-editor') {
+    header('Location: /admin/page-builder');
     exit;
 }
 
@@ -94,6 +99,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare('SELECT first_name, last_name, email, phone FROM members WHERE id = :id');
                 $stmt->execute(['id' => $row['member_id']]);
                 $memberRow = $stmt->fetch();
+                $memberMeta = [];
+                if ($memberRow) {
+                    $stmt = $pdo->prepare('SELECT member_number_base, chapter_id, address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic FROM members WHERE id = :id');
+                    $stmt->execute(['id' => $row['member_id']]);
+                    $memberMeta = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                }
 
                 if (!empty($memberRow['email'])) {
                     $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
@@ -150,6 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $items = [];
                 $fullSelected = !empty($notes['membership']['full_selected']);
                 $associateSelected = !empty($notes['membership']['associate_selected']) || !empty($notes['membership']['associate_add']);
+                $fullTerm = $term;
+                $associateTerm = $term;
                 if ($fullSelected) {
                     $fullTerm = strtoupper((string) ($notes['membership']['full']['period_key'] ?? $term));
                     $fullAmount = (int) ($notes['membership']['full']['price_cents'] ?? 0);
@@ -182,6 +195,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
                 }
 
+                $associateMemberId = null;
+                $associatePeriodId = null;
+                $associateDetails = is_array($notes['associate'] ?? null) ? $notes['associate'] : [];
+                $associateFirst = trim((string) ($associateDetails['first_name'] ?? ''));
+                $associateLast = trim((string) ($associateDetails['last_name'] ?? ''));
+                $associateEmail = trim((string) ($associateDetails['email'] ?? ''));
+                $associatePhone = trim((string) ($associateDetails['phone'] ?? ''));
+                $associateAddressDiff = strtolower(trim((string) ($associateDetails['address_diff'] ?? '')));
+                $associateAddressLine1 = trim((string) ($associateDetails['address_line1'] ?? ''));
+                $associateCity = trim((string) ($associateDetails['city'] ?? ''));
+                $associateState = trim((string) ($associateDetails['state'] ?? ''));
+                $associatePostalCode = trim((string) ($associateDetails['postal_code'] ?? ''));
+                $associateCountry = trim((string) ($associateDetails['country'] ?? ''));
+                $associateVehicles = $notes['vehicles']['associate'] ?? [];
+                if (!is_array($associateVehicles)) {
+                    $associateVehicles = [];
+                }
+
+                if ($associateSelected && $associateAdd === 'yes' && ($associateFirst !== '' || $associateLast !== '')) {
+                    $existingAssociateId = null;
+                    $nameKey = strtolower(trim($associateFirst . ' ' . $associateLast));
+                    if ($nameKey !== '') {
+                        $stmt = $pdo->prepare('SELECT id FROM members WHERE full_member_id = :full_member_id AND LOWER(CONCAT(first_name, " ", last_name)) = :name LIMIT 1');
+                        $stmt->execute([
+                            'full_member_id' => $row['member_id'],
+                            'name' => $nameKey,
+                        ]);
+                        $existingAssociateId = (int) ($stmt->fetchColumn() ?: 0);
+                    }
+                    if ($existingAssociateId <= 0 && $associateEmail !== '') {
+                        $stmt = $pdo->prepare('SELECT id FROM members WHERE full_member_id = :full_member_id AND LOWER(email) = :email LIMIT 1');
+                        $stmt->execute([
+                            'full_member_id' => $row['member_id'],
+                            'email' => strtolower($associateEmail),
+                        ]);
+                        $existingAssociateId = (int) ($stmt->fetchColumn() ?: 0);
+                    }
+
+                    if ($existingAssociateId > 0) {
+                        $associateMemberId = $existingAssociateId;
+                    } else {
+                        $stmt = $pdo->prepare('SELECT MAX(member_number_suffix) as max_suffix FROM members WHERE full_member_id = :full_id');
+                        $stmt->execute(['full_id' => $row['member_id']]);
+                        $suffixRow = $stmt->fetch();
+                        $maxSuffix = (int) ($suffixRow['max_suffix'] ?? 0);
+                        $suffixStart = (int) SettingsService::getGlobal('membership.associate_suffix_start', 1);
+                        $associateSuffix = max($maxSuffix, $suffixStart - 1) + 1;
+                        $memberNumberBase = (int) ($memberMeta['member_number_base'] ?? 0);
+                        if ($memberNumberBase <= 0) {
+                            $stmt = $pdo->prepare('SELECT member_number_base FROM members WHERE id = :id');
+                            $stmt->execute(['id' => $row['member_id']]);
+                            $memberNumberBase = (int) ($stmt->fetchColumn() ?: 0);
+                        }
+
+                        $useAssociateAddress = $associateAddressDiff === 'yes';
+                        $addressLine1 = $useAssociateAddress ? $associateAddressLine1 : (string) ($memberMeta['address_line1'] ?? '');
+                        $addressLine2 = $useAssociateAddress ? '' : (string) ($memberMeta['address_line2'] ?? '');
+                        $city = $useAssociateAddress ? $associateCity : (string) ($memberMeta['city'] ?? '');
+                        $state = $useAssociateAddress ? $associateState : (string) ($memberMeta['state'] ?? '');
+                        $postal = $useAssociateAddress ? $associatePostalCode : (string) ($memberMeta['postal_code'] ?? '');
+                        $country = $useAssociateAddress ? $associateCountry : (string) ($memberMeta['country'] ?? '');
+                        if ($country === '') {
+                            $country = 'Australia';
+                        }
+
+                        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone, address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES ("ASSOCIATE", "PENDING", :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone, :address1, :address2, :city, :state, :postal, :country, :privacy, 0, 0, 0, 0, 0, 0, NOW())');
+                        $stmt->execute([
+                            'base' => $memberNumberBase,
+                            'suffix' => $associateSuffix,
+                            'full_id' => $row['member_id'],
+                            'chapter_id' => $memberMeta['chapter_id'] ?? null,
+                            'first_name' => $associateFirst,
+                            'last_name' => $associateLast,
+                            'email' => $associateEmail !== '' ? $associateEmail : ($memberRow['email'] ?? ''),
+                            'phone' => $associatePhone !== '' ? $associatePhone : ($memberRow['phone'] ?? null),
+                            'address1' => $addressLine1 !== '' ? $addressLine1 : null,
+                            'address2' => $addressLine2 !== '' ? $addressLine2 : null,
+                            'city' => $city !== '' ? $city : null,
+                            'state' => $state !== '' ? $state : null,
+                            'postal' => $postal !== '' ? $postal : null,
+                            'country' => $country,
+                            'privacy' => $memberMeta['privacy_level'] ?? 'A',
+                        ]);
+                        $associateMemberId = (int) $pdo->lastInsertId();
+                        if ($associateMemberId > 0 && MemberRepository::hasMemberNumberColumn($pdo)) {
+                            $memberNumberDisplay = MembershipService::displayMembershipNumber($memberNumberBase, $associateSuffix);
+                            $stmt = $pdo->prepare('UPDATE members SET member_number = :member_number WHERE id = :id');
+                            $stmt->execute([
+                                'member_number' => $memberNumberDisplay,
+                                'id' => $associateMemberId,
+                            ]);
+                        }
+                    }
+
+                    if ($associateMemberId) {
+                        $stmt = $pdo->prepare('SELECT COUNT(*) FROM membership_periods WHERE member_id = :member_id');
+                        $stmt->execute(['member_id' => $associateMemberId]);
+                        $hasPeriods = (int) ($stmt->fetchColumn() ?: 0);
+                        if ($hasPeriods === 0) {
+                            $associatePeriodId = MembershipService::createMembershipPeriod($associateMemberId, $associateTerm, date('Y-m-d'));
+                        }
+                    }
+                }
+
+                if ($associateMemberId && $associateVehicles) {
+                    $stmt = $pdo->prepare('SELECT COUNT(*) FROM member_bikes WHERE member_id = :member_id');
+                    $stmt->execute(['member_id' => $associateMemberId]);
+                    $hasAssociateBikes = (int) ($stmt->fetchColumn() ?: 0);
+                    if ($hasAssociateBikes === 0) {
+                        $bikeColumns = [];
+                        $bikeHasRego = true;
+                        $bikeHasColour = false;
+                        try {
+                            $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+                            $bikeHasRego = in_array('rego', $bikeColumns, true);
+                            $bikeHasColour = in_array('colour', $bikeColumns, true) || in_array('color', $bikeColumns, true);
+                        } catch (Throwable $e) {
+                            $bikeColumns = [];
+                            $bikeHasRego = true;
+                            $bikeHasColour = false;
+                        }
+
+                        foreach ($associateVehicles as $vehicle) {
+                            $make = trim((string) ($vehicle['make'] ?? ''));
+                            $model = trim((string) ($vehicle['model'] ?? ''));
+                            $yearValue = trim((string) ($vehicle['year'] ?? ''));
+                            $year = $yearValue !== '' && is_numeric($yearValue) ? (int) $yearValue : null;
+                            $rego = trim((string) ($vehicle['rego'] ?? ''));
+                            $colour = trim((string) ($vehicle['colour'] ?? ($vehicle['color'] ?? '')));
+                            if (strlen($rego) > 20) {
+                                $rego = substr($rego, 0, 20);
+                            }
+                            if ($make !== '' && $model !== '') {
+                                $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
+                                $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
+                                $params = [
+                                    'member_id' => $associateMemberId,
+                                    'make' => $make,
+                                    'model' => $model,
+                                    'year' => $year,
+                                ];
+                                if ($bikeHasRego) {
+                                    $columns[] = 'rego';
+                                    $placeholders[] = ':rego';
+                                    $params['rego'] = $rego !== '' ? $rego : null;
+                                }
+                                if ($bikeHasColour && $colour !== '') {
+                                    if (in_array('colour', $bikeColumns, true)) {
+                                        $columns[] = 'colour';
+                                        $placeholders[] = ':colour';
+                                        $params['colour'] = $colour;
+                                    } elseif (in_array('color', $bikeColumns, true)) {
+                                        $columns[] = 'color';
+                                        $placeholders[] = ':color';
+                                        $params['color'] = $colour;
+                                    }
+                                }
+                                $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+                                $stmt->execute($params);
+                            }
+                        }
+                    }
+                }
+
+                $internalNotes = 'Application approval';
+                if ($associateMemberId) {
+                    $internalNotes = json_encode([
+                        'source' => 'application_approval',
+                        'associate_member_id' => $associateMemberId,
+                        'associate_period_id' => $associatePeriodId,
+                        'membership_selection' => [
+                            'full_selected' => $fullSelected,
+                            'associate_selected' => $associateSelected,
+                            'associate_add' => $associateAdd,
+                        ],
+                        'associate_details' => [
+                            'first_name' => $associateFirst,
+                            'last_name' => $associateLast,
+                            'email' => $associateEmail !== '' ? $associateEmail : ($memberRow['email'] ?? ''),
+                        ],
+                    ], JSON_UNESCAPED_SLASHES);
+                }
+
                 $order = MembershipOrderService::createMembershipOrder((int) $row['member_id'], $periodId, $amount, [
                     'payment_method' => $paymentMethod,
                     'payment_status' => $paymentStatus,
@@ -190,13 +386,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'items' => $items,
                     'actor_user_id' => $user['id'] ?? null,
                     'term' => $term,
-                    'internal_notes' => 'Application approval',
+                    'admin_notes' => 'Application approval',
+                    'internal_notes' => $internalNotes,
                 ]);
                 if ($order && $paymentRecorded) {
                     MembershipOrderService::activateMembershipForOrder($order, [
                         'payment_reference' => $paymentKey !== '' ? $paymentKey : null,
                         'period_id' => $periodId,
                     ]);
+                    if ($associateMemberId) {
+                        if ($associatePeriodId) {
+                            MembershipService::markPaid($associatePeriodId, $paymentKey !== '' ? $paymentKey : ($order['order_number'] ?? ''));
+                        } else {
+                            $stmt = $pdo->prepare('UPDATE members SET status = "ACTIVE", updated_at = NOW() WHERE id = :id');
+                            $stmt->execute(['id' => $associateMemberId]);
+                        }
+                    }
                 }
 
                 $paymentNeeded = !$paymentRecorded && $amount > 0;
@@ -709,7 +914,7 @@ $pageTitles = [
     'fallen-wings' => 'Fallen Wings Memorials',
     'media' => 'Media Library',
     'wings' => 'Wings Magazine',
-    'ai-editor' => 'AI Editor (comming soon)',
+    'ai-editor' => 'AI Page Builder',
     'audit' => 'Audit Log',
     'reports' => 'Reports & Exports',
 ];
@@ -2181,17 +2386,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </section>
       <?php elseif ($page === 'ai-editor'): ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h1 class="font-display text-2xl font-bold text-gray-900 mb-2">AI Page Editor (comming soon)</h1>
-          <?php if (in_array('admin', $user['roles'] ?? [], true)): ?>
-            <p class="text-sm text-gray-500 mb-4">Use the AI editor to draft content changes. Admins must review and apply.</p>
-            <form method="post" action="/admin/ai_editor.php" class="space-y-3">
-              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-              <textarea name="prompt" rows="4" class="w-full" placeholder="Draft an update to the About page..."></textarea>
-              <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Send to AI</button>
-            </form>
-          <?php else: ?>
-            <p class="text-sm text-gray-500">AI editor is restricted to admin users.</p>
-          <?php endif; ?>
+          <h1 class="font-display text-2xl font-bold text-gray-900 mb-2">AI Page Builder</h1>
+          <p class="text-sm text-gray-500 mb-4">Open the interactive page builder to edit front-facing pages.</p>
+          <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" href="/admin/page-builder">Open AI Page Builder</a>
         </section>
       <?php elseif ($page === 'audit'): ?>
         <?php $audit = $pdo->query('SELECT a.*, u.name FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 50')->fetchAll(); ?>

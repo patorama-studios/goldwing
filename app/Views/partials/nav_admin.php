@@ -11,7 +11,7 @@
     <a href="/admin/member-of-the-year">Member of the Year</a>
     <a href="/admin/index.php?page=wings">Wings</a>
     <a href="/admin/index.php?page=media">Media</a>
-    <a href="/admin/index.php?page=ai-editor">AI Editor (comming soon)</a>
+    <a href="/admin/page-builder">AI Page Builder</a>
     <a href="/admin/index.php?page=audit">Audit</a>
     <a href="/admin/index.php?page=reports">Reports</a>
     <a class="cta" href="/logout.php">Logout</a>

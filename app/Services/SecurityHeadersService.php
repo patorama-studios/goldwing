@@ -9,7 +9,7 @@ class SecurityHeadersService
             return;
         }
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-        $allowFraming = in_array($path, ['/calendar/events_public.php'], true);
+        $allowFraming = in_array($path, ['/calendar/events_public.php', '/admin/page-builder/preview.php'], true);
         $frameAncestors = $allowFraming ? "frame-ancestors 'self'" : "frame-ancestors 'none'";
         $styleSrc = $allowFraming
             ? "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net"

@@ -5,7 +5,7 @@
 - Create a menu, assign it to a location (primary/footer/secondary), and save.
 - Add pages via the “Add Pages” panel, or create custom links with labels + URLs.
 - Reorder using Up/Down, and nest items with Indent/Outdent.
-- Each page item includes an “Edit Page” button that opens the AI editor at `/admin/pages/{pageId}/editor`.
+- AI Page Builder lives at `/admin/ai_editor.php` (admin-only).
 - If no menus exist yet, a default Primary Menu is created from the current public navigation (Home/About/Ride Calendar/Membership/Events + Member Login).
 
 ## Menu locations

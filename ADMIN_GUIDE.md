@@ -46,14 +46,26 @@
 - Edit notice content; pinned notices appear first in the member portal.
 
 ## Pages
-- Edit public page HTML content.
-- Changes are versioned in `page_versions`.
+- Public page content is stored as draft/live HTML.
+- Versions are created only when publishing live.
 
-## AI Page Builder
-- Open from Navigation / Menus and use chat instructions to update a page.
-- Click elements in the preview to target a specific section.
-- Choose OpenAI, Gemini, or Claude models per session.
-- Every change is logged with a diff and can be reverted.
+## AI Page Builder (Visual)
+- Open at `/admin/page-builder` (admins + committee only).
+- Select a page from the left list, then click elements in the preview to target edits.
+- Chat uses a continuous history per page.
+- Save Draft stores draft HTML; Push Live publishes and creates a version.
+- Versions can be restored into draft and published later.
+- Access control is set per page (public or role-locked).
+
+### Manual test steps
+1. Open `/admin/page-builder` as admin or committee.
+2. Select a `?page=` page and verify the preview loads the draft.
+3. Click an element in the preview and confirm it highlights + appears in the selector panel.
+4. Use “Edit manually” to update the element and verify the preview updates immediately.
+5. Use “Save Draft” then refresh the builder to confirm draft persists.
+6. Use “Push Live” and confirm a new version appears in Versions.
+7. Use Versions → Restore and confirm the draft updates.
+8. Try hitting `/admin/page-builder/pages/{id}/publish` for a non-eligible page id and confirm it is blocked.
 
 ## Wings Magazine
 - Review uploaded issues.
@@ -63,10 +75,8 @@
 - Uploaded assets are stored in `/public_html/uploads/`.
 - Media metadata is stored in the `media` table.
 
-## AI Editor
-- Enter a prompt to draft page/notice/event updates.
-- Preview and click Apply to commit changes.
-- All AI drafts are stored and audited.
+## AI Settings
+- Configure provider, model, and API key at `/admin/settings/ai.php`.
 
 ## Audit Log
 - Review approvals, rejections, content edits, and AI applies.

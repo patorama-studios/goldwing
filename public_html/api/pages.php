@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\Csrf;
 use App\Services\DomSnapshotService;
 use App\Services\PageAiRevisionService;
+use App\Services\PageSchemaService;
 use App\Services\PageService;
 use App\Services\UnifiedDiffService;
 
@@ -100,6 +101,7 @@ if ($method === 'GET') {
                 'slug' => $page['slug'],
             ],
             'preview_url' => '/?page=' . urlencode($page['slug']) . '&builder_preview=1',
+            'has_schema' => !empty($page['schema_json']),
             'providers' => $providerList,
             'default_provider' => config('ai.default_provider', 'openai'),
             'default_model' => config('ai.default_model', 'gpt-4o-mini'),
@@ -204,37 +206,45 @@ if ($method === 'POST') {
             json_response(['ok' => false, 'error' => $aiResult['error'] ?? 'AI request failed.'], 500);
         }
 
-        $parsed = UnifiedDiffService::extractSummaryAndDiff($aiResult['content'] ?? '');
-        $summary = $parsed['summary'] ?: 'AI update';
-        $diff = $parsed['diff'] ?? '';
-
-        if (stripos($summary, 'NEEDS_CLARIFICATION') === 0 || $diff === '') {
+        $schemaError = null;
+        $decoded = PageSchemaService::decode($aiResult['content'] ?? '', $schemaError);
+        if (!$decoded) {
             json_response([
                 'ok' => false,
-                'error' => 'AI could not produce a safe patch.',
-                'question' => $aiResult['content'] ?? '',
+                'error' => $schemaError ?: 'AI response invalid.',
             ], 400);
         }
 
-        $files = UnifiedDiffService::parse($diff);
-        if (count($files) !== 1) {
-            json_response(['ok' => false, 'error' => 'Patch must target a single file.'], 400);
+        $normalized = PageSchemaService::normalizeResponse($decoded);
+        $summary = $normalized['summary'] ?? 'AI page update';
+        $schema = null;
+
+        if (!empty($normalized['page'])) {
+            $schema = PageSchemaService::normalizePage($normalized['page'], $page);
+        } elseif (!empty($normalized['blocks'])) {
+            if (empty($page['schema_json'])) {
+                json_response(['ok' => false, 'error' => 'No existing page schema to edit.'], 400);
+            }
+            $currentSchema = PageSchemaService::decode($page['schema_json'] ?? '', $schemaError);
+            if (!$currentSchema) {
+                json_response(['ok' => false, 'error' => 'Existing page schema is invalid.'], 400);
+            }
+            $currentSchema = PageSchemaService::normalizePage($currentSchema, $page);
+            $schema = PageSchemaService::applyBlockUpdates($currentSchema, $normalized['blocks']);
+            $schema = PageSchemaService::normalizePage($schema, $page);
+        } else {
+            json_response(['ok' => false, 'error' => 'AI response missing page or blocks.'], 400);
         }
 
-        $filePatch = $files[0];
-        $path = $filePatch['new'] ?: $filePatch['old'];
-        $expectedPath = 'pages/' . $page['slug'] . '.html';
-        if ($path !== $expectedPath) {
-            json_response(['ok' => false, 'error' => 'Patch path not allowed.'], 400);
+        $validationErrors = PageSchemaService::validatePage($schema);
+        if ($validationErrors) {
+            json_response(['ok' => false, 'error' => 'Schema validation failed.', 'details' => $validationErrors], 400);
         }
 
-        [$ok, $updatedHtml, $applyError] = UnifiedDiffService::apply($page['html_content'], $filePatch);
-        if (!$ok) {
-            json_response(['ok' => false, 'error' => $applyError], 400);
-        }
-
-        $beforeHtml = $page['html_content'];
-        PageService::updateContent($pageId, $updatedHtml, $user['id'], $summary);
+        $updatedHtml = PageSchemaService::renderPage($schema);
+        $beforeHtml = $page['html_content'] ?? '';
+        $schemaJson = json_encode($schema, JSON_UNESCAPED_SLASHES);
+        PageService::updateContentWithSchema($pageId, $updatedHtml, $schemaJson, $user['id'], $summary);
 
         $revisionId = PageAiRevisionService::create([
             'page_id' => $pageId,
@@ -242,8 +252,8 @@ if ($method === 'POST') {
             'provider' => $provider,
             'model' => $model,
             'summary' => $summary,
-            'diff_text' => $diff,
-            'files_changed' => json_encode([$expectedPath]),
+            'diff_text' => UnifiedDiffService::generateFullDiff($beforeHtml, $updatedHtml, 'pages/' . $page['slug'] . '.html'),
+            'files_changed' => json_encode(['pages/' . $page['slug'] . '.html']),
             'before_content' => $beforeHtml,
             'after_content' => $updatedHtml,
             'reverted_from_revision_id' => null,
@@ -258,6 +268,7 @@ if ($method === 'POST') {
             'summary' => $summary,
             'applied' => true,
             'revisionId' => $revisionId,
+            'preview_url' => '/?page=' . urlencode($page['slug']) . '&builder_preview=1',
         ]);
     }
 

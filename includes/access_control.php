@@ -337,11 +337,11 @@ function access_control_default_registry(): array
         ],
         [
             'page_key' => 'admin_ai_editor',
-            'label' => 'AI Editor (comming soon)',
-            'path_pattern' => '/admin/ai_editor.php',
-            'match_type' => 'exact',
+            'label' => 'AI Page Builder',
+            'path_pattern' => '/admin/page-builder',
+            'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'super_admin'],
+            'roles' => ['admin', 'committee', 'super_admin'],
         ],
         [
             'page_key' => 'settings_hub',
@@ -358,6 +358,14 @@ function access_control_default_registry(): array
             'match_type' => 'exact',
             'nav_group' => 'Admin',
             'roles' => ['super_admin'],
+        ],
+        [
+            'page_key' => 'settings_ai',
+            'label' => 'AI Settings',
+            'path_pattern' => '/admin/settings/ai.php',
+            'match_type' => 'exact',
+            'nav_group' => 'Admin',
+            'roles' => ['admin', 'committee', 'super_admin'],
         ],
         [
             'page_key' => 'settings_access_control_save',

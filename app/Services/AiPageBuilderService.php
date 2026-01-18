@@ -8,41 +8,62 @@ class AiPageBuilderService
     public static function buildMessages(array $page, string $message, array $selectedElement, string $domSnapshot): array
     {
         $pageSlug = $page['slug'] ?? 'page';
-        $pagePath = 'pages/' . $pageSlug . '.html';
         $systemPrompt = implode("\n", [
-            'You are an expert web page editor for the Australian Goldwing Association admin.',
-            'Return a unified diff patch ONLY along with a short summary line.',
-            'Format your response exactly as:',
-            'Summary: <short summary>',
-            '--- ' . $pagePath,
-            '+++ ' . $pagePath,
-            '@@ ...',
-            'Rules:',
-            '- Only modify ' . $pagePath . ' for the provided page.',
-            '- Preserve existing formatting unless changing it is necessary.',
-            '- Never output secrets or API keys.',
-            '- Do not change PHP, server config, or unrelated files.',
-            '- Do not wrap the diff in markdown fences.',
-            '- If you cannot safely produce a patch, respond with: Summary: NEEDS_CLARIFICATION and a question.',
+            'SYSTEM ROLE: AI-FIRST PAGE BUILDER ENGINE',
+            '',
+            'You are an AI-based Page Builder Engine operating inside a custom-built, PHP-based CMS.',
+            'This system is NOT WordPress and does NOT use any third-party page builder plugins.',
+            'You are ADMIN-ONLY.',
+            'End users will never see the editor or interact with you directly.',
+            '',
+            'Your primary purpose is to CREATE, EDIT, and OPTIMISE web pages using NATURAL LANGUAGE PROMPTS,',
+            'while outputting STRUCTURED PAGE SCHEMAS (JSON) that are rendered by a PHP frontend.',
+            '',
+            'CORE PRINCIPLES:',
+            '1. AI-FIRST CREATION',
+            '2. BLOCK-BASED ARCHITECTURE',
+            '3. STRUCTURED OUTPUT ONLY',
+            '4. SAFE EDITING',
+            '',
+            'PAGE DATA MODEL:',
+            '{ "page": { "id": "uuid", "slug": "string", "title": "string", "seo": { "meta_title": "string", "meta_description": "string" }, "layout": "default | full-width | landing", "blocks": [] } }',
+            '',
+            'BLOCK DATA MODEL:',
+            '{ "id": "uuid", "type": "block_type", "settings": {}, "content": {}, "style": {}, "visibility": { "roles": [], "logged_in_only": false } }',
+            '',
+            'SUPPORTED BLOCK TYPES:',
+            '- hero, text, image, gallery, video, button, cta, quote, faq, pricing, testimonial, form',
+            '- section, columns, spacer, divider',
+            '- latest_posts, upcoming_events, user_profile, membership_status, notifications',
+            '',
+            'STYLING SYSTEM:',
+            '- Use design tokens only (e.g. "background": "var(--color-surface)").',
+            '- No hex values, no inline CSS, no arbitrary font sizes.',
+            '- Allowed color tokens: var(--color-surface), var(--color-surface-alt), var(--color-surface-strong), var(--color-accent), var(--color-text-primary), var(--color-text-muted), var(--color-text-inverse).',
+            '- Allowed spacing tokens for padding/spacing: xs, sm, md, lg, xl, 2xl.',
+            '- Allowed alignment values: left, center, right.',
+            '- Allowed max_width values: 1200px, 1000px, 960px, 900px, 800px, 720px, 640px, 600px.',
+            '',
+            'EDITING MODES:',
+            '- If creating a full page, return { "summary": "...", "page": { ... } }.',
+            '- If editing specific blocks, return { "summary": "...", "blocks": [ ... ] } with ONLY the modified blocks.',
+            '- Never modify blocks that were not explicitly targeted.',
+            '',
+            'OUTPUT RULES:',
+            '- Respond with JSON only. No markdown, no HTML, no extra text.',
+            '- Always include a short "summary" string.',
+            '- Ensure IDs are unique, block order is logical, and accessibility best practices are applied.',
         ]);
-        $currentHtml = $page['html_content'] ?? '';
-
-        $selectedInfo = 'None';
-        if (!empty($selectedElement)) {
-            $selectedInfo = "Selector: " . ($selectedElement['selector'] ?? 'n/a') . "\n";
-            $selectedInfo .= "Breadcrumb: " . ($selectedElement['breadcrumb'] ?? 'n/a') . "\n";
-            $selectedInfo .= "HTML: " . ($selectedElement['html'] ?? '');
+        $currentSchema = $page['schema_json'] ?? '';
+        if ($currentSchema === '') {
+            $currentSchema = 'null';
         }
 
         $userPrompt = implode("\n\n", [
             'Page slug: ' . $pageSlug,
             'User instruction: ' . $message,
-            'Selected element info:',
-            $selectedInfo,
-            'Current page HTML:',
-            "```html\n" . $currentHtml . "\n```",
-            'Rendered DOM snapshot (sanitized):',
-            "```html\n" . $domSnapshot . "\n```",
+            'Current page schema JSON:',
+            $currentSchema,
         ]);
 
         return [

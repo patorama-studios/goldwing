@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../app/bootstrap.php';
 
 use App\Services\MembershipPricingService;
+use App\Services\PageBuilderService;
 use App\Services\PageService;
+use App\Services\SettingsService;
 
 $pageSlug = $_GET['page'] ?? 'home';
 $pageSlug = preg_replace('/[^a-z0-9-]/', '', strtolower($pageSlug));
@@ -10,15 +12,28 @@ $page = PageService::getBySlug($pageSlug);
 
 $pageTitle = $page ? $page['title'] : 'Australian Goldwing Association';
 $isMembershipPage = $pageSlug === 'membership';
+$templateHeader = (string) SettingsService::getGlobal('ai.template_header_html', '');
+$templateFooter = (string) SettingsService::getGlobal('ai.template_footer_html', '');
+if ($templateHeader !== '') {
+    $templateHeader = PageBuilderService::stripElementIds($templateHeader);
+}
+if ($templateFooter !== '') {
+    $templateFooter = PageBuilderService::stripElementIds($templateFooter);
+}
 
 $canView = false;
 if ($page) {
-    if ($page['visibility'] === 'public') {
-        $canView = true;
-    } elseif ($page['visibility'] === 'member' && current_user()) {
-        $canView = true;
-    } elseif ($page['visibility'] === 'admin' && current_user() && in_array('admin', current_user()['roles'] ?? [], true)) {
-        $canView = true;
+    $accessLevel = $page['access_level'] ?? '';
+    if ($accessLevel !== '') {
+        $canView = PageBuilderService::canAccessPage($page, current_user());
+    } else {
+        if ($page['visibility'] === 'public') {
+            $canView = true;
+        } elseif ($page['visibility'] === 'member' && current_user()) {
+            $canView = true;
+        } elseif ($page['visibility'] === 'admin' && current_user() && in_array('admin', current_user()['roles'] ?? [], true)) {
+            $canView = true;
+        }
     }
 }
 
@@ -26,7 +41,7 @@ $heroTitle = 'Welcome to the Australian Goldwing Association';
 $heroLead = 'Rides, events, and member services for Goldwing riders across Australia.';
 if ($page && $canView) {
     $heroTitle = $page['title'];
-    $plainContent = trim(strip_tags($page['html_content']));
+    $plainContent = trim(strip_tags(PageService::liveHtml($page)));
     if ($plainContent !== '') {
         $heroLead = $plainContent;
     }
@@ -58,6 +73,11 @@ require __DIR__ . '/../app/Views/partials/header.php';
 require __DIR__ . '/../app/Views/partials/nav_public.php';
 ?>
 <main class="site-main">
+  <?php if ($templateHeader !== ''): ?>
+    <div class="page-builder-template page-builder-template--header">
+      <?= render_media_shortcodes($templateHeader) ?>
+    </div>
+  <?php endif; ?>
   <?php if ($isMembershipPage && $page && $canView): ?>
     <section class="membership-hero">
       <div class="container membership-hero__inner">
@@ -208,7 +228,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           </article>
         </div>
         <div class="membership-cta">
-          <a class="button primary membership-cta__button" href="/become-a-member">
+          <a class="button primary membership-cta__button" href="/apply.php">
             Apply today
             <span class="membership-cta__arrow" aria-hidden="true">&rarr;</span>
           </a>
@@ -249,7 +269,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <div class="container">
         <h2>Ready to join the community?</h2>
         <p>Complete your application today and join the premier association for Goldwing owners in Australia.</p>
-        <a class="button primary membership-final-cta__button" href="/become-a-member">Apply today</a>
+        <a class="button primary membership-final-cta__button" href="/apply.php">Apply today</a>
       </div>
     </section>
   <?php else: ?>
@@ -271,7 +291,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <div class="container">
         <div class="page-card reveal">
           <?php if ($page && $canView): ?>
-            <div class="page-content"><?= render_media_shortcodes($page['html_content']) ?></div>
+            <div class="page-content"><?= render_media_shortcodes(PageService::liveHtml($page)) ?></div>
             <?php if ($pageSlug === 'ride-calendar'): ?>
               <div class="page-content">
                 <iframe title="Ride calendar" src="/calendar/events_public.php" style="width: 100%; min-height: 900px; border: 0;" loading="lazy"></iframe>
@@ -287,6 +307,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         </div>
       </div>
     </section>
+  <?php endif; ?>
+  <?php if ($templateFooter !== ''): ?>
+    <div class="page-builder-template page-builder-template--footer">
+      <?= render_media_shortcodes($templateFooter) ?>
+    </div>
   <?php endif; ?>
 </main>
 <?php

@@ -101,7 +101,7 @@ class NavigationService
     public static function getMenuItemsTree(int $menuId): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT mi.*, p.title AS page_title, p.slug AS page_slug, p.visibility AS page_visibility
+        $stmt = $pdo->prepare('SELECT mi.*, p.title AS page_title, p.slug AS page_slug, p.visibility AS page_visibility, p.access_level AS page_access
             FROM menu_items mi
             LEFT JOIN pages p ON mi.page_id = p.id
             WHERE mi.menu_id = :menu_id
@@ -200,7 +200,7 @@ class NavigationService
     private static function getMenuItemsForPublic(int $menuId): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT mi.*, p.title AS page_title, p.slug AS page_slug, p.visibility AS page_visibility
+        $stmt = $pdo->prepare('SELECT mi.*, p.title AS page_title, p.slug AS page_slug, p.visibility AS page_visibility, p.access_level AS page_access
             FROM menu_items mi
             LEFT JOIN pages p ON mi.page_id = p.id
             WHERE mi.menu_id = :menu_id
@@ -253,13 +253,14 @@ class NavigationService
             'page_title' => $row['page_title'],
             'page_slug' => $row['page_slug'],
             'page_visibility' => $row['page_visibility'],
+            'page_access' => $row['page_access'] ?? null,
             'status' => 'Custom',
         ];
 
         if ($item['page_id']) {
             if (!$row['page_title']) {
                 $item['status'] = 'Missing';
-            } elseif ($row['page_visibility'] !== 'public') {
+            } elseif (($row['page_access'] ?? 'public') !== 'public' || $row['page_visibility'] !== 'public') {
                 $item['status'] = 'Restricted';
             } else {
                 $item['status'] = 'Published';
@@ -294,6 +295,7 @@ class NavigationService
             'url' => $url,
             'page_id' => $row['page_id'] ? (int) $row['page_id'] : null,
             'page_visibility' => $row['page_visibility'],
+            'page_access' => $row['page_access'] ?? null,
             'page_slug' => $row['page_slug'],
             'open_in_new_tab' => (int) $row['open_in_new_tab'] === 1,
         ];
@@ -306,7 +308,7 @@ class NavigationService
             $children = self::filterNavigation($item['children'] ?? [], $user);
             $canView = true;
             if (!empty($item['page_id'])) {
-                $canView = self::canViewPage($item['page_visibility'] ?? 'public', $user);
+                $canView = self::canViewPage($item['page_access'] ?? null, $item['page_visibility'] ?? 'public', $user);
             }
 
             $canAccess = true;
@@ -339,7 +341,7 @@ class NavigationService
     private static function fallbackNavigation(?array $user): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->query('SELECT id, slug, title, visibility FROM pages WHERE visibility = "public" ORDER BY title ASC');
+        $stmt = $pdo->query('SELECT id, slug, title, visibility, access_level FROM pages WHERE visibility = "public" OR access_level = "public" ORDER BY title ASC');
         $rows = $stmt->fetchAll() ?: [];
 
         $items = [];
@@ -354,6 +356,7 @@ class NavigationService
                     'page_id' => (int) $row['id'],
                     'page_slug' => 'home',
                     'page_visibility' => $row['visibility'],
+                    'page_access' => $row['access_level'] ?? null,
                     'open_in_new_tab' => false,
                     'children' => [],
                 ];
@@ -366,6 +369,7 @@ class NavigationService
                 'page_id' => (int) $row['id'],
                 'page_slug' => $row['slug'],
                 'page_visibility' => $row['visibility'],
+                'page_access' => $row['access_level'] ?? null,
                 'open_in_new_tab' => false,
                 'children' => [],
             ];
@@ -376,8 +380,17 @@ class NavigationService
         return $items;
     }
 
-    private static function canViewPage(string $visibility, ?array $user): bool
+    private static function canViewPage(?string $accessLevel, string $visibility, ?array $user): bool
     {
+        if ($accessLevel && $accessLevel !== 'public') {
+            if (!$user) {
+                return false;
+            }
+            if (str_starts_with($accessLevel, 'role:')) {
+                $role = substr($accessLevel, 5);
+                return $role !== '' && in_array($role, $user['roles'] ?? [], true);
+            }
+        }
         if ($visibility === 'public') {
             return true;
         }

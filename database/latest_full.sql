@@ -155,6 +155,10 @@ CREATE TABLE pages (
   slug VARCHAR(120) UNIQUE NOT NULL,
   title VARCHAR(150) NOT NULL,
   html_content MEDIUMTEXT NOT NULL,
+  draft_html MEDIUMTEXT NULL,
+  live_html MEDIUMTEXT NULL,
+  access_level VARCHAR(60) NOT NULL DEFAULT 'public',
+  schema_json MEDIUMTEXT NULL,
   visibility ENUM('public','member','admin') NOT NULL DEFAULT 'public',
   created_at DATETIME NOT NULL,
   updated_at DATETIME NULL
@@ -199,9 +203,26 @@ CREATE TABLE page_versions (
   html_content MEDIUMTEXT NOT NULL,
   created_by INT NOT NULL,
   change_summary VARCHAR(255) NULL,
+  version_number INT NULL,
+  version_label VARCHAR(150) NULL,
+  html_snapshot MEDIUMTEXT NULL,
+  published_by_user_id INT NULL,
+  published_at DATETIME NULL,
   created_at DATETIME NOT NULL,
   FOREIGN KEY (page_id) REFERENCES pages(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE page_chat_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  page_id INT NOT NULL,
+  user_id INT NULL,
+  role ENUM('user','assistant','system') NOT NULL,
+  content MEDIUMTEXT NOT NULL,
+  selected_element_id VARCHAR(80) NULL,
+  created_at DATETIME NOT NULL,
+  FOREIGN KEY (page_id) REFERENCES pages(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE page_ai_revisions (
@@ -232,6 +253,17 @@ CREATE TABLE ai_provider_keys (
   updated_at DATETIME NULL,
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE ai_usage_monthly (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  month_key VARCHAR(7) NOT NULL,
+  provider VARCHAR(40) NOT NULL,
+  total_usd_cents INT NOT NULL DEFAULT 0,
+  total_tokens INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NULL,
+  UNIQUE KEY uniq_usage_month_provider (month_key, provider)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE notices (

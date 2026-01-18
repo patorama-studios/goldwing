@@ -1,0 +1,13 @@
+RewriteEngine On
+RewriteRule ^pages$ api.php?action=pages [QSA,L]
+RewriteRule ^pages/create$ api.php?action=create_page [QSA,L]
+RewriteRule ^pages/([0-9]+)$ api.php?action=page&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/draft$ api.php?action=save_draft&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/publish$ api.php?action=publish&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/versions$ api.php?action=versions&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/rollback$ api.php?action=rollback&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/ai-edit$ api.php?action=ai_edit&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/manual-edit$ api.php?action=manual_edit&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/image-generate$ api.php?action=image_generate&id=$1 [QSA,L]
+RewriteRule ^pages/([0-9]+)/access$ api.php?action=access&id=$1 [QSA,L]
+RewriteRule ^settings$ api.php?action=settings [QSA,L]

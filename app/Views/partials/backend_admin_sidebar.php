@@ -10,6 +10,7 @@ $settingsChildren = [
     ['key' => 'settings-integrations', 'label' => 'Integrations', 'href' => '/admin/settings/index.php?section=integrations', 'path' => '/admin/settings/index.php'],
     ['key' => 'settings-media', 'label' => 'Media & Files', 'href' => '/admin/settings/index.php?section=media', 'path' => '/admin/settings/index.php'],
     ['key' => 'settings-events', 'label' => 'Events', 'href' => '/admin/settings/index.php?section=events', 'path' => '/admin/settings/index.php'],
+    ['key' => 'settings-ai', 'label' => 'AI Settings', 'href' => '/admin/settings/ai.php', 'path' => '/admin/settings/ai.php'],
     ['key' => 'settings-membership', 'label' => 'Membership Settings', 'href' => '/admin/settings/index.php?section=membership_pricing', 'path' => '/admin/settings/index.php'],
     ['key' => 'settings-audit-log', 'label' => 'Audit Log', 'href' => '/admin/settings/index.php?section=audit', 'path' => '/admin/settings/index.php'],
     ['key' => 'settings-advanced', 'label' => 'Advanced / Developer', 'href' => '/admin/settings/index.php?section=advanced', 'path' => '/admin/settings/index.php'],
@@ -38,7 +39,7 @@ $items = [
     ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings'],
     ['key' => 'media', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media'],
     ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/admin/store/products'],
-    ['key' => 'ai-editor', 'label' => 'AI Editor (comming soon)', 'icon' => 'smart_toy', 'href' => '/admin/index.php?page=ai-editor'],
+    ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder'],
 ];
 $user = $user ?? current_user();
 if (function_exists('can_access_path')) {
@@ -64,7 +65,7 @@ if (function_exists('can_access_path')) {
     $items = $filteredItems;
 }
 $activePage = $activePage ?? 'dashboard';
-$settingsActiveKeys = ['settings', 'security-log', 'reports', 'audit'];
+$settingsActiveKeys = ['settings', 'security-log', 'reports', 'audit', 'settings-ai'];
 $isSettingsActive = in_array($activePage, $settingsActiveKeys, true);
 // Keep the admin sidebar logo consistent with the member area.
 $logoUrl = '/uploads/library/2023/good-logo-cropped.png';

@@ -392,6 +392,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           return button;
         };
 
+        if (item.page_id) {
+          actions.appendChild(makeIconButton('smart_toy', 'Open AI builder', () => {
+            window.location.href = `/admin/page-builder?page_id=${item.page_id}`;
+          }, 'accent'));
+        }
         actions.appendChild(makeIconButton('arrow_upward', 'Move up', () => moveItem(item.id, -1)));
         actions.appendChild(makeIconButton('arrow_downward', 'Move down', () => moveItem(item.id, 1)));
         actions.appendChild(makeIconButton('subdirectory_arrow_right', 'Indent', () => indentItem(item.id)));
@@ -653,6 +658,18 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         label.appendChild(document.createTextNode(`${page.title} (${page.slug})`));
 
         row.appendChild(label);
+        const aiBtn = document.createElement('button');
+        aiBtn.type = 'button';
+        aiBtn.className = 'p-2 rounded-lg text-secondary hover:bg-emerald-50';
+        aiBtn.title = 'Open AI builder';
+        const aiIcon = document.createElement('span');
+        aiIcon.className = 'material-icons-outlined text-base';
+        aiIcon.textContent = 'smart_toy';
+        aiBtn.appendChild(aiIcon);
+        aiBtn.addEventListener('click', () => {
+          window.location.href = `/admin/page-builder?page_id=${page.id}`;
+        });
+        row.appendChild(aiBtn);
         pageList.appendChild(row);
       });
     };
