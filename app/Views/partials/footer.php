@@ -4,10 +4,11 @@ use App\Services\SettingsService;
 $siteName = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $showFooter = SettingsService::getGlobal('site.show_footer', true);
 $legal = SettingsService::getGlobal('site.legal_urls', []);
+$suppressFooterMarkup = $suppressFooterMarkup ?? false;
 $privacyUrl = is_array($legal) ? ($legal['privacy'] ?? '') : '';
 $termsUrl = is_array($legal) ? ($legal['terms'] ?? '') : '';
 ?>
-<?php if ($showFooter): ?>
+<?php if ($showFooter && !$suppressFooterMarkup): ?>
 <footer class="footer">
   <div class="container footer__inner">
     <div class="footer__brand"><?= e($siteName) ?></div>

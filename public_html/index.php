@@ -308,11 +308,12 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       </div>
     </section>
   <?php endif; ?>
-  <?php if ($templateFooter !== ''): ?>
-    <div class="page-builder-template page-builder-template--footer">
-      <?= render_media_shortcodes($templateFooter) ?>
-    </div>
-  <?php endif; ?>
 </main>
+<?php if ($templateFooter !== ''): ?>
+  <div class="page-builder-template page-builder-template--footer">
+    <?= render_media_shortcodes($templateFooter) ?>
+  </div>
+<?php endif; ?>
 <?php
+$suppressFooterMarkup = $templateFooter !== '';
 require __DIR__ . '/../app/Views/partials/footer.php';

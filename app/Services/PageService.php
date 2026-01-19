@@ -15,7 +15,31 @@ class PageService
     public static function listEditablePages(): array
     {
         $pdo = Database::connection();
+        self::ensureHomePage();
         return $pdo->query('SELECT id, slug, title, draft_html, live_html, access_level, updated_at FROM pages ORDER BY title ASC')->fetchAll() ?: [];
+    }
+
+    public static function ensureHomePage(): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id FROM pages WHERE slug = :slug LIMIT 1');
+        $stmt->execute(['slug' => 'home']);
+        if ($stmt->fetch()) {
+            return;
+        }
+
+        $title = 'Welcome to the Australian Goldwing Association';
+        $html = '<p>Australian Goldwing Association is the national home for riders, chapters, and the open road.</p>';
+        $stmt = $pdo->prepare('INSERT INTO pages (slug, title, html_content, draft_html, live_html, access_level, visibility, created_at) VALUES (:slug, :title, :html_content, :draft_html, :live_html, :access_level, :visibility, NOW())');
+        $stmt->execute([
+            'slug' => 'home',
+            'title' => $title,
+            'html_content' => $html,
+            'draft_html' => $html,
+            'live_html' => $html,
+            'access_level' => 'public',
+            'visibility' => 'public',
+        ]);
     }
 
     public static function draftHtml(array $page): string

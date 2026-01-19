@@ -96,6 +96,22 @@ function normalize_ai_response(string $content): array
     ];
 }
 
+function default_template_html(string $scope): string
+{
+    if ($scope === 'header') {
+        ob_start();
+        require __DIR__ . '/../../../app/Views/partials/nav_public.php';
+        return ob_get_clean() ?: '';
+    }
+    if ($scope === 'footer') {
+        ob_start();
+        require __DIR__ . '/../../../app/Views/partials/footer.php';
+        $html = ob_get_clean() ?: '';
+        return preg_replace('/<\/body>.*$/s', '', $html);
+    }
+    return '';
+}
+
 function generate_image_openai(string $prompt): array
 {
     $apiKey = AiProviderKeyService::getKey('openai');
@@ -321,6 +337,12 @@ if ($method === 'GET') {
         $live = PageService::liveHtml($page);
         $headerTemplate = (string) SettingsService::getGlobal('ai.template_header_html', '');
         $footerTemplate = (string) SettingsService::getGlobal('ai.template_footer_html', '');
+        if ($headerTemplate === '') {
+            $headerTemplate = default_template_html('header');
+        }
+        if ($footerTemplate === '') {
+            $footerTemplate = default_template_html('footer');
+        }
 
         $pdo = db();
         $stmt = $pdo->prepare('SELECT id, version_number, version_label, published_by_user_id, published_at FROM page_versions WHERE page_id = :page_id AND published_at IS NOT NULL ORDER BY version_number DESC');
@@ -394,7 +416,16 @@ if ($rawUploadAction && $method === 'POST') {
 
     $allowedTypes = SettingsService::getGlobal('media.allowed_types', []);
     if (!is_array($allowedTypes) || empty($allowedTypes)) {
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        $allowedTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'application/pdf',
+            'text/html',
+            'application/xhtml+xml',
+            'text/plain',
+        ];
     }
     $file = $_FILES['file'];
     if (!empty($file['error'])) {
@@ -417,6 +448,9 @@ if ($rawUploadAction && $method === 'POST') {
         'image/gif' => 'gif',
         'image/webp' => 'webp',
         'application/pdf' => 'pdf',
+        'text/html' => 'html',
+        'application/xhtml+xml' => 'html',
+        'text/plain' => 'txt',
     ];
     $extension = $extensionMap[$mime] ?? 'bin';
 
@@ -432,7 +466,13 @@ if ($rawUploadAction && $method === 'POST') {
         json_response(['error' => 'Unable to save upload.'], 500);
     }
 
-    $type = $mime === 'application/pdf' ? 'pdf' : 'image';
+    if ($mime === 'application/pdf') {
+        $type = 'pdf';
+    } elseif (str_starts_with($mime, 'image/')) {
+        $type = 'image';
+    } else {
+        $type = 'file';
+    }
     $url = '/uploads/media/' . $safeName;
     $title = trim((string) ($_POST['title'] ?? $file['name']));
     $visibility = SettingsService::getGlobal('media.privacy_default', 'member');
@@ -636,6 +676,9 @@ if ($method === 'POST') {
         }
         if ($templateScope !== '') {
             $currentTemplate = (string) SettingsService::getGlobal('ai.template_' . $templateScope . '_html', '');
+            if ($currentTemplate === '') {
+                $currentTemplate = default_template_html($templateScope);
+            }
             $currentTemplate = PageBuilderService::ensureDraftHtml($currentTemplate);
             [$ok, $updatedTemplate, $error] = PageBuilderService::replaceElementHtml($currentTemplate, $elementId, $updatedHtml);
             if (!$ok) {
@@ -736,6 +779,9 @@ if ($method === 'POST') {
 
         if ($templateScope !== '') {
             $currentTemplate = (string) SettingsService::getGlobal('ai.template_' . $templateScope . '_html', '');
+            if ($currentTemplate === '') {
+                $currentTemplate = default_template_html($templateScope);
+            }
             $currentTemplate = PageBuilderService::ensureDraftHtml($currentTemplate);
             if ($mode === 'page') {
                 $updatedTemplate = PageBuilderService::ensureDraftHtml($parsed['updated_html']);

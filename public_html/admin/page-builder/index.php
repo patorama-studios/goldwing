@@ -229,6 +229,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <button id="media-upload" class="w-full rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white">Upload</button>
           <div id="media-result" class="text-xs text-gray-500"></div>
           <button id="media-use" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hidden">Use in selected image</button>
+          <button id="media-reference" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hidden">Add to AI prompt</button>
         </div>
         <div class="mt-6">
           <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Menu Builder</div>
@@ -359,6 +360,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     const mediaUpload = document.getElementById('media-upload');
     const mediaResult = document.getElementById('media-result');
     const mediaUse = document.getElementById('media-use');
+    const mediaReference = document.getElementById('media-reference');
     const newPageBtn = document.getElementById('new-page');
     const newPageModal = document.getElementById('new-page-modal');
     const newPagePrompt = document.getElementById('new-page-prompt');
@@ -377,7 +379,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         header: '',
         footer: ''
       },
-      lastMedia: null
+      lastMedia: null,
+      lastReferenceContent: '',
+      lastReferenceName: ''
     };
 
     const apiRequest = async (path, options = {}) => {
@@ -482,6 +486,13 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     };
 
     const updateElementPanel = () => {
+      if (mediaReference) {
+        if (state.lastMedia) {
+          mediaReference.classList.remove('hidden');
+        } else {
+          mediaReference.classList.add('hidden');
+        }
+      }
       if (!state.selected) {
         elementMeta.textContent = 'Click an element in the preview.';
         elementSnippet.textContent = '';
@@ -849,9 +860,25 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         if (!mediaFile || !mediaFile.files || !mediaFile.files.length) {
           return;
         }
+        const file = mediaFile.files[0];
+        const isHtmlRef = file && (file.type === 'text/html' || file.type === 'application/xhtml+xml' || file.type === 'text/plain' || file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm'));
+        if (isHtmlRef) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const raw = String(reader.result || '');
+            const maxChars = 8000;
+            const trimmed = raw.length > maxChars ? `${raw.slice(0, maxChars)}\n...[truncated]` : raw;
+            state.lastReferenceContent = trimmed;
+            state.lastReferenceName = file.name || 'reference';
+          };
+          reader.readAsText(file);
+        } else {
+          state.lastReferenceContent = '';
+          state.lastReferenceName = '';
+        }
         const formData = new FormData();
-        formData.append('file', mediaFile.files[0]);
-        formData.append('title', mediaFile.files[0].name || '');
+        formData.append('file', file);
+        formData.append('title', file.name || '');
         formData.append('csrf_token', csrfToken);
         try {
           const res = await fetch(apiUrl('upload_media'), {
@@ -866,6 +893,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           state.lastMedia = data;
           mediaResult.textContent = `Uploaded: ${data.url} (ID ${data.id}) — [media:${data.id}]`;
           mediaUse.classList.remove('hidden');
+          if (mediaReference) {
+            mediaReference.classList.remove('hidden');
+          }
         } catch (err) {
           mediaResult.textContent = err.message || 'Upload failed.';
         }
@@ -897,6 +927,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         }
         postToPreview({ type: 'gw-update-html', html: state.draftHtml });
         loadPage(state.currentPage.id);
+      });
+    }
+
+    if (mediaReference) {
+      mediaReference.addEventListener('click', () => {
+        if (!state.lastMedia) {
+          return;
+        }
+        const refLines = [];
+        if (state.lastReferenceContent) {
+          refLines.push(`Reference HTML (${state.lastReferenceName || 'upload'}):`);
+          refLines.push(state.lastReferenceContent);
+        } else if (state.lastMedia.type === 'image') {
+          refLines.push(`Reference image URL: ${state.lastMedia.url}`);
+        } else {
+          refLines.push(`Reference file: ${state.lastMedia.url}`);
+        }
+        const refText = refLines.join('\n');
+        const spacer = chatInput.value.trim() === '' ? '' : '\n\n';
+        chatInput.value = `${chatInput.value}${spacer}${refText}`;
+        chatInput.focus();
       });
     }
 

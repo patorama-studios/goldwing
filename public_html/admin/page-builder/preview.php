@@ -49,6 +49,12 @@ ob_start();
 require __DIR__ . '/../../../app/Views/partials/footer.php';
 $siteFooterHtml = ob_get_clean();
 $siteFooterHtml = preg_replace('/<\/body>.*$/s', '', $siteFooterHtml);
+if ($footerTemplate === '') {
+    $footerTemplate = PageBuilderService::ensureDraftHtml($siteFooterHtml);
+}
+if ($footerTemplate !== '') {
+    $siteFooterHtml = '';
+}
 
 if ($draftHtml !== ($page['draft_html'] ?? '')) {
     PageService::updateDraft($pageId, $draftHtml, (string) ($page['access_level'] ?? 'public'));
@@ -95,13 +101,13 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
             <div id="gw-preview-root"><?= $draftHtml ?></div>
           </div>
         </div>
-      </section>
-      <?php if ($footerTemplate !== ''): ?>
-        <div class="page-builder-template page-builder-template--footer" data-gw-template="footer" data-gw-el="gw-template-footer">
-          <?= render_media_shortcodes($footerTemplate) ?>
-        </div>
-      <?php endif; ?>
+    </section>
     </main>
+    <?php if ($footerTemplate !== ''): ?>
+      <div class="page-builder-template page-builder-template--footer" data-gw-template="footer" data-gw-el="gw-template-footer">
+        <?= render_media_shortcodes($footerTemplate) ?>
+      </div>
+    <?php endif; ?>
     <?= $siteFooterHtml ?>
   </div>
   <script>
