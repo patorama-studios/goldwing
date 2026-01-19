@@ -116,6 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!Validator::required($firstName) || !Validator::required($lastName) || !Validator::email($email)) {
             $error = 'Please provide your name and a valid email address.';
+        } elseif (!MemberRepository::isEmailAvailable($email, (int) ($member['id'] ?? 0))) {
+            $error = 'That email address is already linked to another member.';
         } elseif (!$termsAccepted) {
             $error = 'Please accept the terms and conditions.';
         }

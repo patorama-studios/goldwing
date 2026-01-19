@@ -20,6 +20,60 @@ use App\Services\NotificationPreferenceService;
 
 require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
 
+function orders_member_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'member_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'member_id';
+            return $column;
+        }
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'user_id';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = '';
+    return $column;
+}
+
+function orders_member_value(?array $member, int $memberId, string $column): ?int
+{
+    if ($column === 'member_id') {
+        return $memberId > 0 ? $memberId : null;
+    }
+    if ($column === 'user_id') {
+        return !empty($member['user_id']) ? (int) $member['user_id'] : null;
+    }
+    return null;
+}
+
+function orders_payment_status_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_status'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'payment_status';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = 'status';
+    return $column;
+}
+
 $user = current_user();
 $chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
 $memberId = (int) ($_GET['id'] ?? 0);
@@ -136,10 +190,17 @@ try {
 $membershipOrders = [];
 $membershipOrderItems = [];
 $membershipPeriodById = [];
+$ordersMemberColumn = orders_member_column($pdo);
+$ordersMemberValue = $ordersMemberColumn ? orders_member_value($member, $memberId, $ordersMemberColumn) : null;
+$ordersPaymentStatusColumn = orders_payment_status_column($pdo);
 try {
-    $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" ORDER BY created_at DESC LIMIT 25');
-    $stmt->execute(['member_id' => $memberId]);
-    $membershipOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($ordersMemberColumn && $ordersMemberValue) {
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC LIMIT 25');
+        $stmt->execute(['value' => $ordersMemberValue]);
+        $membershipOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $membershipOrders = [];
+    }
     $latestPayment = $membershipOrders[0] ?? null;
     $orderIds = array_column($membershipOrders, 'id');
     if ($orderIds) {
@@ -363,11 +424,13 @@ $canEditContact = AdminMemberAccess::canEditContact($user);
 $canEditAddress = AdminMemberAccess::canEditAddress($user);
 $canResetPassword = AdminMemberAccess::canResetPassword($user);
 $canSetPassword = AdminMemberAccess::canSetPassword($user);
+$canImpersonate = AdminMemberAccess::canImpersonate($user);
 $canRefund = AdminMemberAccess::canRefund($user);
 $canManualFix = AdminMemberAccess::canManualOrderFix($user);
 $canManageVehicles = AdminMemberAccess::canManageVehicles($user);
 $canEditRoles = AdminMemberAccess::isFullAccess($user);
 $canEditSettings = AdminMemberAccess::isFullAccess($user);
+$memberHasUser = !empty($member['user_id']);
 
 $flash = $_SESSION['members_flash'] ?? null;
 $flashContext = $flash['context'] ?? null;
@@ -799,6 +862,23 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     Quick Actions
                   </h3>
                   <div class="space-y-3 mb-8">
+                    <?php if ($canImpersonate && $memberHasUser): ?>
+                      <form method="post" action="/admin/members/actions.php">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                        <input type="hidden" name="tab" value="overview">
+                        <input type="hidden" name="action" value="impersonate_member">
+                        <button class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-primary shadow-sm text-sm font-semibold rounded-lg text-white bg-primary hover:bg-primary/90 transition-all">
+                          <span class="material-icons-outlined mr-2 text-[18px]">visibility</span>
+                          View as Member
+                        </button>
+                      </form>
+                    <?php else: ?>
+                      <button class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-gray-200 shadow-sm text-sm font-medium rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed" type="button" disabled>
+                        <span class="material-icons-outlined mr-2 text-[18px]">visibility</span>
+                        View as Member
+                      </button>
+                    <?php endif; ?>
                     <?php if ($canResetPassword): ?>
                       <form method="post" action="/admin/members/actions.php">
                         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
@@ -1493,15 +1573,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <div class="rounded-3xl border border-gray-200 bg-yellow-50 p-4 text-sm font-semibold text-yellow-700">You do not have permission to manage vehicles.</div>
             <?php else: ?>
               <div class="space-y-6">
-                <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h2 class="text-lg font-semibold text-gray-900">Vehicles</h2>
-                      <p class="text-sm text-gray-500">Record each motorcycle, trailer, or support vehicle attached to this member.</p>
-                    </div>
-                    <span class="text-sm text-gray-500"><?= count($vehicles) ?> stored</span>
-                  </div>
-                </div>
                 <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
                   <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-3">
@@ -1518,7 +1589,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php if ($bikes): ?>
                     <ul class="space-y-3 text-sm text-gray-700">
                       <?php foreach ($bikes as $bike): ?>
-                        <li class="rounded-xl border border-gray-100 bg-white p-3">
+                        <li class="rounded-xl border border-gray-100 bg-white p-3 space-y-3">
                           <div class="flex gap-3">
                             <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
                                 <?php if (!empty($bike['image_url'])): ?>
@@ -1553,6 +1624,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               </form>
                             <?php endif; ?>
                           </div>
+                          <?php if ($canManageVehicles): ?>
+                            <?php $bikeId = (int) $bike['id']; ?>
+                            <form method="post" action="/admin/members/actions.php" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                              <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                              <input type="hidden" name="tab" value="vehicles">
+                              <input type="hidden" name="action" value="bike_update">
+                              <input type="hidden" name="bike_id" value="<?= e((string) $bikeId) ?>">
+                              <input type="text" name="bike_make" value="<?= e($bike['make'] ?? '') ?>" placeholder="Make" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_model" value="<?= e($bike['model'] ?? '') ?>" placeholder="Model" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="number" name="bike_year" value="<?= e($bike['year'] ?? '') ?>" placeholder="Year" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_color" value="<?= e($bikeColor ?? '') ?>" placeholder="Colour" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_rego" value="<?= e($bike['rego'] ?? '') ?>" placeholder="Rego" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <div class="flex items-center gap-3">
+                                <div id="bike-image-preview-<?= e((string) $bikeId) ?>" class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
+                                  <?php if (!empty($bike['image_url'])): ?>
+                                    <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>" class="h-full w-full object-cover">
+                                  <?php else: ?>
+                                    <span class="material-icons-outlined">image</span>
+                                  <?php endif; ?>
+                                </div>
+                                <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>" value="<?= e($bike['image_url'] ?? '') ?>">
+                                <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>" data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>" data-upload-context="bikes">Update bike image</button>
+                              </div>
+                              <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Save changes</button>
+                            </form>
+                          <?php endif; ?>
                         </li>
                       <?php endforeach; ?>
                     </ul>
@@ -1580,115 +1678,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Add Bike</button>
                     </form>
                   <?php endif; ?>
-                </div>
-                <div class="space-y-4">
-                  <?php foreach ($vehicles as $index => $vehicle): ?>
-                    <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-                      <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Vehicle <?= $index + 1 ?> <?= (int) $vehicle['is_primary'] === 1 ? '• Primary' : '' ?></p>
-                          <h3 class="text-lg font-semibold text-gray-900"><?= e(trim((($vehicle['make'] ?? '') . ' ' . ($vehicle['model'] ?? '')))) ?: 'Vehicle' ?></h3>
-                          <p class="text-sm text-gray-500"><?= e(ucfirst($vehicle['vehicle_type'] ?? '')) ?> <?= $vehicle['year_exact'] ? '(' . e($vehicle['year_exact']) . ')' : '' ?></p>
-                        </div>
-                        <span class="text-xs text-gray-500">Added <?= e(formatDate($vehicle['created_at'])) ?></span>
-                      </div>
-                      <form method="post" action="/admin/members/actions.php" class="space-y-4">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                        <input type="hidden" name="tab" value="vehicles">
-                        <input type="hidden" name="action" value="vehicle_update">
-                        <input type="hidden" name="vehicle_id" value="<?= e($vehicle['id']) ?>">
-                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          <label class="text-sm font-medium text-gray-700">
-                            Make
-                            <input type="text" name="make" value="<?= e($vehicle['make'] ?? '') ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          </label>
-                          <label class="text-sm font-medium text-gray-700">
-                            Model
-                            <input type="text" name="model" value="<?= e($vehicle['model'] ?? '') ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          </label>
-                          <label class="text-sm font-medium text-gray-700">
-                            Type
-                            <select name="vehicle_type" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                              <?php foreach (VehicleRepository::ALLOWED_TYPES as $type): ?>
-                                <option value="<?= e($type) ?>" <?= $vehicle['vehicle_type'] === $type ? 'selected' : '' ?>><?= ucfirst($type) ?></option>
-                              <?php endforeach; ?>
-                            </select>
-                          </label>
-                        </div>
-                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          <label class="text-sm font-medium text-gray-700">
-                            Exact year
-                            <input type="number" name="year_exact" min="1900" max="2100" value="<?= e($vehicle['year_exact'] ?? '') ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          </label>
-                          <label class="text-sm font-medium text-gray-700">
-                            Year from
-                            <input type="number" name="year_from" min="1900" max="2100" value="<?= e($vehicle['year_from'] ?? '') ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          </label>
-                          <label class="text-sm font-medium text-gray-700">
-                            Year to
-                            <input type="number" name="year_to" min="1900" max="2100" value="<?= e($vehicle['year_to'] ?? '') ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          </label>
-                        </div>
-                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                          <input type="checkbox" name="is_primary" value="1" <?= (int) $vehicle['is_primary'] === 1 ? 'checked' : '' ?> class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                          Primary vehicle
-                        </label>
-                        <div class="flex flex-wrap gap-2">
-                          <button type="submit" class="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-gray-900">Save vehicle</button>
-                        </div>
-                      </form>
-                      <form method="post" action="/admin/members/actions.php" onsubmit="return confirm('Delete this vehicle?');">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                        <input type="hidden" name="tab" value="vehicles">
-                        <input type="hidden" name="action" value="vehicle_delete">
-                        <input type="hidden" name="vehicle_id" value="<?= e($vehicle['id']) ?>">
-                        <button type="submit" class="w-full rounded-full border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">Delete vehicle</button>
-                      </form>
-                    </div>
-                  <?php endforeach; ?>
-                </div>
-                <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-                  <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Add vehicle</h3>
-                    <p class="text-sm text-gray-500">Add additional motorcycles, trikes, or trailers for this member.</p>
-                  </div>
-                  <form method="post" action="/admin/members/actions.php" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                    <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                    <input type="hidden" name="tab" value="vehicles">
-                    <input type="hidden" name="action" value="vehicle_create">
-                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <label class="text-sm font-medium text-gray-700">
-                        Make
-                        <input type="text" name="make" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                      </label>
-                      <label class="text-sm font-medium text-gray-700">
-                        Model
-                        <input type="text" name="model" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                      </label>
-                      <label class="text-sm font-medium text-gray-700">
-                        Type
-                        <select name="vehicle_type" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          <?php foreach (VehicleRepository::ALLOWED_TYPES as $type): ?>
-                            <option value="<?= e($type) ?>"><?= ucfirst($type) ?></option>
-                          <?php endforeach; ?>
-                        </select>
-                      </label>
-                    </div>
-                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <label class="text-sm font-medium text-gray-700">
-                        Model year
-                        <input type="number" name="year_exact" min="1900" max="2100" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                      </label>
-                    </div>
-                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <input type="checkbox" name="is_primary" value="1" class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                      Set as primary
-                    </label>
-                    <button type="submit" class="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-gray-900">Add vehicle</button>
-                  </form>
                 </div>
               </div>
             <?php endif; ?>

@@ -236,6 +236,9 @@ class MemberRepository
 
     public static function update(int $memberId, array $payload): bool
     {
+        if (array_key_exists('email', $payload) && !self::isEmailAvailable((string) $payload['email'], $memberId)) {
+            return false;
+        }
         $fields = [];
         $params = ['id' => $memberId];
         $pdo = Database::connection();
@@ -334,6 +337,25 @@ class MemberRepository
             }
             throw $exception;
         }
+    }
+
+    public static function isEmailAvailable(?string $email, ?int $excludeMemberId = null): bool
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return true;
+        }
+        $pdo = Database::connection();
+        $sql = 'SELECT id FROM members WHERE LOWER(email) = LOWER(:email)';
+        $params = ['email' => $email];
+        if ($excludeMemberId) {
+            $sql .= ' AND id != :exclude_id';
+            $params['exclude_id'] = $excludeMemberId;
+        }
+        $sql .= ' LIMIT 1';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return !$stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public static function directoryPreferences(): array

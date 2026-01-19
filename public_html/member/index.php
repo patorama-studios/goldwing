@@ -170,6 +170,25 @@ function orders_member_value(array $member, array $user, string $column): ?int
     return null;
 }
 
+function orders_payment_status_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_status'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'payment_status';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = 'status';
+    return $column;
+}
+
 
 if ($user && $user['member_id']) {
     $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
@@ -179,6 +198,7 @@ if ($user && $user['member_id']) {
     if ($member) {
         $ordersMemberColumn = orders_member_column($pdo);
         $ordersMemberValue = $ordersMemberColumn ? orders_member_value($member, $user ?? [], $ordersMemberColumn) : null;
+        $ordersPaymentStatusColumn = orders_payment_status_column($pdo);
         $memberActivity = ActivityRepository::listByMember((int) $member['id'], [], 60);
         $memberActivity = array_values(array_filter($memberActivity, function ($entry) {
             if (empty($entry['metadata'])) {
@@ -222,6 +242,9 @@ if ($user && $user['member_id']) {
                     $profileError = 'You do not have permission to update this profile.';
                 } else {
                     $newEmail = trim($_POST['email'] ?? $targetMember['email']);
+                    if (!MemberRepository::isEmailAvailable($newEmail, $targetMemberId)) {
+                        $profileError = 'That email address is already linked to another member.';
+                    } else {
                     $payload = [
                         'email' => $newEmail,
                         'phone' => trim($_POST['phone'] ?? ''),
@@ -246,6 +269,7 @@ if ($user && $user['member_id']) {
                         $profileMessage = $targetMemberId === (int) $member['id'] ? 'Profile updated.' : 'Linked profile updated.';
                     } else {
                         $profileError = 'Unable to save profile changes.';
+                    }
                     }
                 }
             } elseif ($_POST['action'] === 'request_chapter') {
@@ -322,6 +346,73 @@ if ($user && $user['member_id']) {
                     $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
                     $stmt->execute($params);
                     $profileMessage = 'Bike added.';
+                }
+            } elseif ($_POST['action'] === 'update_bike') {
+                $bikeId = (int) ($_POST['bike_id'] ?? 0);
+                $make = trim($_POST['bike_make'] ?? '');
+                $model = trim($_POST['bike_model'] ?? '');
+                $year = (int) ($_POST['bike_year'] ?? 0);
+                $rego = trim($_POST['bike_rego'] ?? '');
+                $imageUrl = trim($_POST['bike_image_url'] ?? '');
+                $color = trim($_POST['bike_color'] ?? '');
+                $targetBikeMemberId = (int) ($_POST['profile_member_id'] ?? $member['id']);
+                $canUpdateBike = $targetBikeMemberId === (int) $member['id'];
+
+                if (!$canUpdateBike && in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
+                    $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id AND full_member_id = :full_id');
+                    $stmt->execute(['id' => $targetBikeMemberId, 'full_id' => $member['id']]);
+                    $canUpdateBike = (bool) $stmt->fetchColumn();
+                }
+
+                if (
+                    !$canUpdateBike
+                    && $member['member_type'] === 'ASSOCIATE'
+                    && !empty($member['full_member_id'])
+                    && $targetBikeMemberId === (int) $member['full_member_id']
+                ) {
+                    $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id');
+                    $stmt->execute(['id' => $targetBikeMemberId]);
+                    $canUpdateBike = (bool) $stmt->fetchColumn();
+                }
+
+                if (!$canUpdateBike || $bikeId <= 0) {
+                    $profileError = 'You do not have permission to update bikes for this profile.';
+                } elseif ($make === '' || $model === '') {
+                    $profileError = 'Make and model are required.';
+                } else {
+                    $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+                    $hasRego = in_array('rego', $bikeColumns, true);
+                    $hasImage = in_array('image_url', $bikeColumns, true);
+                    $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
+
+                    $fields = ['make = :make', 'model = :model', 'year = :year'];
+                    $params = [
+                        'make' => $make,
+                        'model' => $model,
+                        'year' => $year ?: null,
+                        'id' => $bikeId,
+                        'member_id' => $targetBikeMemberId,
+                    ];
+                    if ($hasRego) {
+                        $fields[] = 'rego = :rego';
+                        $params['rego'] = $rego !== '' ? $rego : null;
+                    }
+                    if ($hasImage) {
+                        $fields[] = 'image_url = :image_url';
+                        $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
+                    }
+                    if ($hasColor) {
+                        if (in_array('color', $bikeColumns, true)) {
+                            $fields[] = 'color = :color';
+                            $params['color'] = $color !== '' ? $color : null;
+                        } elseif (in_array('colour', $bikeColumns, true)) {
+                            $fields[] = 'colour = :colour';
+                            $params['colour'] = $color !== '' ? $color : null;
+                        }
+                    }
+                    $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
+                    $stmt->execute($params);
+                    $profileMessage = 'Bike updated.';
                 }
             } elseif ($_POST['action'] === 'delete_bike') {
                 $bikeId = (int) ($_POST['bike_id'] ?? 0);
@@ -481,7 +572,11 @@ if ($user && $user['member_id']) {
                             $billingError = 'Unable to start checkout for this order.';
                         } else {
                             OrderService::updateStripeSession($orderId, $session['id']);
-                            $stmt = $pdo->prepare('UPDATE orders SET payment_method = "stripe", payment_status = "pending", status = "pending", updated_at = NOW() WHERE id = :id');
+                            $updateFields = ['payment_method = "stripe"', 'status = "pending"', 'updated_at = NOW()'];
+                            if (!empty($ordersPaymentStatusColumn) && $ordersPaymentStatusColumn !== 'status') {
+                                $updateFields[] = 'payment_status = "pending"';
+                            }
+                            $stmt = $pdo->prepare('UPDATE orders SET ' . implode(', ', $updateFields) . ' WHERE id = :id');
                             $stmt->execute(['id' => $orderId]);
                             header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
                             exit;
@@ -496,7 +591,7 @@ if ($user && $user['member_id']) {
                 } else {
                     $pendingOrderId = 0;
                     if ($ordersMemberColumn && $ordersMemberValue) {
-                        $stmt = $pdo->prepare('SELECT id FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND payment_status = "pending" ORDER BY created_at DESC LIMIT 1');
+                        $stmt = $pdo->prepare('SELECT id FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' = "pending" ORDER BY created_at DESC LIMIT 1');
                         $stmt->execute(['value' => $ordersMemberValue]);
                         $pendingOrderId = (int) $stmt->fetchColumn();
                     }
@@ -1807,7 +1902,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php if ($bikes): ?>
                     <ul class="space-y-3 text-sm text-gray-700">
                       <?php foreach ($bikes as $bike): ?>
-                        <li class="rounded-xl border border-gray-100 bg-white p-3">
+                        <li class="rounded-xl border border-gray-100 bg-white p-3 space-y-3">
                           <div class="flex gap-3">
                             <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
                               <?php if (!empty($bike['image_url'])): ?>
@@ -1841,6 +1936,32 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                               </form>
                             <?php endif; ?>
                           </div>
+                          <?php if ($canManageProfileBikes): ?>
+                            <?php $bikeId = (int) $bike['id']; ?>
+                            <form method="post" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                              <input type="hidden" name="action" value="update_bike">
+                              <input type="hidden" name="bike_id" value="<?= e((string) $bikeId) ?>">
+                              <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                              <input type="text" name="bike_make" value="<?= e($bike['make'] ?? '') ?>" placeholder="Make" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_model" value="<?= e($bike['model'] ?? '') ?>" placeholder="Model" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="number" name="bike_year" value="<?= e($bike['year'] ?? '') ?>" placeholder="Year" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_color" value="<?= e($bikeColor ?? '') ?>" placeholder="Colour" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_rego" value="<?= e($bike['rego'] ?? '') ?>" placeholder="Rego" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <div class="flex items-center gap-3">
+                                <div id="bike-image-preview-<?= e((string) $bikeId) ?>" class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
+                                  <?php if (!empty($bike['image_url'])): ?>
+                                    <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>" class="h-full w-full object-cover">
+                                  <?php else: ?>
+                                    <span class="material-icons-outlined">image</span>
+                                  <?php endif; ?>
+                                </div>
+                                <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>" value="<?= e($bike['image_url'] ?? '') ?>">
+                                <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>" data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>" data-upload-context="bikes">Update bike image</button>
+                              </div>
+                              <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Save changes</button>
+                            </form>
+                          <?php endif; ?>
                         </li>
                       <?php endforeach; ?>
                     </ul>
@@ -2523,7 +2644,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 $pendingPeriod = $stmt->fetch();
                 $pendingMembershipOrder = null;
                 if ($ordersMemberColumn && $ordersMemberValue) {
-                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
                     $stmt->execute(['value' => $ordersMemberValue]);
                     $pendingMembershipOrder = $stmt->fetch();
                 }

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityLogger;
+use App\Services\AuthService;
 use App\Services\BaseUrlService;
 use App\Services\Csrf;
 use App\Services\Database;
@@ -332,12 +333,64 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_delete'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
 
 switch ($action) {
+    case 'impersonate_member':
+        if (!AdminMemberAccess::canImpersonate($user)) {
+            redirectWithFlash($memberId, $tab, 'You are not authorized to impersonate members.', 'error');
+        }
+        $pdo = Database::connection();
+        $memberUser = null;
+        if (!empty($member['user_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $member['user_id']]);
+            $memberUser = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        if (!$memberUser) {
+            $stmt = $pdo->prepare('SELECT * FROM users WHERE member_id = :member_id LIMIT 1');
+            $stmt->execute(['member_id' => (int) $member['id']]);
+            $memberUser = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        if (!$memberUser) {
+            redirectWithFlash($memberId, $tab, 'This member does not have a login account.', 'error');
+        }
+        if ((int) ($memberUser['is_active'] ?? 0) !== 1) {
+            redirectWithFlash($memberId, $tab, 'This member login is inactive.', 'error');
+        }
+        $memberUser['roles'] = AuthService::getUserRoles((int) $memberUser['id']);
+        if (empty($memberUser['roles'])) {
+            $memberUser['roles'] = ['member'];
+        }
+        $memberName = trim((string) ($member['first_name'] ?? '') . ' ' . (string) ($member['last_name'] ?? ''));
+        if ($memberName === '') {
+            $memberName = (string) ($memberUser['name'] ?? 'Member');
+        }
+        $_SESSION['impersonation'] = [
+            'admin_user' => $user,
+            'admin_id' => (int) ($user['id'] ?? 0),
+            'member_id' => (int) $member['id'],
+            'member_user_id' => (int) $memberUser['id'],
+            'member_name' => $memberName,
+            'started_at' => time(),
+            'return_member_id' => (int) $member['id'],
+            'return_tab' => 'overview',
+        ];
+        $_SESSION['user'] = [
+            'id' => (int) $memberUser['id'],
+            'email' => $memberUser['email'],
+            'name' => $memberUser['name'] ?? $memberName,
+            'member_id' => (int) $member['id'],
+            'roles' => $memberUser['roles'],
+        ];
+        ActivityLogger::log('admin', (int) ($user['id'] ?? 0), (int) $member['id'], 'impersonation.started', [
+            'member_user_id' => (int) $memberUser['id'],
+        ]);
+        header('Location: /member/index.php');
+        exit;
     case 'save_profile':
         if (!AdminMemberAccess::canEditProfile($user)) {
             redirectWithFlash($memberId, $tab, 'You are not authorized to update this profile.', 'error');
@@ -400,6 +453,9 @@ switch ($action) {
 
         if ($payload === []) {
             redirectWithFlash($memberId, $tab, 'No changes detected.', 'error', $redirectExtras);
+        }
+        if (array_key_exists('email', $payload) && !MemberRepository::isEmailAvailable($payload['email'], $targetMemberId)) {
+            redirectWithFlash($memberId, $tab, 'That email address is already linked to another member.', 'error', $redirectExtras);
         }
 
         $before = [];
@@ -902,6 +958,52 @@ switch ($action) {
         $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
         $stmt->execute($params);
         redirectWithFlash($memberId, $tab, 'Bike added.');
+        break;
+
+    case 'bike_update':
+        if (!AdminMemberAccess::canManageVehicles($user)) {
+            redirectWithFlash($memberId, $tab, 'Bike management not permitted.', 'error');
+        }
+        $bikeId = (int) ($_POST['bike_id'] ?? 0);
+        $make = trim($_POST['bike_make'] ?? '');
+        $model = trim($_POST['bike_model'] ?? '');
+        $year = (int) ($_POST['bike_year'] ?? 0);
+        $rego = trim($_POST['bike_rego'] ?? '');
+        $imageUrl = trim($_POST['bike_image_url'] ?? '');
+        $color = trim($_POST['bike_color'] ?? '');
+        if ($bikeId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Bike not found.', 'error');
+        }
+        if ($make === '' || $model === '') {
+            redirectWithFlash($memberId, $tab, 'Make and model are required.', 'error');
+        }
+        $pdo = Database::connection();
+        $fields = ['make = :make', 'model = :model', 'year = :year'];
+        $params = [
+            'id' => $bikeId,
+            'member_id' => $memberId,
+            'make' => $make,
+            'model' => $model,
+            'year' => $year ?: null,
+        ];
+        if (memberBikeHasColumn($pdo, 'rego')) {
+            $fields[] = 'rego = :rego';
+            $params['rego'] = $rego !== '' ? $rego : null;
+        }
+        if (memberBikeHasColumn($pdo, 'image_url')) {
+            $fields[] = 'image_url = :image_url';
+            $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
+        }
+        if (memberBikeHasColumn($pdo, 'color')) {
+            $fields[] = 'color = :color';
+            $params['color'] = $color !== '' ? $color : null;
+        } elseif (memberBikeHasColumn($pdo, 'colour')) {
+            $fields[] = 'colour = :colour';
+            $params['colour'] = $color !== '' ? $color : null;
+        }
+        $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
+        $stmt->execute($params);
+        redirectWithFlash($memberId, $tab, 'Bike updated.');
         break;
 
     case 'bike_delete':
@@ -1407,61 +1509,6 @@ switch ($action) {
             'actor_roles' => $user['roles'] ?? [],
         ]);
         redirectWithFlash($memberId, 'roles', '2FA requirement updated.');
-        break;
-
-    case 'vehicle_create':
-        if (!AdminMemberAccess::canManageVehicles($user)) {
-            redirectWithFlash($memberId, $tab, 'Vehicle management not permitted.', 'error');
-        }
-        $payload = [
-            'vehicle_type' => $_POST['vehicle_type'] ?? '',
-            'make' => trim($_POST['make'] ?? ''),
-            'model' => trim($_POST['model'] ?? ''),
-            'year_exact' => $_POST['year_exact'] ?? '',
-            'year_from' => $_POST['year_from'] ?? '',
-            'year_to' => $_POST['year_to'] ?? '',
-            'is_primary' => isset($_POST['is_primary']) ? 1 : 0,
-        ];
-        $vehicleId = VehicleRepository::create($memberId, $payload);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'vehicle.created', ['vehicle_id' => $vehicleId]);
-        redirectWithFlash($memberId, $tab, 'Vehicle added.');
-        break;
-
-    case 'vehicle_update':
-        if (!AdminMemberAccess::canManageVehicles($user)) {
-            redirectWithFlash($memberId, $tab, 'Vehicle management not permitted.', 'error');
-        }
-        $vehicleId = (int) ($_POST['vehicle_id'] ?? 0);
-        $vehicle = VehicleRepository::getById($vehicleId);
-        if (!$vehicle || (int) $vehicle['member_id'] !== $memberId) {
-            redirectWithFlash($memberId, $tab, 'Vehicle not found.', 'error');
-        }
-        $payload = [
-            'vehicle_type' => $_POST['vehicle_type'] ?? '',
-            'make' => trim($_POST['make'] ?? ''),
-            'model' => trim($_POST['model'] ?? ''),
-            'year_exact' => $_POST['year_exact'] ?? '',
-            'year_from' => $_POST['year_from'] ?? '',
-            'year_to' => $_POST['year_to'] ?? '',
-            'is_primary' => isset($_POST['is_primary']) ? 1 : 0,
-        ];
-        VehicleRepository::update($vehicleId, $payload);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'vehicle.updated', ['vehicle_id' => $vehicleId]);
-        redirectWithFlash($memberId, $tab, 'Vehicle saved.');
-        break;
-
-    case 'vehicle_delete':
-        if (!AdminMemberAccess::canManageVehicles($user)) {
-            redirectWithFlash($memberId, $tab, 'Vehicle management not permitted.', 'error');
-        }
-        $vehicleId = (int) ($_POST['vehicle_id'] ?? 0);
-        $vehicle = VehicleRepository::getById($vehicleId);
-        if (!$vehicle || (int) $vehicle['member_id'] !== $memberId) {
-            redirectWithFlash($memberId, $tab, 'Vehicle not found.', 'error');
-        }
-        VehicleRepository::delete($vehicleId);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'vehicle.deleted', ['vehicle_id' => $vehicleId]);
-        redirectWithFlash($memberId, $tab, 'Vehicle removed.');
         break;
 
     case 'manual_order_fix':

@@ -242,6 +242,11 @@ while (($row = fgetcsv($handle)) !== false) {
         $skippedCount++;
         continue;
     }
+    if (!MemberRepository::isEmailAvailable($email)) {
+        $errors[] = 'Row ' . $rowNumber . ': Email already linked to another member.';
+        $skippedCount++;
+        continue;
+    }
 
     $parsedNumber = MembershipService::parseMemberNumberString($memberIdRaw);
     if (!$parsedNumber) {

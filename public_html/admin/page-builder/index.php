@@ -911,7 +911,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         lines.push(`Reference HTML (${ref.title || 'upload'}):`);
         lines.push(ref.referenceContent);
       } else if (ref.type === 'image') {
-        lines.push(`Reference image URL: ${ref.url}`);
+        lines.push('Use the attached design reference image to inform a full redesign.');
       } else {
         lines.push(`Reference file: ${ref.url}`);
       }
@@ -1131,7 +1131,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         mode: aiMode.value,
         selected_element_id: state.selected ? state.selected.elementId : '',
         selected_element_html: state.selected ? state.selected.html : '',
-        template_scope: state.selected ? state.selected.templateScope : ''
+        template_scope: state.selected ? state.selected.templateScope : '',
+        reference_image_url: state.attachedMedia && state.attachedMedia.type === 'image' ? state.attachedMedia.url : ''
       };
       try {
         const data = await apiRequest(apiUrl('ai_edit', state.currentPage.id), {

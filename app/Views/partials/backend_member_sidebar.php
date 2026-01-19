@@ -20,6 +20,19 @@ $items = [
     ['key' => 'history', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
 ];
 $user = $user ?? current_user();
+$impersonation = function_exists('impersonation_context') ? impersonation_context() : null;
+$impersonationName = '';
+if ($impersonation) {
+    if (!empty($member) && is_array($member)) {
+        $impersonationName = trim((string) ($member['first_name'] ?? '') . ' ' . (string) ($member['last_name'] ?? ''));
+    }
+    if ($impersonationName === '') {
+        $impersonationName = trim((string) ($user['name'] ?? 'Member'));
+    }
+    if ($impersonationName === '') {
+        $impersonationName = 'Member';
+    }
+}
 if (function_exists('can_access_path')) {
     foreach ($items as &$item) {
         if (!empty($item['children'])) {
@@ -47,6 +60,17 @@ if (!empty($member)) {
 }
 ?>
 <aside class="w-64 flex flex-col bg-card-light border-r border-gray-200 shadow-sm z-40 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-200 ease-out md:translate-x-0 md:static md:flex" data-backend-sidebar aria-hidden="true">
+  <?php if ($impersonation): ?>
+    <div class="hidden md:block border-b border-amber-200 bg-amber-50 px-4 py-3">
+      <form method="post" action="/member/impersonation_stop.php">
+        <input type="hidden" name="csrf_token" value="<?= e(\App\Services\Csrf::token()) ?>">
+        <button class="inline-flex items-center gap-2 text-xs font-semibold text-amber-800 hover:text-amber-900" type="submit">
+          &larr; Back to Admin
+        </button>
+      </form>
+      <p class="mt-1 text-[11px] font-medium text-amber-700">Viewing as Member: <?= e($impersonationName) ?></p>
+    </div>
+  <?php endif; ?>
   <div class="border-b border-gray-100 px-6 py-5">
     <div class="flex flex-col items-center text-center gap-2">
       <img src="/uploads/library/2023/good-logo-cropped.png" alt="Goldwing logo" class="h-36 w-auto">

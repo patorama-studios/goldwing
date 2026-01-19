@@ -15,6 +15,7 @@ use App\Services\SettingsService;
 use App\Services\BaseUrlService;
 use App\Services\Validator;
 use App\Services\MembershipPricingService;
+use App\Services\MemberRepository;
 
 header('Content-Type: application/json');
 
@@ -818,6 +819,9 @@ if ($resource === 'stripe') {
             if ($stmt->fetch()) {
                 json_response(['error' => 'An account with this email already exists. Please log in.'], 409);
             }
+            if (!MemberRepository::isEmailAvailable($primaryEmail)) {
+                json_response(['error' => 'That email address is already linked to another member.'], 409);
+            }
 
             $name = trim($primaryFirst . ' ' . $primaryLast);
             $stmt = $pdo->prepare('INSERT INTO users (member_id, name, email, password_hash, is_active, created_at) VALUES (NULL, :name, :email, :password_hash, 0, NOW())');
@@ -873,6 +877,9 @@ if ($resource === 'stripe') {
             }
 
             if (!$memberId) {
+                if (!MemberRepository::isEmailAvailable($primaryEmail)) {
+                    json_response(['error' => 'That email address is already linked to another member.'], 409);
+                }
                 $memberType = $fullSelected ? 'FULL' : 'ASSOCIATE';
                 $memberNumberBase = 0;
                 $memberNumberSuffix = 0;
@@ -910,6 +917,9 @@ if ($resource === 'stripe') {
                 $stmt->execute(['member_id' => $memberId, 'id' => $membershipUserId]);
                 $createdMember = true;
             } else {
+                if (!MemberRepository::isEmailAvailable($primaryEmail, (int) $memberId)) {
+                    json_response(['error' => 'That email address is already linked to another member.'], 409);
+                }
                 $stmt = $pdo->prepare('UPDATE members SET first_name = :first_name, last_name = :last_name, email = :email, phone = :phone, address_line1 = :address_line1, address_line2 = :address_line2, city = :city, state = :state, postal_code = :postal, country = :country, updated_at = NOW() WHERE id = :id');
                 $stmt->execute([
                     'first_name' => $primaryFirst,
@@ -942,6 +952,12 @@ if ($resource === 'stripe') {
         if ($associateSelected && $associateAdd === 'yes') {
             if (!Validator::required($associateFirst) || !Validator::required($associateLast)) {
                 json_response(['error' => 'Associate member details are required.'], 422);
+            }
+            if (!Validator::email($associateEmail)) {
+                json_response(['error' => 'A valid associate member email is required.'], 422);
+            }
+            if (!MemberRepository::isEmailAvailable($associateEmail)) {
+                json_response(['error' => 'Associate member email is already linked to another member.'], 409);
             }
             $stmt = $pdo->prepare('SELECT MAX(member_number_suffix) as max_suffix FROM members WHERE full_member_id = :full_id');
             $stmt->execute(['full_id' => $memberId]);

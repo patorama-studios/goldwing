@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tokenRate = isset($_POST['token_cost_usd']) ? (float) $_POST['token_cost_usd'] : 0.0;
         $imageCost = isset($_POST['image_cost_usd']) ? (float) $_POST['image_cost_usd'] : 0.0;
         $guardrails = trim((string) ($_POST['ai_guardrails'] ?? ''));
+        $masterPrompt = trim((string) ($_POST['ai_builder_master_prompt'] ?? ''));
 
         if ($apiKey !== '' && !EncryptionService::isReady()) {
             $error = 'APP_KEY is not configured. Set APP_KEY in .env to store API keys securely.';
@@ -39,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SettingsService::setGlobal((int) $user['id'], 'ai.token_cost_usd', $tokenRate);
             SettingsService::setGlobal((int) $user['id'], 'ai.image_cost_usd', $imageCost);
             SettingsService::setGlobal((int) $user['id'], 'ai.guardrails', $guardrails);
+            SettingsService::setGlobal((int) $user['id'], 'ai.builder_master_prompt', $masterPrompt);
             AiProviderKeyService::upsertKey($provider, $apiKey, (int) $user['id']);
 
             AuditService::log((int) $user['id'], 'settings_change', 'AI settings updated.');
@@ -54,6 +56,7 @@ $monthlyCap = (float) SettingsService::getGlobal('ai.monthly_cap_usd', 50);
 $tokenRate = (float) SettingsService::getGlobal('ai.token_cost_usd', 0.01);
 $imageCost = (float) SettingsService::getGlobal('ai.image_cost_usd', 0.02);
 $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
+$masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
 $meta = AiProviderKeyService::getMeta($provider);
 $encryptionReady = EncryptionService::isReady();
 
@@ -112,6 +115,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </div>
           <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Changing guardrails will affect how the AI builder behaves across all pages.
+          </div>
+          <div>
+            <label class="text-xs uppercase tracking-[0.2em] text-slate-500">AI Builder Master Prompt</label>
+            <textarea name="ai_builder_master_prompt" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Describe the overall behavior/personality of the AI builder."><?= e($masterPrompt) ?></textarea>
           </div>
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">AI Guardrails</label>

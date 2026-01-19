@@ -153,6 +153,27 @@ function generate_image_openai(string $prompt): array
     return ['ok' => true, 'url' => $url];
 }
 
+function normalize_reference_image_url(string $url): ?string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return null;
+    }
+    if (str_starts_with($url, '/')) {
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        if ($host === '') {
+            return null;
+        }
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . $host . $url;
+    }
+    $parsed = parse_url($url);
+    if (!$parsed || empty($parsed['scheme']) || !in_array($parsed['scheme'], ['http', 'https'], true)) {
+        return null;
+    }
+    return $url;
+}
+
 function usage_month_key(?\DateTimeInterface $date = null): string
 {
     $date = $date ?: new \DateTimeImmutable('now');
@@ -539,11 +560,14 @@ if ($method === 'POST') {
         }
 
         $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
+        $masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
         $systemPrompt = implode("\n", [
             'You create HTML for a front-facing page on the Australian Goldwing Association site.',
+            'You are an advanced product and website builder and designer.',
             'Return ONLY valid JSON with keys: title, slug, html, summary.',
             'Use existing site styles and structure (sections, headings, buttons).',
             'Output HTML only (no markdown).',
+            $masterPrompt !== '' ? 'Master prompt: ' . $masterPrompt : '',
             $guardrails !== '' ? 'Guardrails: ' . $guardrails : '',
         ]);
 
@@ -706,6 +730,7 @@ if ($method === 'POST') {
         $elementId = trim((string) ($data['selected_element_id'] ?? ''));
         $elementHtml = (string) ($data['selected_element_html'] ?? '');
         $templateScope = trim((string) ($data['template_scope'] ?? ''));
+        $referenceImageUrl = normalize_reference_image_url((string) ($data['reference_image_url'] ?? ''));
         $mode = ($data['mode'] ?? 'element') === 'page' ? 'page' : 'element';
 
         if ($prompt === '') {
@@ -728,14 +753,20 @@ if ($method === 'POST') {
         if (!$client) {
             json_response(['error' => 'AI provider is not configured.'], 400);
         }
+        if ($referenceImageUrl !== null && !$client->supportsVision()) {
+            json_response(['error' => 'Selected AI provider does not support vision inputs.'], 400);
+        }
 
         $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
+        $masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
         $systemPrompt = implode("\n", [
-            'You are an AI page editor.',
+            'You are an advanced product and website builder and designer.',
+            'You can fully redesign pages when asked, applying modern UX/UI best practices and clear content hierarchy.',
             'Return ONLY valid JSON with keys: updated_html (string), summary (string), warnings (array).',
             'If mode is element, updated_html MUST be the full HTML for the selected element only.',
             'If mode is page, updated_html MUST be the full HTML for the page content.',
             'Do not include markdown fences.',
+            $masterPrompt !== '' ? 'Master prompt: ' . $masterPrompt : '',
             $guardrails !== '' ? 'Guardrails: ' . $guardrails : '',
         ]);
 
@@ -750,11 +781,28 @@ if ($method === 'POST') {
             $userPromptParts[] = 'Current page HTML:';
             $userPromptParts[] = PageService::draftHtml($page);
         }
+        if ($referenceImageUrl !== null) {
+            $userPromptParts[] = 'Design reference image is attached.';
+        }
 
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => implode("\n\n", $userPromptParts)],
-        ];
+        $userContent = implode("\n\n", $userPromptParts);
+        if ($referenceImageUrl !== null) {
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $userContent],
+                        ['type' => 'image_url', 'image_url' => ['url' => $referenceImageUrl]],
+                    ],
+                ],
+            ];
+        } else {
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userContent],
+            ];
+        }
 
         $options = [
             'temperature' => 0.2,

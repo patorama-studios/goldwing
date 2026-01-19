@@ -78,6 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!Validator::required($firstName) || !Validator::required($lastName) || !Validator::email($email)) {
             $error = 'Please fill in all required fields.';
+        } elseif (!MemberRepository::isEmailAvailable($email)) {
+            $error = 'That email address is already linked to another member.';
         } elseif (!$fullSelected && !$associateSelected) {
             $error = 'Select at least one membership type.';
         } else {
@@ -106,6 +108,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (!$error && $associateSelected && $associateAdd === 'yes' && (!Validator::required($associateFirstName) || !Validator::required($associateLastName))) {
                 $error = 'Associate member first and last name are required.';
+            }
+            if (
+                !$error
+                && $associateSelected
+                && $associateAdd === 'yes'
+                && !Validator::email($associateEmail)
+            ) {
+                $error = 'A valid associate member email is required.';
+            }
+            if (
+                !$error
+                && $associateSelected
+                && $associateAdd === 'yes'
+                && !MemberRepository::isEmailAvailable($associateEmail)
+            ) {
+                $error = 'Associate member email is already linked to another member.';
             }
         }
         if (!$error) {
@@ -368,7 +386,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       </div>
     <?php else: ?>
       <?php if ($error): ?>
-        <div class="form-alert error"><?= e($error) ?></div>
+        <div class="form-alert error" id="application-form-error"><?= e($error) ?></div>
+      <?php else: ?>
+        <div class="form-alert error" id="application-form-error" hidden></div>
       <?php endif; ?>
 
       <div class="form-progress">
@@ -964,6 +984,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const stripePaymentNote = document.getElementById('stripe-payment-note');
     const paymentElementContainer = document.getElementById('stripe-payment-element');
     const stripePaymentError = document.getElementById('stripe-payment-error');
+    const formErrorAlert = document.getElementById('application-form-error');
     const finalSubmitButton = form.querySelector('button[type="submit"]');
     const summaryFullPrice = document.querySelector('[data-summary-full-price]');
     const summaryFullDetail = document.querySelector('[data-summary-full-detail]');
@@ -1419,6 +1440,19 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       stripePaymentError.hidden = false;
     };
 
+    const showFormError = (message) => {
+      if (!formErrorAlert) {
+        return;
+      }
+      if (!message) {
+        formErrorAlert.textContent = '';
+        formErrorAlert.hidden = true;
+        return;
+      }
+      formErrorAlert.textContent = message;
+      formErrorAlert.hidden = false;
+    };
+
     const loadStripeConfig = async () => {
       if (stripeConfig) {
         return stripeConfig;
@@ -1731,6 +1765,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         event.preventDefault();
         showPaymentMethodError('');
         showStripeError('');
+        showFormError('');
         if (processingStripePayment) {
           return;
         }
@@ -1759,7 +1794,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           const intentId = (paymentIntent && paymentIntent.id) ? paymentIntent.id : paymentIntentId;
           await submitApplicationViaAjax(intentId);
         } catch (apiError) {
-          showStripeError((apiError && apiError.message) ? apiError.message : 'Stripe payment failed.');
+          const message = (apiError && apiError.message) ? apiError.message : 'Stripe payment failed.';
+          showStripeError(message);
+          showFormError(message);
           if (finalSubmitButton) {
             finalSubmitButton.disabled = false;
             finalSubmitButton.textContent = finalSubmitButton.dataset.originalText || 'Submit application';

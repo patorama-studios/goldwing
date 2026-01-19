@@ -23,6 +23,49 @@ use App\Services\BaseUrlService;
 
 require_role(['admin', 'committee', 'treasurer', 'chapter_leader']);
 
+function orders_member_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'member_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'member_id';
+            return $column;
+        }
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'user_id'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'user_id';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = '';
+    return $column;
+}
+
+function orders_payment_status_column(\PDO $pdo): string
+{
+    static $column = null;
+    if ($column !== null) {
+        return $column;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_status'");
+        if ($stmt && $stmt->fetchColumn()) {
+            $column = 'payment_status';
+            return $column;
+        }
+    } catch (\Throwable $e) {
+        // Ignore schema inspection errors.
+    }
+    $column = 'status';
+    return $column;
+}
+
 $page = $_GET['page'] ?? 'dashboard';
 $page = preg_replace('/[^a-z0-9-]/', '', strtolower($page));
 $user = current_user();
@@ -215,6 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $associateVehicles = $notes['vehicles']['associate'] ?? [];
                 if (!is_array($associateVehicles)) {
                     $associateVehicles = [];
+                }
+
+                if ($associateSelected && $associateAdd === 'yes') {
+                    if ($associateEmail === '' || !filter_var($associateEmail, FILTER_VALIDATE_EMAIL)) {
+                        $alerts[] = ['type' => 'error', 'message' => 'Associate member email is required and must be unique.'];
+                        $associateAdd = 'no';
+                    } elseif (!MemberRepository::isEmailAvailable($associateEmail)) {
+                        $alerts[] = ['type' => 'error', 'message' => 'Associate member email is already linked to another member.'];
+                        $associateAdd = 'no';
+                    }
                 }
 
                 if ($associateSelected && $associateAdd === 'yes' && ($associateFirst !== '' || $associateLast !== '')) {
@@ -484,13 +537,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($page === 'applications' && isset($_POST['resend_approval_id'])) {
             $appId = (int) $_POST['resend_approval_id'];
-            $stmt = $pdo->prepare('SELECT a.member_id, m.first_name, m.last_name, m.email, m.phone FROM membership_applications a JOIN members m ON m.id = a.member_id WHERE a.id = :id');
+            $stmt = $pdo->prepare('SELECT a.member_id, m.user_id, m.first_name, m.last_name, m.email, m.phone FROM membership_applications a JOIN members m ON m.id = a.member_id WHERE a.id = :id');
             $stmt->execute(['id' => $appId]);
             $row = $stmt->fetch();
             if ($row && !empty($row['email'])) {
-                $stmt = $pdo->prepare('SELECT * FROM orders WHERE member_id = :member_id AND order_type = "membership" AND payment_status IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
-                $stmt->execute(['member_id' => $row['member_id']]);
-                $order = $stmt->fetch();
+                $ordersMemberColumn = orders_member_column($pdo);
+                $ordersPaymentStatusColumn = orders_payment_status_column($pdo);
+                $ordersMemberValue = null;
+                if ($ordersMemberColumn === 'member_id') {
+                    $ordersMemberValue = (int) ($row['member_id'] ?? 0);
+                } elseif ($ordersMemberColumn === 'user_id') {
+                    $ordersMemberValue = (int) ($row['user_id'] ?? 0);
+                }
+                $order = null;
+                if ($ordersMemberColumn && $ordersMemberValue) {
+                    $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
+                    $stmt->execute(['value' => $ordersMemberValue]);
+                    $order = $stmt->fetch();
+                }
                 if (!$order) {
                     $alerts[] = ['type' => 'success', 'message' => 'No pending membership order found to resend.'];
                 } else {

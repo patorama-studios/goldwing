@@ -5,6 +5,7 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMXPath;
+use App\Services\MembershipPricingService;
 
 class PageBuilderService
 {
@@ -124,6 +125,10 @@ class PageBuilderService
         }
 
         $pageSlug = $page['slug'] ?? 'home';
+        if ($pageSlug === 'membership' && self::shouldUseMembershipTemplate($draftHtml)) {
+            $content = self::renderMembershipContent();
+            return '<div id="gw-content-root" class="page-body" data-gw-body="true">' . $content . '</div>';
+        }
         $pageTitle = $page['title'] ?? 'Australian Goldwing Association';
         $plainContent = trim(strip_tags($draftHtml));
         $heroLead = $plainContent !== '' ? $plainContent : 'Rides, events, and member services for Goldwing riders across Australia.';
@@ -157,6 +162,37 @@ class PageBuilderService
             . '</section>';
 
         return '<div id="gw-content-root" class="page-body" data-gw-body="true">' . $heroHtml . $bodyHtml . '</div>';
+    }
+
+    private static function shouldUseMembershipTemplate(string $html): bool
+    {
+        $normalized = trim(strip_tags($html));
+        if ($normalized === '') {
+            return true;
+        }
+        return str_contains($html, 'Choose from Full, Associate, or Life membership options.');
+    }
+
+    private static function renderMembershipContent(): string
+    {
+        $membershipPricing = MembershipPricingService::getMembershipPricing();
+        $pricingMatrix = $membershipPricing['matrix'] ?? [];
+        $pricingCurrency = $membershipPricing['currency'] ?? 'AUD';
+        $pricingNote = MembershipPricingService::pricingNote();
+        $formatMembershipPrice = static function (?int $cents, string $currency): string {
+            if ($cents === null) {
+                return 'N/A';
+            }
+            $prefix = $currency === 'AUD' ? '$' : ($currency . ' ');
+            return $prefix . number_format($cents / 100, 2);
+        };
+        $getMembershipPrice = static function (array $matrix, string $magazine, string $membership, string $period): ?int {
+            return $matrix[$magazine][$membership][$period] ?? null;
+        };
+
+        ob_start();
+        require __DIR__ . '/../Views/partials/membership_content.php';
+        return ob_get_clean() ?: '';
     }
 
     private static function applyElementIds(DOMNode $node): void

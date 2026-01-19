@@ -79,6 +79,11 @@ class AdminMemberAccess
         return self::isFullAccess($user);
     }
 
+    public static function canImpersonate(array $user): bool
+    {
+        return self::isFullAccess($user);
+    }
+
     public static function canRefund(array $user): bool
     {
         return self::hasAnyRole($user, ['super_admin', 'admin', 'treasurer']);

@@ -81,6 +81,29 @@ function current_user(): ?array
     return $user;
 }
 
+function impersonation_context(): ?array
+{
+    $context = $_SESSION['impersonation'] ?? null;
+    if (!$context || empty($context['admin_user']) || empty($context['member_id'])) {
+        return null;
+    }
+    return $context;
+}
+
+function is_impersonating(): bool
+{
+    return impersonation_context() !== null;
+}
+
+function impersonation_admin_user(): ?array
+{
+    $context = impersonation_context();
+    if (!$context) {
+        return null;
+    }
+    return $context['admin_user'] ?? null;
+}
+
 function require_login(): void
 {
     if (!current_user()) {
@@ -89,7 +112,7 @@ function require_login(): void
     }
     $user = current_user();
     $path = $_SERVER['REQUEST_URI'] ?? '';
-    if ($user && !str_contains($path, '/member/2fa_enroll.php')) {
+    if ($user && !str_contains($path, '/member/2fa_enroll.php') && !is_impersonating()) {
         $requirement = App\Services\SecurityPolicyService::computeTwoFaRequirement($user);
         $has2fa = App\Services\TwoFactorService::isEnabled((int) $user['id']);
         if ($requirement === 'REQUIRED' && !$has2fa && !App\Services\AuthService::withinGracePeriod() && !App\Services\EmailOtpService::isEnabled()) {

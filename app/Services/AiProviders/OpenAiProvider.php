@@ -14,7 +14,7 @@ class OpenAiProvider implements AiProviderInterface
 
     public function supportsVision(): bool
     {
-        return false;
+        return true;
     }
 
     public function request(array $messages, array $options = []): array
