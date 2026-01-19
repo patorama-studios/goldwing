@@ -14,7 +14,6 @@ use App\Services\OrderRepository;
 use App\Services\RefundService;
 use App\Services\SecurityPolicyService;
 use App\Services\SettingsService;
-use App\Services\VehicleRepository;
 use App\Services\ChapterRepository;
 use App\Services\NotificationPreferenceService;
 
@@ -167,7 +166,6 @@ if (array_key_exists('membership_type_id', $member)) {
 
 $directoryPrefs = MemberRepository::directoryPreferences();
 $directorySummary = MemberRepository::summarizeDirectoryPreferences($member);
-$vehicles = VehicleRepository::listByMember($memberId);
 $orders = OrderRepository::listByMember($memberId, 25);
 $refunds = RefundService::listByMember($memberId, 25);
 $events = EventRsvpRepository::listByMember($memberId, 25);
@@ -326,9 +324,20 @@ try {
     $chapterRequests = [];
 }
 
+$bikeColumns = [];
+$bikeHasPrimary = false;
+try {
+    $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+    $bikeHasPrimary = in_array('is_primary', $bikeColumns, true);
+} catch (Throwable $e) {
+    $bikeColumns = [];
+    $bikeHasPrimary = false;
+}
+
 $bikes = [];
 try {
-    $stmt = $pdo->prepare('SELECT * FROM member_bikes WHERE member_id = :member_id ORDER BY created_at DESC');
+    $bikeOrder = $bikeHasPrimary ? 'is_primary DESC, created_at DESC' : 'created_at DESC';
+    $stmt = $pdo->prepare('SELECT * FROM member_bikes WHERE member_id = :member_id ORDER BY ' . $bikeOrder);
     $stmt->execute(['member_id' => $memberId]);
     $bikes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
@@ -382,25 +391,19 @@ $addressLines = array_filter([
 ], static fn($line) => $line !== '');
 
 $primaryVehicle = null;
-foreach ($vehicles as $vehicle) {
-    if ((int) ($vehicle['is_primary'] ?? 0) === 1) {
-        $primaryVehicle = $vehicle;
-        break;
+if ($bikeHasPrimary) {
+    foreach ($bikes as $bike) {
+        if ((int) ($bike['is_primary'] ?? 0) === 1) {
+            $primaryVehicle = $bike;
+            break;
+        }
     }
 }
-if (!$primaryVehicle && !empty($vehicles)) {
-    $primaryVehicle = $vehicles[0];
+if (!$primaryVehicle && !empty($bikes)) {
+    $primaryVehicle = $bikes[0];
 }
-$primaryVehicleYearLabel = '—';
-$primaryVehicleRegoLabel = '—';
-if ($primaryVehicle) {
-    if (!empty($primaryVehicle['year_exact'])) {
-        $primaryVehicleYearLabel = (string) $primaryVehicle['year_exact'];
-    } elseif (!empty($primaryVehicle['year_from']) || !empty($primaryVehicle['year_to'])) {
-        $primaryVehicleYearLabel = trim((string) ($primaryVehicle['year_from'] ?? '') . ' - ' . (string) ($primaryVehicle['year_to'] ?? ''));
-    }
-    $primaryVehicleRegoLabel = $primaryVehicle['rego'] ?? '—';
-}
+$primaryVehicleYearLabel = $primaryVehicle ? ($primaryVehicle['year'] ?? '—') : '—';
+$primaryVehicleRegoLabel = $primaryVehicle ? ($primaryVehicle['rego'] ?? '—') : '—';
 
 $activityActor = trim((string) ($_GET['activity_actor'] ?? ''));
 $activityAction = trim((string) ($_GET['activity_action'] ?? ''));
@@ -827,7 +830,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         </div>
                       </div>
                       <div>
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Primary Vehicle</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Primary Bike</h3>
                         <div class="w-full overflow-hidden rounded-lg border border-gray-200">
                           <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <tbody class="divide-y divide-gray-200 bg-white">
@@ -1653,6 +1656,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                 <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>" value="<?= e($bike['image_url'] ?? '') ?>">
                                 <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>" data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>" data-upload-context="bikes">Update bike image</button>
                               </div>
+                              <?php if ($bikeHasPrimary): ?>
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
+                                  <input type="radio" name="is_primary" value="1" <?= (int) ($bike['is_primary'] ?? 0) === 1 ? 'checked' : '' ?> class="text-primary focus:ring-2 focus:ring-primary">
+                                  Primary bike
+                                </label>
+                              <?php endif; ?>
                               <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Save changes</button>
                             </form>
                           <?php endif; ?>

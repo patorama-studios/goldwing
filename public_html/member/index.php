@@ -313,6 +313,7 @@ if ($user && $user['member_id']) {
                     $hasRego = in_array('rego', $bikeColumns, true);
                     $hasImage = in_array('image_url', $bikeColumns, true);
                     $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
+                    $hasPrimary = in_array('is_primary', $bikeColumns, true);
 
                     $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
                     $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
@@ -341,6 +342,16 @@ if ($user && $user['member_id']) {
                             $columns[] = 'colour';
                             $placeholders[] = ':colour';
                             $params['colour'] = $color;
+                        }
+                    }
+                    if ($hasPrimary) {
+                        $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+                        $primaryStmt->execute(['member_id' => $targetBikeMemberId]);
+                        $primaryExists = (bool) $primaryStmt->fetchColumn();
+                        if (!$primaryExists) {
+                            $columns[] = 'is_primary';
+                            $placeholders[] = ':is_primary';
+                            $params['is_primary'] = 1;
                         }
                     }
                     $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
@@ -384,6 +395,7 @@ if ($user && $user['member_id']) {
                     $hasRego = in_array('rego', $bikeColumns, true);
                     $hasImage = in_array('image_url', $bikeColumns, true);
                     $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
+                    $hasPrimary = in_array('is_primary', $bikeColumns, true);
 
                     $fields = ['make = :make', 'model = :model', 'year = :year'];
                     $params = [
@@ -410,8 +422,17 @@ if ($user && $user['member_id']) {
                             $params['colour'] = $color !== '' ? $color : null;
                         }
                     }
+                    $setPrimary = $hasPrimary && isset($_POST['is_primary']) && $_POST['is_primary'] === '1';
+                    $pdo->beginTransaction();
                     $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
                     $stmt->execute($params);
+                    if ($setPrimary) {
+                        $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 0 WHERE member_id = :member_id');
+                        $stmt->execute(['member_id' => $targetBikeMemberId]);
+                        $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 1 WHERE id = :id AND member_id = :member_id');
+                        $stmt->execute(['id' => $bikeId, 'member_id' => $targetBikeMemberId]);
+                    }
+                    $pdo->commit();
                     $profileMessage = 'Bike updated.';
                 }
             } elseif ($_POST['action'] === 'delete_bike') {
@@ -1100,7 +1121,17 @@ if ($user && $user['member_id']) {
             return strtotime($b['date']) <=> strtotime($a['date']);
         });
 
-        $stmt = $pdo->prepare('SELECT * FROM member_bikes WHERE member_id = :member_id ORDER BY created_at DESC');
+        $bikeColumns = [];
+        $bikeHasPrimary = false;
+        try {
+            $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+            $bikeHasPrimary = in_array('is_primary', $bikeColumns, true);
+        } catch (Throwable $e) {
+            $bikeColumns = [];
+            $bikeHasPrimary = false;
+        }
+        $bikeOrder = $bikeHasPrimary ? 'is_primary DESC, created_at DESC' : 'created_at DESC';
+        $stmt = $pdo->prepare('SELECT * FROM member_bikes WHERE member_id = :member_id ORDER BY ' . $bikeOrder);
         $stmt->execute(['member_id' => $profileMemberId]);
         $bikes = $stmt->fetchAll();
 
@@ -1524,7 +1555,18 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               trim((string) ($profileMember['postal_code'] ?? '')),
               trim((string) ($profileMember['country'] ?? '')),
           ], static fn($line) => $line !== '');
-          $primaryBike = $bikes[0] ?? null;
+          $primaryBike = null;
+          if (!empty($bikes) && !empty($bikeHasPrimary)) {
+              foreach ($bikes as $bike) {
+                  if ((int) ($bike['is_primary'] ?? 0) === 1) {
+                      $primaryBike = $bike;
+                      break;
+                  }
+              }
+          }
+          if (!$primaryBike && !empty($bikes)) {
+              $primaryBike = $bikes[0];
+          }
           $primaryBikeYearLabel = $primaryBike['year'] ?? '—';
           $primaryBikeRegoLabel = $primaryBike['rego'] ?? '—';
           $profileRenewalLabel = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'LIFE' ? 'N/A' : format_date($profileMembershipPeriod['end_date'] ?? null);
@@ -1959,6 +2001,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                                 <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>" value="<?= e($bike['image_url'] ?? '') ?>">
                                 <button type="button" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700" data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>" data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>" data-upload-context="bikes">Update bike image</button>
                               </div>
+                              <?php if (!empty($bikeHasPrimary)): ?>
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
+                                  <input type="radio" name="is_primary" value="1" <?= (int) ($bike['is_primary'] ?? 0) === 1 ? 'checked' : '' ?> class="text-primary focus:ring-2 focus:ring-primary">
+                                  Primary bike
+                                </label>
+                              <?php endif; ?>
                               <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Save changes</button>
                             </form>
                           <?php endif; ?>

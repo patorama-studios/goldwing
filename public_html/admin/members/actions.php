@@ -934,6 +934,7 @@ switch ($action) {
             'model' => $model,
             'year' => $year ?: null,
         ];
+        $hasPrimary = memberBikeHasColumn($pdo, 'is_primary');
         if (memberBikeHasColumn($pdo, 'rego')) {
             $columns[] = 'rego';
             $placeholders[] = ':rego';
@@ -953,6 +954,16 @@ switch ($action) {
                 $columns[] = 'colour';
                 $placeholders[] = ':colour';
                 $params['colour'] = $color;
+            }
+        }
+        if ($hasPrimary) {
+            $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+            $primaryStmt->execute(['member_id' => $memberId]);
+            $primaryExists = (bool) $primaryStmt->fetchColumn();
+            if (!$primaryExists) {
+                $columns[] = 'is_primary';
+                $placeholders[] = ':is_primary';
+                $params['is_primary'] = 1;
             }
         }
         $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
@@ -1001,8 +1012,18 @@ switch ($action) {
             $fields[] = 'colour = :colour';
             $params['colour'] = $color !== '' ? $color : null;
         }
+        $hasPrimary = memberBikeHasColumn($pdo, 'is_primary');
+        $setPrimary = $hasPrimary && isset($_POST['is_primary']) && $_POST['is_primary'] === '1';
+        $pdo->beginTransaction();
         $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
         $stmt->execute($params);
+        if ($setPrimary) {
+            $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 0 WHERE member_id = :member_id');
+            $stmt->execute(['member_id' => $memberId]);
+            $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 1 WHERE id = :id AND member_id = :member_id');
+            $stmt->execute(['id' => $bikeId, 'member_id' => $memberId]);
+        }
+        $pdo->commit();
         redirectWithFlash($memberId, $tab, 'Bike updated.');
         break;
 
