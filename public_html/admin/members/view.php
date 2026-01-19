@@ -861,6 +861,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <span class="material-icons-outlined text-primary">bolt</span>
                     Quick Actions
                   </h3>
+                  <?php if ($flash && $flashContext === 'account_access'): ?>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm mb-4 <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
+                      <?= e($flash['message']) ?>
+                    </div>
+                  <?php endif; ?>
                   <div class="space-y-3 mb-8">
                     <?php if ($canImpersonate && $memberHasUser): ?>
                       <form method="post" action="/admin/members/actions.php">

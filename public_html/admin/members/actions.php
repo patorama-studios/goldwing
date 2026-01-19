@@ -1643,12 +1643,15 @@ switch ($action) {
             'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
         $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
-        NotificationService::dispatch('member_password_reset_admin', [
+        $sent = NotificationService::dispatch('member_password_reset_admin', [
             'primary_email' => $member['email'],
             'admin_emails' => NotificationService::getAdminEmails(),
             'reset_link' => NotificationService::escape($link),
         ]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_reset_link_sent', ['user_id' => $userId]);
+        if (!$sent) {
+            redirectWithFlash($memberId, $tab, 'Password reset link could not be emailed. Check email settings.', 'error', $flashContext);
+        }
         redirectWithFlash($memberId, $tab, 'Password reset link queued.', 'success', $flashContext);
         break;
 
@@ -1715,12 +1718,17 @@ switch ($action) {
             if ($hasMemberAuth) {
                 $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
                 if (!$stmt->execute(['member_id' => $memberId, 'hash' => $hash])) {
-                    throw new \RuntimeException('Unable to update member auth record.');
+                    $errorInfo = $stmt->errorInfo();
+                    error_log('[Admin] Member auth update failed for member #' . $memberId . ': ' . ($errorInfo[2] ?? 'Unknown SQL error'));
                 }
             }
-            $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
-            if (!$stmt->execute(['user_id' => $targetUserId])) {
-                throw new \RuntimeException('Unable to update password reset log.');
+            $hasPasswordResets = (bool) $pdo->query("SHOW TABLES LIKE 'password_resets'")->fetchColumn();
+            if ($hasPasswordResets) {
+                $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');
+                if (!$stmt->execute(['user_id' => $targetUserId])) {
+                    $errorInfo = $stmt->errorInfo();
+                    error_log('[Admin] Password reset log update failed for user #' . $targetUserId . ': ' . ($errorInfo[2] ?? 'Unknown SQL error'));
+                }
             }
             $pdo->commit();
         } catch (\Throwable $e) {
