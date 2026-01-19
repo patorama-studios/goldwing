@@ -96,6 +96,10 @@ class RefundService
         if (!$intent) {
             throw new RuntimeException('Stripe payment intent is not available for this order.');
         }
+        $pdo = Database::connection();
+        if (!self::hasRefundsTable($pdo)) {
+            throw new RuntimeException('Refunds table is missing. Run the store admin migration to create store_refunds.');
+        }
 
         ActivityLogger::log('admin', $adminUserId, $memberId, 'refund.requested', [
             'order_id' => $orderId,
@@ -113,7 +117,6 @@ class RefundService
             throw new RuntimeException('Stripe refund could not be completed.');
         }
 
-        $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO store_refunds (order_id, member_id, amount_cents, reason, stripe_refund_id, status, created_by_user_id, created_at) VALUES (:order_id, :member_id, :amount_cents, :reason, :stripe_refund_id, "processed", :admin_id, NOW())');
         $stmt->execute([
             'order_id' => $orderId,

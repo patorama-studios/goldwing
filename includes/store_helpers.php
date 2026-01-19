@@ -19,6 +19,16 @@ function store_require_admin(): void
     exit;
 }
 
+function store_table_exists(PDO $pdo, string $table): bool
+{
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table));
+        return (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function store_permissions_map(): array
 {
     return [
@@ -59,6 +69,9 @@ function store_require_permission(string $permission): void
 
 function store_add_order_event(PDO $pdo, int $orderId, string $eventType, string $message, ?int $userId = null, array $metadata = []): void
 {
+    if (!store_table_exists($pdo, 'store_order_events')) {
+        return;
+    }
     $stmt = $pdo->prepare('INSERT INTO store_order_events (order_id, event_type, message, metadata_json, created_by_user_id, created_at) VALUES (:order_id, :event_type, :message, :metadata_json, :created_by_user_id, NOW())');
     $stmt->execute([
         'order_id' => $orderId,

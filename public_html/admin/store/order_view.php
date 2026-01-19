@@ -247,9 +247,12 @@ if ($hasTable('store_tickets') && $hasTable('store_order_items')) {
 
 $orderEvents = [];
 if ($hasTable('store_order_events')) {
+$orderEvents = [];
+if (store_table_exists($pdo, 'store_order_events')) {
     $stmt = $pdo->prepare('SELECT e.*, u.name as actor_name FROM store_order_events e LEFT JOIN users u ON u.id = e.created_by_user_id WHERE e.order_id = :order_id ORDER BY e.created_at DESC');
     $stmt->execute(['order_id' => $order['id']]);
     $orderEvents = $stmt->fetchAll();
+}
 }
 
 $refundableCents = OrderRepository::calculateRefundableCents((int) $order['id']);
@@ -257,9 +260,12 @@ $refundableAmount = number_format($refundableCents / 100, 2);
 
 $refunds = [];
 if ($hasTable('store_refunds')) {
+$refunds = [];
+if (store_table_exists($pdo, 'store_refunds')) {
     $stmt = $pdo->prepare('SELECT * FROM store_refunds WHERE order_id = :order_id ORDER BY created_at DESC');
     $stmt->execute(['order_id' => $order['id']]);
     $refunds = $stmt->fetchAll();
+}
 }
 
 $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);

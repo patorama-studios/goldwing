@@ -2112,7 +2112,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <td class="px-3 py-2 text-gray-600"><?= e(ucfirst($order['fulfillment_method'] ?? 'shipping')) ?></td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'])) ?></td>
                               <td class="px-3 py-2 text-gray-600">
-                                <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="/admin/store/order_view.php?order=<?= e($order['order_number'] ?? $order['id']) ?>" target="_blank">View</a>
+                                <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="/admin/store/orders/<?= e($order['id']) ?>" target="_blank">View</a>
                               </td>
                             </tr>
                           <?php endforeach; ?>
