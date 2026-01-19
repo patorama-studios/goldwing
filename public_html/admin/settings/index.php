@@ -8,6 +8,7 @@ use App\Services\PaymentSettingsService;
 use App\Services\NotificationService;
 use App\Services\SecuritySettingsService;
 use App\Services\SettingsService;
+use App\Services\LogViewerService;
 use App\Services\StripeSettingsService;
 use App\Services\ChapterRepository;
 use App\Services\Validator;
@@ -58,6 +59,10 @@ if (!can_access_section($roles, $sections[$section]['roles'])) {
 SettingsService::migrateLegacy((int) $user['id']);
 SettingsService::ensureDefaults((int) $user['id']);
 $securitySettings = SecuritySettingsService::get();
+$systemLog = null;
+if ($section === 'advanced') {
+    $systemLog = LogViewerService::readTail(300);
+}
 
 $errors = [];
 $toast = '';
@@ -122,6 +127,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
         $errors[] = 'Invalid CSRF token.';
+    } elseif ($action === 'clear_system_log') {
+        require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/settings/index.php');
+        $postedSection = $_POST['section'] ?? '';
+        if ($postedSection !== $section) {
+            $errors[] = 'Invalid settings section.';
+        } elseif (!can_access_section($roles, $sections[$section]['roles'])) {
+            $errors[] = 'Unauthorized.';
+        } else {
+            $cleared = LogViewerService::clear();
+            $toast = $cleared ? 'System log cleared.' : 'Unable to clear system log.';
+        }
     } elseif ($action === 'send_test_notification') {
         if ($section !== 'payments') {
             require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/settings/index.php');
@@ -2223,6 +2239,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
               </div>
             </form>
+            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 mt-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="font-display text-lg font-bold text-gray-900">System Logs</h2>
+                  <p class="text-xs text-slate-500">Shows PHP error_log output and internal system error messages.</p>
+                </div>
+                <form method="post">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="clear_system_log">
+                  <input type="hidden" name="section" value="advanced">
+                  <button type="submit" class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">Clear log</button>
+                </form>
+              </div>
+              <?php if ($systemLog && $systemLog['path'] !== ''): ?>
+                <div class="text-xs text-slate-500">
+                  Log file: <?= e($systemLog['path']) ?> (<?= e(number_format((int) $systemLog['size'])) ?> bytes)
+                </div>
+              <?php endif; ?>
+              <?php if ($systemLog && $systemLog['error']): ?>
+                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                  <?= e($systemLog['error']) ?>
+                </div>
+              <?php endif; ?>
+              <div class="max-h-96 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-xs text-slate-700">
+                <pre class="whitespace-pre-wrap"><?= e($systemLog['content'] ?? 'No log entries yet.') ?></pre>
+              </div>
+            </div>
           <?php endif; ?>
       </section>
     </div>

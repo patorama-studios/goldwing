@@ -1716,8 +1716,8 @@ switch ($action) {
             $stmt = $pdo->query("SHOW TABLES LIKE 'member_auth'");
             $hasMemberAuth = (bool) $stmt->fetchColumn();
             if ($hasMemberAuth) {
-                $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
-                if (!$stmt->execute(['member_id' => $memberId, 'hash' => $hash])) {
+                $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash_insert) ON DUPLICATE KEY UPDATE password_hash = :hash_update, password_reset_token = NULL, password_reset_expires_at = NULL');
+                if (!$stmt->execute(['member_id' => $memberId, 'hash_insert' => $hash, 'hash_update' => $hash])) {
                     $errorInfo = $stmt->errorInfo();
                     error_log('[Admin] Member auth update failed for member #' . $memberId . ': ' . ($errorInfo[2] ?? 'Unknown SQL error'));
                 }

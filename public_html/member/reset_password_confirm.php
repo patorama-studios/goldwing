@@ -62,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $hasMemberAuth = false;
                     }
                     if ($hasMemberAuth) {
-                        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash) ON DUPLICATE KEY UPDATE password_hash = :hash, password_reset_token = NULL, password_reset_expires_at = NULL');
-                        $stmt->execute(['member_id' => $memberId, 'hash' => $hash]);
+                        $stmt = $pdo->prepare('INSERT INTO member_auth (member_id, password_hash) VALUES (:member_id, :hash_insert) ON DUPLICATE KEY UPDATE password_hash = :hash_update, password_reset_token = NULL, password_reset_expires_at = NULL');
+                        $stmt->execute(['member_id' => $memberId, 'hash_insert' => $hash, 'hash_update' => $hash]);
                     }
                 }
                 $stmt = $pdo->prepare('UPDATE password_resets SET used_at = NOW() WHERE user_id = :user_id AND used_at IS NULL');

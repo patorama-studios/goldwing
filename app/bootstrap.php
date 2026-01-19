@@ -5,6 +5,7 @@ require_once __DIR__ . '/Services/Database.php';
 use App\Services\Env;
 use App\Services\Database;
 use App\Services\DbSessionHandler;
+use App\Services\LogViewerService;
 use App\Services\SecurityHeadersService;
 use App\Services\StepUpService;
 
@@ -25,6 +26,7 @@ spl_autoload_register(function ($class) {
 });
 
 $appConfig = require __DIR__ . '/../config/app.php';
+LogViewerService::configurePhpLogging();
 
 $sessionConfig = $appConfig['session'];
 $secure = $sessionConfig['secure'];
