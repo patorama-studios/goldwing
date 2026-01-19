@@ -66,7 +66,7 @@ $nameParts = preg_split('/\s+/', trim((string) $primaryName));
 $guestFirst = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
 $guestLast = $nameParts && count($nameParts) > 1 ? implode(' ', $nameParts) : '';
 
-$fulfillment = $requiresShipping ? 'shipping' : 'pickup';
+$fulfillment = 'shipping';
 
 $address = [
     'name' => trim($_POST['shipping_name'] ?? ($member ? ($member['first_name'] . ' ' . $member['last_name']) : $primaryName)),
@@ -212,6 +212,13 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                       <div><?= e(trim($address['city'] . ' ' . $address['state'] . ' ' . $address['postal'])) ?></div>
                       <div><?= e($address['country']) ?></div>
                     </div>
+                    <input type="hidden" name="shipping_name" value="<?= e($address['name']) ?>">
+                    <input type="hidden" name="shipping_line1" value="<?= e($address['line1']) ?>">
+                    <input type="hidden" name="shipping_line2" value="<?= e($address['line2']) ?>">
+                    <input type="hidden" name="shipping_city" value="<?= e($address['city']) ?>">
+                    <input type="hidden" name="shipping_state" value="<?= e($address['state']) ?>">
+                    <input type="hidden" name="shipping_postal" value="<?= e($address['postal']) ?>">
+                    <input type="hidden" name="shipping_country" value="<?= e($address['country']) ?>">
                     <details class="mt-4">
                       <summary class="text-sm">Use a different shipping address</summary>
                       <div class="form-group">
@@ -336,10 +343,6 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                   </table>
                 </div>
               </div>
-
-              <?php if ($requiresShipping && $fulfillment === 'shipping' && !$shippingAvailable): ?>
-                <div class="alert error">Shipping is not available for this order. Choose pickup or adjust your cart.</div>
-              <?php endif; ?>
 
               <button type="button" class="button primary" data-pay-button>Pay now</button>
             </form>

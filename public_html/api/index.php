@@ -140,14 +140,24 @@ function insert_member_bikes($pdo, int $memberId, array $vehicles): void
     $bikeColumns = [];
     $bikeHasRego = true;
     $bikeHasColour = false;
+    $bikeHasPrimary = false;
     try {
         $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(\PDO::FETCH_COLUMN, 0);
         $bikeHasRego = in_array('rego', $bikeColumns, true);
         $bikeHasColour = in_array('colour', $bikeColumns, true) || in_array('color', $bikeColumns, true);
+        $bikeHasPrimary = in_array('is_primary', $bikeColumns, true);
     } catch (Throwable $e) {
         $bikeColumns = [];
         $bikeHasRego = true;
         $bikeHasColour = false;
+        $bikeHasPrimary = false;
+    }
+
+    $primarySet = false;
+    if ($bikeHasPrimary) {
+        $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+        $primaryStmt->execute(['member_id' => $memberId]);
+        $primarySet = (bool) $primaryStmt->fetchColumn();
     }
 
     foreach ($vehicles as $vehicle) {
@@ -185,8 +195,16 @@ function insert_member_bikes($pdo, int $memberId, array $vehicles): void
                     $params['color'] = $colour;
                 }
             }
+            if ($bikeHasPrimary && !$primarySet) {
+                $columns[] = 'is_primary';
+                $placeholders[] = ':is_primary';
+                $params['is_primary'] = 1;
+            }
             $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
             $stmt->execute($params);
+            if ($bikeHasPrimary && !$primarySet) {
+                $primarySet = true;
+            }
         }
     }
 }
@@ -419,17 +437,7 @@ if ($resource === 'stripe') {
             }
         }
 
-        $pickupEnabled = (int) ($settingsStore['pickup_enabled'] ?? 0) === 1;
-        $fulfillment = $body['fulfillment'] ?? 'shipping';
-        if (!in_array($fulfillment, ['shipping', 'pickup'], true)) {
-            $fulfillment = 'shipping';
-        }
-        if (!$requiresShipping) {
-            $fulfillment = 'pickup';
-        }
-        if ($requiresShipping && $fulfillment === 'pickup' && !$pickupEnabled) {
-            json_response(['error' => 'Pickup is not available.'], 422);
-        }
+        $fulfillment = 'shipping';
 
         $shipping = [
             'name' => trim((string) ($body['shipping_name'] ?? '')),
@@ -497,9 +505,6 @@ if ($resource === 'stripe') {
                 $shippingAvailable = true;
             } elseif (!empty($settingsStore['shipping_flat_enabled']) && $flatRate > 0) {
                 $shippingAvailable = true;
-            }
-            if (!$shippingAvailable) {
-                json_response(['error' => 'Shipping is not available for this order.'], 422);
             }
         }
 
