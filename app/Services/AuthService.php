@@ -191,20 +191,33 @@ class AuthService
             return null;
         }
 
+        $member = null;
         if (MemberRepository::hasMemberNumberColumn($pdo)) {
-            $stmt = $pdo->prepare('SELECT u.* FROM users u JOIN members m ON m.id = u.member_id WHERE m.member_number = :member_number LIMIT 1');
+            $stmt = $pdo->prepare('SELECT id, user_id FROM members WHERE member_number = :member_number LIMIT 1');
             $stmt->execute(['member_number' => $memberNumber['display']]);
+            $member = $stmt->fetch();
+        }
+        if (!$member) {
+            $stmt = $pdo->prepare('SELECT id, user_id FROM members WHERE member_number_base = :base AND member_number_suffix = :suffix LIMIT 1');
+            $stmt->execute([
+                'base' => $memberNumber['base'],
+                'suffix' => $memberNumber['suffix'],
+            ]);
+            $member = $stmt->fetch();
+        }
+        if (!$member) {
+            return null;
+        }
+        if (!empty($member['user_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $member['user_id']]);
             $user = $stmt->fetch();
             if ($user) {
                 return $user;
             }
         }
-
-        $stmt = $pdo->prepare('SELECT u.* FROM users u JOIN members m ON m.id = u.member_id WHERE m.member_number_base = :base AND m.member_number_suffix = :suffix LIMIT 1');
-        $stmt->execute([
-            'base' => $memberNumber['base'],
-            'suffix' => $memberNumber['suffix'],
-        ]);
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE member_id = :member_id LIMIT 1');
+        $stmt->execute(['member_id' => (int) $member['id']]);
         $user = $stmt->fetch();
         return $user ?: null;
     }

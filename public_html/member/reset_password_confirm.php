@@ -50,6 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare('SELECT member_id FROM users WHERE id = :id');
                 $stmt->execute(['id' => $userId]);
                 $memberId = (int) $stmt->fetchColumn();
+                if ($memberId <= 0) {
+                    $stmt = $pdo->prepare('SELECT id FROM members WHERE user_id = :user_id LIMIT 1');
+                    $stmt->execute(['user_id' => $userId]);
+                    $memberId = (int) $stmt->fetchColumn();
+                }
                 if ($memberId > 0) {
                     try {
                         $hasMemberAuth = (bool) $pdo->query("SHOW TABLES LIKE 'member_auth'")->fetchColumn();

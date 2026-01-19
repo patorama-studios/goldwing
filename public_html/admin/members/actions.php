@@ -24,7 +24,7 @@ use App\Services\VehicleRepository;
 require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
 
 $user = current_user();
-$allowedTabs = ['overview', 'profile', 'vehicles', 'orders', 'refunds', 'activity'];
+$allowedTabs = ['overview', 'profile', 'roles', 'settings', 'vehicles', 'orders', 'refunds', 'activity'];
 $tab = $_POST['tab'] ?? 'overview';
 if (!in_array($tab, $allowedTabs, true)) {
     $tab = 'overview';
