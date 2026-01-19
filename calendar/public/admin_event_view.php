@@ -189,13 +189,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $event = $stmt->fetch();
 }
 
-$stmt = $pdo->prepare('SELECT r.*, u.email FROM calendar_event_rsvps r JOIN users u ON u.id = r.user_id WHERE r.event_id = :event_id ORDER BY r.created_at ASC');
-$stmt->execute(['event_id' => $eventId]);
-$rsvps = $stmt->fetchAll();
+$hasMemberVehicles = calendar_table_exists($pdo, 'member_vehicles');
+$hasMemberBikes = calendar_table_exists($pdo, 'member_bikes');
+$primaryBikeSelect = 'NULL AS primary_bike';
+$primaryBikeJoin = '';
+if ($hasMemberVehicles) {
+    $primaryBikeSelect = 'pb.primary_bike';
+    $primaryBikeJoin = 'LEFT JOIN (SELECT member_id, MAX(CONCAT_WS(" ", CASE WHEN year_exact IS NOT NULL THEN year_exact WHEN year_from IS NOT NULL AND year_to IS NOT NULL THEN CONCAT(year_from, "-", year_to) WHEN year_from IS NOT NULL THEN year_from WHEN year_to IS NOT NULL THEN year_to ELSE NULL END, make, model)) AS primary_bike FROM member_vehicles WHERE is_primary = 1 GROUP BY member_id) pb ON pb.member_id = m.id';
+} elseif ($hasMemberBikes) {
+    $primaryBikeSelect = 'pb.primary_bike';
+    $primaryBikeJoin = 'LEFT JOIN (SELECT member_id, MAX(CONCAT_WS(" ", year, make, model, colour)) AS primary_bike FROM member_bikes WHERE is_primary = 1 GROUP BY member_id) pb ON pb.member_id = m.id';
+}
 
-$stmt = $pdo->prepare('SELECT t.*, u.email FROM calendar_event_tickets t JOIN users u ON u.id = t.user_id WHERE t.event_id = :event_id ORDER BY t.created_at ASC');
+$attendeeByUser = [];
+$rsvpSql = 'SELECT r.user_id, r.qty, r.status, r.created_at, u.email, u.name AS user_name, m.id AS member_id, m.first_name, m.last_name, ' . $primaryBikeSelect . ', 0 AS paid'
+    . ' FROM calendar_event_rsvps r JOIN users u ON u.id = r.user_id LEFT JOIN members m ON m.id = u.member_id '
+    . $primaryBikeJoin
+    . ' WHERE r.event_id = :event_id ORDER BY r.created_at ASC';
+if ((int) $event['is_paid'] === 1) {
+    $rsvpSql = 'SELECT r.user_id, r.qty, r.status, r.created_at, u.email, u.name AS user_name, m.id AS member_id, m.first_name, m.last_name, ' . $primaryBikeSelect . ', CASE WHEN t.user_id IS NULL THEN 0 ELSE 1 END AS paid'
+        . ' FROM calendar_event_rsvps r JOIN users u ON u.id = r.user_id'
+        . ' LEFT JOIN members m ON m.id = u.member_id '
+        . ' LEFT JOIN (SELECT DISTINCT user_id, event_id FROM calendar_event_tickets WHERE event_id = :event_id) t ON t.user_id = r.user_id AND t.event_id = r.event_id '
+        . $primaryBikeJoin
+        . ' WHERE r.event_id = :event_id ORDER BY r.created_at ASC';
+}
+$stmt = $pdo->prepare($rsvpSql);
 $stmt->execute(['event_id' => $eventId]);
-$tickets = $stmt->fetchAll();
+$rsvpRows = $stmt->fetchAll();
+
+foreach ($rsvpRows as $row) {
+    $userId = (int) $row['user_id'];
+    $fullName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+    if ($fullName === '') {
+        $fullName = $row['user_name'] ?? '';
+    }
+    $attendeeByUser[$userId] = [
+        'member_id' => $row['member_id'] ?? null,
+        'name' => $fullName !== '' ? $fullName : ($row['email'] ?? ''),
+        'email' => $row['email'] ?? '',
+        'primary_bike' => $row['primary_bike'] ?? '',
+        'paid' => (int) ($row['paid'] ?? 0),
+    ];
+}
+
+if ((int) $event['is_paid'] === 1) {
+    $ticketSql = 'SELECT t.user_id, t.qty, t.created_at, u.email, u.name AS user_name, m.id AS member_id, m.first_name, m.last_name, ' . $primaryBikeSelect . ', 1 AS paid'
+        . ' FROM calendar_event_tickets t JOIN users u ON u.id = t.user_id LEFT JOIN members m ON m.id = u.member_id '
+        . $primaryBikeJoin
+        . ' WHERE t.event_id = :event_id ORDER BY t.created_at ASC';
+    $stmt = $pdo->prepare($ticketSql);
+    $stmt->execute(['event_id' => $eventId]);
+    $ticketRows = $stmt->fetchAll();
+    foreach ($ticketRows as $row) {
+        $userId = (int) $row['user_id'];
+        $fullName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+        if ($fullName === '') {
+            $fullName = $row['user_name'] ?? '';
+        }
+        if (!isset($attendeeByUser[$userId])) {
+            $attendeeByUser[$userId] = [
+                'member_id' => $row['member_id'] ?? null,
+                'name' => $fullName !== '' ? $fullName : ($row['email'] ?? ''),
+                'email' => $row['email'] ?? '',
+                'primary_bike' => $row['primary_bike'] ?? '',
+                'paid' => 1,
+            ];
+        } else {
+            $attendeeByUser[$userId]['paid'] = 1;
+        }
+    }
+}
+
+$attendees = array_values($attendeeByUser);
+usort($attendees, function ($a, $b) {
+    return strcasecmp($a['name'], $b['name']);
+});
 
 $timezoneOptions = [
     'Australia/Sydney',
@@ -461,6 +530,43 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700" href="export_attendees.php?event_id=<?php echo (int) $eventId; ?>&type=tickets">Export Tickets</a>
               <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700" href="admin_refunds.php?event_id=<?php echo (int) $eventId; ?>">Refund Requests</a>
             </div>
+            <?php if (empty($attendees)) : ?>
+              <p class="text-sm text-gray-500">No attendees yet.</p>
+            <?php else : ?>
+              <div class="text-xs text-gray-500">Total attendees: <?php echo count($attendees); ?></div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                    <tr>
+                      <th class="py-2 pr-3">Member ID</th>
+                      <th class="py-2 pr-3">Name</th>
+                      <th class="py-2 pr-3">Email</th>
+                      <th class="py-2 pr-3">Primary Bike</th>
+                      <?php if ((int) $event['is_paid'] === 1) : ?>
+                        <th class="py-2">Paid</th>
+                      <?php endif; ?>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <?php foreach ($attendees as $attendee) : ?>
+                      <tr>
+                        <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e((string) ($attendee['member_id'] ?? '—')); ?></td>
+                        <td class="py-2 pr-3 text-gray-900 font-medium"><?php echo calendar_e($attendee['name']); ?></td>
+                        <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e($attendee['email']); ?></td>
+                        <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e($attendee['primary_bike'] !== '' ? $attendee['primary_bike'] : '—'); ?></td>
+                        <?php if ((int) $event['is_paid'] === 1) : ?>
+                          <td class="py-2">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold <?php echo $attendee['paid'] ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'; ?>">
+                              <?php echo $attendee['paid'] ? 'Paid' : 'Unpaid'; ?>
+                            </span>
+                          </td>
+                        <?php endif; ?>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
           </section>
 
           <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
