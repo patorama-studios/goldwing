@@ -6,9 +6,7 @@ use PDO;
 
 class AdminMemberAccess
 {
-    private const FULL_ACCESS_ROLES = ['super_admin', 'admin', 'committee'];
     private const CHAPTER_ROLE = 'chapter_leader';
-    private const TREASURER_ROLE = 'treasurer';
 
     public static function getChapterRestrictionId(?array $user): ?int
     {
@@ -36,12 +34,12 @@ class AdminMemberAccess
 
     public static function isFullAccess(array $user): bool
     {
-        return self::hasAnyRole($user, self::FULL_ACCESS_ROLES);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     public static function isTreasurer(array $user): bool
     {
-        return self::hasRole($user, self::TREASURER_ROLE);
+        return function_exists('current_admin_can') && current_admin_can('admin.payments.view', $user);
     }
 
     public static function isChapterLeader(array $user): bool
@@ -51,62 +49,52 @@ class AdminMemberAccess
 
     public static function canEditProfile(array $user): bool
     {
-        return self::isFullAccess($user) || self::isTreasurer($user) || self::isChapterLeader($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     public static function canEditFullProfile(array $user): bool
     {
-        return self::isFullAccess($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     public static function canEditAddress(array $user): bool
     {
-        return self::isFullAccess($user) || self::isTreasurer($user) || self::isChapterLeader($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     public static function canEditContact(array $user): bool
     {
-        return self::isFullAccess($user) || self::isChapterLeader($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     public static function canResetPassword(array $user): bool
     {
-        return self::isFullAccess($user) || self::isTreasurer($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.users.edit', $user);
     }
 
     public static function canSetPassword(array $user): bool
     {
-        return self::isFullAccess($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.users.edit', $user);
     }
 
     public static function canImpersonate(array $user): bool
     {
-        return self::isFullAccess($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.users.edit', $user);
     }
 
     public static function canRefund(array $user): bool
     {
-        return self::hasAnyRole($user, ['super_admin', 'admin', 'treasurer']);
+        return function_exists('current_admin_can') && current_admin_can('admin.payments.refund', $user);
     }
 
     public static function canManualOrderFix(array $user): bool
     {
-        return self::isFullAccess($user);
+        return function_exists('current_admin_can') && current_admin_can('admin.members.manual_payment', $user);
     }
 
     public static function canManageVehicles(array $user): bool
     {
-        return self::isFullAccess($user);
-    }
-
-    private static function hasAnyRole(array $user, array $roles): bool
-    {
-        foreach ($roles as $role) {
-            if (self::hasRole($user, $role)) {
-                return true;
-            }
-        }
-        return false;
+        return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
     }
 
     private static function hasRole(array $user, string $role): bool

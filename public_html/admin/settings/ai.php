@@ -7,7 +7,7 @@ use App\Services\Csrf;
 use App\Services\EncryptionService;
 use App\Services\SettingsService;
 
-require_role(['admin', 'committee']);
+require_permission('admin.settings.general.manage');
 
 $user = current_user();
 $message = '';

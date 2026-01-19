@@ -6,7 +6,7 @@ use App\Services\ActivityLogger;
 use App\Services\MemberRepository;
 use App\Services\SecurityAlertService;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.import_export');
 require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 
 $user = current_user();

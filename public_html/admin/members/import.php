@@ -11,7 +11,7 @@ use App\Services\MembershipService;
 use App\Services\SecurityAlertService;
 use App\Services\Validator;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.import_export');
 require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

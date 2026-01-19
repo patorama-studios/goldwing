@@ -5,7 +5,7 @@ use App\Services\PageBuilderService;
 use App\Services\PageService;
 use App\Services\SettingsService;
 
-require_role(['admin', 'committee']);
+require_permission('admin.ai_page_builder.access');
 
 $pageId = isset($_GET['page_id']) ? (int) $_GET['page_id'] : 0;
 $page = $pageId ? PageService::getById($pageId) : null;

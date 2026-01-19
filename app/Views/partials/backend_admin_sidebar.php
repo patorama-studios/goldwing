@@ -1,62 +1,69 @@
 <?php
 $settingsChildren = [
-    ['key' => 'settings-hub', 'label' => 'Settings Hub', 'href' => '/admin/settings/index.php', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-site', 'label' => 'Site Settings', 'href' => '/admin/settings/index.php?section=site', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-store', 'label' => 'Store Settings', 'href' => '/admin/settings/index.php?section=store', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-payments', 'label' => 'Payments (Stripe)', 'href' => '/admin/settings/index.php?section=payments', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-notifications', 'label' => 'Notifications', 'href' => '/admin/settings/index.php?section=notifications', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-accounts', 'label' => 'Accounts & Roles', 'href' => '/admin/settings/index.php?section=accounts', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-security', 'label' => 'Security & Authentication', 'href' => '/admin/settings/index.php?section=security', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-integrations', 'label' => 'Integrations', 'href' => '/admin/settings/index.php?section=integrations', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-media', 'label' => 'Media & Files', 'href' => '/admin/settings/index.php?section=media', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-events', 'label' => 'Events', 'href' => '/admin/settings/index.php?section=events', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-ai', 'label' => 'AI Settings', 'href' => '/admin/settings/ai.php', 'path' => '/admin/settings/ai.php'],
-    ['key' => 'settings-membership', 'label' => 'Membership Settings', 'href' => '/admin/settings/index.php?section=membership_pricing', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-audit-log', 'label' => 'Audit Log', 'href' => '/admin/settings/index.php?section=audit', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-advanced', 'label' => 'Advanced / Developer', 'href' => '/admin/settings/index.php?section=advanced', 'path' => '/admin/settings/index.php'],
-    ['key' => 'settings-access-control', 'label' => 'Access Control', 'href' => '/admin/settings/access-control.php', 'path' => '/admin/settings/access-control.php'],
-    ['key' => 'security-log', 'label' => 'Security Log', 'href' => '/admin/security/activity_log.php', 'path' => '/admin/security/activity_log.php'],
-    ['key' => 'reports', 'label' => 'Reports', 'href' => '/admin/index.php?page=reports', 'path' => '/admin/index.php'],
-    ['key' => 'audit', 'label' => 'Audit', 'href' => '/admin/index.php?page=audit', 'path' => '/admin/index.php'],
+    ['key' => 'settings-hub', 'label' => 'Settings Hub', 'href' => '/admin/settings/index.php', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-site', 'label' => 'Site Settings', 'href' => '/admin/settings/index.php?section=site', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-store', 'label' => 'Store Settings', 'href' => '/admin/settings/index.php?section=store', 'path' => '/admin/settings/index.php', 'permission' => 'admin.store.view'],
+    ['key' => 'settings-payments', 'label' => 'Payments (Stripe)', 'href' => '/admin/settings/index.php?section=payments', 'path' => '/admin/settings/index.php', 'permission' => 'admin.payments.view'],
+    ['key' => 'settings-notifications', 'label' => 'Notifications', 'href' => '/admin/settings/index.php?section=notifications', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-accounts', 'label' => 'Accounts & Roles', 'href' => '/admin/settings/index.php?section=accounts', 'path' => '/admin/settings/index.php', 'permission' => 'admin.users.view'],
+    ['key' => 'settings-security', 'label' => 'Security & Authentication', 'href' => '/admin/settings/index.php?section=security', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-integrations', 'label' => 'Integrations', 'href' => '/admin/settings/index.php?section=integrations', 'path' => '/admin/settings/index.php', 'permission' => 'admin.integrations.manage'],
+    ['key' => 'settings-media', 'label' => 'Media & Files', 'href' => '/admin/settings/index.php?section=media', 'path' => '/admin/settings/index.php', 'permission' => 'admin.media_library.manage'],
+    ['key' => 'settings-events', 'label' => 'Events', 'href' => '/admin/settings/index.php?section=events', 'path' => '/admin/settings/index.php', 'permission' => 'admin.events.manage'],
+    ['key' => 'settings-ai', 'label' => 'AI Settings', 'href' => '/admin/settings/ai.php', 'path' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-membership', 'label' => 'Membership Settings', 'href' => '/admin/settings/index.php?section=membership_pricing', 'path' => '/admin/settings/index.php', 'permission' => 'admin.membership_types.manage'],
+    ['key' => 'settings-audit-log', 'label' => 'Audit Log', 'href' => '/admin/settings/index.php?section=audit', 'path' => '/admin/settings/index.php', 'permission' => 'admin.logs.view'],
+    ['key' => 'settings-advanced', 'label' => 'Advanced / Developer', 'href' => '/admin/settings/index.php?section=advanced', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
+    ['key' => 'settings-roles', 'label' => 'Admin Role Builder', 'href' => '/admin/settings/roles.php', 'path' => '/admin/settings/roles.php', 'permission' => 'admin.roles.view'],
+    ['key' => 'settings-access-control', 'label' => 'Access Control', 'href' => '/admin/settings/access-control.php', 'path' => '/admin/settings/access-control.php', 'permission' => 'admin.roles.manage'],
+    ['key' => 'security-log', 'label' => 'Security Log', 'href' => '/admin/security/activity_log.php', 'path' => '/admin/security/activity_log.php', 'permission' => 'admin.logs.view'],
+    ['key' => 'reports', 'label' => 'Reports', 'href' => '/admin/index.php?page=reports', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
+    ['key' => 'audit', 'label' => 'Audit', 'href' => '/admin/index.php?page=audit', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
 ];
 $items = [
-    ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php'],
+    ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
     [
         'key' => 'settings',
         'label' => 'Settings',
         'icon' => 'settings',
         'children' => $settingsChildren,
     ],
-    ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members'],
-    ['key' => 'applications', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications'],
-    ['key' => 'payments', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments'],
-    ['key' => 'events', 'label' => 'Events', 'icon' => 'event', 'href' => '/admin/index.php?page=events'],
-    ['key' => 'calendar-events', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php'],
-    ['key' => 'navigation', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php'],
-    ['key' => 'notices', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices'],
-    ['key' => 'member-of-year', 'label' => 'Member of the Year Submissions', 'icon' => 'emoji_events', 'href' => '/admin/member-of-the-year'],
-    ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings'],
-    ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings'],
-    ['key' => 'media', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media'],
+    ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members', 'permission' => 'admin.members.view'],
+    ['key' => 'applications', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
+    ['key' => 'payments', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
+    ['key' => 'events', 'label' => 'Events', 'icon' => 'event', 'href' => '/admin/index.php?page=events', 'permission' => 'admin.events.manage'],
+    ['key' => 'calendar-events', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php', 'permission' => 'admin.calendar.view'],
+    ['key' => 'navigation', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php', 'permission' => 'admin.pages.edit'],
+    ['key' => 'notices', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices', 'permission' => 'admin.pages.edit'],
+    ['key' => 'member-of-year', 'label' => 'Member of the Year Submissions', 'icon' => 'emoji_events', 'href' => '/admin/member-of-the-year', 'permission' => 'admin.member_of_year.view'],
+    ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings', 'permission' => 'admin.pages.view'],
+    ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings', 'permission' => 'admin.wings_magazine.manage'],
+    ['key' => 'media', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media', 'permission' => 'admin.media_library.manage'],
     [
         'key' => 'store',
         'label' => 'Store',
         'icon' => 'storefront',
         'children' => [
-            ['key' => 'store-orders', 'label' => 'Orders', 'href' => '/admin/store/orders', 'path' => '/admin/store/orders'],
-            ['key' => 'store-products', 'label' => 'Products (Inventory)', 'href' => '/admin/store/products', 'path' => '/admin/store/products'],
+            ['key' => 'store-orders', 'label' => 'Orders', 'href' => '/admin/store/orders', 'path' => '/admin/store/orders', 'permission' => 'admin.orders.view'],
+            ['key' => 'store-products', 'label' => 'Products (Inventory)', 'href' => '/admin/store/products', 'path' => '/admin/store/products', 'permission' => 'admin.products.manage'],
         ],
     ],
-    ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder'],
+    ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
 ];
 $user = $user ?? current_user();
-if (function_exists('can_access_path')) {
+if (function_exists('current_admin_can')) {
     $filteredItems = [];
     foreach ($items as $item) {
         if (!empty($item['children'])) {
             $children = array_values(array_filter($item['children'], function ($child) use ($user) {
+                if (!empty($child['permission']) && !current_admin_can($child['permission'], $user)) {
+                    return false;
+                }
                 $path = $child['path'] ?? $child['href'];
-                return can_access_path($user, $path);
+                if (function_exists('can_access_path')) {
+                    return can_access_path($user, $path);
+                }
+                return true;
             }));
             if (!$children) {
                 continue;
@@ -65,8 +72,11 @@ if (function_exists('can_access_path')) {
             $filteredItems[] = $item;
             continue;
         }
+        if (!empty($item['permission']) && !current_admin_can($item['permission'], $user)) {
+            continue;
+        }
         $path = $item['path'] ?? $item['href'];
-        if (can_access_path($user, $path)) {
+        if (!function_exists('can_access_path') || can_access_path($user, $path)) {
             $filteredItems[] = $item;
         }
     }
@@ -141,6 +151,9 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                     $isChildActive = true;
                 }
                 if ($activePage === 'settings' && $child['key'] === 'settings-access-control' && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/access-control.php') === 0) {
+                    $isChildActive = true;
+                }
+                if ($activePage === 'settings' && $child['key'] === 'settings-roles' && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/roles.php') === 0) {
                     $isChildActive = true;
                 }
                 if (!$isChildActive && $currentPath && !empty($child['path']) && strpos($currentPath, $child['path']) === 0) {

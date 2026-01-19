@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 
-require_role(['super_admin', 'admin', 'web_admin']);
+require_permission('admin.member_of_year.manage');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /admin/member-of-the-year');

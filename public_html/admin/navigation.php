@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\Csrf;
 
-require_role(['admin']);
+require_permission('admin.pages.edit');
 
 $pdo = db();
 $user = current_user();

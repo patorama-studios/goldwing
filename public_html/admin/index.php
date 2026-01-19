@@ -21,7 +21,7 @@ use App\Services\ChapterRepository;
 use App\Services\DomSnapshotService;
 use App\Services\BaseUrlService;
 
-require_role(['admin', 'committee', 'treasurer', 'chapter_leader']);
+require_login();
 
 function orders_member_column(\PDO $pdo): string
 {
@@ -70,6 +70,21 @@ $page = $_GET['page'] ?? 'dashboard';
 $page = preg_replace('/[^a-z0-9-]/', '', strtolower($page));
 $user = current_user();
 $pdo = db();
+
+$permissionMap = [
+    'dashboard' => 'admin.dashboard.view',
+    'applications' => 'admin.members.view',
+    'payments' => 'admin.payments.view',
+    'events' => 'admin.events.manage',
+    'notices' => 'admin.pages.edit',
+    'fallen-wings' => 'admin.pages.view',
+    'wings' => 'admin.wings_magazine.manage',
+    'media' => 'admin.media_library.manage',
+    'reports' => 'admin.logs.view',
+    'audit' => 'admin.logs.view',
+];
+$permissionKey = $permissionMap[$page] ?? 'admin.dashboard.view';
+require_permission($permissionKey);
 
 if ($page === 'menus') {
     header('Location: /admin/navigation.php');

@@ -5,7 +5,7 @@ use App\Services\ActivityLogger;
 use App\Services\Csrf;
 use App\Services\NavigationService;
 
-require_role(['super_admin']);
+require_permission('admin.roles.manage');
 
 if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     $_SESSION['access_control_toast'] = 'Invalid CSRF token.';

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Database;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer']);
+require_permission('admin.logs.view');
 
 $filters = [
     'user_id' => isset($_GET['user_id']) && $_GET['user_id'] !== '' ? (int) $_GET['user_id'] : null,

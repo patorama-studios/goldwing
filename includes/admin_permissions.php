@@ -187,7 +187,7 @@ function admin_role_ids_for_user(array $user): array
     }
     $pdo = db();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
-    $stmt = $pdo->prepare('SELECT id FROM roles WHERE name IN (' . $placeholders . ')');
+    $stmt = $pdo->prepare('SELECT id FROM roles WHERE name IN (' . $placeholders . ') AND is_active = 1');
     $stmt->execute($roles);
     $rows = $stmt->fetchAll() ?: [];
     return array_map('intval', array_column($rows, 'id'));
@@ -264,6 +264,10 @@ function require_permission(string $permissionKey): void
 
 function admin_role_builder_candidates(PDO $pdo): array
 {
+    if (!admin_permissions_tables_ready()) {
+        $stmt = $pdo->query('SELECT r.*, 0 AS permission_count FROM roles r ORDER BY r.name');
+        return $stmt->fetchAll() ?: [];
+    }
     $stmt = $pdo->query('SELECT r.*, COUNT(rp.id) AS permission_count FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id GROUP BY r.id ORDER BY r.name');
     return $stmt->fetchAll() ?: [];
 }

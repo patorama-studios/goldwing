@@ -6,24 +6,13 @@ use App\Services\SecurityPolicyService;
 use App\Services\Database;
 use App\Services\ChapterRepository;
 use App\Services\Csrf;
+use App\Services\AdminMemberAccess;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.view');
 
 $user = current_user();
-$roles = $user['roles'] ?? [];
-$chapterRestriction = null;
-if (!in_array('admin', $roles, true) && !in_array('super_admin', $roles, true) && in_array('chapter_leader', $roles, true)) {
-    $memberId = $user['member_id'] ?? null;
-    if ($memberId) {
-        $stmt = db()->prepare('SELECT chapter_id FROM members WHERE id = :id');
-        $stmt->execute(['id' => $memberId]);
-        $row = $stmt->fetch();
-        if ($row && $row['chapter_id']) {
-            $chapterRestriction = (int) $row['chapter_id'];
-        }
-    }
-}
-$canInlineEdit = !empty(array_intersect($roles, ['super_admin', 'admin', 'committee']));
+$chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
+$canInlineEdit = AdminMemberAccess::isFullAccess($user);
 
 $allowedLimits = [25, 50, 100];
 $limit = (int) ($_GET['limit'] ?? 25);

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
-require_role(['admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.view');
 
 $pdo = db();
 $user = current_user();

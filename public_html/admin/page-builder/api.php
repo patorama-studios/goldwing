@@ -9,8 +9,6 @@ use App\Services\PageBuilderService;
 use App\Services\PageService;
 use App\Services\SettingsService;
 
-require_role(['admin', 'committee']);
-
 header('Content-Type: application/json');
 
 function json_response(array $payload, int $status = 200): void
@@ -312,6 +310,26 @@ function unique_slug(string $slug): string
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = $_GET['action'] ?? '';
+$permissionMap = [
+    'pages' => 'admin.ai_page_builder.access',
+    'page' => 'admin.ai_page_builder.access',
+    'versions' => 'admin.ai_page_builder.access',
+    'settings' => 'admin.ai_page_builder.edit',
+    'upload_media' => 'admin.media_library.manage',
+    'save_draft' => 'admin.ai_page_builder.edit',
+    'create_page' => 'admin.ai_page_builder.edit',
+    'access' => 'admin.ai_page_builder.edit',
+    'publish' => 'admin.ai_page_builder.publish',
+    'rollback' => 'admin.ai_page_builder.edit',
+    'manual_edit' => 'admin.ai_page_builder.edit',
+    'ai_edit' => 'admin.ai_page_builder.edit',
+    'image_generate' => 'admin.ai_page_builder.edit',
+    'template_update' => 'admin.ai_page_builder.edit',
+];
+$permissionKey = $permissionMap[$action] ?? 'admin.ai_page_builder.access';
+if (!current_admin_can($permissionKey, current_user())) {
+    json_response(['error' => 'Forbidden'], 403);
+}
 $pageId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $user = current_user();
 

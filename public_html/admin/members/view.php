@@ -17,7 +17,7 @@ use App\Services\SettingsService;
 use App\Services\ChapterRepository;
 use App\Services\NotificationPreferenceService;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.view');
 
 function orders_member_column(\PDO $pdo): string
 {
@@ -140,11 +140,17 @@ try {
     $membershipTypes = [];
 }
 try {
-    $roleStmt = $pdo->prepare('SELECT id, name FROM roles ORDER BY name');
-    $roleStmt->execute();
-    $roleOptions = $roleStmt->fetchAll(PDO::FETCH_ASSOC);
+    $roleOptions = admin_role_builder_candidates($pdo);
 } catch (Throwable $e) {
     $roleOptions = [];
+}
+[$adminRoleOptions, $systemRoleOptions] = [[], []];
+foreach ($roleOptions as $roleOption) {
+    if (admin_role_is_admin($roleOption)) {
+        $adminRoleOptions[] = $roleOption;
+    } else {
+        $systemRoleOptions[] = $roleOption;
+    }
 }
 
 $allowedMembershipNames = ['Life', 'Full', 'Associate'];
@@ -431,8 +437,9 @@ $canImpersonate = AdminMemberAccess::canImpersonate($user);
 $canRefund = AdminMemberAccess::canRefund($user);
 $canManualFix = AdminMemberAccess::canManualOrderFix($user);
 $canManageVehicles = AdminMemberAccess::canManageVehicles($user);
-$canEditRoles = AdminMemberAccess::isFullAccess($user);
+$canEditRoles = current_admin_can('admin.roles.manage', $user);
 $canEditSettings = AdminMemberAccess::isFullAccess($user);
+$canManageSecurity = current_admin_can('admin.users.edit', $user);
 $memberHasUser = !empty($member['user_id']);
 
 $flash = $_SESSION['members_flash'] ?? null;
@@ -1384,23 +1391,50 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php if ($userId <= 0): ?>
                     <div class="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">Member is not linked to a user account yet; link the user before changing roles.</div>
                   <?php endif; ?>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                    <?php foreach ($roleOptions as $roleOption): ?>
-                      <?php
-                        $name = $roleOption['name'] ?? '';
-                        $display = str_replace(['_', '-'], ' ', ucfirst($name));
-                      ?>
-                      <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                        <input type="checkbox" name="roles[]" value="<?= e($name) ?>" <?= in_array($name, $memberRoles, true) ? 'checked' : '' ?> <?= ($canEditRoles && $userId > 0) ? '' : 'disabled' ?> class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
-                        <span><?= e($display) ?></span>
-                      </label>
-                    <?php endforeach; ?>
+                  <div class="space-y-4">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">System Roles</p>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <?php foreach ($systemRoleOptions as $roleOption): ?>
+                          <?php
+                            $name = $roleOption['name'] ?? '';
+                            $display = str_replace(['_', '-'], ' ', ucfirst($name));
+                          ?>
+                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                            <input type="checkbox" name="roles_system[]" value="<?= e($name) ?>" <?= in_array($name, $memberRoles, true) ? 'checked' : '' ?> <?= ($canEditRoles && $userId > 0) ? '' : 'disabled' ?> class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                            <span><?= e($display) ?></span>
+                          </label>
+                        <?php endforeach; ?>
+                        <?php if (!$systemRoleOptions): ?>
+                          <p class="text-xs text-gray-500">No system roles available.</p>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Admin Roles</p>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <?php foreach ($adminRoleOptions as $roleOption): ?>
+                          <?php
+                            $name = $roleOption['name'] ?? '';
+                            $display = str_replace(['_', '-'], ' ', ucfirst($name));
+                          ?>
+                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                            <input type="checkbox" name="roles_admin[]" value="<?= e($name) ?>" <?= in_array($name, $memberRoles, true) ? 'checked' : '' ?> <?= ($canEditRoles && $userId > 0) ? '' : 'disabled' ?> class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                            <span><?= e($display) ?></span>
+                          </label>
+                        <?php endforeach; ?>
+                        <?php if (!$adminRoleOptions): ?>
+                          <p class="text-xs text-gray-500">No admin roles configured yet.</p>
+                        <?php endif; ?>
+                      </div>
+                    </div>
                   </div>
-                  <p class="text-xs text-gray-500">Permissions mapping will be linked/expanded later in the system role permission module.</p>
+                  <p class="text-xs text-gray-500">Admin roles map to the new permissions registry.</p>
                   <?php if ($canEditRoles && $userId > 0): ?>
                     <button class="inline-flex items-center px-4 py-2 rounded-full bg-primary text-xs font-semibold text-gray-900" type="submit">Save role assignments</button>
                   <?php else: ?>
-                    <p class="text-xs text-gray-500"><?= $canEditRoles ? 'Assign a linked user account before updating roles.' : 'Only Admin/Committee can manage system roles.' ?></p>
+                    <p class="text-xs text-gray-500"><?= $canEditRoles ? 'Assign a linked user account before updating roles.' : 'Only Super Admins can manage roles.' ?></p>
                   <?php endif; ?>
                 </form>
               </div>
@@ -1428,7 +1462,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <input type="hidden" name="tab" value="roles">
                         <input type="hidden" name="action" value="twofa_toggle">
                         <input type="hidden" name="twofa_required" value="<?= $twofaOverride === 'REQUIRED' ? '0' : '1' ?>">
-                        <button class="rounded-full border border-gray-200 px-4 py-1 text-xs font-semibold text-gray-700 <?= $canEditRoles ? 'hover:border-gray-400' : 'opacity-40 cursor-not-allowed' ?>" type="submit" <?= $canEditRoles ? '' : 'disabled' ?>>
+                        <button class="rounded-full border border-gray-200 px-4 py-1 text-xs font-semibold text-gray-700 <?= $canManageSecurity ? 'hover:border-gray-400' : 'opacity-40 cursor-not-allowed' ?>" type="submit" <?= $canManageSecurity ? '' : 'disabled' ?>>
                           <?= $twofaOverride === 'REQUIRED' ? 'Set optional' : 'Require 2FA' ?>
                         </button>
                       </form>
@@ -1440,14 +1474,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                           <input type="hidden" name="tab" value="roles">
                           <input type="hidden" name="action" value="twofa_force">
-                          <button type="submit" class="w-full rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Force 2FA enrollment</button>
+                          <button type="submit" class="w-full rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 <?= $canManageSecurity ? 'hover:bg-gray-50' : 'opacity-40 cursor-not-allowed' ?>" <?= $canManageSecurity ? '' : 'disabled' ?>>Force 2FA enrollment</button>
                         </form>
                         <form method="post" action="/admin/members/actions.php">
                           <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                           <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                           <input type="hidden" name="tab" value="roles">
                           <input type="hidden" name="action" value="twofa_exempt">
-                          <button type="submit" class="w-full rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Exempt from 2FA</button>
+                          <button type="submit" class="w-full rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 <?= $canManageSecurity ? 'hover:bg-gray-50' : 'opacity-40 cursor-not-allowed' ?>" <?= $canManageSecurity ? '' : 'disabled' ?>>Exempt from 2FA</button>
                         </form>
                         <form method="post" action="/admin/members/actions.php" onsubmit="return confirm('Reset 2FA for this user?');">
                           <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">

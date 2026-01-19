@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
-require_role(['super_admin', 'admin', 'web_admin']);
+require_permission('admin.member_of_year.view');
 
 $pdo = db();
 $id = (int) ($_GET['id'] ?? 0);

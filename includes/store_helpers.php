@@ -5,18 +5,7 @@ use App\Services\SettingsService;
 
 function store_require_admin(): void
 {
-    require_login();
-    $user = current_user();
-    $roles = $user['roles'] ?? [];
-    $allowed = ['admin', 'super_admin', 'store_manager'];
-    foreach ($allowed as $role) {
-        if (in_array($role, $roles, true)) {
-            return;
-        }
-    }
-    http_response_code(403);
-    echo 'Forbidden';
-    exit;
+    require_permission('admin.store.view');
 }
 
 function store_table_exists(PDO $pdo, string $table): bool
@@ -43,6 +32,17 @@ function store_user_can(?array $user, string $permission): bool
 {
     if (!$user) {
         return false;
+    }
+    if (function_exists('current_admin_can')) {
+        $permissionMap = [
+            'store_orders_view' => 'admin.orders.view',
+            'store_orders_manage' => 'admin.orders.fulfil',
+            'store_refunds_manage' => 'admin.orders.refund_cancel',
+            'store_inventory_manage' => 'admin.products.manage',
+        ];
+        if (isset($permissionMap[$permission])) {
+            return current_admin_can($permissionMap[$permission], $user);
+        }
     }
     $roles = $user['roles'] ?? [];
     if (in_array('super_admin', $roles, true)) {

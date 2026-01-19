@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 
-require_role(['admin', 'committee']);
+require_permission('admin.ai_page_builder.access');
 
 $pageTitle = 'AI Page Builder';
 $activePage = 'ai-editor';

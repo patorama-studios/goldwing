@@ -22,7 +22,7 @@ use App\Services\NotificationPreferenceService;
 use App\Services\TwoFactorService;
 use App\Services\VehicleRepository;
 
-require_role(['super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader']);
+require_permission('admin.members.view');
 
 $user = current_user();
 $allowedTabs = ['overview', 'profile', 'roles', 'settings', 'vehicles', 'orders', 'refunds', 'activity'];
@@ -68,7 +68,8 @@ function respondWithJson(array $payload, int $statusCode = 200): void
 
 function userCanInlineEdit(array $roles): bool
 {
-    return (bool) array_intersect($roles, ['super_admin', 'admin', 'committee']);
+    $user = ['roles' => $roles];
+    return function_exists('current_admin_can') && current_admin_can('admin.members.edit', $user);
 }
 
 function inlineStatusLabel(string $status): string
@@ -1414,14 +1415,16 @@ switch ($action) {
         break;
 
     case 'roles_update':
-        if (!AdminMemberAccess::isFullAccess($user)) {
+        if (!current_admin_can('admin.roles.manage', $user)) {
             redirectWithFlash($memberId, 'roles', 'Role updates restricted.', 'error');
         }
         $userId = $member['user_id'] ?? null;
         if (!$userId) {
             redirectWithFlash($memberId, 'roles', 'Member does not have a linked user account.', 'error');
         }
-        $requested = array_filter(array_map('trim', (array) ($_POST['roles'] ?? [])));
+        $requestedSystem = array_filter(array_map('trim', (array) ($_POST['roles_system'] ?? [])));
+        $requestedAdmin = array_filter(array_map('trim', (array) ($_POST['roles_admin'] ?? [])));
+        $requested = array_values(array_unique(array_merge($requestedSystem, $requestedAdmin)));
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT id, name FROM roles');
         $stmt->execute();
@@ -1513,7 +1516,7 @@ switch ($action) {
         break;
 
     case 'twofa_toggle':
-        if (!AdminMemberAccess::isFullAccess($user)) {
+        if (!current_admin_can('admin.users.edit', $user)) {
             redirectWithFlash($memberId, 'roles', '2FA overrides are restricted.', 'error');
         }
         $userId = $member['user_id'] ?? null;
@@ -1603,6 +1606,9 @@ switch ($action) {
         break;
 
     case 'twofa_force':
+        if (!current_admin_can('admin.users.edit', $user)) {
+            redirectWithFlash($memberId, $tab, '2FA updates are restricted.', 'error');
+        }
         if (empty($member['user_id'])) {
             redirectWithFlash($memberId, $tab, 'User account missing.', 'error');
         }
@@ -1612,6 +1618,9 @@ switch ($action) {
         break;
 
     case 'twofa_exempt':
+        if (!current_admin_can('admin.users.edit', $user)) {
+            redirectWithFlash($memberId, $tab, '2FA updates are restricted.', 'error');
+        }
         if (empty($member['user_id'])) {
             redirectWithFlash($memberId, $tab, 'User account missing.', 'error');
         }
@@ -1621,6 +1630,9 @@ switch ($action) {
         break;
 
     case 'twofa_reset':
+        if (!current_admin_can('admin.users.edit', $user)) {
+            redirectWithFlash($memberId, $tab, '2FA updates are restricted.', 'error');
+        }
         if (empty($member['user_id'])) {
             redirectWithFlash($memberId, $tab, 'User account missing.', 'error');
         }

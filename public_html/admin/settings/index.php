@@ -16,34 +16,25 @@ use App\Services\Validator;
 require_login();
 
 $user = current_user();
-$roles = $user['roles'] ?? [];
 
 $sections = [
-    'site' => ['label' => 'Site Settings', 'roles' => ['admin']],
-    'store' => ['label' => 'Store Settings', 'roles' => ['admin', 'store_manager']],
-    'payments' => ['label' => 'Payments (Stripe)', 'roles' => ['committee', 'treasurer']],
-    'notifications' => ['label' => 'Notifications', 'roles' => ['admin']],
-    'accounts' => ['label' => 'Accounts & Roles', 'roles' => ['super_admin', 'admin']],
-    'security' => ['label' => 'Security & Authentication', 'roles' => ['super_admin', 'admin', 'committee']],
-    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin', 'admin']],
-    'media' => ['label' => 'Media & Files', 'roles' => ['admin']],
-    'events' => ['label' => 'Events', 'roles' => ['admin']],
-    'membership_pricing' => ['label' => 'Membership Settings', 'roles' => ['admin', 'store_manager', 'committee', 'treasurer']],
-    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin', 'admin']],
-    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin', 'admin']],
+    'site' => ['label' => 'Site Settings', 'permission' => 'admin.settings.general.manage'],
+    'store' => ['label' => 'Store Settings', 'permission' => 'admin.store.view'],
+    'payments' => ['label' => 'Payments (Stripe)', 'permission' => 'admin.payments.view'],
+    'notifications' => ['label' => 'Notifications', 'permission' => 'admin.settings.general.manage'],
+    'accounts' => ['label' => 'Accounts & Roles', 'permission' => 'admin.users.view'],
+    'security' => ['label' => 'Security & Authentication', 'permission' => 'admin.settings.general.manage'],
+    'integrations' => ['label' => 'Integrations', 'permission' => 'admin.integrations.manage'],
+    'media' => ['label' => 'Media & Files', 'permission' => 'admin.media_library.manage'],
+    'events' => ['label' => 'Events', 'permission' => 'admin.events.manage'],
+    'membership_pricing' => ['label' => 'Membership Settings', 'permission' => 'admin.membership_types.manage'],
+    'audit' => ['label' => 'Audit Log', 'permission' => 'admin.logs.view'],
+    'advanced' => ['label' => 'Advanced / Developer', 'permission' => 'admin.settings.general.manage'],
 ];
 
-function can_access_section(array $roles, array $allowed): bool
+function can_access_section(string $permission, array $user): bool
 {
-    if (in_array('super_admin', $roles, true)) {
-        return true;
-    }
-    foreach ($allowed as $role) {
-        if (in_array($role, $roles, true)) {
-            return true;
-        }
-    }
-    return false;
+    return function_exists('current_admin_can') && current_admin_can($permission, $user);
 }
 
 $section = $_GET['section'] ?? 'site';
@@ -51,9 +42,8 @@ if (!isset($sections[$section])) {
     $section = 'site';
 }
 
-if (!can_access_section($roles, $sections[$section]['roles'])) {
-    header('Location: /locked-out');
-    exit;
+if (!can_access_section($sections[$section]['permission'], $user)) {
+    admin_render_forbidden();
 }
 
 SettingsService::migrateLegacy((int) $user['id']);
@@ -132,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedSection = $_POST['section'] ?? '';
         if ($postedSection !== $section) {
             $errors[] = 'Invalid settings section.';
-        } elseif (!can_access_section($roles, $sections[$section]['roles'])) {
+        } elseif (!can_access_section($sections[$section]['permission'], $user)) {
             $errors[] = 'Unauthorized.';
         } else {
             $cleared = LogViewerService::clear();
@@ -145,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedSection = $_POST['section'] ?? '';
         if ($postedSection !== $section) {
             $errors[] = 'Invalid settings section.';
-        } elseif (!can_access_section($roles, $sections[$section]['roles'])) {
+        } elseif (!can_access_section($sections[$section]['permission'], $user)) {
             $errors[] = 'Unauthorized.';
         } else {
             $definitions = NotificationService::definitions();
@@ -177,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedSection = $_POST['section'] ?? '';
         if ($postedSection !== $section) {
             $errors[] = 'Invalid settings section.';
-        } elseif (!can_access_section($roles, $sections[$section]['roles'])) {
+        } elseif (!can_access_section($sections[$section]['permission'], $user)) {
             $errors[] = 'Unauthorized.';
         } else {
             if ($section === 'site') {

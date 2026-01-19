@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 
-require_role(['super_admin']);
+require_permission('admin.roles.manage');
 
 sync_access_registry();
 
