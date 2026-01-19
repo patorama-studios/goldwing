@@ -74,22 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $newStatus = str_replace('status_', '', $action);
                 $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-                $stmt = $pdo->prepare('UPDATE store_orders SET order_status = :order_status, updated_at = NOW() WHERE id IN (' . $placeholders . ')');
-                $stmt->bindValue(':order_status', $newStatus);
-                foreach ($orderIds as $index => $orderId) {
-                    $stmt->bindValue($index + 1, $orderId, PDO::PARAM_INT);
-                }
-                $stmt->execute();
-
-                if ($newStatus === 'shipped') {
-                    $stmtItems = $pdo->prepare('UPDATE store_order_items SET fulfilled_qty = quantity WHERE order_id IN (' . $placeholders . ')');
-                    $stmtItems->execute($orderIds);
-                    $stmtOrders = $pdo->prepare('UPDATE store_orders SET fulfillment_status = "fulfilled", shipped_at = COALESCE(shipped_at, NOW()), updated_at = NOW() WHERE id IN (' . $placeholders . ')');
-                    $stmtOrders->execute($orderIds);
-                }
-
+                $markItemsFulfilled = $newStatus === 'shipped';
                 foreach ($orderIds as $orderId) {
-                    store_add_order_event($pdo, $orderId, 'order.status', 'Order status set to ' . $newStatus . '.', $user['id'] ?? null, [
+                    store_apply_order_status($pdo, (int) $orderId, $newStatus, null, null, $markItemsFulfilled);
+                    store_add_order_event($pdo, (int) $orderId, 'order.status', 'Order status set to ' . $newStatus . '.', $user['id'] ?? null, [
                         'order_status' => $newStatus,
                     ]);
                 }

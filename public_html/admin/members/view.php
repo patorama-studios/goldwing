@@ -459,8 +459,8 @@ function statusBadgeClasses(string $status): string
 {
     $status = strtolower(trim($status));
     return match ($status) {
-        'active', 'paid', 'fulfilled', 'accepted' => 'bg-green-100 text-green-800',
-        'pending', 'processing' => 'bg-yellow-100 text-yellow-800',
+        'active', 'paid', 'fulfilled', 'accepted', 'completed' => 'bg-green-100 text-green-800',
+        'pending', 'processing', 'new', 'packed', 'shipped' => 'bg-yellow-100 text-yellow-800',
         'expired', 'lapsed', 'refunded', 'failed', 'rejected' => 'bg-red-100 text-red-800',
         'cancelled', 'inactive' => 'bg-gray-100 text-gray-800',
         'suspended' => 'bg-indigo-50 text-indigo-800',
@@ -2094,9 +2094,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <thead class="text-left text-xs uppercase text-gray-500">
                           <tr>
                             <th class="px-3 py-2">Order #</th>
-                            <th class="px-3 py-2">Status</th>
-                            <th class="px-3 py-2">Total</th>
+                            <th class="px-3 py-2">Order status</th>
+                            <th class="px-3 py-2">Payment</th>
                             <th class="px-3 py-2">Fulfillment</th>
+                            <th class="px-3 py-2">Total</th>
                             <th class="px-3 py-2">Created</th>
                             <th class="px-3 py-2">Actions</th>
                           </tr>
@@ -2106,10 +2107,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <tr>
                               <td class="px-3 py-2 text-gray-600"><?= e($order['order_number'] ?? 'ORD_' . $order['id']) ?></td>
                               <td class="px-3 py-2">
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($order['status'] ?? '') ?>"><?= ucfirst($order['status'] ?? 'Unknown') ?></span>
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($order['order_status'] ?? '') ?>"><?= ucfirst($order['order_status'] ?? 'Unknown') ?></span>
                               </td>
+                              <td class="px-3 py-2 text-gray-600"><?= e(ucwords(str_replace('_', ' ', (string) ($order['payment_status'] ?? 'unpaid')))) ?></td>
+                              <td class="px-3 py-2 text-gray-600"><?= e(ucfirst((string) ($order['fulfillment_status'] ?? 'unfulfilled'))) ?></td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatCurrency($order['total_cents'] ?? 0)) ?></td>
-                              <td class="px-3 py-2 text-gray-600"><?= e(ucfirst($order['fulfillment_method'] ?? 'shipping')) ?></td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'])) ?></td>
                               <td class="px-3 py-2 text-gray-600">
                                 <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="/admin/store/orders/<?= e($order['id']) ?>" target="_blank">View</a>

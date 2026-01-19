@@ -14,6 +14,7 @@ if ($slug === '') {
     echo 'Event not found';
     exit;
 }
+$embed = ($_GET['embed'] ?? '') === '1';
 
 $sql = 'SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, '
     . ($hasChapterId ? 'c.name AS chapter_name' : 'NULL AS chapter_name')
@@ -181,17 +182,14 @@ if ($event['capacity']) {
 }
 
 $locationText = $event['event_type'] === 'online' ? ($event['online_url'] ?? '') : ($event['map_url'] ?? '');
+$backUrl = 'events_public.php';
+$formAction = 'event_view.php?slug=' . urlencode($event['slug']) . ($embed ? '&embed=1' : '');
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title><?php echo calendar_e($event['title']); ?></title>
-    <link rel="stylesheet" href="assets/app.css">
-</head>
-<body>
+<?php
+ob_start();
+?>
 <div class="calendar-container">
-    <a class="link" href="events.php">&larr; Back to events</a>
+    <a class="link" href="<?php echo calendar_e($backUrl); ?>" data-calendar-back>&larr; Back to events</a>
 
     <?php if ($isCancelled) : ?>
         <div class="alert danger">This event has been cancelled. <?php echo calendar_e($event['cancellation_message'] ?? ''); ?></div>
@@ -249,7 +247,7 @@ $locationText = $event['event_type'] === 'online' ? ($event['online_url'] ?? '')
                 <?php if ($userRsvp) : ?>
                     <div class="alert info">You are RSVP'd for this event.</div>
                 <?php else : ?>
-                    <form method="post" class="inline-form">
+                    <form method="post" class="inline-form" action="<?php echo calendar_e($formAction); ?>" data-calendar-embed-form="1">
                         <?php echo calendar_csrf_field(); ?>
                         <input type="hidden" name="action" value="rsvp">
                         <label>
@@ -270,7 +268,7 @@ $locationText = $event['event_type'] === 'online' ? ($event['online_url'] ?? '')
 
         <?php if ($event['is_paid'] && !$salesClosed && !$isCancelled) : ?>
             <?php if ($user) : ?>
-                <form method="post" class="inline-form">
+                <form method="post" class="inline-form" action="<?php echo calendar_e($formAction); ?>" data-calendar-embed-form="1">
                     <?php echo calendar_csrf_field(); ?>
                     <input type="hidden" name="action" value="buy_ticket">
                     <label>
@@ -306,5 +304,126 @@ $locationText = $event['event_type'] === 'online' ? ($event['online_url'] ?? '')
         </section>
     <?php endif; ?>
 </div>
+<?php
+$content = ob_get_clean();
+?>
+<?php if ($embed) : ?>
+<div class="calendar-event-embed">
+    <style>
+        .calendar-event-embed {
+            font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+            color: #1c2b39;
+        }
+        .calendar-event-embed .calendar-container {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+        .calendar-event-embed h1,
+        .calendar-event-embed h2 {
+            margin-top: 0;
+        }
+        .calendar-event-embed .link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: #2f5f8d;
+            text-decoration: none;
+        }
+        .calendar-event-embed .btn {
+            background: #2f5f8d;
+            color: #fff;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .calendar-event-embed .btn.secondary {
+            background: #fff;
+            border: 1px solid #2f5f8d;
+            color: #2f5f8d;
+        }
+        .calendar-event-embed .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+        .calendar-event-embed .alert.success {
+            background: #e7f5ee;
+            color: #146c43;
+        }
+        .calendar-event-embed .alert.danger {
+            background: #fdecea;
+            color: #b42318;
+        }
+        .calendar-event-embed .alert.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .calendar-event-embed .alert.info {
+            background: #e8f4fd;
+            color: #0f5132;
+        }
+        .calendar-event-embed .muted {
+            color: #667085;
+            font-size: 14px;
+        }
+        .calendar-event-embed .inline-form {
+            display: flex;
+            gap: 12px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        .calendar-event-embed .inline-form input {
+            padding: 8px 10px;
+            border: 1px solid #d9dee6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .calendar-event-embed .badge {
+            background: #f5f7fa;
+            border: 1px solid #d9dee6;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+        .calendar-event-embed .event-detail {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .calendar-event-embed .event-thumb {
+            width: 260px;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #d9dee6;
+        }
+        .calendar-event-embed .event-badges {
+            margin: 8px 0;
+        }
+        .calendar-event-embed .event-description {
+            margin-top: 16px;
+            line-height: 1.6;
+        }
+    </style>
+    <?php echo $content; ?>
+</div>
+<?php else : ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title><?php echo calendar_e($event['title']); ?></title>
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<?php echo $content; ?>
 </body>
 </html>
+<?php endif; ?>

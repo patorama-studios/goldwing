@@ -66,8 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newStatus = $_POST['order_status'] ?? '';
                 $allowed = ['new','processing','packed','shipped','completed','cancelled'];
                 if (in_array($newStatus, $allowed, true)) {
-                    $stmt = $pdo->prepare('UPDATE store_orders SET order_status = :order_status, updated_at = NOW() WHERE id = :id');
-                    $stmt->execute(['order_status' => $newStatus, 'id' => $order['id']]);
+                    $markItemsFulfilled = in_array($newStatus, ['shipped', 'completed'], true);
+                    store_apply_order_status($pdo, (int) $order['id'], $newStatus, null, null, $markItemsFulfilled);
                     store_add_order_event($pdo, (int) $order['id'], 'order.status', 'Order status set to ' . $newStatus . '.', $user['id'] ?? null, [
                         'order_status' => $newStatus,
                     ]);
@@ -106,12 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
 
-                $stmt = $pdo->prepare('UPDATE store_order_items SET fulfilled_qty = quantity WHERE order_id = :order_id');
-                $stmt->execute(['order_id' => $order['id']]);
-
-                $stmt = $pdo->prepare('UPDATE store_orders SET order_status = "shipped", shipped_at = :shipped_at, updated_at = NOW() WHERE id = :id');
-                $stmt->execute(['shipped_at' => $shippedAtValue, 'id' => $order['id']]);
-                store_refresh_fulfillment_status($pdo, (int) $order['id']);
+                store_apply_order_status($pdo, (int) $order['id'], 'shipped', null, $shippedAtValue, true);
 
                 store_add_order_event($pdo, (int) $order['id'], 'shipment.shipped', 'Order marked shipped.', $user['id'] ?? null, [
                     'carrier' => $carrier,
@@ -206,8 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$canManage) {
                 $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to manage orders.'];
             } else {
-                $stmt = $pdo->prepare('UPDATE store_orders SET order_status = "cancelled", updated_at = NOW() WHERE id = :id');
-                $stmt->execute(['id' => $order['id']]);
+                store_apply_order_status($pdo, (int) $order['id'], 'cancelled');
                 store_add_order_event($pdo, (int) $order['id'], 'order.cancelled', 'Order cancelled.', $user['id'] ?? null);
                 $alerts[] = ['type' => 'success', 'message' => 'Order cancelled.'];
             }

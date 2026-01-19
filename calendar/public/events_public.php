@@ -320,6 +320,22 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             background: var(--panel);
             box-shadow: var(--shadow);
         }
+        .event-panel {
+            display: none;
+        }
+        .calendar-shell.is-event-view .calendar-controls,
+        .calendar-shell.is-event-view .calendar-header,
+        .calendar-shell.is-event-view .calendar-panel,
+        .calendar-shell.is-event-view .calendar-footer,
+        .calendar-shell.is-event-view .calendar-notice {
+            display: none;
+        }
+        .calendar-shell.is-event-view .event-panel {
+            display: block;
+        }
+        .event-panel .calendar-notice {
+            margin-top: 12px;
+        }
         .calendar-footer {
             display: flex;
             align-items: center;
@@ -521,6 +537,10 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             <div id="calendar"></div>
         </div>
 
+        <div class="event-panel" id="eventPanel" hidden>
+            <div id="eventPanelContent"></div>
+        </div>
+
         <div class="calendar-footer">
             <a class="subscribe-button" href="<?php echo calendar_e($icsUrl); ?>">
                 Subscribe to calendar
@@ -544,6 +564,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var actionButtons = document.querySelectorAll('[data-action]');
     var monthPicker = document.getElementById('monthPicker');
     var monthTrigger = document.getElementById('monthPickerTrigger');
+    var shellEl = document.querySelector('.calendar-shell');
+    var eventPanel = document.getElementById('eventPanel');
+    var eventPanelContent = document.getElementById('eventPanelContent');
     var dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
     function formatMonthValue(date) {
@@ -566,6 +589,83 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function buildEmbedUrl(url) {
+        if (!url) {
+            return '';
+        }
+        if (url.indexOf('embed=1') !== -1) {
+            return url;
+        }
+        return url + (url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
+    }
+
+    function hideEventPanel() {
+        shellEl.classList.remove('is-event-view');
+        eventPanel.hidden = true;
+        eventPanelContent.innerHTML = '';
+    }
+
+    function bindEventPanel() {
+        var backLinks = eventPanelContent.querySelectorAll('[data-calendar-back]');
+        backLinks.forEach(function(link) {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                hideEventPanel();
+            });
+        });
+
+        var embedForms = eventPanelContent.querySelectorAll('form[data-calendar-embed-form="1"]');
+        embedForms.forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                var action = buildEmbedUrl(form.getAttribute('action') || '');
+                if (!action) {
+                    return;
+                }
+                var formData = new FormData(form);
+                fetch(action, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                })
+                    .then(function(response) {
+                        return response.text();
+                    })
+                    .then(function(html) {
+                        eventPanelContent.innerHTML = html;
+                        bindEventPanel();
+                    })
+                    .catch(function() {
+                        eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to update this event right now.</div>';
+                    });
+            });
+        });
+    }
+
+    function showEventPanel(url) {
+        var embedUrl = buildEmbedUrl(url);
+        if (!embedUrl) {
+            return;
+        }
+        eventPanelContent.innerHTML = '<div class="calendar-notice">Loading event...</div>';
+        eventPanel.hidden = false;
+        shellEl.classList.add('is-event-view');
+        fetch(embedUrl, { credentials: 'same-origin' })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+                return response.text();
+            })
+            .then(function(html) {
+                eventPanelContent.innerHTML = html;
+                bindEventPanel();
+            })
+            .catch(function() {
+                eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to load this event. <a href="' + url + '">Open in a new page</a>.</div>';
+            });
+    }
+
     var calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         headerToolbar: false,
@@ -582,7 +682,7 @@ document.addEventListener('DOMContentLoaded', function() {
         eventClick: function(info) {
             if (info.event.url) {
                 info.jsEvent.preventDefault();
-                window.top.location.href = info.event.url;
+                showEventPanel(info.event.url);
             }
         },
         eventDidMount: function(info) {

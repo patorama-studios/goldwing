@@ -110,6 +110,54 @@ function store_refresh_fulfillment_status(PDO $pdo, int $orderId): string
     return $status;
 }
 
+function store_map_legacy_status(string $orderStatus, string $paymentStatus): string
+{
+    if ($paymentStatus === 'refunded') {
+        return 'refunded';
+    }
+    if ($orderStatus === 'cancelled') {
+        return 'cancelled';
+    }
+    if (in_array($orderStatus, ['shipped', 'completed'], true)) {
+        return 'fulfilled';
+    }
+    if (in_array($paymentStatus, ['paid', 'partial_refund'], true)) {
+        return 'paid';
+    }
+    return 'pending';
+}
+
+function store_apply_order_status(PDO $pdo, int $orderId, string $orderStatus, ?string $paymentStatus = null, ?string $shippedAt = null, bool $markItemsFulfilled = false): void
+{
+    $stmt = $pdo->prepare('SELECT payment_status, shipped_at FROM store_orders WHERE id = :id');
+    $stmt->execute(['id' => $orderId]);
+    $order = $stmt->fetch();
+    if (!$order) {
+        return;
+    }
+    $paymentStatus = $paymentStatus ?? ($order['payment_status'] ?? 'unpaid');
+    $legacyStatus = store_map_legacy_status($orderStatus, $paymentStatus);
+    $shippedAtValue = $shippedAt ?? ($order['shipped_at'] ?? null);
+    if ($orderStatus === 'shipped' && $shippedAtValue === null) {
+        $shippedAtValue = date('Y-m-d H:i:s');
+    }
+
+    $stmt = $pdo->prepare('UPDATE store_orders SET order_status = :order_status, payment_status = :payment_status, status = :status, shipped_at = :shipped_at, updated_at = NOW() WHERE id = :id');
+    $stmt->execute([
+        'order_status' => $orderStatus,
+        'payment_status' => $paymentStatus,
+        'status' => $legacyStatus,
+        'shipped_at' => $shippedAtValue,
+        'id' => $orderId,
+    ]);
+
+    if ($markItemsFulfilled) {
+        $stmt = $pdo->prepare('UPDATE store_order_items SET fulfilled_qty = quantity WHERE order_id = :order_id');
+        $stmt->execute(['order_id' => $orderId]);
+    }
+    store_refresh_fulfillment_status($pdo, $orderId);
+}
+
 function store_slugify(string $value): string
 {
     $value = strtolower(trim($value));
