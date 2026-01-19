@@ -10,11 +10,23 @@ $activePage = 'ai-editor';
 
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 ?>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --builder-bg: #f8fafc;
+    --builder-border: #e2e8f0;
+    --builder-text: #0f172a;
+    --builder-muted: #64748b;
+    --builder-card: #ffffff;
+    --builder-accent: #15803d;
+    --builder-accent-soft: rgba(21, 128, 61, 0.12);
+  }
+
   .builder-shell {
     height: 100vh;
     display: flex;
-    background: #f5f3ee;
+    background: var(--builder-bg);
   }
   .builder-shell [data-backend-sidebar] {
     position: fixed;
@@ -37,17 +49,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   .builder-shell[data-sidebar-open="true"] .builder-main {
     margin-left: 16rem;
   }
-  .builder-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1.25rem;
-    border-bottom: 1px solid #e5e1d6;
-    background: #fffdfa;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
   .builder-hide-sidebar {
     display: none;
     position: absolute;
@@ -56,39 +57,227 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     width: 28px;
     height: 48px;
     border-radius: 999px;
-    background: #fffdfa;
-    border: 1px solid #e5e1d6;
+    background: var(--builder-card);
+    border: 1px solid var(--builder-border);
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
   }
   .builder-shell[data-sidebar-open="true"] .builder-hide-sidebar {
     display: flex;
   }
-  .builder-header .builder-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.5rem;
-    letter-spacing: 0.04em;
+  .builder-topbar {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--builder-border);
+    background: var(--builder-card);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .topbar-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .topbar-devices {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--builder-border);
+    background: #f1f5f9;
+  }
+  .device-toggle {
+    width: 36px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+  }
+  .device-toggle.active {
+    background: #ffffff;
+    color: var(--builder-accent);
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-right: 0.75rem;
+    border-right: 1px solid var(--builder-border);
+  }
+  .topbar-action {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--builder-muted);
+    transition: all 0.2s ease;
+  }
+  .topbar-action.active {
+    color: var(--builder-accent);
+    background: var(--builder-accent-soft);
+  }
+  .topbar-action:hover {
+    color: var(--builder-accent);
+    background: var(--builder-accent-soft);
+  }
+  .topbar-subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    display: none;
   }
   .builder-content {
     flex: 1;
     display: grid;
-    grid-template-columns: 260px 360px 1fr;
-    gap: 0;
+    grid-template-columns: 288px 1fr 360px;
     min-height: 0;
   }
   .builder-panel {
-    background: #ffffff;
-    border-right: 1px solid #e5e1d6;
+    background: var(--builder-card);
+    border-right: 1px solid var(--builder-border);
     padding: 1rem;
     overflow-y: auto;
   }
+  .panel-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 0.5rem;
+  }
+  .panel-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+  .builder-preview {
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+  }
+  .preview-stage {
+    height: 100%;
+    width: 100%;
+    background: #0f172a;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+  }
+  .preview-viewport {
+    height: 100%;
+    width: 100%;
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+  }
+  .preview-viewport.is-constrained {
+    padding: 1.25rem 0;
+  }
+  .preview-frame {
+    height: 100%;
+    width: 100%;
+    border: 0;
+    background: #0f172a;
+  }
+  .preview-viewport.is-constrained .preview-frame {
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+    background: #ffffff;
+  }
   .builder-chat {
-    background: #fefcf7;
-    border-right: 1px solid #e5e1d6;
+    background: var(--builder-card);
+    border-left: 1px solid var(--builder-border);
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+  .chat-header {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--builder-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+  }
+  .chat-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .chat-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--builder-accent);
+    box-shadow: 0 0 0 6px rgba(21, 128, 61, 0.15);
+  }
+  .chat-selected {
+    margin: 0.75rem 1rem 0;
+    padding: 0.6rem 0.75rem;
+    border-radius: 999px;
+    background: var(--builder-accent-soft);
+    color: var(--builder-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: none;
+  }
+  .chat-selected.active {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .selected-actions {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem 0;
+  }
+  .selected-actions.active {
+    display: flex;
+  }
+  .selected-action {
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--builder-border);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--builder-muted);
+    background: #ffffff;
   }
   .builder-chat-history {
     flex: 1;
@@ -96,52 +285,126 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.85rem;
+    background: #f8fafc;
   }
   .builder-chat-message {
-    padding: 0.75rem;
-    border-radius: 12px;
-    background: #ffffff;
-    border: 1px solid #eee6d9;
-    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    background: #e2e8f0;
+    font-size: 0.85rem;
+    color: #0f172a;
+    max-width: 85%;
+    border: 1px solid #e2e8f0;
   }
   .builder-chat-message.user {
-    border-left: 4px solid #9e9140;
+    align-self: flex-end;
+    border-top-right-radius: 6px;
   }
   .builder-chat-message.assistant {
-    border-left: 4px solid #4a9114;
+    align-self: flex-start;
+    background: var(--builder-accent);
+    color: #ffffff;
+    border-color: var(--builder-accent);
+    border-top-left-radius: 6px;
   }
-  .builder-chat-footer {
-    border-top: 1px solid #e5e1d6;
-    padding: 0.75rem;
+  .builder-chat-message.system {
+    align-self: center;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    padding: 0.35rem 0.75rem;
+  }
+  .chat-media-card {
+    align-self: flex-start;
     background: #ffffff;
+    border: 1px solid var(--builder-border);
+    border-radius: 14px;
+    padding: 0.6rem;
+    max-width: 85%;
     display: grid;
-    gap: 0.5rem;
+    gap: 0.4rem;
   }
-  .builder-preview {
-    position: relative;
-    background: #f5f3ee;
-  }
-  .builder-iframe {
+  .chat-media-thumb {
     width: 100%;
-    height: 100%;
-    border: 0;
-    background: #f5f3ee;
+    border-radius: 10px;
+    object-fit: cover;
+    max-height: 160px;
   }
-  .element-panel {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+  .chat-footer {
+    border-top: 1px solid var(--builder-border);
+    padding: 0.85rem 1rem;
     background: #ffffff;
-    border: 1px solid #e5e1d6;
-    border-radius: 16px;
-    padding: 0.75rem;
-    width: 300px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
-    font-size: 0.85rem;
   }
-  .element-panel button {
-    margin-top: 0.5rem;
+  .chat-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--builder-border);
+    border-radius: 16px;
+    padding: 0.4rem 0.5rem;
+    background: #f8fafc;
+  }
+  .chat-input-wrap:focus-within {
+    border-color: var(--builder-accent);
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+  }
+  .chat-media-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    color: #94a3b8;
+    transition: color 0.2s ease;
+  }
+  .chat-media-button:hover {
+    color: var(--builder-accent);
+  }
+  .chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    resize: none;
+    font-size: 0.9rem;
+    min-height: 40px;
+    max-height: 120px;
+    outline: none;
+  }
+  .chat-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: var(--builder-accent);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 20px rgba(21, 128, 61, 0.25);
+  }
+  .chat-attachment {
+    margin-top: 0.6rem;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.6rem;
+    border-radius: 12px;
+    background: #ecfdf3;
+    color: var(--builder-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .chat-attachment.active {
+    display: flex;
+  }
+  .chat-footer-meta {
+    margin-top: 0.6rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: #94a3b8;
   }
   .builder-modal {
     position: fixed;
@@ -163,9 +426,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     max-height: 90vh;
     overflow-y: auto;
   }
+  @media (min-width: 1024px) {
+    .topbar-subtitle {
+      display: block;
+    }
+  }
   @media (max-width: 1200px) {
     .builder-content {
-      grid-template-columns: 240px 320px 1fr;
+      grid-template-columns: 260px 1fr 320px;
     }
   }
   @media (max-width: 980px) {
@@ -174,8 +442,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     }
     .builder-panel,
     .builder-chat {
-      border-right: none;
-      border-bottom: 1px solid #e5e1d6;
+      border: none;
+      border-top: 1px solid var(--builder-border);
+    }
+    .builder-preview {
+      min-height: 50vh;
+    }
+    .topbar-devices {
+      position: static;
+      transform: none;
+      margin: 0 auto;
     }
   }
 </style>
@@ -185,54 +461,79 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     <span class="material-icons-outlined text-gray-600">chevron_left</span>
   </button>
   <main class="builder-main">
-    <header class="builder-header">
-      <button type="button" class="inline-flex items-center justify-center rounded-full p-2 text-gray-600 hover:bg-gray-100" id="builder-menu-toggle" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="material-icons-outlined">menu</span>
-      </button>
-      <div class="builder-title">AI Page Builder</div>
-      <div class="text-sm text-gray-500">Draft-first editor</div>
+    <header class="builder-topbar">
+      <div class="topbar-left">
+        <button type="button" class="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100" id="builder-menu-toggle" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="material-icons-outlined">menu</span>
+        </button>
+        <div class="topbar-title">AI Page Builder</div>
+      </div>
+      <div class="topbar-devices" role="tablist" aria-label="Preview size">
+        <button class="device-toggle active" data-viewport="desktop" title="Desktop view">
+          <span class="material-symbols-outlined text-[20px]">desktop_windows</span>
+        </button>
+        <button class="device-toggle" data-viewport="tablet" title="Tablet view">
+          <span class="material-symbols-outlined text-[20px]">tablet_mac</span>
+        </button>
+        <button class="device-toggle" data-viewport="mobile" title="Mobile view">
+          <span class="material-symbols-outlined text-[20px]">smartphone</span>
+        </button>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-actions">
+          <button class="topbar-action active" id="toggle-selection" title="Toggle selection mode">
+            <span class="material-symbols-outlined text-[20px]">ads_click</span>
+          </button>
+          <button class="topbar-action" id="clear-selection" title="Clear selection">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+        <div class="topbar-subtitle">Draft-first editor</div>
+      </div>
     </header>
 
     <div class="builder-content">
       <aside class="builder-panel">
-        <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Pages</div>
-        <select id="page-select" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"></select>
-        <button id="new-page" class="mt-3 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">New Page</button>
+        <div class="panel-section-label">Pages</div>
+        <select id="page-select" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"></select>
+        <button id="new-page" class="mt-3 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">+ New Page</button>
+
         <div class="mt-6">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Access</div>
-          <select id="access-level" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"></select>
+          <div class="panel-section-label">Access</div>
+          <select id="access-level" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"></select>
         </div>
+
         <div class="mt-6 space-y-2">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500">Status</div>
-          <div id="draft-status" class="text-sm text-gray-600">Select a page.</div>
-          <div id="usage-wrap" class="mt-3 hidden">
-            <div class="text-xs text-gray-500">Monthly usage</div>
-            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-2">
-              <div id="usage-bar" class="h-full bg-primary" style="width: 0%;"></div>
+          <div class="panel-section-label">Status</div>
+          <div class="panel-card">
+            <div id="draft-status">Select a page.</div>
+            <div id="usage-wrap" class="mt-3 hidden">
+              <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
+                <div id="usage-bar" class="h-full" style="width: 0%; background: var(--builder-accent);"></div>
+              </div>
+              <div id="usage-label" class="text-[10px] mt-2"></div>
             </div>
-            <div id="usage-label" class="text-xs text-gray-500 mt-2"></div>
           </div>
         </div>
+
         <div class="mt-6 space-y-2">
-          <button id="save-draft" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save Draft</button>
+          <button id="save-draft" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-slate-900">Save Draft</button>
           <button id="push-live" class="w-full rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Push Live</button>
-          <button id="show-versions" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Versions</button>
+          <button id="show-versions" class="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">Versions</button>
         </div>
+
         <div class="mt-6 space-y-2">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500">Templates</div>
-          <button id="edit-header-template" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Edit Header Block</button>
-          <button id="edit-footer-template" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Edit Footer Block</button>
+          <div class="panel-section-label">Templates</div>
+          <button id="edit-header-template" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">view_stream</span> Edit Header Block
+          </button>
+          <button id="edit-footer-template" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">view_headline</span> Edit Footer Block
+          </button>
         </div>
-        <div class="mt-6 space-y-2">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500">Media Library</div>
-          <input id="media-file" type="file" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-          <button id="media-upload" class="w-full rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white">Upload</button>
-          <div id="media-result" class="text-xs text-gray-500"></div>
-          <button id="media-use" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hidden">Use in selected image</button>
-          <button id="media-reference" class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hidden">Add to AI prompt</button>
-        </div>
+
         <div class="mt-6">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Menu Builder</div>
+          <div class="panel-section-label">Menu Builder</div>
           <a class="inline-flex items-center gap-2 text-sm font-semibold text-secondary" href="/admin/navigation.php" target="_blank" rel="noopener">
             Manage menus
             <span class="material-icons-outlined text-base">open_in_new</span>
@@ -240,36 +541,65 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       </aside>
 
-      <section class="builder-chat">
-        <div class="builder-chat-history" id="chat-history"></div>
-        <div class="builder-chat-footer">
-          <div class="flex items-center gap-2 text-xs text-gray-500">
-            <span>Mode:</span>
-            <select id="ai-mode" class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs">
-              <option value="element">Element</option>
-              <option value="page">Page</option>
-            </select>
-          </div>
-          <textarea id="chat-input" rows="3" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Describe the change you want..."></textarea>
-          <div class="flex items-center gap-2">
-            <button id="send-ai" class="inline-flex items-center px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold">Send to AI</button>
-            <span id="chat-status" class="text-xs text-gray-500"></span>
+      <section class="builder-preview">
+        <div class="preview-stage">
+          <div class="preview-viewport" id="preview-viewport" data-viewport="desktop">
+            <iframe id="preview-frame" class="preview-frame" title="Draft preview"></iframe>
           </div>
         </div>
       </section>
 
-      <section class="builder-preview">
-        <iframe id="preview-frame" class="builder-iframe" title="Draft preview"></iframe>
-        <div class="element-panel" id="element-panel">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-500">Selected Element</div>
-          <div id="element-meta" class="text-sm text-gray-700 mt-2">Click an element in the preview.</div>
-          <div class="text-xs text-gray-500 mt-2" id="element-snippet"></div>
-          <button id="edit-ai" class="w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-ink">Edit with AI</button>
-          <button id="edit-manual" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700">Edit manually</button>
-          <button id="replace-image" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hidden">Replace image</button>
-          <button id="generate-image" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hidden">Generate image</button>
+      <aside class="builder-chat">
+        <div class="chat-header">
+          <div class="chat-header-title">
+            <span class="chat-pulse"></span>
+            AI Design Assistant
+          </div>
+          <div class="flex items-center gap-2 text-slate-400">
+            <button id="chat-history-toggle" class="text-slate-400 hover:text-slate-600" title="Versions">
+              <span class="material-symbols-outlined text-[20px]">history</span>
+            </button>
+          </div>
         </div>
-      </section>
+        <div id="selected-summary" class="chat-selected"></div>
+        <div id="selected-actions" class="selected-actions">
+          <button id="edit-ai" class="selected-action">Edit with AI</button>
+          <button id="edit-manual" class="selected-action">Edit HTML</button>
+          <button id="replace-image" class="selected-action hidden">Replace image</button>
+          <button id="generate-image" class="selected-action hidden">Generate image</button>
+        </div>
+        <div class="builder-chat-history" id="chat-history"></div>
+        <div class="chat-footer">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <div class="flex items-center gap-2">
+              <span>Mode:</span>
+              <select id="ai-mode" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                <option value="element">Element</option>
+                <option value="page">Page</option>
+              </select>
+            </div>
+            <span id="chat-status"></span>
+          </div>
+          <div class="chat-input-wrap">
+            <label class="chat-media-button" title="Upload media">
+              <input id="chat-media-input" type="file" class="hidden">
+              <span class="material-symbols-outlined text-[22px]">add_circle</span>
+            </label>
+            <textarea id="chat-input" rows="1" class="chat-input" placeholder="Ask AI to edit anything..."></textarea>
+            <button id="send-ai" class="chat-send" title="Send">
+              <span class="material-symbols-outlined text-[20px]">send</span>
+            </button>
+          </div>
+          <div id="chat-attachment" class="chat-attachment">
+            <span id="chat-attachment-label"></span>
+            <button id="chat-attachment-clear" class="text-xs font-semibold">Remove</button>
+          </div>
+          <div class="chat-footer-meta">
+            <span>Press Enter to send</span>
+            <button id="clear-chat" class="text-xs font-semibold hover:text-green-700">Clear chat</button>
+          </div>
+        </div>
+      </aside>
     </div>
   </main>
 </div>
@@ -333,16 +663,20 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     const accessSelect = document.getElementById('access-level');
     const draftStatus = document.getElementById('draft-status');
     const previewFrame = document.getElementById('preview-frame');
+    const previewViewport = document.getElementById('preview-viewport');
     const chatHistory = document.getElementById('chat-history');
     const chatInput = document.getElementById('chat-input');
     const chatStatus = document.getElementById('chat-status');
     const aiMode = document.getElementById('ai-mode');
-    const elementMeta = document.getElementById('element-meta');
-    const elementSnippet = document.getElementById('element-snippet');
+    const sendAiBtn = document.getElementById('send-ai');
+    const selectedSummary = document.getElementById('selected-summary');
+    const selectedActions = document.getElementById('selected-actions');
     const editAiBtn = document.getElementById('edit-ai');
     const editManualBtn = document.getElementById('edit-manual');
     const replaceImageBtn = document.getElementById('replace-image');
     const generateImageBtn = document.getElementById('generate-image');
+    const toggleSelectionBtn = document.getElementById('toggle-selection');
+    const clearSelectionBtn = document.getElementById('clear-selection');
     const manualModal = document.getElementById('manual-modal');
     const manualHtml = document.getElementById('manual-html');
     const versionsModal = document.getElementById('versions-modal');
@@ -356,11 +690,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     const usageLabel = document.getElementById('usage-label');
     const editHeaderBtn = document.getElementById('edit-header-template');
     const editFooterBtn = document.getElementById('edit-footer-template');
-    const mediaFile = document.getElementById('media-file');
-    const mediaUpload = document.getElementById('media-upload');
-    const mediaResult = document.getElementById('media-result');
-    const mediaUse = document.getElementById('media-use');
-    const mediaReference = document.getElementById('media-reference');
+    const mediaInput = document.getElementById('chat-media-input');
+    const chatAttachment = document.getElementById('chat-attachment');
+    const chatAttachmentLabel = document.getElementById('chat-attachment-label');
+    const chatAttachmentClear = document.getElementById('chat-attachment-clear');
+    const clearChatBtn = document.getElementById('clear-chat');
+    const chatHistoryToggle = document.getElementById('chat-history-toggle');
     const newPageBtn = document.getElementById('new-page');
     const newPageModal = document.getElementById('new-page-modal');
     const newPagePrompt = document.getElementById('new-page-prompt');
@@ -375,13 +710,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       selected: null,
       imageGenerationEnabled: false,
       usage: null,
+      chatMessages: [],
       templates: {
         header: '',
         footer: ''
       },
       lastMedia: null,
-      lastReferenceContent: '',
-      lastReferenceName: ''
+      attachedMedia: null,
+      uploadsByPage: {},
+      selectionEnabled: true
     };
 
     const apiRequest = async (path, options = {}) => {
@@ -450,10 +787,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       chatHistory.innerHTML = '';
       messages.forEach(msg => {
         const div = document.createElement('div');
-        div.className = `builder-chat-message ${msg.role || ''}`;
-        const time = msg.created_at ? new Date(msg.created_at).toLocaleString() : '';
-        div.innerHTML = `<strong>${msg.role}</strong> <span class="text-xs text-gray-400">${time}</span><div>${msg.content}</div>`;
+        const role = msg.role || 'system';
+        div.className = `builder-chat-message ${role}`;
+        div.textContent = msg.content || '';
         chatHistory.appendChild(div);
+      });
+      const uploads = state.currentPage ? (state.uploadsByPage[state.currentPage.id] || []) : [];
+      uploads.forEach(upload => {
+        const card = document.createElement('div');
+        card.className = 'chat-media-card';
+        if (upload.type === 'image') {
+          const img = document.createElement('img');
+          img.src = upload.url;
+          img.alt = upload.title || 'Uploaded image';
+          img.className = 'chat-media-thumb';
+          card.appendChild(img);
+        }
+        const label = document.createElement('div');
+        label.className = 'text-xs text-slate-500';
+        label.textContent = upload.title || upload.url;
+        card.appendChild(label);
+        chatHistory.appendChild(card);
       });
       chatHistory.scrollTop = chatHistory.scrollHeight;
     };
@@ -486,23 +840,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     };
 
     const updateElementPanel = () => {
-      if (mediaReference) {
-        if (state.lastMedia) {
-          mediaReference.classList.remove('hidden');
-        } else {
-          mediaReference.classList.add('hidden');
-        }
-      }
       if (!state.selected) {
-        elementMeta.textContent = 'Click an element in the preview.';
-        elementSnippet.textContent = '';
+        selectedSummary.classList.remove('active');
+        selectedSummary.textContent = '';
+        selectedActions.classList.remove('active');
         replaceImageBtn.classList.add('hidden');
         generateImageBtn.classList.add('hidden');
         return;
       }
-      const scopeLabel = state.selected.templateScope ? ` • ${state.selected.templateScope}` : '';
-      elementMeta.textContent = `${state.selected.tagName} • ${state.selected.elementId}${scopeLabel}`;
-      elementSnippet.textContent = state.selected.snippet || '';
+      const tag = state.selected.tagName ? state.selected.tagName.toUpperCase() : 'ELEMENT';
+      const descriptor = `${state.selected.idText || ''}${state.selected.classText || ''}`;
+      const selectorRef = state.selected.selectorHint || state.selected.elementId || '';
+      const text = state.selected.textSnippet || state.selected.snippet || '';
+      selectedSummary.textContent = `Selected: ${tag}${descriptor ? ` ${descriptor}` : ''}${selectorRef ? ` · ${selectorRef}` : ''} — ${text}`;
+      selectedSummary.classList.add('active');
+      selectedActions.classList.add('active');
       if (state.selected.tagName === 'img') {
         replaceImageBtn.classList.remove('hidden');
         if (state.imageGenerationEnabled) {
@@ -510,15 +862,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         } else {
           generateImageBtn.classList.add('hidden');
         }
-        if (state.lastMedia && mediaUse) {
-          mediaUse.classList.remove('hidden');
-        }
       } else {
         replaceImageBtn.classList.add('hidden');
         generateImageBtn.classList.add('hidden');
-        if (mediaUse) {
-          mediaUse.classList.add('hidden');
-        }
       }
     };
 
@@ -526,17 +872,78 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       previewFrame.contentWindow?.postMessage(payload, '*');
     };
 
+    const clearSelection = () => {
+      state.selected = null;
+      updateElementPanel();
+      postToPreview({ type: 'gw-clear-selection' });
+    };
+
+    const setSelectionMode = (enabled) => {
+      state.selectionEnabled = enabled;
+      toggleSelectionBtn.classList.toggle('active', enabled);
+      postToPreview({ type: 'gw-selection-mode', enabled });
+      if (!enabled) {
+        clearSelection();
+      }
+    };
+
+    const updateAttachment = () => {
+      if (!chatAttachment || !chatAttachmentLabel) {
+        return;
+      }
+      if (!state.attachedMedia) {
+        chatAttachment.classList.remove('active');
+        chatAttachmentLabel.textContent = '';
+        return;
+      }
+      const label = state.attachedMedia.title || state.attachedMedia.url || 'Attachment';
+      chatAttachmentLabel.textContent = `Attached: ${label}`;
+      chatAttachment.classList.add('active');
+    };
+
+    const appendAttachmentToPrompt = (prompt) => {
+      if (!state.attachedMedia) {
+        return prompt;
+      }
+      const ref = state.attachedMedia;
+      const lines = [];
+      if (ref.referenceContent) {
+        lines.push(`Reference HTML (${ref.title || 'upload'}):`);
+        lines.push(ref.referenceContent);
+      } else if (ref.type === 'image') {
+        lines.push(`Reference image URL: ${ref.url}`);
+      } else {
+        lines.push(`Reference file: ${ref.url}`);
+      }
+      return `${prompt}\n\n${lines.join('\n')}`;
+    };
+
+    const setViewport = (mode) => {
+      const sizes = { mobile: 375, tablet: 768 };
+      previewViewport.dataset.viewport = mode;
+      const constrained = mode !== 'desktop';
+      previewViewport.classList.toggle('is-constrained', constrained);
+      if (constrained) {
+        previewFrame.style.width = `${sizes[mode]}px`;
+      } else {
+        previewFrame.style.width = '100%';
+      }
+    };
+
     const loadPage = async (id) => {
       const data = await apiRequest(apiUrl('page', id));
       state.currentPage = data.page;
       state.draftHtml = data.page.draft_html || '';
       state.selected = null;
+      state.attachedMedia = null;
       pageSelect.value = data.page.id;
       state.templates = data.templates || { header: '', footer: '' };
       accessSelect.value = data.page.access_level || 'public';
-      renderChat(data.chat || []);
+      state.chatMessages = data.chat || [];
+      renderChat(state.chatMessages);
       updateStatus();
       updateElementPanel();
+      updateAttachment();
       previewFrame.src = `/admin/page-builder/preview.php?page_id=${id}`;
     };
 
@@ -576,6 +983,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       });
     }
 
+    if (toggleSelectionBtn) {
+      toggleSelectionBtn.addEventListener('click', () => {
+        setSelectionMode(!state.selectionEnabled);
+      });
+    }
+
+    if (clearSelectionBtn) {
+      clearSelectionBtn.addEventListener('click', () => {
+        clearSelection();
+      });
+    }
+
+    document.querySelectorAll('.device-toggle').forEach(button => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.viewport || 'desktop';
+        document.querySelectorAll('.device-toggle').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        setViewport(mode);
+      });
+    });
+
     window.addEventListener('message', (event) => {
       const data = event.data || {};
       if (data.type === 'gw-select') {
@@ -584,7 +1012,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           tagName: data.tagName,
           html: data.html,
           snippet: data.snippet,
-          templateScope: data.templateScope || ''
+          templateScope: data.templateScope || '',
+          textSnippet: data.textSnippet || '',
+          selectorHint: data.selectorHint || '',
+          idText: data.idText || '',
+          classText: data.classText || ''
         };
         updateElementPanel();
       }
@@ -646,6 +1078,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       versionsModal.classList.add('active');
     });
 
+    if (chatHistoryToggle) {
+      chatHistoryToggle.addEventListener('click', () => {
+        document.getElementById('show-versions').click();
+      });
+    }
+
     document.getElementById('versions-close').addEventListener('click', () => {
       versionsModal.classList.remove('active');
     });
@@ -655,7 +1093,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       chatInput.focus();
     });
 
-    document.getElementById('send-ai').addEventListener('click', async () => {
+    chatInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendAiBtn.click();
+      }
+    });
+
+    sendAiBtn.addEventListener('click', async () => {
       if (!state.currentPage) return;
       const prompt = chatInput.value.trim();
       if (!prompt) return;
@@ -665,11 +1110,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           return;
         }
       }
+      if (aiMode.value === 'element' && !state.selected) {
+        alert('Select an element in the preview first.');
+        return;
+      }
       let finalPrompt = prompt;
       if (aiMode.value === 'element' && state.selected) {
-        const context = `Selected Element: ${state.selected.elementId}\nSnippet: ${state.selected.snippet}\n\n`;
-        finalPrompt = context + prompt;
+        const context = [
+          `Selected Element: ${state.selected.elementId}`,
+          `Tag: ${state.selected.tagName || ''}`,
+          `Selector: ${state.selected.selectorHint || ''}`,
+          `Snippet: ${state.selected.textSnippet || state.selected.snippet || ''}`
+        ].join('\n');
+        finalPrompt = `${context}\n\n${prompt}`;
       }
+      finalPrompt = appendAttachmentToPrompt(finalPrompt);
       chatStatus.textContent = 'Thinking...';
       const payload = {
         prompt: finalPrompt,
@@ -855,27 +1310,29 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       editFooterBtn.addEventListener('click', () => openTemplateEditor('footer'));
     }
 
-    if (mediaUpload) {
-      mediaUpload.addEventListener('click', async () => {
-        if (!mediaFile || !mediaFile.files || !mediaFile.files.length) {
+    const readReferenceContent = (file) => new Promise((resolve) => {
+      const isHtmlRef = file && (file.type === 'text/html' || file.type === 'application/xhtml+xml' || file.type === 'text/plain' || file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm'));
+      if (!isHtmlRef) {
+        resolve('');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const raw = String(reader.result || '');
+        const maxChars = 8000;
+        const trimmed = raw.length > maxChars ? `${raw.slice(0, maxChars)}\n...[truncated]` : raw;
+        resolve(trimmed);
+      };
+      reader.readAsText(file);
+    });
+
+    if (mediaInput) {
+      mediaInput.addEventListener('change', async () => {
+        if (!mediaInput.files || !mediaInput.files.length || !state.currentPage) {
           return;
         }
-        const file = mediaFile.files[0];
-        const isHtmlRef = file && (file.type === 'text/html' || file.type === 'application/xhtml+xml' || file.type === 'text/plain' || file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm'));
-        if (isHtmlRef) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const raw = String(reader.result || '');
-            const maxChars = 8000;
-            const trimmed = raw.length > maxChars ? `${raw.slice(0, maxChars)}\n...[truncated]` : raw;
-            state.lastReferenceContent = trimmed;
-            state.lastReferenceName = file.name || 'reference';
-          };
-          reader.readAsText(file);
-        } else {
-          state.lastReferenceContent = '';
-          state.lastReferenceName = '';
-        }
+        const file = mediaInput.files[0];
+        const referenceContent = await readReferenceContent(file);
         const formData = new FormData();
         formData.append('file', file);
         formData.append('title', file.name || '');
@@ -890,64 +1347,44 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           if (!res.ok) {
             throw new Error(data.error || 'Upload failed.');
           }
+          const upload = {
+            id: data.id,
+            url: data.url,
+            type: data.type,
+            title: file.name || data.url,
+            referenceContent
+          };
           state.lastMedia = data;
-          mediaResult.textContent = `Uploaded: ${data.url} (ID ${data.id}) — [media:${data.id}]`;
-          mediaUse.classList.remove('hidden');
-          if (mediaReference) {
-            mediaReference.classList.remove('hidden');
+          state.attachedMedia = upload;
+          if (!state.uploadsByPage[state.currentPage.id]) {
+            state.uploadsByPage[state.currentPage.id] = [];
           }
+          state.uploadsByPage[state.currentPage.id].push(upload);
+          renderChat(state.chatMessages);
+          updateAttachment();
         } catch (err) {
-          mediaResult.textContent = err.message || 'Upload failed.';
+          alert(err.message || 'Upload failed.');
+        } finally {
+          mediaInput.value = '';
         }
       });
     }
 
-    if (mediaUse) {
-      mediaUse.addEventListener('click', async () => {
-        if (!state.lastMedia || !state.selected || state.selected.tagName !== 'img') {
-          return;
-        }
-        const imgHtml = `<img src="${state.lastMedia.url}" data-media-id="${state.lastMedia.id}" alt="">`;
-        const data = await apiRequest(apiUrl('manual_edit', state.currentPage.id), {
-          method: 'POST',
-          body: JSON.stringify({
-            selected_element_id: state.selected.elementId,
-            updated_html: imgHtml,
-            template_scope: state.selected.templateScope || ''
-          })
-        });
-        if (data.template_html) {
-          if (state.selected.templateScope === 'header') {
-            state.templates.header = data.template_html;
-          } else if (state.selected.templateScope === 'footer') {
-            state.templates.footer = data.template_html;
-          }
-        } else {
-          state.draftHtml = data.draft_html || state.draftHtml;
-        }
-        postToPreview({ type: 'gw-update-html', html: state.draftHtml });
-        loadPage(state.currentPage.id);
+    if (chatAttachmentClear) {
+      chatAttachmentClear.addEventListener('click', () => {
+        state.attachedMedia = null;
+        updateAttachment();
       });
     }
 
-    if (mediaReference) {
-      mediaReference.addEventListener('click', () => {
-        if (!state.lastMedia) {
+    if (clearChatBtn) {
+      clearChatBtn.addEventListener('click', () => {
+        if (!state.currentPage) {
           return;
         }
-        const refLines = [];
-        if (state.lastReferenceContent) {
-          refLines.push(`Reference HTML (${state.lastReferenceName || 'upload'}):`);
-          refLines.push(state.lastReferenceContent);
-        } else if (state.lastMedia.type === 'image') {
-          refLines.push(`Reference image URL: ${state.lastMedia.url}`);
-        } else {
-          refLines.push(`Reference file: ${state.lastMedia.url}`);
-        }
-        const refText = refLines.join('\n');
-        const spacer = chatInput.value.trim() === '' ? '' : '\n\n';
-        chatInput.value = `${chatInput.value}${spacer}${refText}`;
-        chatInput.focus();
+        state.chatMessages = [];
+        state.uploadsByPage[state.currentPage.id] = [];
+        renderChat(state.chatMessages);
       });
     }
 
@@ -983,6 +1420,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     });
 
     loadPages();
+    setViewport('desktop');
+    previewFrame.addEventListener('load', () => {
+      postToPreview({ type: 'gw-selection-mode', enabled: state.selectionEnabled });
+    });
     setSidebarOpen(false);
   })();
 </script>

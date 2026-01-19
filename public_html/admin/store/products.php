@@ -120,6 +120,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alerts[] = ['type' => 'success', 'message' => 'Product duplicated.'];
             }
         }
+        if ($action === 'toggle_track_inventory') {
+            $productId = (int) ($_POST['product_id'] ?? 0);
+            $trackInventory = isset($_POST['track_inventory']) ? 1 : 0;
+            $stmt = $pdo->prepare('UPDATE store_products SET track_inventory = :track_inventory, updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['track_inventory' => $trackInventory, 'id' => $productId]);
+            $alerts[] = ['type' => 'success', 'message' => 'Inventory tracking updated.'];
+        }
     }
 }
 
@@ -283,6 +290,18 @@ $pageSubtitle = 'Manage products, variants, and inventory.';
               Stock: <span class="font-semibold text-slate-700"><?= e($product['stock_display']) ?></span>
             </span>
             <span class="font-medium <?= $stockTone ?>"><?= e($stockLabel) ?></span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-500">
+            <span>SKU: <span class="font-semibold text-slate-700"><?= e((string) ($product['sku'] ?? '—')) ?></span></span>
+            <form method="post" class="inline-flex items-center gap-2">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="toggle_track_inventory">
+              <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
+              <label class="inline-flex items-center gap-2">
+                <input type="checkbox" name="track_inventory" class="rounded border-gray-300" <?= (int) $product['track_inventory'] === 1 ? 'checked' : '' ?> onchange="this.form.submit()">
+                <span><?= (int) $product['track_inventory'] === 1 ? 'Track stock' : 'No tracking' ?></span>
+              </label>
+            </form>
           </div>
           <div class="flex items-center justify-between text-xs text-slate-500">
             <span>Variants: <span class="font-semibold text-slate-700"><?= e((string) $product['variant_count']) ?></span></span>

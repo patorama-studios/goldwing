@@ -125,6 +125,26 @@ class RefundService
         ]);
         $refundId = (int) $pdo->lastInsertId();
 
+        $remainingAfter = $remaining - $amountCents;
+        $paymentStatus = $remainingAfter <= 0 ? 'refunded' : 'partial_refund';
+        $status = $remainingAfter <= 0 ? 'refunded' : 'paid';
+        $orderStatus = $remainingAfter <= 0 ? 'cancelled' : ($order['order_status'] ?? 'processing');
+
+        $stmt = $pdo->prepare('UPDATE store_orders SET status = :status, payment_status = :payment_status, order_status = :order_status, updated_at = NOW() WHERE id = :id');
+        $stmt->execute([
+            'status' => $status,
+            'payment_status' => $paymentStatus,
+            'order_status' => $orderStatus,
+            'id' => $orderId,
+        ]);
+
+        store_add_order_event($pdo, $orderId, 'refund.processed', $paymentStatus === 'refunded' ? 'Full refund processed.' : 'Partial refund processed.', $adminUserId, [
+            'refund_id' => $refundId,
+            'stripe_refund_id' => $refund['id'],
+            'amount_cents' => $amountCents,
+            'reason' => trim($reason),
+        ]);
+
         ActivityLogger::log('admin', $adminUserId, $memberId, 'refund.processed', [
             'order_id' => $orderId,
             'refund_id' => $refundId,
@@ -135,10 +155,20 @@ class RefundService
         $safeAdminId = htmlspecialchars((string) $adminUserId, ENT_QUOTES, 'UTF-8');
         SecurityAlertService::send('refund_created', 'Security alert: refund created', '<p>Refund #' . $safeRefundId . ' created by user ID ' . $safeAdminId . '.</p>');
 
+        if (!empty($order['customer_email'])) {
+            NotificationService::dispatch('store_refund_processed', [
+                'primary_email' => $order['customer_email'],
+                'admin_emails' => NotificationService::getAdminEmails(store_get_settings()['notification_emails'] ?? ''),
+                'order_number' => NotificationService::escape((string) ($order['order_number'] ?? $orderId)),
+                'refund_amount' => NotificationService::escape(self::formatCurrency($amountCents)),
+                'refund_reason' => NotificationService::escape(trim($reason)),
+            ]);
+        }
+
         return [
             'refund_id' => $refundId,
             'stripe_refund_id' => $refund['id'],
-            'remaining_refundable_cents' => $remaining - $amountCents,
+            'remaining_refundable_cents' => $remainingAfter,
         ];
     }
 

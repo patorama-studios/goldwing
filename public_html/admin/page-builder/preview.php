@@ -16,6 +16,7 @@ if (!$page) {
 }
 
 $draftHtml = PageService::draftHtml($page);
+$draftHtml = PageBuilderService::ensureEditableBody($page, $draftHtml);
 $draftHtml = PageBuilderService::ensureDraftHtml($draftHtml);
 
 if (!isset($_GET['page']) && !empty($page['slug'])) {
@@ -23,14 +24,6 @@ if (!isset($_GET['page']) && !empty($page['slug'])) {
 }
 
 $pageSlug = $page['slug'] ?? 'home';
-$pageTitle = $page['title'] ?? 'Australian Goldwing Association';
-$heroTitle = $pageTitle;
-$plainContent = trim(strip_tags($draftHtml));
-$heroLead = $plainContent !== '' ? $plainContent : 'Rides, events, and member services for Goldwing riders across Australia.';
-if (strlen($heroLead) > 200) {
-    $heroLead = substr($heroLead, 0, 200) . '...';
-}
-$heroClass = $pageSlug === 'home' ? 'hero hero--home' : 'hero hero--compact';
 
 $siteHeaderHtml = '';
 ob_start();
@@ -78,6 +71,11 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
       outline: 2px solid #f59e0b;
       outline-offset: 2px;
     }
+    .gw-hover {
+      outline: 2px solid rgba(21, 128, 61, 0.6);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -88,20 +86,7 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
           <?= render_media_shortcodes($headerTemplate) ?>
         </div>
       <?php endif; ?>
-      <section class="<?= e($heroClass) ?>">
-        <div class="container hero__inner">
-          <span class="hero__eyebrow">Australian Goldwing Association</span>
-          <h1><?= e($heroTitle) ?></h1>
-          <p class="hero__lead"><?= e($heroLead) ?></p>
-        </div>
-      </section>
-      <section class="page-section">
-        <div class="container">
-          <div class="page-card reveal">
-            <div id="gw-preview-root"><?= $draftHtml ?></div>
-          </div>
-        </div>
-    </section>
+      <div id="gw-preview-root"><?= render_media_shortcodes($draftHtml) ?></div>
     </main>
     <?php if ($footerTemplate !== ''): ?>
       <div class="page-builder-template page-builder-template--footer" data-gw-template="footer" data-gw-el="gw-template-footer">
@@ -113,13 +98,70 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
   <script>
     (() => {
       const root = document.getElementById('gw-preview-root');
+      let contentRoot = document.getElementById('gw-content-root');
+      const selectableTags = new Set(['section', 'article', 'div', 'header', 'main', 'h1', 'h2', 'h3', 'h4', 'p', 'img', 'button', 'a', 'ul', 'ol', 'li', 'figure', 'figcaption', 'blockquote', 'table']);
+      let selectionEnabled = true;
       let selectedEl = null;
+      let hoveredEl = null;
 
       const clearSelection = () => {
         if (selectedEl) {
           selectedEl.classList.remove('gw-selected');
         }
         selectedEl = null;
+      };
+
+      const clearHover = () => {
+        if (hoveredEl) {
+          hoveredEl.classList.remove('gw-hover');
+        }
+        hoveredEl = null;
+      };
+
+      const hasIgnoreMarker = (el) => el && el.closest('[data-gw-no-select]') !== null;
+
+      const findSelectable = (target) => {
+        if (!target || !contentRoot) {
+          return null;
+        }
+        if (!contentRoot.contains(target)) {
+          return null;
+        }
+        if (hasIgnoreMarker(target)) {
+          return null;
+        }
+        let node = target;
+        while (node && node !== contentRoot) {
+          if (node instanceof HTMLElement && node.hasAttribute('data-gw-el')) {
+            const tag = node.tagName.toLowerCase();
+            if (selectableTags.has(tag)) {
+              return node;
+            }
+          }
+          node = node.parentElement;
+        }
+        node = target;
+        while (node && node !== contentRoot) {
+          if (node instanceof HTMLElement && node.hasAttribute('data-gw-el')) {
+            return node;
+          }
+          node = node.parentElement;
+        }
+        return null;
+      };
+
+      const buildSnippet = (el) => {
+        if (!el) {
+          return '';
+        }
+        if (el.tagName.toLowerCase() === 'img') {
+          return el.getAttribute('alt') || el.getAttribute('src') || 'Image';
+        }
+        const text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+        if (text !== '') {
+          return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+        }
+        return (el.outerHTML || '').slice(0, 120);
       };
 
       const sendSelection = (el) => {
@@ -130,28 +172,57 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
         const templateScope = templateNode ? templateNode.getAttribute('data-gw-template') : '';
         const html = el.outerHTML || '';
         const snippet = html.length > 240 ? html.slice(0, 240) + '...' : html;
+        const tagName = el.tagName.toLowerCase();
+        const idText = el.id ? `#${el.id}` : '';
+        const classText = el.classList && el.classList.length ? `.${Array.from(el.classList).slice(0, 3).join('.')}` : '';
+        const selectorHint = el.getAttribute('data-gw-el') ? `[data-gw-el="${el.getAttribute('data-gw-el')}"]` : '';
         window.parent.postMessage({
           type: 'gw-select',
           elementId: el.getAttribute('data-gw-el'),
-          tagName: el.tagName.toLowerCase(),
+          tagName,
           templateScope,
           html,
-          snippet
+          snippet,
+          textSnippet: buildSnippet(el),
+          selectorHint,
+          idText,
+          classText
         }, '*');
       };
 
+      document.addEventListener('mousemove', (event) => {
+        if (!selectionEnabled) {
+          clearHover();
+          return;
+        }
+        const target = findSelectable(event.target);
+        if (!target || target === selectedEl) {
+          if (hoveredEl && hoveredEl !== selectedEl) {
+            clearHover();
+          }
+          return;
+        }
+        if (hoveredEl && hoveredEl !== target) {
+          clearHover();
+        }
+        hoveredEl = target;
+        hoveredEl.classList.add('gw-hover');
+      });
+
       document.addEventListener('click', (event) => {
-        const target = event.target.closest('[data-gw-el]');
+        if (!selectionEnabled) {
+          return;
+        }
+        const target = findSelectable(event.target);
         if (!target) {
           return;
         }
         event.preventDefault();
         event.stopPropagation();
-        if (selectedEl !== target) {
-          clearSelection();
-          selectedEl = target;
-          selectedEl.classList.add('gw-selected');
-        }
+        clearSelection();
+        clearHover();
+        selectedEl = target;
+        selectedEl.classList.add('gw-selected');
         sendSelection(selectedEl);
       });
 
@@ -170,6 +241,15 @@ if ($draftHtml !== ($page['draft_html'] ?? '')) {
           if (root) {
             root.innerHTML = data.html || '';
           }
+          contentRoot = document.getElementById('gw-content-root');
+        }
+        if (data.type === 'gw-selection-mode') {
+          selectionEnabled = !!data.enabled;
+          clearHover();
+        }
+        if (data.type === 'gw-clear-selection') {
+          clearSelection();
+          clearHover();
         }
       });
     })();

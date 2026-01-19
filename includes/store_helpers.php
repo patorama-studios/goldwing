@@ -19,6 +19,84 @@ function store_require_admin(): void
     exit;
 }
 
+function store_permissions_map(): array
+{
+    return [
+        'store_orders_view' => ['admin', 'super_admin', 'store_manager'],
+        'store_orders_manage' => ['admin', 'super_admin', 'store_manager'],
+        'store_refunds_manage' => ['admin', 'super_admin'],
+        'store_inventory_manage' => ['admin', 'super_admin', 'store_manager'],
+    ];
+}
+
+function store_user_can(?array $user, string $permission): bool
+{
+    if (!$user) {
+        return false;
+    }
+    $roles = $user['roles'] ?? [];
+    if (in_array('super_admin', $roles, true)) {
+        return true;
+    }
+    $map = store_permissions_map();
+    if (!isset($map[$permission])) {
+        return false;
+    }
+    return (bool) array_intersect($roles, $map[$permission]);
+}
+
+function store_require_permission(string $permission): void
+{
+    require_login();
+    $user = current_user();
+    if (store_user_can($user, $permission)) {
+        return;
+    }
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
+function store_add_order_event(PDO $pdo, int $orderId, string $eventType, string $message, ?int $userId = null, array $metadata = []): void
+{
+    $stmt = $pdo->prepare('INSERT INTO store_order_events (order_id, event_type, message, metadata_json, created_by_user_id, created_at) VALUES (:order_id, :event_type, :message, :metadata_json, :created_by_user_id, NOW())');
+    $stmt->execute([
+        'order_id' => $orderId,
+        'event_type' => $eventType,
+        'message' => $message,
+        'metadata_json' => $metadata ? json_encode($metadata, JSON_UNESCAPED_SLASHES) : null,
+        'created_by_user_id' => $userId,
+    ]);
+}
+
+function store_fulfillment_status_from_items(array $items): string
+{
+    $totalQty = 0;
+    $fulfilledQty = 0;
+    foreach ($items as $item) {
+        $totalQty += (int) ($item['quantity'] ?? 0);
+        $fulfilledQty += (int) ($item['fulfilled_qty'] ?? 0);
+    }
+    if ($totalQty <= 0 || $fulfilledQty <= 0) {
+        return 'unfulfilled';
+    }
+    if ($fulfilledQty < $totalQty) {
+        return 'partial';
+    }
+    return 'fulfilled';
+}
+
+function store_refresh_fulfillment_status(PDO $pdo, int $orderId): string
+{
+    $stmt = $pdo->prepare('SELECT quantity, fulfilled_qty FROM store_order_items WHERE order_id = :order_id');
+    $stmt->execute(['order_id' => $orderId]);
+    $items = $stmt->fetchAll();
+    $status = store_fulfillment_status_from_items($items);
+    $stmt = $pdo->prepare('UPDATE store_orders SET fulfillment_status = :status, updated_at = NOW() WHERE id = :id');
+    $stmt->execute(['status' => $status, 'id' => $orderId]);
+    return $status;
+}
+
 function store_slugify(string $value): string
 {
     $value = strtolower(trim($value));

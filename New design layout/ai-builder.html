@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Page Builder - Goldwing Association</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Oswald:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#fbbf24", // Gold color from brand
+              secondary: "#15803d", // Green color from brand
+              "background-light": "#f8fafc",
+              "background-dark": "#0f172a",
+            },
+            fontFamily: {
+              display: ["Inter", "sans-serif"],
+              brand: ["Oswald", "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.5rem",
+            },
+          },
+        },
+      };
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+        .device-toggle-btn { @apply p-2 rounded-md transition-all flex items-center justify-center; }
+        .device-toggle-btn.active { @apply bg-slate-100 dark:bg-slate-800 text-secondary; }
+        .device-toggle-btn:not(.active) { @apply text-slate-400 hover:text-slate-600 dark:hover:text-slate-200; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-screen overflow-hidden flex flex-col">
+<header class="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-4 z-20">
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-bold text-lg tracking-tight uppercase">AI Page Builder</h1>
+</div>
+<div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+<button class="device-toggle-btn active" title="Desktop View">
+<span class="material-symbols-outlined text-[20px]">desktop_windows</span>
+</button>
+<button class="device-toggle-btn" title="Tablet View">
+<span class="material-symbols-outlined text-[20px]">tablet_mac</span>
+</button>
+<button class="device-toggle-btn" title="Mobile View">
+<span class="material-symbols-outlined text-[20px]">smartphone</span>
+</button>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-1 border-r border-slate-200 dark:border-slate-800 pr-4 mr-2">
+<button class="p-1.5 text-slate-400 hover:text-secondary hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors" title="Edit Content">
+<span class="material-symbols-outlined text-xl">edit_note</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-secondary hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors" title="Style Settings">
+<span class="material-symbols-outlined text-xl">palette</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-secondary hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors" title="Duplicate">
+<span class="material-symbols-outlined text-xl">content_copy</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</div>
+<span class="text-xs font-medium text-slate-400 uppercase tracking-widest hidden lg:block">Draft-first editor</span>
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs">JD</div>
+</div>
+</div>
+</header>
+<main class="flex-1 flex overflow-hidden">
+<aside class="w-72 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-y-auto custom-scrollbar">
+<div class="p-4 space-y-6">
+<section>
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Pages</label>
+<div class="space-y-1">
+<button class="w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-medium flex items-center justify-between">
+                        Welcome to Goldwing...
+                        <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+<button class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm text-slate-500 transition-colors border border-dashed border-slate-200 dark:border-slate-700">
+                        + New Page
+                    </button>
+</div>
+</section>
+<section>
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Access</label>
+<select class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary focus:border-primary">
+<option>Public</option>
+<option>Private</option>
+<option>Members Only</option>
+</select>
+</section>
+<section>
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Status</label>
+<div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+<p class="text-[11px] text-slate-500 leading-relaxed mb-2">Draft differs from live. Monthly usage reset in 12 days.</p>
+<div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 45%"></div>
+</div>
+<p class="text-[10px] mt-2 text-slate-400 font-medium">$0.01 / $50.00</p>
+</div>
+</section>
+<div class="space-y-2 pt-2">
+<button class="w-full py-2.5 px-4 bg-primary text-slate-900 font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                    Save Draft
+                </button>
+<button class="w-full py-2.5 px-4 bg-secondary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                    Push Live
+                </button>
+<button class="w-full py-2.5 px-4 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    Versions
+                </button>
+</div>
+<section>
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Templates</label>
+<div class="space-y-2">
+<button class="w-full py-2 px-3 border border-slate-200 dark:border-slate-700 text-sm rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-base">view_stream</span> Edit Header Block
+                    </button>
+<button class="w-full py-2 px-3 border border-slate-200 dark:border-slate-700 text-sm rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-base">view_headline</span> Edit Footer Block
+                    </button>
+</div>
+</section>
+</div>
+</aside>
+<section class="flex-1 bg-white dark:bg-black relative overflow-y-auto custom-scrollbar">
+<div class="w-full min-h-full flex flex-col relative group">
+<nav class="bg-black text-white px-8 py-4 flex items-center justify-between border-b border-white/10">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center p-1">
+<img alt="Logo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBTEqdxkN5HgPPsgVFZv8n-VmJxSIRYynFo7hou3G-vuLQD5B80LiOcFM2ek2MHr47-hCH4LfdJ-fCBPK4DStcVTLi0QVNUz7IHrl8ig4TcHz1wEcu4psEcGf9l5x6k_FPQ49d3J5R-Uw2bof-jPM3LZJ-fvDshDhBpmhG9sw_5ubNOh4b-mzJBfVkqNbMSqTpIc6-Iyc1L-pKb3EEe64l8W_yQoJkBL66pJ0wv_KRLNzCY4kOy5767qoZhXQwu02oEDNqxqAmJ1Q"/>
+</div>
+<div>
+<h2 class="font-brand text-lg leading-tight uppercase">Australian Goldwing Association</h2>
+<p class="text-[8px] tracking-[0.2em] text-slate-400 uppercase">Touring Riders and Community</p>
+</div>
+</div>
+<div class="flex items-center gap-6 text-[11px] font-bold uppercase tracking-wider text-slate-300">
+<a class="text-primary" href="#">Home</a>
+<a class="hover:text-white flex items-center gap-1" href="#">About <span class="material-symbols-outlined text-[14px]">expand_more</span></a>
+<a class="hover:text-white" href="#">Ride Calendar</a>
+<a class="hover:text-white" href="#">Membership</a>
+<button class="bg-primary text-black px-4 py-2 rounded text-[10px]">Member Area</button>
+</div>
+</nav>
+<div class="relative bg-slate-900 aspect-video flex flex-col justify-center px-12 overflow-hidden">
+<img alt="Motorcycle Background" class="absolute inset-0 w-full h-full object-cover opacity-40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDln2shSHV1swpDE0RFHuo7p5SlH9OVTJPJi7XC_ZCwhO9DkcsnE5PQNRHwp8YCdn8r_Tv-cDeMH2pdUosAJJhcKTQlEpDW6kuYw-JwqCUJbByf6RGLV_LlnibicJlnEcfnprBS62vsyr_KOF_J82Vguh3rlVLrK9B6rHafVkg-fSft5RMxharJfz5bhIowD-OY1gp8O9xe6CClxp5tYF_j6dKmMnnZx54uGAw9D9I7xDpw78VmvZNHZQ1TNJdkG2tmh-DmOHRLZII"/>
+<div class="relative z-10 max-w-2xl">
+<span class="inline-block bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest px-2 py-1 mb-4 border border-primary/30">Australian Goldwing Association</span>
+<h1 class="text-7xl font-brand text-white uppercase leading-[0.9] mb-6">
+                        Welcome to <br/> <span class="text-secondary">Goldwing</span> <br/> Association
+                    </h1>
+<p class="text-slate-300 text-lg max-w-md leading-relaxed">
+                        Australian Goldwing Association is the national home for riders, chapters, and the open road.
+                    </p>
+</div>
+</div>
+<div class="flex-1 bg-white dark:bg-black p-12">
+<div class="max-w-3xl mx-auto space-y-6">
+<div class="border-l-4 border-primary pl-6 py-2">
+<p class="text-xl text-slate-600 dark:text-slate-400 italic">"Australian Goldwing Association is the national home for riders, chapters, and the open road."</p>
+</div>
+<p class="text-slate-700 dark:text-slate-300 leading-relaxed">
+                        Goldwing Association is the national home for riders, chapters, and the open road. Whether you're a long-time member or a newcomer to the Goldwing family, our association offers a community built on the passion for touring.
+                    </p>
+</div>
+</div>
+<footer class="bg-black text-white px-8 py-6 flex items-center justify-between text-[10px] border-t border-white/10 uppercase tracking-widest text-slate-500">
+<div>AUSTRALIAN GOLDWING ASSOCIATION</div>
+<div class="flex gap-4">
+<span>© 2024 Australian Goldwing Association. All rights reserved.</span>
+<span class="text-slate-700">|</span>
+<span class="hover:text-white cursor-pointer">Website by Patorama</span>
+</div>
+</footer>
+</div>
+</section>
+<aside class="w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+<div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
+<span class="text-xs font-bold uppercase tracking-wider">AI Design Assistant</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined text-xl">history</span></button>
+<button class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined text-xl">settings</span></button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/30 dark:bg-slate-900">
+<div class="flex flex-col items-end">
+<div class="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-2xl rounded-tr-none max-w-[85%] text-sm shadow-sm border border-slate-100 dark:border-slate-700">
+                    Change the "WELCOME TO GOLDWING ASSOCIATION" text to match the brand logo green exactly.
+                </div>
+<span class="text-[9px] text-slate-400 mt-1 mr-1">17:36</span>
+</div>
+<div class="flex flex-col items-start">
+<div class="bg-secondary text-white px-4 py-2.5 rounded-2xl rounded-tl-none max-w-[85%] text-sm shadow-md">
+                    I've updated the hero heading color to the brand green (#15803d). I also noticed the secondary button could use a similar adjustment—should I update that too?
+                </div>
+<span class="text-[9px] text-slate-400 mt-1 ml-1">Assistant · 17:36</span>
+</div>
+<div class="flex justify-center my-4">
+<div class="bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 px-4 py-1.5 rounded-full text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                    Element style updated · 17:37
+                </div>
+</div>
+<div class="flex flex-col items-end">
+<div class="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-2xl rounded-tr-none max-w-[85%] text-sm shadow-sm border border-slate-100 dark:border-slate-700">
+                    Yes, please. And make the background image slightly darker to improve readability.
+                </div>
+<span class="text-[9px] text-slate-400 mt-1 mr-1">17:38</span>
+</div>
+<div class="flex flex-col items-start">
+<div class="bg-secondary text-white px-4 py-2.5 rounded-2xl rounded-tl-none max-w-[85%] text-sm shadow-md">
+                    Done. I've synced the button colors and adjusted the hero overlay opacity to 60%.
+                </div>
+<span class="text-[9px] text-slate-400 mt-1 ml-1">Assistant · 17:39</span>
+</div>
+</div>
+<div class="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+<div class="relative bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center p-2 focus-within:ring-2 focus-within:ring-secondary/50 focus-within:border-secondary transition-all">
+<label class="p-2 cursor-pointer text-slate-400 hover:text-secondary transition-colors" for="media-upload-input" title="Upload Media">
+<input class="hidden" id="media-upload-input" type="file"/>
+<span class="material-symbols-outlined text-xl">add_circle</span>
+</label>
+<textarea class="flex-1 bg-transparent border-none text-sm p-2 focus:ring-0 focus:border-none resize-none min-h-[40px] max-h-32 custom-scrollbar" placeholder="Ask AI to edit anything..." rows="1"></textarea>
+<button class="p-2 ml-1 bg-secondary text-white rounded-xl shadow-lg hover:opacity-90 transition-all flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">send</span>
+</button>
+</div>
+<div class="mt-3 flex items-center justify-between px-1">
+<p class="text-[10px] text-slate-400 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">info</span> Press Enter to send
+                </p>
+<button class="text-xs font-bold text-slate-400 hover:text-secondary transition-colors">Clear chat</button>
+</div>
+</div>
+</aside>
+</main>
+<footer class="h-8 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-4 z-20">
+<div class="flex items-center gap-4 text-[10px] font-medium text-slate-500">
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Live Sync Enabled</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">desktop_windows</span> 1920 x 1080</span>
+</div>
+<div class="text-[10px] font-medium text-slate-400">
+        V 2.5.0-PRO
+    </div>
+</footer>
+
+</body></html>

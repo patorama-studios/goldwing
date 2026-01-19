@@ -348,6 +348,24 @@ class NotificationService
                     'reply_to' => 'webmaster@goldwing.org.au',
                 ],
             ],
+            'store_refund_processed' => [
+                'label' => 'Store refund processed',
+                'description' => 'Sent to the customer when a store refund is processed.',
+                'trigger' => 'Admin processes a Stripe refund.',
+                'category' => 'payments',
+                'is_mandatory' => false,
+                'placeholders' => ['order_number', 'refund_amount', 'refund_reason'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'primary',
+                    'custom_recipients' => '',
+                    'subject' => 'Refund processed for order #{{order_number}}',
+                    'body' => '<p>Your refund for order <strong>#{{order_number}}</strong> has been processed.</p><p>Amount: {{refund_amount}}<br>Reason: {{refund_reason}}</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
         ];
     }
 

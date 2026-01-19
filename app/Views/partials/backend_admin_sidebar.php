@@ -38,7 +38,15 @@ $items = [
     ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings'],
     ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings'],
     ['key' => 'media', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media'],
-    ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/admin/store/products'],
+    [
+        'key' => 'store',
+        'label' => 'Store',
+        'icon' => 'storefront',
+        'children' => [
+            ['key' => 'store-orders', 'label' => 'Orders', 'href' => '/admin/store/orders', 'path' => '/admin/store/orders'],
+            ['key' => 'store-products', 'label' => 'Products (Inventory)', 'href' => '/admin/store/products', 'path' => '/admin/store/products'],
+        ],
+    ],
     ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder'],
 ];
 $user = $user ?? current_user();
@@ -67,6 +75,7 @@ if (function_exists('can_access_path')) {
 $activePage = $activePage ?? 'dashboard';
 $settingsActiveKeys = ['settings', 'security-log', 'reports', 'audit', 'settings-ai'];
 $isSettingsActive = in_array($activePage, $settingsActiveKeys, true);
+$currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
 // Keep the admin sidebar logo consistent with the member area.
 $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
 ?>
@@ -83,7 +92,17 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
   <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
     <?php foreach ($items as $item): ?>
       <?php if (!empty($item['children'])): ?>
-        <?php $isDropdownActive = $item['key'] === 'settings' && $isSettingsActive; ?>
+        <?php
+          $isDropdownActive = $item['key'] === 'settings' && $isSettingsActive;
+          if (!$isDropdownActive && $currentPath) {
+              foreach ($item['children'] as $child) {
+                  if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                      $isDropdownActive = true;
+                      break;
+                  }
+              }
+          }
+        ?>
         <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
           <summary class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
             <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
@@ -122,6 +141,9 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                     $isChildActive = true;
                 }
                 if ($activePage === 'settings' && $child['key'] === 'settings-access-control' && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/access-control.php') === 0) {
+                    $isChildActive = true;
+                }
+                if (!$isChildActive && $currentPath && !empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
                     $isChildActive = true;
                 }
               ?>

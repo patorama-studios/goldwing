@@ -330,6 +330,7 @@ if ($method === 'GET') {
     if ($action === 'page') {
         $page = load_page_or_fail($pageId);
         $draft = PageService::draftHtml($page);
+        $draft = PageBuilderService::ensureEditableBody($page, $draft);
         $draft = PageBuilderService::ensureDraftHtml($draft);
         if ($draft !== ($page['draft_html'] ?? '')) {
             PageService::updateDraft($pageId, $draft, (string) ($page['access_level'] ?? 'public'));

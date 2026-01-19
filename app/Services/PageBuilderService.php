@@ -117,6 +117,48 @@ class PageBuilderService
         return self::extractFragment($doc);
     }
 
+    public static function ensureEditableBody(array $page, string $draftHtml): string
+    {
+        if (strpos($draftHtml, 'data-gw-body') !== false) {
+            return $draftHtml;
+        }
+
+        $pageSlug = $page['slug'] ?? 'home';
+        $pageTitle = $page['title'] ?? 'Australian Goldwing Association';
+        $plainContent = trim(strip_tags($draftHtml));
+        $heroLead = $plainContent !== '' ? $plainContent : 'Rides, events, and member services for Goldwing riders across Australia.';
+        if (strlen($heroLead) > 200) {
+            $heroLead = substr($heroLead, 0, 200) . '...';
+        }
+        $heroClass = $pageSlug === 'home' ? 'hero hero--home' : 'hero hero--compact';
+        $heroActions = '';
+        if ($pageSlug === 'home') {
+            $heroActions = '<div class="hero__actions">'
+                . '<a class="button primary" href="/?page=membership">Join the Association</a>'
+                . '<a class="button ghost" href="/?page=ride-calendar">Ride Calendar</a>'
+                . '</div>';
+        }
+
+        $heroHtml = '<section class="' . $heroClass . '">'
+            . '<div class="container hero__inner">'
+            . '<span class="hero__eyebrow">Australian Goldwing Association</span>'
+            . '<h1>' . htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') . '</h1>'
+            . '<p class="hero__lead">' . htmlspecialchars($heroLead, ENT_QUOTES, 'UTF-8') . '</p>'
+            . $heroActions
+            . '</div>'
+            . '</section>';
+
+        $bodyHtml = '<section class="page-section">'
+            . '<div class="container">'
+            . '<div class="page-card reveal">'
+            . '<div class="page-content">' . $draftHtml . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</section>';
+
+        return '<div id="gw-content-root" class="page-body" data-gw-body="true">' . $heroHtml . $bodyHtml . '</div>';
+    }
+
     private static function applyElementIds(DOMNode $node): void
     {
         if ($node instanceof DOMElement) {

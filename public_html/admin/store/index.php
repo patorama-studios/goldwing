@@ -42,6 +42,13 @@ if ($page === 'orders' && $subPage) {
     $page = 'order';
 }
 
+if (in_array($page, ['orders', 'order'], true)) {
+    store_require_permission('store_orders_view');
+}
+if (in_array($page, ['products', 'product', 'low-stock'], true)) {
+    store_require_permission('store_inventory_manage');
+}
+
 $pageTitles = [
     'settings' => 'Store Settings',
     'categories' => 'Store Categories',

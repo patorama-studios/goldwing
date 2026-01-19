@@ -68,6 +68,8 @@ $formatMembershipPrice = static function (?int $cents, string $currency): string
 $getMembershipPrice = static function (array $matrix, string $magazine, string $membership, string $period): ?int {
     return $matrix[$magazine][$membership][$period] ?? null;
 };
+$liveHtml = $page ? PageService::liveHtml($page) : '';
+$hasEditableBody = $page && $liveHtml !== '' && strpos($liveHtml, 'data-gw-body') !== false;
 
 require __DIR__ . '/../app/Views/partials/header.php';
 require __DIR__ . '/../app/Views/partials/nav_public.php';
@@ -78,7 +80,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <?= render_media_shortcodes($templateHeader) ?>
     </div>
   <?php endif; ?>
-  <?php if ($isMembershipPage && $page && $canView): ?>
+  <?php if ($isMembershipPage && $page && $canView && !$hasEditableBody): ?>
     <section class="membership-hero">
       <div class="container membership-hero__inner">
         <span class="membership-hero__eyebrow">Australian Goldwing Association</span>
@@ -273,40 +275,44 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       </div>
     </section>
   <?php else: ?>
-    <section class="<?= e($heroClass) ?>">
-      <div class="container hero__inner">
-        <span class="hero__eyebrow">Australian Goldwing Association</span>
-        <h1><?= e($heroTitle) ?></h1>
-        <p class="hero__lead"><?= e($heroLead) ?></p>
-        <?php if ($pageSlug === 'home'): ?>
-          <div class="hero__actions">
-            <a class="button primary" href="/?page=membership">Join the Association</a>
-            <a class="button ghost" href="/?page=ride-calendar">Ride Calendar</a>
-          </div>
-        <?php endif; ?>
-      </div>
-    </section>
-
-    <section class="page-section">
-      <div class="container">
-        <div class="page-card reveal">
-          <?php if ($page && $canView): ?>
-            <div class="page-content"><?= render_media_shortcodes(PageService::liveHtml($page)) ?></div>
-            <?php if ($pageSlug === 'ride-calendar'): ?>
-              <div class="page-content">
-                <iframe title="Ride calendar" src="/calendar/events_public.php" style="width: 100%; min-height: 900px; border: 0;" loading="lazy"></iframe>
-              </div>
-            <?php endif; ?>
-          <?php elseif ($page && !$canView): ?>
-            <h2>Members Only</h2>
-            <p>Please <a href="/login.php">log in</a> to view this content.</p>
-          <?php else: ?>
-            <h2>Welcome to the Australian Goldwing Association</h2>
-            <p>We are building the home for rides, events, and member services. Please check back soon.</p>
+    <?php if ($page && $canView && $hasEditableBody): ?>
+      <?= render_media_shortcodes($liveHtml) ?>
+    <?php else: ?>
+      <section class="<?= e($heroClass) ?>">
+        <div class="container hero__inner">
+          <span class="hero__eyebrow">Australian Goldwing Association</span>
+          <h1><?= e($heroTitle) ?></h1>
+          <p class="hero__lead"><?= e($heroLead) ?></p>
+          <?php if ($pageSlug === 'home'): ?>
+            <div class="hero__actions">
+              <a class="button primary" href="/?page=membership">Join the Association</a>
+              <a class="button ghost" href="/?page=ride-calendar">Ride Calendar</a>
+            </div>
           <?php endif; ?>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section class="page-section">
+        <div class="container">
+          <div class="page-card reveal">
+            <?php if ($page && $canView): ?>
+              <div class="page-content"><?= render_media_shortcodes($liveHtml) ?></div>
+              <?php if ($pageSlug === 'ride-calendar'): ?>
+                <div class="page-content">
+                  <iframe title="Ride calendar" src="/calendar/events_public.php" style="width: 100%; min-height: 900px; border: 0;" loading="lazy"></iframe>
+                </div>
+              <?php endif; ?>
+            <?php elseif ($page && !$canView): ?>
+              <h2>Members Only</h2>
+              <p>Please <a href="/login.php">log in</a> to view this content.</p>
+            <?php else: ?>
+              <h2>Welcome to the Australian Goldwing Association</h2>
+              <p>We are building the home for rides, events, and member services. Please check back soon.</p>
+            <?php endif; ?>
+          </div>
+        </div>
+      </section>
+    <?php endif; ?>
   <?php endif; ?>
 </main>
 <?php if ($templateFooter !== ''): ?>

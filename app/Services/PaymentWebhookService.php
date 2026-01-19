@@ -437,7 +437,7 @@ class PaymentWebhookService
         $paidStatus = (string) SettingsService::getGlobal('store.order_paid_status', 'paid');
         $alreadyPaid = ($order['status'] ?? '') === $paidStatus;
         if (!$alreadyPaid) {
-            $stmt = $pdo->prepare('UPDATE store_orders SET status = :status, stripe_payment_intent_id = :payment_intent_id, stripe_session_id = :session_id, paid_at = NOW(), updated_at = NOW() WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE store_orders SET status = :status, order_status = "new", payment_status = "paid", fulfillment_status = "unfulfilled", stripe_payment_intent_id = :payment_intent_id, stripe_session_id = :session_id, paid_at = NOW(), updated_at = NOW() WHERE id = :id');
             $stmt->execute([
                 'status' => $paidStatus,
                 'payment_intent_id' => $paymentIntentId,
@@ -461,6 +461,10 @@ class PaymentWebhookService
             }
             return;
         }
+
+        store_add_order_event($pdo, $storeOrderId, 'payment.paid', 'Payment captured via Stripe.', null, [
+            'stripe_payment_intent_id' => $paymentIntentId,
+        ]);
 
         $stmt = $pdo->prepare('SELECT * FROM store_order_items WHERE order_id = :id');
         $stmt->execute(['id' => $storeOrderId]);
@@ -495,10 +499,10 @@ class PaymentWebhookService
                 continue;
             }
             if (!empty($item['variant_id'])) {
-                $stmt = $pdo->prepare('UPDATE store_product_variants SET stock_quantity = GREATEST(0, stock_quantity - :qty) WHERE id = :id');
+                $stmt = $pdo->prepare('UPDATE store_product_variants SET stock_quantity = stock_quantity - :qty WHERE id = :id');
                 $stmt->execute(['qty' => $item['quantity'], 'id' => $item['variant_id']]);
             } else {
-                $stmt = $pdo->prepare('UPDATE store_products SET stock_quantity = GREATEST(0, stock_quantity - :qty) WHERE id = :id');
+                $stmt = $pdo->prepare('UPDATE store_products SET stock_quantity = stock_quantity - :qty WHERE id = :id');
                 $stmt->execute(['qty' => $item['quantity'], 'id' => $item['product_id']]);
             }
         }

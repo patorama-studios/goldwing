@@ -187,6 +187,9 @@ CREATE TABLE store_orders (
   user_id INT NULL,
   member_id INT NULL,
   status ENUM('pending','paid','fulfilled','cancelled','refunded') NOT NULL DEFAULT 'pending',
+  order_status ENUM('new','processing','packed','shipped','completed','cancelled') NOT NULL DEFAULT 'new',
+  payment_status ENUM('unpaid','paid','refunded','partial_refund') NOT NULL DEFAULT 'unpaid',
+  fulfillment_status ENUM('unfulfilled','partial','fulfilled') NOT NULL DEFAULT 'unfulfilled',
   subtotal DECIMAL(10,2) NOT NULL,
   discount_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   shipping_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -209,6 +212,7 @@ CREATE TABLE store_orders (
   stripe_payment_intent_id VARCHAR(120) NULL,
   paid_at DATETIME NULL,
   fulfilled_at DATETIME NULL,
+  shipped_at DATETIME NULL,
   admin_notes TEXT NULL,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NULL,
@@ -228,6 +232,7 @@ CREATE TABLE store_order_items (
   type ENUM('physical','ticket') NOT NULL DEFAULT 'physical',
   event_name_snapshot VARCHAR(200) NULL,
   quantity INT NOT NULL,
+  fulfilled_qty INT NOT NULL DEFAULT 0,
   unit_price DECIMAL(10,2) NOT NULL,
   unit_price_final DECIMAL(10,2) NOT NULL,
   line_total DECIMAL(10,2) NOT NULL,
@@ -258,6 +263,20 @@ CREATE TABLE store_shipments (
   shipped_at DATETIME NULL,
   created_at DATETIME NOT NULL,
   FOREIGN KEY (order_id) REFERENCES store_orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE store_order_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  event_type VARCHAR(80) NOT NULL,
+  message VARCHAR(255) NOT NULL,
+  metadata_json TEXT NULL,
+  created_by_user_id INT NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_store_order_events_order (order_id),
+  INDEX idx_store_order_events_type (event_type),
+  FOREIGN KEY (order_id) REFERENCES store_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE store_tickets (
