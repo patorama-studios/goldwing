@@ -209,6 +209,13 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
               <?php if ($requiresShipping): ?>
                 <div class="card" data-shipping-section>
                   <h3>Shipping address confirmation</h3>
+                  <input type="hidden" data-shipping-base name="shipping_name" value="<?= e($address['name']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_line1" value="<?= e($address['line1']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_line2" value="<?= e($address['line2']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_city" value="<?= e($address['city']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_state" value="<?= e($address['state']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_postal" value="<?= e($address['postal']) ?>">
+                  <input type="hidden" data-shipping-base name="shipping_country" value="<?= e($address['country']) ?>">
                   <?php if ($memberHasShipping): ?>
                     <p class="text-sm text-gray-600">We will ship to the address on your member profile.</p>
                     <div class="text-sm">
@@ -220,76 +227,69 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                       <div><?= e(trim($address['city'] . ' ' . $address['state'] . ' ' . $address['postal'])) ?></div>
                       <div><?= e($address['country']) ?></div>
                     </div>
-                    <input type="hidden" name="shipping_name" value="<?= e($address['name']) ?>">
-                    <input type="hidden" name="shipping_line1" value="<?= e($address['line1']) ?>">
-                    <input type="hidden" name="shipping_line2" value="<?= e($address['line2']) ?>">
-                    <input type="hidden" name="shipping_city" value="<?= e($address['city']) ?>">
-                    <input type="hidden" name="shipping_state" value="<?= e($address['state']) ?>">
-                    <input type="hidden" name="shipping_postal" value="<?= e($address['postal']) ?>">
-                    <input type="hidden" name="shipping_country" value="<?= e($address['country']) ?>">
                     <details class="mt-4">
                       <summary class="text-sm">Use a different shipping address</summary>
                       <div class="form-group">
                         <label for="shipping-name">Name</label>
-                        <input id="shipping-name" name="shipping_name" value="<?= e($address['name']) ?>">
+                        <input id="shipping-name" data-shipping-override name="shipping_name" value="<?= e($address['name']) ?>">
                       </div>
                       <div class="form-group">
                         <label for="shipping-line1">Address line 1</label>
-                        <input id="shipping-line1" name="shipping_line1" value="<?= e($address['line1']) ?>">
+                        <input id="shipping-line1" data-shipping-override name="shipping_line1" value="<?= e($address['line1']) ?>">
                       </div>
                       <div class="form-group">
                         <label for="shipping-line2">Address line 2</label>
-                        <input id="shipping-line2" name="shipping_line2" value="<?= e($address['line2']) ?>">
+                        <input id="shipping-line2" data-shipping-override name="shipping_line2" value="<?= e($address['line2']) ?>">
                       </div>
                       <div class="grid grid-3">
                         <div class="form-group">
                           <label for="shipping-city">City</label>
-                          <input id="shipping-city" name="shipping_city" value="<?= e($address['city']) ?>">
+                          <input id="shipping-city" data-shipping-override name="shipping_city" value="<?= e($address['city']) ?>">
                         </div>
                         <div class="form-group">
                           <label for="shipping-state">State</label>
-                          <input id="shipping-state" name="shipping_state" value="<?= e($address['state']) ?>">
+                          <input id="shipping-state" data-shipping-override name="shipping_state" value="<?= e($address['state']) ?>">
                         </div>
                         <div class="form-group">
                           <label for="shipping-postal">Postcode</label>
-                          <input id="shipping-postal" name="shipping_postal" value="<?= e($address['postal']) ?>">
+                          <input id="shipping-postal" data-shipping-override name="shipping_postal" value="<?= e($address['postal']) ?>">
                         </div>
                       </div>
                       <div class="form-group">
                         <label for="shipping-country">Country</label>
-                        <input id="shipping-country" name="shipping_country" value="<?= e($address['country']) ?>" readonly>
+                        <input id="shipping-country" data-shipping-override name="shipping_country" value="<?= e($address['country']) ?>" readonly>
                       </div>
                     </details>
                   <?php else: ?>
                     <div class="form-group">
                       <label for="shipping-name">Name</label>
-                      <input id="shipping-name" name="shipping_name" value="<?= e($address['name']) ?>">
+                      <input id="shipping-name" data-shipping-override name="shipping_name" value="<?= e($address['name']) ?>">
                     </div>
                     <div class="form-group">
                       <label for="shipping-line1">Address line 1</label>
-                      <input id="shipping-line1" name="shipping_line1" value="<?= e($address['line1']) ?>">
+                      <input id="shipping-line1" data-shipping-override name="shipping_line1" value="<?= e($address['line1']) ?>">
                     </div>
                     <div class="form-group">
                       <label for="shipping-line2">Address line 2</label>
-                      <input id="shipping-line2" name="shipping_line2" value="<?= e($address['line2']) ?>">
+                      <input id="shipping-line2" data-shipping-override name="shipping_line2" value="<?= e($address['line2']) ?>">
                     </div>
                     <div class="grid grid-3">
                       <div class="form-group">
                         <label for="shipping-city">City</label>
-                        <input id="shipping-city" name="shipping_city" value="<?= e($address['city']) ?>">
+                        <input id="shipping-city" data-shipping-override name="shipping_city" value="<?= e($address['city']) ?>">
                       </div>
                       <div class="form-group">
                         <label for="shipping-state">State</label>
-                        <input id="shipping-state" name="shipping_state" value="<?= e($address['state']) ?>">
+                        <input id="shipping-state" data-shipping-override name="shipping_state" value="<?= e($address['state']) ?>">
                       </div>
                       <div class="form-group">
                         <label for="shipping-postal">Postcode</label>
-                        <input id="shipping-postal" name="shipping_postal" value="<?= e($address['postal']) ?>">
+                        <input id="shipping-postal" data-shipping-override name="shipping_postal" value="<?= e($address['postal']) ?>">
                       </div>
                     </div>
                     <div class="form-group">
                       <label for="shipping-country">Country</label>
-                      <input id="shipping-country" name="shipping_country" value="<?= e($address['country']) ?>" readonly>
+                      <input id="shipping-country" data-shipping-override name="shipping_country" value="<?= e($address['country']) ?>" readonly>
                     </div>
                   <?php endif; ?>
                 </div>
@@ -431,6 +431,15 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       return data;
     };
 
+    const getShippingValue = (name) => {
+      const overrideInput = form.querySelector(`[data-shipping-override][name="${name}"]`);
+      if (overrideInput && overrideInput.value.trim() !== '') {
+        return overrideInput.value;
+      }
+      const baseInput = form.querySelector(`[data-shipping-base][name="${name}"]`);
+      return baseInput ? baseInput.value : '';
+    };
+
     const collectPayload = () => {
       const fulfillmentInput = form.querySelector('input[name="fulfillment"]');
       const fulfillment = fulfillmentInput ? fulfillmentInput.value : (requiresShipping ? 'shipping' : 'pickup');
@@ -443,13 +452,13 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         guest_first_name: form.querySelector('input[name="guest_first_name"]')?.value || '',
         guest_last_name: form.querySelector('input[name="guest_last_name"]')?.value || '',
         guest_phone: form.querySelector('input[name="guest_phone"]')?.value || '',
-        shipping_name: form.querySelector('input[name="shipping_name"]')?.value || '',
-        shipping_line1: form.querySelector('input[name="shipping_line1"]')?.value || '',
-        shipping_line2: form.querySelector('input[name="shipping_line2"]')?.value || '',
-        shipping_city: form.querySelector('input[name="shipping_city"]')?.value || '',
-        shipping_state: form.querySelector('input[name="shipping_state"]')?.value || '',
-        shipping_postal: form.querySelector('input[name="shipping_postal"]')?.value || '',
-        shipping_country: form.querySelector('input[name="shipping_country"]')?.value || '',
+        shipping_name: getShippingValue('shipping_name'),
+        shipping_line1: getShippingValue('shipping_line1'),
+        shipping_line2: getShippingValue('shipping_line2'),
+        shipping_city: getShippingValue('shipping_city'),
+        shipping_state: getShippingValue('shipping_state'),
+        shipping_postal: getShippingValue('shipping_postal'),
+        shipping_country: getShippingValue('shipping_country'),
       };
     };
 
