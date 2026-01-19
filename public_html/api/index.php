@@ -302,10 +302,17 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Method not allowed.'], 405);
         }
         require_csrf_json($body);
-        $stripeSettings = require_stripe_checkout_enabled();
-        $activeKeys = StripeSettingsService::getActiveKeys();
-        if (empty($activeKeys['secret_key'])) {
-            json_response(['error' => 'Stripe is not configured.'], 422);
+        $paymentMethod = strtolower(trim((string) ($body['payment_method'] ?? 'card')));
+        if (!in_array($paymentMethod, ['card', 'bank_transfer'], true)) {
+            $paymentMethod = 'card';
+        }
+        $stripeSettings = [];
+        if ($paymentMethod === 'card') {
+            $stripeSettings = require_stripe_checkout_enabled();
+            $activeKeys = StripeSettingsService::getActiveKeys();
+            if (empty($activeKeys['secret_key'])) {
+                json_response(['error' => 'Stripe is not configured.'], 422);
+            }
         }
         $fullSelected = !empty($body['membership_full']);
         $associateSelected = !empty($body['membership_associate']);
@@ -414,7 +421,10 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Stripe is not configured.'], 422);
         }
         $user = current_user();
-        if (!$user && empty($stripeSettings['allow_guest_checkout'])) {
+        if (!$user && $paymentMethod === 'card' && empty($stripeSettings['allow_guest_checkout'])) {
+            json_response(['error' => 'Guest checkout is disabled.'], 403);
+        }
+        if (!$user && $paymentMethod === 'bank_transfer' && empty((StripeSettingsService::getSettings())['allow_guest_checkout'])) {
             json_response(['error' => 'Guest checkout is disabled.'], 403);
         }
 
@@ -612,6 +622,18 @@ if ($resource === 'stripe') {
                 'store_order_number' => $orderNumber,
             ]),
         ], $orderItems);
+
+        if ($paymentMethod === 'bank_transfer') {
+            $stmt = $pdo->prepare('UPDATE orders SET payment_method = "bank_transfer", payment_status = "pending", updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => $orderId]);
+            $stmt = $pdo->prepare('UPDATE store_carts SET status = "converted", updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => $cart['id']]);
+            json_response([
+                'orderId' => $orderId,
+                'storeOrderId' => $storeOrderId,
+                'payment_method' => 'bank_transfer',
+            ]);
+        }
 
         $amountCents = (int) round(((float) $totals['total']) * 100);
         $payload = [

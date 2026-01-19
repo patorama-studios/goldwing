@@ -3,6 +3,7 @@ require_once __DIR__ . '/../app/bootstrap.php';
 
 use App\Services\Csrf;
 use App\Services\StripeSettingsService;
+use App\Services\SettingsService;
 
 $pdo = db();
 $user = current_user();
@@ -10,6 +11,9 @@ $settings = store_get_settings();
 $stripeSettings = StripeSettingsService::getSettings();
 $checkoutEnabled = !empty($stripeSettings['checkout_enabled']);
 $allowGuestCheckout = !empty($stripeSettings['allow_guest_checkout']);
+$bankTransferInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
+$bankTransferEnabled = $bankTransferInstructions !== '';
+$cardEnabled = $checkoutEnabled;
 
 if (!$user && !$allowGuestCheckout) {
     $pageTitle = 'Checkout';
@@ -164,7 +168,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             <div class="alert success"><?= e($checkoutSuccess) ?></div>
           <?php endif; ?>
 
-          <?php if (!$checkoutEnabled): ?>
+          <?php if (!$cardEnabled && !$bankTransferEnabled): ?>
             <div class="alert error">Checkout is currently unavailable.</div>
           <?php elseif (!$items): ?>
             <p>Your cart is empty.</p>
@@ -173,6 +177,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             <form id="checkout-form" class="grid gap-6" data-guest-required="<?= $user ? '0' : '1' ?>" data-requires-shipping="<?= $requiresShipping ? '1' : '0' ?>" data-require-shipping="<?= !empty($stripeSettings['require_shipping_for_physical']) ? '1' : '0' ?>" data-digital-minimal="<?= !empty($stripeSettings['digital_only_minimal']) ? '1' : '0' ?>">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="fulfillment" value="<?= e($fulfillment) ?>">
+
+              <?php if (!$cardEnabled && $bankTransferEnabled): ?>
+                <div class="alert info">Card payments are unavailable. Please use bank transfer.</div>
+              <?php endif; ?>
 
               <div class="card">
                 <h3>Contact details</h3>
@@ -289,9 +297,30 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
 
               <div class="card">
                 <h3>Payment</h3>
-                <p id="stripe-payment-note" class="form-helper">The Stripe Payment Element handles card details securely. Complete it below to pay instantly.</p>
-                <div id="stripe-payment-element" class="mt-4"></div>
-                <div class="form-error" id="stripe-payment-error" hidden></div>
+                <div class="form-group">
+                  <span class="form-label">Payment Method</span>
+                  <div class="form-checkboxes">
+                    <label class="form-checkbox">
+                      <input type="radio" name="payment_method" value="card" data-payment-toggle="card" <?= $cardEnabled ? '' : 'disabled' ?>>
+                      Credit Card (Stripe)
+                    </label>
+                    <label class="form-checkbox">
+                      <input type="radio" name="payment_method" value="bank_transfer" data-payment-toggle="bank_transfer" <?= $bankTransferEnabled ? '' : 'disabled' ?>>
+                      Bank Transfer
+                    </label>
+                  </div>
+                  <div class="form-error" id="payment-method-error" hidden></div>
+                </div>
+                <div class="payment-panel stripe-style" data-payment-panel="card" hidden>
+                  <p id="stripe-payment-note" class="form-helper">The Stripe Payment Element handles card details securely. Complete it below to pay instantly.</p>
+                  <div id="stripe-payment-element" class="mt-4"></div>
+                  <div class="form-error" id="stripe-payment-error" hidden></div>
+                </div>
+                <div class="payment-panel" data-payment-panel="bank_transfer" hidden>
+                  <div class="bank-transfer-instructions">
+                    <?= nl2br(e($bankTransferInstructions)) ?>
+                  </div>
+                </div>
               </div>
 
               <div class="grid gap-4 md:grid-cols-[1.2fr_1fr]">
@@ -363,6 +392,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const payButton = form.querySelector('[data-pay-button]');
     const errorEl = document.getElementById('stripe-payment-error');
     const paymentElementContainer = document.getElementById('stripe-payment-element');
+    const paymentMethodError = document.getElementById('payment-method-error');
+    const paymentPanels = Array.from(document.querySelectorAll('[data-payment-panel]'));
+    const paymentMethodInputs = Array.from(form.querySelectorAll('input[name="payment_method"]'));
+    const payButtonLabel = payButton ? payButton.textContent : 'Pay now';
     const csrfToken = form.querySelector('input[name="csrf_token"]').value;
     const requiresShipping = form.dataset.requiresShipping === '1';
     const requireShipping = form.dataset.requireShipping === '1';
@@ -401,8 +434,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     const collectPayload = () => {
       const fulfillmentInput = form.querySelector('input[name="fulfillment"]');
       const fulfillment = fulfillmentInput ? fulfillmentInput.value : (requiresShipping ? 'shipping' : 'pickup');
+      const methodInput = form.querySelector('input[name="payment_method"]:checked');
+      const paymentMethod = methodInput ? methodInput.value : '';
       return {
         fulfillment,
+        payment_method: paymentMethod,
         guest_email: form.querySelector('input[name="guest_email"]')?.value || '',
         guest_first_name: form.querySelector('input[name="guest_first_name"]')?.value || '',
         guest_last_name: form.querySelector('input[name="guest_last_name"]')?.value || '',
@@ -423,12 +459,37 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           return 'Please enter your name and email.';
         }
       }
+      if (!payload.payment_method) {
+        return 'Please select a payment method.';
+      }
       if (requiresShipping && requireShipping) {
         if (!payload.shipping_line1 || !payload.shipping_city || !payload.shipping_state || !payload.shipping_postal) {
           return 'Please complete the shipping address.';
         }
       }
       return '';
+    };
+
+    const showPaymentMethodError = (message) => {
+      if (!paymentMethodError) {
+        return;
+      }
+      if (!message) {
+        paymentMethodError.textContent = '';
+        paymentMethodError.hidden = true;
+        return;
+      }
+      paymentMethodError.textContent = message;
+      paymentMethodError.hidden = false;
+    };
+
+    const setPaymentPanel = (method) => {
+      paymentPanels.forEach((panel) => {
+        panel.hidden = panel.dataset.paymentPanel !== method;
+      });
+      if (payButton) {
+        payButton.textContent = method === 'bank_transfer' ? 'Place order' : payButtonLabel;
+      }
     };
 
     const initStripeElements = async (secret) => {
@@ -454,18 +515,63 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       clientSecret = secret;
     };
 
+    if (paymentMethodInputs.length) {
+      let defaultMethod = paymentMethodInputs.find((input) => !input.disabled && input.value === 'card');
+      if (!defaultMethod) {
+        defaultMethod = paymentMethodInputs.find((input) => !input.disabled && input.value === 'bank_transfer');
+      }
+      if (defaultMethod) {
+        defaultMethod.checked = true;
+        setPaymentPanel(defaultMethod.value);
+      }
+      paymentMethodInputs.forEach((input) => {
+        input.addEventListener('change', () => {
+          showPaymentMethodError('');
+          setPaymentPanel(input.value);
+          if (input.value !== 'card' && paymentElement) {
+            paymentElement.unmount();
+            paymentElement = null;
+            elements = null;
+            clientSecret = null;
+          }
+        });
+      });
+    }
+
     if (payButton) {
       payButton.addEventListener('click', async () => {
         setError('');
+        showPaymentMethodError('');
         const payload = collectPayload();
         const validationError = validatePayload(payload);
         if (validationError) {
-          setError(validationError);
+          if (validationError.includes('payment method')) {
+            showPaymentMethodError(validationError);
+          } else {
+            setError(validationError);
+          }
           return;
         }
         payButton.disabled = true;
         payButton.textContent = 'Processing...';
         try {
+          if (payload.payment_method === 'bank_transfer') {
+            const response = await fetch('/api/stripe/create-payment-intent', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+              },
+              body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+              throw new Error(data.error || 'Unable to place order.');
+            }
+            const bankOrderId = data.orderId || null;
+            window.location.href = `${window.location.origin}/order/success?orderId=${encodeURIComponent(bankOrderId || '')}`;
+            return;
+          }
           if (!clientSecret) {
             const response = await fetch('/api/stripe/create-payment-intent', {
               method: 'POST',
@@ -495,7 +601,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         } catch (error) {
           setError(error.message || 'Payment could not be processed.');
           payButton.disabled = false;
-          payButton.textContent = 'Pay now';
+          payButton.textContent = payload.payment_method === 'bank_transfer' ? 'Place order' : 'Pay now';
         }
       });
     }
