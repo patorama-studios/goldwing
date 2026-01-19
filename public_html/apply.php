@@ -242,14 +242,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $bikeColumns = [];
                 $bikeHasRego = true;
                 $bikeHasColour = false;
+                $bikeHasPrimary = false;
                 try {
                     $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
                     $bikeHasRego = in_array('rego', $bikeColumns, true);
                     $bikeHasColour = in_array('colour', $bikeColumns, true) || in_array('color', $bikeColumns, true);
+                    $bikeHasPrimary = in_array('is_primary', $bikeColumns, true);
                 } catch (Throwable $e) {
                     $bikeColumns = [];
                     $bikeHasRego = true;
                     $bikeHasColour = false;
+                    $bikeHasPrimary = false;
+                }
+
+                $primarySet = false;
+                if ($bikeHasPrimary) {
+                    $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+                    $primaryStmt->execute(['member_id' => $memberId]);
+                    $primarySet = (bool) $primaryStmt->fetchColumn();
                 }
 
                 foreach ($fullVehicles as $vehicle) {
@@ -287,8 +297,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $params['color'] = $colour;
                             }
                         }
+                        if ($bikeHasPrimary && !$primarySet) {
+                            $columns[] = 'is_primary';
+                            $placeholders[] = ':is_primary';
+                            $params['is_primary'] = 1;
+                        }
                         $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
                         $stmt->execute($params);
+                        if ($bikeHasPrimary && !$primarySet) {
+                            $primarySet = true;
+                        }
                     }
                 }
 

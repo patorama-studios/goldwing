@@ -6,6 +6,19 @@ use App\Services\RefundService;
 
 $canManage = store_user_can($user, 'store_orders_manage');
 $canRefund = store_user_can($user, 'store_refunds_manage');
+$hasTable = function (string $table) use ($pdo): bool {
+    static $cache = [];
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table));
+        $cache[$table] = (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        $cache[$table] = false;
+    }
+    return $cache[$table];
+};
 
 $orderLookup = $subPage ?? '';
 if (isset($_GET['order'])) {
@@ -206,33 +219,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $order = $stmt->fetch();
 }
 
-$stmt = $pdo->prepare('SELECT oi.*, (SELECT image_url FROM store_product_images i WHERE i.product_id = oi.product_id ORDER BY i.sort_order ASC, i.id ASC LIMIT 1) as image_url FROM store_order_items oi WHERE oi.order_id = :order_id ORDER BY oi.id ASC');
-$stmt->execute(['order_id' => $order['id']]);
-$orderItems = $stmt->fetchAll();
+$orderItems = [];
+if ($hasTable('store_order_items')) {
+    $stmt = $pdo->prepare('SELECT oi.*, (SELECT image_url FROM store_product_images i WHERE i.product_id = oi.product_id ORDER BY i.sort_order ASC, i.id ASC LIMIT 1) as image_url FROM store_order_items oi WHERE oi.order_id = :order_id ORDER BY oi.id ASC');
+    $stmt->execute(['order_id' => $order['id']]);
+    $orderItems = $stmt->fetchAll();
+}
 
-$stmt = $pdo->prepare('SELECT * FROM store_shipments WHERE order_id = :order_id ORDER BY created_at DESC');
-$stmt->execute(['order_id' => $order['id']]);
-$shipments = $stmt->fetchAll();
+$shipments = [];
+if ($hasTable('store_shipments')) {
+    $stmt = $pdo->prepare('SELECT * FROM store_shipments WHERE order_id = :order_id ORDER BY created_at DESC');
+    $stmt->execute(['order_id' => $order['id']]);
+    $shipments = $stmt->fetchAll();
+}
 $shipment = $shipments[0] ?? null;
 $shippedDateValue = '';
 if (!empty($shipment['shipped_at'])) {
     $shippedDateValue = substr($shipment['shipped_at'], 0, 10);
 }
 
-$stmt = $pdo->prepare('SELECT t.ticket_code, t.event_name FROM store_tickets t JOIN store_order_items oi ON oi.id = t.order_item_id WHERE oi.order_id = :order_id ORDER BY t.id ASC');
-$stmt->execute(['order_id' => $order['id']]);
-$tickets = $stmt->fetchAll();
+$tickets = [];
+if ($hasTable('store_tickets') && $hasTable('store_order_items')) {
+    $stmt = $pdo->prepare('SELECT t.ticket_code, t.event_name FROM store_tickets t JOIN store_order_items oi ON oi.id = t.order_item_id WHERE oi.order_id = :order_id ORDER BY t.id ASC');
+    $stmt->execute(['order_id' => $order['id']]);
+    $tickets = $stmt->fetchAll();
+}
 
-$stmt = $pdo->prepare('SELECT e.*, u.name as actor_name FROM store_order_events e LEFT JOIN users u ON u.id = e.created_by_user_id WHERE e.order_id = :order_id ORDER BY e.created_at DESC');
-$stmt->execute(['order_id' => $order['id']]);
-$orderEvents = $stmt->fetchAll();
+$orderEvents = [];
+if ($hasTable('store_order_events')) {
+    $stmt = $pdo->prepare('SELECT e.*, u.name as actor_name FROM store_order_events e LEFT JOIN users u ON u.id = e.created_by_user_id WHERE e.order_id = :order_id ORDER BY e.created_at DESC');
+    $stmt->execute(['order_id' => $order['id']]);
+    $orderEvents = $stmt->fetchAll();
+}
 
 $refundableCents = OrderRepository::calculateRefundableCents((int) $order['id']);
 $refundableAmount = number_format($refundableCents / 100, 2);
 
-$stmt = $pdo->prepare('SELECT * FROM store_refunds WHERE order_id = :order_id ORDER BY created_at DESC');
-$stmt->execute(['order_id' => $order['id']]);
-$refunds = $stmt->fetchAll();
+$refunds = [];
+if ($hasTable('store_refunds')) {
+    $stmt = $pdo->prepare('SELECT * FROM store_refunds WHERE order_id = :order_id ORDER BY created_at DESC');
+    $stmt->execute(['order_id' => $order['id']]);
+    $refunds = $stmt->fetchAll();
+}
 
 $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
 ?>

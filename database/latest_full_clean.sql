@@ -561,6 +561,7 @@ CREATE TABLE member_bikes (
   year INT NULL,
   rego VARCHAR(50) NULL,
   image_url VARCHAR(255) NULL,
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL,
   FOREIGN KEY (member_id) REFERENCES members(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

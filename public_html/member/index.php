@@ -1567,8 +1567,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           if (!$primaryBike && !empty($bikes)) {
               $primaryBike = $bikes[0];
           }
-          $primaryBikeYearLabel = $primaryBike['year'] ?? '—';
-          $primaryBikeRegoLabel = $primaryBike['rego'] ?? '—';
+          $primaryBikeYearLabel = $primaryBike ? ($primaryBike['year'] ?? '—') : '—';
+          $primaryBikeRegoLabel = $primaryBike ? ($primaryBike['rego'] ?? '—') : '—';
           $profileRenewalLabel = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'LIFE' ? 'N/A' : format_date($profileMembershipPeriod['end_date'] ?? null);
           $profileLastPaymentLabel = $profileLatestOrder ? format_datetime($profileLatestOrder['paid_at'] ?? $profileLatestOrder['created_at'] ?? null) : '—';
           $profilePaymentMethodLabel = $profileLatestOrder ? ($profileLatestOrder['payment_method'] ?? '') : '';
@@ -1580,6 +1580,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           $twofaStatusLabel = $twofaEnabled ? 'Enabled' : 'Not enabled';
           $twofaActionHref = $twofaEnabled ? '/member/2fa_verify.php' : '/member/2fa_enroll.php';
           $twofaActionLabel = $twofaEnabled ? 'Manage 2FA' : 'Setup 2FA';
+          $profileActionUrl = '/member/index.php?page=profile';
+          if ($profileMemberId !== $member['id']) {
+              $profileActionUrl .= '&member_id=' . urlencode((string) $profileMemberId);
+          }
         ?>
         <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div class="border-b border-gray-100 px-8 py-6">
@@ -1757,7 +1761,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </div>
                     <div>
                       <h2 class="text-lg font-bold text-gray-900">Membership summary</h2>
-                      <p class="text-sm text-gray-500">Enrollment status, renewal, and primary vehicle.</p>
+                      <p class="text-sm text-gray-500">Enrollment status, renewal, and primary bike.</p>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
@@ -1790,7 +1794,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </div>
                   </div>
                   <div class="pt-4">
-                    <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">Primary vehicle</p>
+                    <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">Primary bike</p>
                     <div class="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Make</p>
@@ -1969,7 +1973,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                               </div>
                             </div>
                             <?php if ($canManageProfileBikes): ?>
-                              <form method="post" class="ml-auto">
+                              <form method="post" action="<?= e($profileActionUrl) ?>" class="ml-auto">
                                 <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                                 <input type="hidden" name="action" value="delete_bike">
                                 <input type="hidden" name="bike_id" value="<?= e((string) $bike['id']) ?>">
@@ -1980,7 +1984,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           </div>
                           <?php if ($canManageProfileBikes): ?>
                             <?php $bikeId = (int) $bike['id']; ?>
-                            <form method="post" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            <form method="post" action="<?= e($profileActionUrl) ?>" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                               <input type="hidden" name="action" value="update_bike">
                               <input type="hidden" name="bike_id" value="<?= e((string) $bikeId) ?>">
@@ -2017,7 +2021,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <p class="text-sm text-gray-500">No bikes saved yet.</p>
                   <?php endif; ?>
                   <?php if ($canManageProfileBikes): ?>
-                    <form method="post" class="mt-4 space-y-2">
+                    <form method="post" action="<?= e($profileActionUrl) ?>" class="mt-4 space-y-2">
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                       <input type="hidden" name="action" value="add_bike">
                       <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
