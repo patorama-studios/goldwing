@@ -1683,6 +1683,8 @@ switch ($action) {
         ]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_reset_link_sent', ['user_id' => $userId]);
         if (!$sent) {
+            error_log('[Admin] Password reset email not sent for member #' . $memberId . '.');
+            ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.password_reset_email_failed', ['user_id' => $userId]);
             redirectWithFlash($memberId, $tab, 'Password reset link could not be emailed. Check email settings.', 'error', $flashContext);
         }
         redirectWithFlash($memberId, $tab, 'Password reset link queued.', 'success', $flashContext);

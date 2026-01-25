@@ -51,12 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'ip' => $ip,
                     ]);
                     $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
-                    NotificationService::dispatch('member_password_reset_self', [
+                    $sent = NotificationService::dispatch('member_password_reset_self', [
                         'primary_email' => $email,
                         'admin_emails' => NotificationService::getAdminEmails(),
                         'reset_link' => NotificationService::escape($link),
                         'member_id' => $user['member_id'] ?? null,
                     ]);
+                    if (!$sent) {
+                        error_log('[Member] Password reset email not sent for ' . $email . '.');
+                        ActivityLogger::log('system', null, null, 'security.password_reset_email_failed', ['email' => $email]);
+                    }
                     ActivityLogger::log('system', null, null, 'security.password_reset_request', ['user_id' => $user['id']]);
                 }
             }
