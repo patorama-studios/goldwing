@@ -206,7 +206,7 @@ function render_media_shortcodes(string $html): string
         $stmt->execute(['id' => (int) $matches[1]]);
         $media = $stmt->fetch();
         if (!$media) {
-            return '';
+            return '<span class="text-xs text-slate-500">Missing media</span>';
         }
         if ($media['type'] === 'image') {
             return '<img src="' . e($media['path']) . '" alt="' . e($media['title']) . '">';

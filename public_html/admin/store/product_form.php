@@ -1,6 +1,7 @@
 <?php
 use App\Services\Csrf;
 use App\Services\SettingsService;
+use App\Services\MediaService;
 
 $productId = 0;
 if (!empty($subPage) && $subPage !== 'new') {
@@ -336,6 +337,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $relativePath = '/uploads/store/' . $safeName;
                             $stmt = $pdo->prepare('INSERT INTO store_product_images (product_id, image_url, sort_order, created_at) VALUES (:product_id, :image_url, 0, NOW())');
                             $stmt->execute(['product_id' => $productId, 'image_url' => $relativePath]);
+                            $imageId = (int) $pdo->lastInsertId();
+                            $actor = current_user();
+                            MediaService::registerUpload([
+                                'path' => $relativePath,
+                                'file_type' => $mime,
+                                'file_size' => (int) ($_FILES['product_images']['size'][$index] ?? 0),
+                                'type' => 'image',
+                                'title' => $product['title'] ?? $safeName,
+                                'uploaded_by_user_id' => (int) ($actor['id'] ?? 0),
+                                'source_context' => 'store',
+                                'source_table' => 'store_product_images',
+                                'source_record_id' => $imageId,
+                            ]);
                         }
                     }
                 }

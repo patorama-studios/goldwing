@@ -122,16 +122,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                             $relativePath = '/uploads/' . $safeName;
                             $titleInput = trim($_POST['media_title'] ?? '');
-                            $stmt = $pdo->prepare('INSERT INTO media (type, title, path, tags, visibility, uploaded_by, created_at) VALUES (:type, :title, :path, :tags, :visibility, :uploaded_by, NOW())');
-                            $stmt->execute([
+                            $mediaId = calendar_register_media([
+                                'path' => $relativePath,
+                                'file_type' => $mime,
+                                'file_size' => (int) ($file['size'] ?? 0),
                                 'type' => 'image',
                                 'title' => $titleInput !== '' ? $titleInput : $safeName,
-                                'path' => $relativePath,
-                                'tags' => '',
-                                'visibility' => 'member',
-                                'uploaded_by' => $user['id'],
-                            ]);
-                            $mediaId = (int) $pdo->lastInsertId();
+                                'uploaded_by_user_id' => (int) ($user['id'] ?? 0),
+                                'source_context' => 'calendar',
+                                'source_table' => 'calendar_events',
+                                'source_record_id' => (int) $eventId,
+                            ]) ?? 0;
+                            if ($mediaId <= 0) {
+                                $error = 'Cover image registration failed.';
+                            }
                         } else {
                             $error = 'Cover image upload failed.';
                         }

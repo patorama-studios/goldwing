@@ -16,6 +16,7 @@ use App\Services\BaseUrlService;
 use App\Services\Validator;
 use App\Services\MembershipPricingService;
 use App\Services\MemberRepository;
+use App\Services\MediaService;
 
 header('Content-Type: application/json');
 
@@ -1743,6 +1744,15 @@ if ($resource === 'uploads' && count($segments) >= 2 && $segments[1] === 'image'
 
     $type = $mime === 'application/pdf' ? 'pdf' : 'image';
     $url = '/uploads/' . $subdir . '/' . $safeName;
+    MediaService::registerUpload([
+        'path' => $url,
+        'file_type' => $mime,
+        'file_size' => (int) ($file['size'] ?? 0),
+        'type' => $type,
+        'title' => $file['name'] ?? $safeName,
+        'uploaded_by_user_id' => (int) ($user['id'] ?? 0),
+        'source_context' => $context,
+    ]);
     json_response(['url' => $url, 'type' => $type]);
 }
 

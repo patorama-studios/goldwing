@@ -20,6 +20,7 @@ use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
 use App\Services\DomSnapshotService;
 use App\Services\BaseUrlService;
+use App\Services\MediaService;
 
 require_login();
 
@@ -64,6 +65,38 @@ function orders_payment_status_column(\PDO $pdo): string
     }
     $column = 'status';
     return $column;
+}
+
+function format_bytes(?int $bytes): string
+{
+    if ($bytes === null || $bytes <= 0) {
+        return 'N/A';
+    }
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $idx = 0;
+    $size = (float) $bytes;
+    while ($size >= 1024 && $idx < count($units) - 1) {
+        $size /= 1024;
+        $idx += 1;
+    }
+    return number_format($size, $size >= 10 || $idx === 0 ? 0 : 1) . ' ' . $units[$idx];
+}
+
+function directory_size_bytes(string $dir): int
+{
+    if (!is_dir($dir)) {
+        return 0;
+    }
+    $size = 0;
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $fileInfo) {
+        if ($fileInfo->isFile()) {
+            $size += $fileInfo->getSize();
+        }
+    }
+    return $size;
 }
 
 $page = $_GET['page'] ?? 'dashboard';
@@ -112,6 +145,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
         $alerts[] = ['type' => 'error', 'message' => 'Invalid CSRF token.'];
     } else {
+        if ($page === 'media' && ($_POST['action'] ?? '') === 'sync_media_index') {
+            if (!current_admin_can('admin.media_library.manage', $user)) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to sync media.'];
+            } else {
+                $result = MediaService::syncIndex((int) ($user['id'] ?? 0));
+                $alerts[] = [
+                    'type' => 'success',
+                    'message' => 'Media index synced. Added ' . ($result['added'] ?? 0) . ' item(s).',
+                ];
+            }
+        }
+        if ($page === 'media' && ($_POST['action'] ?? '') === 'delete_media') {
+            if (!current_admin_can('admin.media_library.manage', $user)) {
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['ok' => false, 'error' => 'You do not have permission to delete media.']);
+                    exit;
+                }
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to delete media.'];
+            } else {
+                $mediaId = (int) ($_POST['media_id'] ?? 0);
+                $result = $mediaId > 0 ? MediaService::deleteMedia($mediaId, (int) ($user['id'] ?? 0)) : ['ok' => false, 'error' => 'Media not found.'];
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'ok' => !empty($result['ok']),
+                        'media_id' => $mediaId,
+                        'error' => $result['error'] ?? null,
+                    ]);
+                    exit;
+                }
+                if (!empty($result['ok'])) {
+                    $alerts[] = ['type' => 'success', 'message' => 'Media deleted.'];
+                } else {
+                    $alerts[] = ['type' => 'error', 'message' => $result['error'] ?? 'Unable to delete media.'];
+                }
+            }
+        }
+        if ($page === 'media' && ($_POST['action'] ?? '') === 'bulk_delete_media') {
+            if (!current_admin_can('admin.media_library.manage', $user)) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to delete media.'];
+            } else {
+                $ids = array_filter(array_map('intval', (array) ($_POST['media_ids'] ?? [])));
+                $bulkId = bin2hex(random_bytes(6));
+                $deleted = 0;
+                $failed = [];
+                foreach ($ids as $mediaId) {
+                    $result = MediaService::deleteMedia($mediaId, (int) ($user['id'] ?? 0), $bulkId);
+                    if (!empty($result['ok'])) {
+                        $deleted += 1;
+                    } else {
+                        $failed[] = ['id' => $mediaId, 'reason' => $result['error'] ?? 'Unknown error'];
+                    }
+                }
+                $message = 'Bulk delete complete. Deleted ' . $deleted . ', failed ' . count($failed) . '.';
+                if ($failed) {
+                    $message .= ' Failed IDs: ' . implode(', ', array_map(fn($item) => $item['id'] . ' (' . $item['reason'] . ')', $failed));
+                }
+                $alerts[] = [
+                    'type' => $failed ? 'error' : 'success',
+                    'message' => $message,
+                ];
+            }
+        }
         if ($page === 'applications' && isset($_POST['assign_chapter_id'], $_POST['member_id'])) {
             $memberId = (int) $_POST['member_id'];
             $chapterId = $_POST['assign_chapter_id'] !== '' ? (int) $_POST['assign_chapter_id'] : null;
@@ -924,16 +1021,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             }
                             $relativePath = '/uploads/' . $safeName;
-                            $stmt = $pdo->prepare('INSERT INTO media (type, title, path, tags, visibility, uploaded_by, created_at) VALUES (:type, :title, :path, :tags, :visibility, :uploaded_by, NOW())');
-                    $defaultVisibility = SettingsService::getGlobal('media.privacy_default', 'member');
-                    $stmt->execute([
-                        'type' => $_POST['media_type'] ?? 'file',
-                        'title' => trim($_POST['title'] ?? $safeName),
-                        'path' => $relativePath,
-                        'tags' => trim($_POST['tags'] ?? ''),
-                        'visibility' => $_POST['visibility'] ?? $defaultVisibility,
-                        'uploaded_by' => $user['id'],
-                    ]);
+                            $defaultVisibility = SettingsService::getGlobal('media.privacy_default', 'member');
+                            MediaService::registerUpload([
+                                'path' => $relativePath,
+                                'file_type' => $mime,
+                                'file_size' => (int) ($file['size'] ?? 0),
+                                'type' => $_POST['media_type'] ?? 'file',
+                                'title' => trim($_POST['title'] ?? $safeName),
+                                'tags' => trim($_POST['tags'] ?? ''),
+                                'visibility' => $_POST['visibility'] ?? $defaultVisibility,
+                                'uploaded_by_user_id' => (int) $user['id'],
+                                'source_context' => 'library',
+                            ]);
                             $alerts[] = ['type' => 'success', 'message' => 'Media uploaded.'];
                         } else {
                             $alerts[] = ['type' => 'error', 'message' => 'Upload failed.'];
@@ -975,6 +1074,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdfPath = $uploadDir . $pdfName;
                 if (move_uploaded_file($pdfFile['tmp_name'], $pdfPath)) {
                     $coverUrl = null;
+                    $coverMime = null;
+                    $coverName = null;
                     if ($coverFile && $coverFile['error'] === UPLOAD_ERR_OK && $coverFile['name'] !== '') {
                         if ($maxBytes > 0 && (int) $coverFile['size'] > $maxBytes) {
                             $alerts[] = ['type' => 'error', 'message' => 'Cover exceeds size limit.'];
@@ -1003,6 +1104,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'published_at' => $_POST['published_at'] ?? date('Y-m-d'),
                         'created_by' => $user['id'],
                     ]);
+                    $issueId = (int) $pdo->lastInsertId();
+                    MediaService::registerUpload([
+                        'path' => '/uploads/' . $pdfName,
+                        'file_type' => $pdfMime,
+                        'file_size' => (int) ($pdfFile['size'] ?? 0),
+                        'type' => 'pdf',
+                        'title' => trim($_POST['title'] ?? $pdfName),
+                        'uploaded_by_user_id' => (int) $user['id'],
+                        'source_context' => 'wings',
+                        'source_table' => 'wings_issues',
+                        'source_record_id' => $issueId,
+                    ]);
+                    if ($coverUrl) {
+                        MediaService::registerUpload([
+                            'path' => $coverUrl,
+                            'file_type' => $coverMime ?? null,
+                            'file_size' => (int) ($coverFile['size'] ?? 0),
+                            'type' => 'image',
+                            'title' => trim($_POST['title'] ?? $coverName ?? $pdfName),
+                            'uploaded_by_user_id' => (int) $user['id'],
+                            'source_context' => 'wings',
+                            'source_table' => 'wings_issues',
+                            'source_record_id' => $issueId,
+                        ]);
+                    }
                     $alerts[] = ['type' => 'success', 'message' => 'Wings issue uploaded.'];
                 } else {
                     $alerts[] = ['type' => 'error', 'message' => 'PDF upload failed.'];
@@ -1067,18 +1193,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               $settingMap[$setting['setting_key']] = $setting['setting_value'];
           }
           $uploadDir = __DIR__ . '/../uploads';
-          $mediaBytes = 0;
-          if (is_dir($uploadDir)) {
-              foreach (scandir($uploadDir) as $file) {
-                  if ($file === '.' || $file === '..') {
-                      continue;
-                  }
-                  $path = $uploadDir . '/' . $file;
-                  if (is_file($path)) {
-                      $mediaBytes += filesize($path);
-                  }
-              }
-          }
+          $mediaBytes = directory_size_bytes($uploadDir);
           $mediaUsageMb = round($mediaBytes / 1024 / 1024, 2);
         ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -2219,7 +2334,51 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </section>
       <?php elseif ($page === 'media'): ?>
         <?php
-          $media = $pdo->query('SELECT * FROM media ORDER BY created_at DESC')->fetchAll();
+          $search = trim($_GET['search'] ?? '');
+          $typeFilter = trim($_GET['type'] ?? '');
+          $contextFilter = trim($_GET['context'] ?? '');
+          $unusedOnly = !empty($_GET['unused']);
+
+          $where = [];
+          $params = [];
+          if ($search !== '') {
+              $where[] = '(title LIKE :search OR path LIKE :search OR file_name LIKE :search)';
+              $params['search'] = '%' . $search . '%';
+          }
+          if ($typeFilter !== '') {
+              if ($typeFilter === 'other') {
+                  $where[] = "type NOT IN ('image','video','pdf','file')";
+              } else {
+                  $where[] = 'type = :type';
+                  $params['type'] = $typeFilter;
+              }
+          }
+          if ($contextFilter !== '') {
+              $where[] = 'source_context = :context';
+              $params['context'] = $contextFilter;
+          }
+          $sql = 'SELECT * FROM media';
+          if ($where) {
+              $sql .= ' WHERE ' . implode(' AND ', $where);
+          }
+          $sql .= ' ORDER BY created_at DESC';
+          $stmt = $pdo->prepare($sql);
+          $stmt->execute($params);
+          $media = $stmt->fetchAll();
+          $referenceCounts = MediaService::referenceCounts($media);
+          if ($unusedOnly) {
+              $media = array_values(array_filter($media, function ($item) use ($referenceCounts) {
+                  if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
+                      return false;
+                  }
+                  $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath((string) ($item['path'] ?? ''));
+                  if (!$pathKey) {
+                      return true;
+                  }
+                  return ($referenceCounts[$pathKey] ?? 0) === 0;
+              }));
+          }
+          $sourceContexts = $pdo->query('SELECT DISTINCT source_context FROM media WHERE source_context IS NOT NULL AND source_context <> "" ORDER BY source_context ASC')->fetchAll(PDO::FETCH_COLUMN, 0);
           $recentCutoff = strtotime('-7 days');
           $newCount = 0;
           $sharedCount = 0;
@@ -2239,18 +2398,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               }
           }
           $uploadDir = __DIR__ . '/../uploads';
-          $mediaBytes = 0;
-          if (is_dir($uploadDir)) {
-              foreach (scandir($uploadDir) as $file) {
-                  if ($file === '.' || $file === '..') {
-                      continue;
-                  }
-                  $path = $uploadDir . '/' . $file;
-                  if (is_file($path)) {
-                      $mediaBytes += filesize($path);
-                  }
-              }
-          }
+          $mediaBytes = directory_size_bytes($uploadDir);
           $mediaUsageMb = round($mediaBytes / 1024 / 1024, 1);
           $storageLimitMb = (float) SettingsService::getGlobal('media.storage_limit_mb', 5120);
           $usagePercent = $storageLimitMb > 0 ? min(100, ($mediaUsageMb / $storageLimitMb) * 100) : 0;
@@ -2263,19 +2411,28 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <div class="absolute bottom-10 left-24 h-60 w-60 rounded-full bg-ocean/20 blur-3xl"></div>
           </div>
           <div class="relative flex flex-col gap-6">
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-up">
-              <div>
-                <p class="text-[10px] uppercase tracking-[0.3em] text-ocean/80">Media</p>
-                <h1 class="font-display text-2xl text-ink">Media Library</h1>
-                <p class="text-sm text-slate-500">Uploads are stored in /public_html/uploads/ and logged here.</p>
-              </div>
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="relative hidden md:block">
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-up">
+                <div>
+                  <p class="text-[10px] uppercase tracking-[0.3em] text-ocean/80">Media</p>
+                  <h1 class="font-display text-2xl text-ink">Media Library</h1>
+                  <p class="text-sm text-slate-500">Uploads are stored in /public_html/uploads/ and logged here.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                <form method="get" class="relative hidden md:block">
+                  <input type="hidden" name="page" value="media">
                   <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                     <span class="material-icons-outlined text-lg">search</span>
                   </span>
-                  <input class="w-64 pl-10 pr-4 py-2 text-sm bg-white/80 border border-line rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary placeholder-slate-400 text-ink" placeholder="Search media..." type="text">
-                </div>
+                  <input class="w-64 pl-10 pr-4 py-2 text-sm bg-white/80 border border-line rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary placeholder-slate-400 text-ink" placeholder="Search media..." type="text" name="search" value="<?= e($search) ?>">
+                </form>
+                <form method="post">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="sync_media_index">
+                  <button class="inline-flex items-center gap-2 bg-sand hover:bg-sand/70 text-ink px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors" type="submit">
+                    <span class="material-icons-outlined text-lg">sync</span>
+                    Sync Media Index
+                  </button>
+                </form>
                 <a href="#media-upload" class="inline-flex items-center gap-2 bg-ink hover:bg-primary-strong text-white px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors">
                   <span class="material-icons-outlined text-lg">cloud_upload</span>
                   Upload
@@ -2401,21 +2558,49 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </div>
                 </div>
                 <div class="bg-paper border border-line rounded-2xl p-5 shadow-soft animate-fade-up stagger-2">
-                  <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                  <form method="get" class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                    <input type="hidden" name="page" value="media">
+                    <?php if ($search !== ''): ?>
+                      <input type="hidden" name="search" value="<?= e($search) ?>">
+                    <?php endif; ?>
                     <div class="flex flex-wrap items-center gap-2">
-                      <button class="px-3 py-1.5 rounded-full bg-primary/15 text-ink text-xs font-semibold">All</button>
-                      <button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Photos</button>
-                      <button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Videos</button>
-                      <button class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors">Docs</button>
+                      <select name="type" class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
+                        <option value="">All types</option>
+                        <option value="image" <?= $typeFilter === 'image' ? 'selected' : '' ?>>Images</option>
+                        <option value="video" <?= $typeFilter === 'video' ? 'selected' : '' ?>>Videos</option>
+                        <option value="pdf" <?= $typeFilter === 'pdf' ? 'selected' : '' ?>>PDFs</option>
+                        <option value="file" <?= $typeFilter === 'file' ? 'selected' : '' ?>>Files</option>
+                        <option value="other" <?= $typeFilter === 'other' ? 'selected' : '' ?>>Other</option>
+                      </select>
+                      <select name="context" class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
+                        <option value="">All sources</option>
+                        <?php foreach ($sourceContexts as $context): ?>
+                          <option value="<?= e($context) ?>" <?= $contextFilter === $context ? 'selected' : '' ?>><?= e(ucfirst($context)) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <label class="inline-flex items-center gap-2 text-xs text-slate-600 px-2 py-1.5 border border-line rounded-full bg-sand">
+                        <input type="checkbox" name="unused" value="1" <?= $unusedOnly ? 'checked' : '' ?>>
+                        Unused only
+                      </label>
+                      <button class="px-3 py-1.5 rounded-full bg-primary/15 text-ink text-xs font-semibold" type="submit">Apply</button>
+                      <a class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors" href="/admin/index.php?page=media">Reset</a>
                     </div>
                     <div class="flex items-center gap-2">
-                      <select class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
-                        <option>Sort by: Newest</option>
-                        <option>Sort by: Name</option>
-                        <option>Sort by: Type</option>
-                      </select>
+                      <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+                        <input id="media-select-all" type="checkbox" class="rounded border-line">
+                        Select all
+                      </label>
+                      <button class="px-3 py-1.5 rounded-full bg-ember/15 text-ember text-xs font-semibold" type="button" id="bulk-delete-trigger">Bulk Delete</button>
                     </div>
+                  </form>
+                  <div id="bulk-action-bar" class="hidden items-center justify-between gap-3 rounded-lg border border-ember/30 bg-ember/5 px-3 py-2 text-xs text-ember">
+                    <span><span id="bulk-selected-count">0</span> selected</span>
+                    <button class="px-3 py-1.5 rounded-full bg-ember text-white text-xs font-semibold" type="button" id="bulk-delete-trigger-alt">Delete selected</button>
                   </div>
+                  <form id="bulk-delete-form" method="post" class="hidden">
+                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                    <input type="hidden" name="action" value="bulk_delete_media">
+                  </form>
                   <?php if (empty($media)): ?>
                     <div class="text-sm text-slate-500">No media has been uploaded yet.</div>
                   <?php else: ?>
@@ -2429,6 +2614,23 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           if ($previewUrl === '' && $type === 'image' && $path !== '') {
                               $previewUrl = $path;
                           }
+                          $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath($path);
+                          $usedCount = $pathKey ? ($referenceCounts[$pathKey] ?? 0) : 0;
+                          if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
+                              $usedCount += 1;
+                          }
+                          $missing = false;
+                          if ($pathKey) {
+                              $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
+                              $missing = !is_file($absolutePath);
+                          }
+                          $rawSize = isset($item['file_size']) ? (int) $item['file_size'] : null;
+                          if ($rawSize === null && !$missing && $pathKey) {
+                              $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
+                              $rawSize = is_file($absolutePath) ? filesize($absolutePath) : null;
+                          }
+                          $sizeLabel = format_bytes($rawSize);
+                          $sourceContext = $item['source_context'] ?? '';
                           $createdLabel = '';
                           if (!empty($item['created_at'])) {
                               $createdAt = strtotime($item['created_at']);
@@ -2447,14 +2649,21 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         ?>
                         <div class="group bg-white border border-line rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all">
                           <div class="relative h-36 bg-sand flex items-center justify-center">
+                            <label class="absolute top-3 right-3 z-20 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-600 bg-paper/90 border border-line rounded-full px-2 py-1">
+                              <input type="checkbox" form="bulk-delete-form" class="rounded border-line" name="media_ids[]" value="<?= e((string) $item['id']) ?>" data-media-checkbox>
+                              Select
+                            </label>
                             <?php if ($previewUrl): ?>
                               <img alt="<?= e($title) ?>" class="w-full h-full object-cover" src="<?= e($previewUrl) ?>">
                             <?php else: ?>
                               <span class="material-icons-outlined text-5xl text-ember"><?= e($icon) ?></span>
                             <?php endif; ?>
                             <div class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink"><?= e($typeLabel) ?></div>
+                            <?php if ($missing): ?>
+                              <div class="absolute bottom-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-ember/15 text-ember border border-ember/30 rounded-full">Missing media</div>
+                            <?php endif; ?>
                             <?php if ($path): ?>
-                              <a class="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" href="<?= e($path) ?>" target="_blank" rel="noopener">
+                              <a class="absolute inset-0 z-10 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" href="<?= e($path) ?>" target="_blank" rel="noopener">
                                 <span class="material-icons-outlined text-2xl text-white">open_in_new</span>
                               </a>
                             <?php endif; ?>
@@ -2469,10 +2678,140 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                               <span><?= e($createdLabel ?: 'N/A') ?></span>
                               <code class="text-[11px] bg-sand/70 text-ink px-2 py-1 rounded-lg">[media:<?= e((string) $item['id']) ?>]</code>
                             </div>
+                            <div class="flex items-center justify-between text-xs text-slate-500">
+                              <span><?= e($sizeLabel) ?></span>
+                              <span><?= e($sourceContext !== '' ? ucfirst($sourceContext) : 'Unknown') ?></span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-500">
+                              <span>Used in <?= e((string) $usedCount) ?></span>
+                              <form method="post" data-media-delete>
+                                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                                <input type="hidden" name="action" value="delete_media">
+                                <input type="hidden" name="media_id" value="<?= e((string) $item['id']) ?>">
+                                <button class="text-ember font-semibold hover:text-ember/80" type="submit">Delete</button>
+                              </form>
+                            </div>
                           </div>
                         </div>
                       <?php endforeach; ?>
                     </div>
+                    <div id="bulk-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+                      <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-card">
+                        <h3 class="text-lg font-semibold text-ink">Confirm bulk delete</h3>
+                        <p class="text-sm text-slate-600 mt-2">You are about to delete <span id="bulk-delete-count" class="font-semibold text-ink">0</span> item(s). This is permanent.</p>
+                        <div class="mt-4 flex justify-end gap-2">
+                          <button id="bulk-delete-cancel" type="button" class="px-3 py-1.5 rounded-lg border border-line text-sm text-slate-600">Cancel</button>
+                          <button id="bulk-delete-confirm" type="button" class="px-3 py-1.5 rounded-lg bg-ember text-white text-sm font-semibold">Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                    <script>
+                      (() => {
+                        const selectAll = document.getElementById('media-select-all');
+                        const checkboxes = Array.from(document.querySelectorAll('[data-media-checkbox]'));
+                        const bulkBtn = document.getElementById('bulk-delete-trigger');
+                        const bulkBar = document.getElementById('bulk-action-bar');
+                        const bulkAltBtn = document.getElementById('bulk-delete-trigger-alt');
+                        const bulkCount = document.getElementById('bulk-selected-count');
+                        const modal = document.getElementById('bulk-delete-modal');
+                        const countEl = document.getElementById('bulk-delete-count');
+                        const confirmBtn = document.getElementById('bulk-delete-confirm');
+                        const cancelBtn = document.getElementById('bulk-delete-cancel');
+                        const bulkForm = document.getElementById('bulk-delete-form');
+
+                        const selectedCount = () => checkboxes.filter((box) => box.checked).length;
+                        const syncSelectAll = () => {
+                          if (!selectAll) {
+                            return;
+                          }
+                          const count = selectedCount();
+                          selectAll.checked = count > 0 && count === checkboxes.length;
+                          selectAll.indeterminate = count > 0 && count < checkboxes.length;
+                          if (bulkBar && bulkCount) {
+                            bulkCount.textContent = count.toString();
+                            bulkBar.classList.toggle('hidden', count === 0);
+                            bulkBar.classList.toggle('flex', count > 0);
+                          }
+                        };
+
+                        checkboxes.forEach((box) => {
+                          box.addEventListener('change', syncSelectAll);
+                        });
+                        if (selectAll) {
+                          selectAll.addEventListener('change', () => {
+                            checkboxes.forEach((box) => {
+                              box.checked = selectAll.checked;
+                            });
+                            syncSelectAll();
+                          });
+                        }
+                        const openModal = () => {
+                          if (!modal || !countEl) {
+                            return;
+                          }
+                            const count = selectedCount();
+                            if (count === 0) {
+                              alert('Select at least one item to delete.');
+                              return;
+                            }
+                            countEl.textContent = count.toString();
+                            modal.classList.remove('hidden');
+                            modal.classList.add('flex');
+                        };
+
+                        if (bulkBtn && modal && countEl && confirmBtn && cancelBtn && bulkForm) {
+                          bulkBtn.addEventListener('click', openModal);
+                          if (bulkAltBtn) {
+                            bulkAltBtn.addEventListener('click', openModal);
+                          }
+                          cancelBtn.addEventListener('click', () => {
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                          });
+                          confirmBtn.addEventListener('click', () => {
+                            bulkForm.submit();
+                          });
+                        }
+
+                        document.querySelectorAll('[data-media-delete]').forEach((form) => {
+                          form.addEventListener('submit', async (event) => {
+                            event.preventDefault();
+                            if (!confirm('Delete this media item? This is permanent.')) {
+                              return;
+                            }
+                            const button = form.querySelector('button[type=\"submit\"]');
+                            const label = button ? button.textContent : '';
+                            if (button) {
+                              button.disabled = true;
+                              button.textContent = 'Deleting...';
+                            }
+                            const data = new FormData(form);
+                            data.append('ajax', '1');
+                            try {
+                              const response = await fetch(window.location.href, {
+                                method: 'POST',
+                                body: data,
+                                headers: {
+                                  'X-Requested-With': 'fetch',
+                                },
+                              });
+                              const result = await response.json();
+                              if (result && result.ok) {
+                                window.location.reload();
+                              } else {
+                                alert(result.error || 'Unable to delete media.');
+                              }
+                            } catch (err) {
+                              alert('Unable to delete media.');
+                            }
+                            if (button) {
+                              button.disabled = false;
+                              button.textContent = label;
+                            }
+                          });
+                        });
+                      })();
+                    </script>
                   <?php endif; ?>
                 </div>
               </section>

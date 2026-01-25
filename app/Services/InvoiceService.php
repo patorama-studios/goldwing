@@ -58,6 +58,16 @@ class InvoiceService
                     'label' => 'Tax Invoice',
                 ]);
                 $fileId = (int) $pdo->lastInsertId();
+                MediaService::registerUpload([
+                    'path' => $relativePath,
+                    'file_type' => 'application/pdf',
+                    'type' => 'pdf',
+                    'title' => 'Tax Invoice ' . ($invoiceNumber ?? ''),
+                    'uploaded_by_user_id' => (int) ($order['user_id'] ?? 0),
+                    'source_context' => 'payments',
+                    'source_table' => 'files',
+                    'source_record_id' => $fileId,
+                ]);
                 $stmt = $pdo->prepare('UPDATE invoices SET pdf_file_id = :file_id WHERE id = :id');
                 $stmt->execute(['file_id' => $fileId, 'id' => $invoiceId]);
             }

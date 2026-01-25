@@ -8,6 +8,7 @@ use App\Services\Csrf;
 use App\Services\PageBuilderService;
 use App\Services\PageService;
 use App\Services\SettingsService;
+use App\Services\MediaService;
 
 header('Content-Type: application/json');
 
@@ -516,17 +517,18 @@ if ($rawUploadAction && $method === 'POST') {
     $url = '/uploads/media/' . $safeName;
     $title = trim((string) ($_POST['title'] ?? $file['name']));
     $visibility = SettingsService::getGlobal('media.privacy_default', 'member');
-    $pdo = db();
-    $stmt = $pdo->prepare('INSERT INTO media (type, title, path, tags, visibility, uploaded_by, created_at) VALUES (:type, :title, :path, :tags, :visibility, :uploaded_by, NOW())');
-    $stmt->execute([
+    $mediaId = MediaService::registerUpload([
+        'path' => $url,
+        'file_type' => $mime,
+        'file_size' => (int) ($file['size'] ?? 0),
         'type' => $type,
         'title' => $title !== '' ? $title : $safeName,
-        'path' => $url,
-        'tags' => '',
         'visibility' => $visibility,
-        'uploaded_by' => (int) ($user['id'] ?? 0),
+        'uploaded_by_user_id' => (int) ($user['id'] ?? 0),
+        'source_context' => 'pagebuilder',
+        'source_table' => 'pages',
+        'source_record_id' => $pageId,
     ]);
-    $mediaId = (int) $pdo->lastInsertId();
 
     json_response([
         'ok' => true,

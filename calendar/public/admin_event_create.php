@@ -104,17 +104,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                         $relativePath = '/uploads/' . $safeName;
                         $titleInput = trim($_POST['media_title'] ?? '');
-                        $stmt = $pdo->prepare('INSERT INTO media (type, title, path, tags, visibility, uploaded_by, created_at) VALUES (:type, :title, :path, :tags, :visibility, :uploaded_by, NOW())');
-                        $stmt->execute([
+                        $uploadedMediaId = calendar_register_media([
+                            'path' => $relativePath,
+                            'file_type' => $mime,
+                            'file_size' => (int) ($file['size'] ?? 0),
                             'type' => 'image',
                             'title' => $titleInput !== '' ? $titleInput : $safeName,
-                            'path' => $relativePath,
-                            'tags' => '',
-                            'visibility' => 'member',
-                            'uploaded_by' => $user['id'],
+                            'uploaded_by_user_id' => (int) ($user['id'] ?? 0),
+                            'source_context' => 'calendar',
+                            'source_table' => 'calendar_events',
                         ]);
-                        $uploadedMediaId = (int) $pdo->lastInsertId();
-                        $mediaId = $uploadedMediaId;
+                        if ($uploadedMediaId) {
+                            $mediaId = $uploadedMediaId;
+                        } else {
+                            $errors[] = 'Cover image registration failed.';
+                        }
                     } else {
                         $errors[] = 'Cover image upload failed.';
                     }
@@ -186,6 +190,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             $eventId = (int) $pdo->lastInsertId();
+            if ($uploadedMediaId) {
+                $stmt = $pdo->prepare('UPDATE media SET source_table = :table, source_record_id = :record_id WHERE id = :id');
+                $stmt->execute([
+                    'table' => 'calendar_events',
+                    'record_id' => $eventId,
+                    'id' => $uploadedMediaId,
+                ]);
+            }
             $subject = 'New event created: ' . $title;
             $body = '<p>A new event has been created.</p><p><strong>' . calendar_e($title) . '</strong></p>';
             if ($scope === 'CHAPTER') {

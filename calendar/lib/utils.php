@@ -155,6 +155,23 @@ function calendar_generate_ticket_pdf(string $filePath, array $ticket): bool
     return file_put_contents($filePath, $pdf) !== false;
 }
 
+function calendar_register_media(array $data): ?int
+{
+    if (!class_exists('App\\Services\\MediaService')) {
+        $base = __DIR__ . '/../../app/Services/';
+        foreach (['Database.php', 'AuditService.php', 'MediaService.php'] as $file) {
+            $path = $base . $file;
+            if (is_file($path)) {
+                require_once $path;
+            }
+        }
+    }
+    if (class_exists('App\\Services\\MediaService')) {
+        return App\Services\MediaService::registerUpload($data);
+    }
+    return null;
+}
+
 function calendar_table_exists(PDO $pdo, string $table): bool
 {
     $stmt = $pdo->query('SHOW TABLES');
