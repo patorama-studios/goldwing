@@ -8,6 +8,7 @@ use App\Services\NotificationService;
 use App\Services\SecuritySettingsService;
 use App\Services\SettingsService;
 use App\Services\Validator;
+use App\Services\LogViewerService;
 
 $message = '';
 $error = '';
@@ -63,8 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'member_id' => $user['member_id'] ?? null,
                     ]);
                     if (!$sent) {
+                        LogViewerService::write('[Member] Password reset email not sent for ' . $email . '.');
                         error_log('[Member] Password reset email not sent for ' . $email . '.');
                         ActivityLogger::log('system', null, null, 'security.password_reset_email_failed', ['email' => $email]);
+                    } else {
+                        LogViewerService::write('[Member] Password reset email sent for ' . $email . '.');
                     }
                     ActivityLogger::log('system', null, null, 'security.password_reset_request', ['user_id' => $user['id']]);
                 }

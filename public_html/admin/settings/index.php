@@ -50,8 +50,22 @@ SettingsService::migrateLegacy((int) $user['id']);
 SettingsService::ensureDefaults((int) $user['id']);
 $securitySettings = SecuritySettingsService::get();
 $systemLog = null;
+$emailLogRows = [];
+$emailLogError = null;
 if ($section === 'advanced') {
     $systemLog = LogViewerService::readTail(300);
+    try {
+        $pdo = db();
+        $stmt = $pdo->query("SHOW TABLES LIKE 'email_log'");
+        if ($stmt->fetchColumn()) {
+            $stmt = $pdo->query('SELECT recipient, subject, sent, created_at FROM email_log ORDER BY created_at DESC LIMIT 50');
+            $emailLogRows = $stmt->fetchAll();
+        } else {
+            $emailLogError = 'email_log table not found.';
+        }
+    } catch (Throwable $e) {
+        $emailLogError = 'Unable to load email log.';
+    }
 }
 
 $errors = [];
@@ -2260,6 +2274,43 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <div class="max-h-96 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-xs text-slate-700">
                 <pre class="whitespace-pre-wrap"><?= e($systemLog['content'] ?? 'No log entries yet.') ?></pre>
               </div>
+            </div>
+            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 mt-6">
+              <div>
+                <h2 class="font-display text-lg font-bold text-gray-900">Email Log</h2>
+                <p class="text-xs text-slate-500">Latest email sends recorded by the system.</p>
+              </div>
+              <?php if ($emailLogError): ?>
+                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                  <?= e($emailLogError) ?>
+                </div>
+              <?php else: ?>
+                <div class="max-h-96 overflow-auto rounded-lg border border-gray-200 bg-white">
+                  <table class="min-w-full text-xs">
+                    <thead class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+                      <tr>
+                        <th class="px-3 py-2 text-left">Sent</th>
+                        <th class="px-3 py-2 text-left">Recipient</th>
+                        <th class="px-3 py-2 text-left">Subject</th>
+                        <th class="px-3 py-2 text-left">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      <?php foreach ($emailLogRows as $row): ?>
+                        <tr>
+                          <td class="px-3 py-2"><?= !empty($row['sent']) ? 'Yes' : 'No' ?></td>
+                          <td class="px-3 py-2"><?= e($row['recipient']) ?></td>
+                          <td class="px-3 py-2"><?= e($row['subject']) ?></td>
+                          <td class="px-3 py-2"><?= e($row['created_at']) ?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                      <?php if (!$emailLogRows): ?>
+                        <tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">No email log entries.</td></tr>
+                      <?php endif; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php endif; ?>
             </div>
           <?php endif; ?>
       </section>

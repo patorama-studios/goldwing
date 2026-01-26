@@ -76,6 +76,17 @@ class LogViewerService
         return $result !== false;
     }
 
+    public static function write(string $message): void
+    {
+        $path = self::logPath();
+        if ($path === '') {
+            return;
+        }
+        $timestamp = date('d-M-Y H:i:s');
+        $line = '[' . $timestamp . ' ' . date_default_timezone_get() . '] ' . $message . "\n";
+        @file_put_contents($path, $line, FILE_APPEND);
+    }
+
     private static function ensureLogFile(): bool
     {
         if (!is_dir(self::LOG_DIR)) {

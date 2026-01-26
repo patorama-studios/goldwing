@@ -16,6 +16,7 @@ use App\Services\RefundService;
 use App\Services\NotificationService;
 use App\Services\SecurityPolicyService;
 use App\Services\SettingsService;
+use App\Services\LogViewerService;
 use App\Services\MembershipService;
 use App\Services\StripeService;
 use App\Services\NotificationPreferenceService;
@@ -1686,11 +1687,13 @@ switch ($action) {
         ]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.password_reset_link_sent', ['user_id' => $userId]);
         if (!$sent) {
+            LogViewerService::write('[Admin] Password reset email not sent for member #' . $memberId . '.');
             error_log('[Admin] Password reset email not sent for member #' . $memberId . '.');
             ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.password_reset_email_failed', ['user_id' => $userId]);
             redirectWithFlash($memberId, $tab, 'Password reset link could not be emailed. Check email settings.', 'error', $flashContext);
         }
-        redirectWithFlash($memberId, $tab, 'Password reset link queued.', 'success', $flashContext);
+        LogViewerService::write('[Admin] Password reset email sent for member #' . $memberId . '.');
+        redirectWithFlash($memberId, $tab, 'Password reset email sent.', 'success', $flashContext);
         break;
 
     case 'set_password':
