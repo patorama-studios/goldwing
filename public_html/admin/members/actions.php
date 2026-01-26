@@ -1656,16 +1656,19 @@ switch ($action) {
         if ($approved === false) {
             redirectWithFlash($memberId, $tab, 'Password reset links are available after application approval.', 'error', $flashContext);
         }
-        $window = (new DateTimeImmutable('now'))->modify('-60 minutes')->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND actor_type = 'admin' AND actor_id = :actor_id AND created_at >= :window");
-        $stmt->execute(['actor_id' => $user['id'] ?? null, 'window' => $window]);
-        if ((int) $stmt->fetchColumn() >= 3) {
-            redirectWithFlash($memberId, $tab, 'Rate limit reached for password reset links.', 'error', $flashContext);
-        }
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND member_id = :member_id AND created_at >= :window");
-        $stmt->execute(['member_id' => $memberId, 'window' => $window]);
-        if ((int) $stmt->fetchColumn() >= 3) {
-            redirectWithFlash($memberId, $tab, 'Member has reached the reset limit.', 'error', $flashContext);
+        $rateLimitDisabled = SettingsService::getGlobal('advanced.disable_password_reset_rate_limit', false);
+        if (!$rateLimitDisabled) {
+            $window = (new DateTimeImmutable('now'))->modify('-60 minutes')->format('Y-m-d H:i:s');
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND actor_type = 'admin' AND actor_id = :actor_id AND created_at >= :window");
+            $stmt->execute(['actor_id' => $user['id'] ?? null, 'window' => $window]);
+            if ((int) $stmt->fetchColumn() >= 3) {
+                redirectWithFlash($memberId, $tab, 'Rate limit reached for password reset links.', 'error', $flashContext);
+            }
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE action = 'member.password_reset_link_sent' AND member_id = :member_id AND created_at >= :window");
+            $stmt->execute(['member_id' => $memberId, 'window' => $window]);
+            if ((int) $stmt->fetchColumn() >= 3) {
+                redirectWithFlash($memberId, $tab, 'Member has reached the reset limit.', 'error', $flashContext);
+            }
         }
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);

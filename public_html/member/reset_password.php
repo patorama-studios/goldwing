@@ -29,19 +29,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $accountWindow = (int) $settings['login_account_window_minutes'];
             $ipMax = (int) $settings['login_ip_max_attempts'];
             $accountMax = (int) $settings['login_account_max_attempts'];
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM password_resets WHERE ip_address = :ip AND created_at >= DATE_SUB(NOW(), INTERVAL :window MINUTE)');
-            $stmt->bindValue(':ip', $ip);
-            $stmt->bindValue(':window', $ipWindow, \PDO::PARAM_INT);
-            $stmt->execute();
-            if ($ipMax > 0 && (int) $stmt->fetchColumn() >= $ipMax) {
-                $message = 'If the email exists, a reset link has been sent.';
-                ActivityLogger::log('system', null, null, 'security.password_reset_rate_limited', ['ip' => $ip]);
-            } elseif ($user) {
+            $rateLimitDisabled = SettingsService::getGlobal('advanced.disable_password_reset_rate_limit', false);
+            $rateLimited = false;
+            if (!$rateLimitDisabled) {
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM password_resets WHERE ip_address = :ip AND created_at >= DATE_SUB(NOW(), INTERVAL :window MINUTE)');
+                $stmt->bindValue(':ip', $ip);
+                $stmt->bindValue(':window', $ipWindow, \PDO::PARAM_INT);
+                $stmt->execute();
+                if ($ipMax > 0 && (int) $stmt->fetchColumn() >= $ipMax) {
+                    $rateLimited = true;
+                    ActivityLogger::log('system', null, null, 'security.password_reset_rate_limited', ['ip' => $ip]);
+                }
+            }
+            if (!$rateLimited && $user) {
                 $stmt = $pdo->prepare('SELECT COUNT(*) FROM password_resets WHERE user_id = :user_id AND created_at >= DATE_SUB(NOW(), INTERVAL :window MINUTE)');
                 $stmt->bindValue(':user_id', $user['id'], \PDO::PARAM_INT);
                 $stmt->bindValue(':window', $accountWindow, \PDO::PARAM_INT);
                 $stmt->execute();
-                if ($accountMax <= 0 || (int) $stmt->fetchColumn() < $accountMax) {
+                if ($rateLimitDisabled || $accountMax <= 0 || (int) $stmt->fetchColumn() < $accountMax) {
                     $token = bin2hex(random_bytes(32));
                     $tokenHash = hash('sha256', $token);
                     $stmt = $pdo->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at, ip_address) VALUES (:user_id, :token_hash, DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW(), :ip)');

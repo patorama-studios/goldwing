@@ -475,6 +475,7 @@ class SettingsService
             ],
             'advanced' => [
                 'maintenance_mode' => false,
+                'disable_password_reset_rate_limit' => false,
                 'feature_flags' => [
                     'security.two_factor' => false,
                     'payments.secondary_stripe' => false,

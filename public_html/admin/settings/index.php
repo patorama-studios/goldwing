@@ -565,6 +565,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } elseif ($section === 'advanced') {
                 SettingsService::setGlobal((int) $user['id'], 'advanced.maintenance_mode', isset($_POST['advanced_maintenance']));
+                SettingsService::setGlobal((int) $user['id'], 'advanced.disable_password_reset_rate_limit', isset($_POST['advanced_disable_password_reset_rate_limit']));
                 $flags = [
                     'security.two_factor' => isset($_POST['flag_security_two_factor']),
                     'payments.secondary_stripe' => isset($_POST['flag_payments_secondary']),
@@ -2197,6 +2198,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <label class="flex items-center gap-3 text-sm text-slate-600">
                     <input type="checkbox" name="advanced_maintenance" class="rounded border-gray-200" <?= SettingsService::getGlobal('advanced.maintenance_mode', false) ? 'checked' : '' ?>>
                     Maintenance mode
+                  </label>
+                  <label class="flex items-center gap-3 text-sm text-slate-600">
+                    <input type="checkbox" name="advanced_disable_password_reset_rate_limit" class="rounded border-gray-200" <?= SettingsService::getGlobal('advanced.disable_password_reset_rate_limit', false) ? 'checked' : '' ?>>
+                    Disable password reset rate limit
                   </label>
                   <p class="text-xs text-slate-500">Maintenance mode blocks non-admin access.</p>
                 </div>
