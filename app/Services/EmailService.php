@@ -10,6 +10,7 @@ class EmailService
     {
         $message = self::wrapIfNeeded($subject, $message);
         $message = self::appendFooter($message, $metadata);
+        $message = self::normalizeMessage($message);
         $baseUrlError = BaseUrlService::validationError();
         if ($baseUrlError !== null) {
             ActivityLogger::log('system', null, null, 'email.base_url_invalid', [
@@ -155,6 +156,20 @@ class EmailService
             return '';
         }
         return $email;
+    }
+
+    private static function normalizeMessage(string $message): string
+    {
+        $message = str_replace(["\r\n", "\r"], "\n", $message);
+        $lines = explode("\n", $message);
+        $wrapped = [];
+        foreach ($lines as $line) {
+            if (strlen($line) > 990) {
+                $line = wordwrap($line, 990, "\n", true);
+            }
+            $wrapped[] = $line;
+        }
+        return str_replace("\n", "\r\n", implode("\n", $wrapped));
     }
 
     private static function appendFooter(string $message, array $metadata): string

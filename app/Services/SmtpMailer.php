@@ -88,8 +88,9 @@ class SmtpMailer
             fclose($socket);
             return false;
         }
-        $message = implode("\r\n", $headers) . "\r\n\r\n" . $html . "\r\n.";
-        self::sendLine($socket, $message);
+        $data = implode("\r\n", $headers) . "\r\n\r\n" . $html;
+        $data = self::prepareData($data);
+        self::sendLine($socket, $data . "\r\n.");
         if (!self::isOk(self::read($socket))) {
             fclose($socket);
             return false;
@@ -124,5 +125,27 @@ class SmtpMailer
     private static function isOk(string $line): bool
     {
         return preg_match('/^(2|3)\\d{2}/', $line) === 1;
+    }
+
+    private static function prepareData(string $data): string
+    {
+        $data = str_replace(["\r\n", "\r"], "\n", $data);
+        $lines = explode("\n", $data);
+        foreach ($lines as &$line) {
+            if (strlen($line) > 990) {
+                $line = wordwrap($line, 990, "\n", true);
+            }
+        }
+        unset($line);
+        $data = implode("\n", $lines);
+        $data = str_replace("\n", "\r\n", $data);
+        $lines = explode("\r\n", $data);
+        foreach ($lines as &$line) {
+            if ($line !== '' && $line[0] === '.') {
+                $line = '.' . $line;
+            }
+        }
+        unset($line);
+        return implode("\r\n", $lines);
     }
 }
