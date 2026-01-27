@@ -1,5 +1,10 @@
 <?php
+$mainSiteUrl = \App\Services\BaseUrlService::configuredBaseUrl();
+if ($mainSiteUrl === '') {
+    $mainSiteUrl = '/';
+}
 $items = [
+    ['key' => 'main-site', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
     ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
     ['key' => 'wings', 'label' => 'Wings', 'icon' => 'flight_takeoff', 'href' => '/member/index.php?page=wings'],
     ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
