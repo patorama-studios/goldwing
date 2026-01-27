@@ -45,8 +45,7 @@ UPDATE roles
 SET is_system = 1,
     is_active = 1,
     description = CASE
-      WHEN name = 'super_admin' THEN 'Super Admin (full access)'
-      WHEN name = 'admin' THEN 'Admin (general access)'
+      WHEN name = 'admin' THEN 'Admin (full access)'
       WHEN name = 'committee' THEN 'Committee admin'
       WHEN name = 'treasurer' THEN 'Treasurer admin'
       WHEN name = 'chapter_leader' THEN 'Chapter leader admin'
@@ -54,59 +53,20 @@ SET is_system = 1,
       ELSE description
     END,
     updated_at = NOW()
-WHERE name IN ('super_admin', 'admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager');
+WHERE name IN ('admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager');
 
 -- Seed default permissions for system admin roles.
 INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
 SELECT r.id, p.permission_key, p.allowed, NOW(), NOW()
 FROM roles r
 JOIN (
-  SELECT 'super_admin' AS role_name, 'admin.dashboard.view' AS permission_key, 1 AS allowed
-  UNION ALL SELECT 'super_admin', 'admin.users.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.users.create', 1
-  UNION ALL SELECT 'super_admin', 'admin.users.edit', 1
-  UNION ALL SELECT 'super_admin', 'admin.users.disable', 1
-  UNION ALL SELECT 'super_admin', 'admin.roles.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.roles.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.members.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.members.edit', 1
-  UNION ALL SELECT 'super_admin', 'admin.members.renew', 1
-  UNION ALL SELECT 'super_admin', 'admin.members.manual_payment', 1
-  UNION ALL SELECT 'super_admin', 'admin.members.import_export', 1
-  UNION ALL SELECT 'super_admin', 'admin.membership_types.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.payments.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.payments.refund', 1
-  UNION ALL SELECT 'super_admin', 'admin.store.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.products.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.orders.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.orders.fulfil', 1
-  UNION ALL SELECT 'super_admin', 'admin.orders.refund_cancel', 1
-  UNION ALL SELECT 'super_admin', 'admin.order_fulfilment.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.pages.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.pages.edit', 1
-  UNION ALL SELECT 'super_admin', 'admin.pages.publish', 1
-  UNION ALL SELECT 'super_admin', 'admin.media_library.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.wings_magazine.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.calendar.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.calendar.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.events.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.member_of_year.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.member_of_year.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.forms.export', 1
-  UNION ALL SELECT 'super_admin', 'admin.ai_page_builder.access', 1
-  UNION ALL SELECT 'super_admin', 'admin.ai_page_builder.edit', 1
-  UNION ALL SELECT 'super_admin', 'admin.ai_page_builder.publish', 1
-  UNION ALL SELECT 'super_admin', 'admin.header_footer_builder.access', 1
-  UNION ALL SELECT 'super_admin', 'admin.settings.general.manage', 1
-  UNION ALL SELECT 'super_admin', 'admin.logs.view', 1
-  UNION ALL SELECT 'super_admin', 'admin.integrations.manage', 1
-
   UNION ALL SELECT 'admin', 'admin.dashboard.view', 1
   UNION ALL SELECT 'admin', 'admin.users.view', 1
   UNION ALL SELECT 'admin', 'admin.users.create', 1
   UNION ALL SELECT 'admin', 'admin.users.edit', 1
   UNION ALL SELECT 'admin', 'admin.users.disable', 1
   UNION ALL SELECT 'admin', 'admin.roles.view', 1
+  UNION ALL SELECT 'admin', 'admin.roles.manage', 1
   UNION ALL SELECT 'admin', 'admin.members.view', 1
   UNION ALL SELECT 'admin', 'admin.members.edit', 1
   UNION ALL SELECT 'admin', 'admin.members.renew', 1
@@ -138,6 +98,7 @@ JOIN (
   UNION ALL SELECT 'admin', 'admin.header_footer_builder.access', 1
   UNION ALL SELECT 'admin', 'admin.settings.general.manage', 1
   UNION ALL SELECT 'admin', 'admin.logs.view', 1
+  UNION ALL SELECT 'admin', 'admin.integrations.manage', 1
 
   UNION ALL SELECT 'membership_admin', 'admin.members.view', 1
   UNION ALL SELECT 'membership_admin', 'admin.members.edit', 1

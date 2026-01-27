@@ -1503,7 +1503,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   </label>
                   <label class="text-sm text-slate-600">Roles required (when mode is role-based)</label>
                   <div class="grid gap-2 text-sm text-slate-600">
-                    <?php foreach (['super_admin','admin','store_manager','committee','treasurer','chapter_leader','member'] as $roleOption): ?>
+                    <?php foreach (['admin','store_manager','committee','treasurer','chapter_leader','member'] as $roleOption): ?>
                       <label class="inline-flex items-center gap-2">
                         <input type="checkbox" name="twofa_roles[]" value="<?= e($roleOption) ?>" class="rounded border-gray-200" <?= in_array($roleOption, $securitySettings['twofa_required_roles'], true) ? 'checked' : '' ?>>
                         <?= e($roleOption) ?>

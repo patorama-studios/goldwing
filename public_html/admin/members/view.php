@@ -1434,7 +1434,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php if ($canEditRoles && $userId > 0): ?>
                     <button class="inline-flex items-center px-4 py-2 rounded-full bg-primary text-xs font-semibold text-gray-900" type="submit">Save role assignments</button>
                   <?php else: ?>
-                    <p class="text-xs text-gray-500"><?= $canEditRoles ? 'Assign a linked user account before updating roles.' : 'Only Super Admins can manage roles.' ?></p>
+                    <p class="text-xs text-gray-500"><?= $canEditRoles ? 'Assign a linked user account before updating roles.' : 'Only Admins can manage roles.' ?></p>
                   <?php endif; ?>
                 </form>
               </div>

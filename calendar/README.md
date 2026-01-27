@@ -25,6 +25,6 @@ Production-ready calendar/events module for cPanel (PHP 8.1 + MySQL 8).
 ## Notes
 - RSVP and ticket checkout require a logged-in member (`$_SESSION['user_id']`).
 - Events are created via `calendar/public/admin_event_create.php`.
-- Event management uses role checks (`SUPER_ADMIN`, `ADMIN`, `CHAPTER_LEADER`, `COMMITTEE`, `TREASURER`).
+- Event management uses role checks (`ADMIN`, `CHAPTER_LEADER`, `COMMITTEE`, `TREASURER`).
 - Calendar data uses `calendar_*` tables to avoid clashing with any existing events table.
 - Media thumbnails are selected from `media_library`.

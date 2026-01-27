@@ -23,7 +23,7 @@
 
 ## Payments & Refunds
 - Configure Stripe keys and webhook secret under Admin → Payments.
-- View recent orders, issue full refunds (Committee Member, Treasurer, Super Admin only).
+- View recent orders, issue full refunds (Committee Member, Treasurer, Admin only).
 - Review webhook processing status in the Payments Debug table.
 
 ## Stripe Setup & Webhooks

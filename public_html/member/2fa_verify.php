@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if (AuthService::completeTwoFactorLogin()) {
                     $user = current_user();
-                    $adminRoles = ['admin', 'committee', 'treasurer', 'chapter_leader', 'super_admin', 'store_manager'];
+                    $adminRoles = ['admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager'];
                     $isAdmin = false;
                     if ($user) {
                         foreach ($adminRoles as $role) {

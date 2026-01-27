@@ -755,7 +755,7 @@ if ($user && $user['member_id']) {
                     if ($hasPublishedAt) {
                         $noticeMessage = 'Notice submitted for approval.';
                         $reviewEmails = [];
-                        $stmt = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee", "super_admin") AND u.is_active = 1');
+                        $stmt = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee") AND u.is_active = 1');
                         foreach ($stmt->fetchAll() as $row) {
                             if (!empty($row['email'])) {
                                 $reviewEmails[] = $row['email'];

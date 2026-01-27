@@ -3,7 +3,7 @@ require_once __DIR__ . '/../lib/utils.php';
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 
-calendar_require_role(['SUPER_ADMIN', 'ADMIN', 'CHAPTER_LEADER']);
+calendar_require_role(['ADMIN', 'CHAPTER_LEADER']);
 $pdo = calendar_db();
 
 $eventId = (int) ($_GET['event_id'] ?? 0);

@@ -26,7 +26,7 @@
 - Admin area: `/admin/store/*` (products, categories, tags, discounts, orders, low stock).
 - Store settings: `/admin/settings/index.php?section=store`.
 - Storefront: `/store` (requires login; cart and checkout at `/store/cart` + `/store/checkout`).
-- Roles: `super_admin`, `admin`, and `store_manager` can access `/admin/store/*` (migration adds missing roles).
+- Roles: `admin` and `store_manager` can access `/admin/store/*` (migration adds missing roles).
 - Stripe keys: configure in Settings Hub → Payments (Stripe).
 - Webhook endpoint: `/api/stripe_webhook.php` (handles memberships and store payments).
 - Configure shipping + processing fee passthrough in Store Settings.

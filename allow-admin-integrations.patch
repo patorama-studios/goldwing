@@ -31,17 +31,17 @@ index f5cbffc..1530c8e 100644
 +++ b/public_html/admin/settings/index.php
 @@ -23,12 +23,12 @@ $sections = [
      'notifications' => ['label' => 'Notifications', 'roles' => ['admin']],
-     'accounts' => ['label' => 'Accounts & Roles', 'roles' => ['super_admin', 'admin']],
-     'security' => ['label' => 'Security & Authentication', 'roles' => ['super_admin', 'admin', 'committee']],
--    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin']],
-+    'integrations' => ['label' => 'Integrations', 'roles' => ['super_admin', 'admin']],
+     'accounts' => ['label' => 'Accounts & Roles', 'roles' => ['admin']],
+     'security' => ['label' => 'Security & Authentication', 'roles' => ['admin', 'committee']],
+-    'integrations' => ['label' => 'Integrations', 'roles' => ['admin']],
++    'integrations' => ['label' => 'Integrations', 'roles' => ['admin']],
      'media' => ['label' => 'Media & Files', 'roles' => ['admin']],
      'events' => ['label' => 'Events', 'roles' => ['admin']],
      'membership_pricing' => ['label' => 'Membership Settings', 'roles' => ['admin', 'store_manager', 'committee', 'treasurer']],
--    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin']],
--    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin']],
-+    'audit' => ['label' => 'Audit Log', 'roles' => ['super_admin', 'admin']],
-+    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['super_admin', 'admin']],
+-    'audit' => ['label' => 'Audit Log', 'roles' => ['admin']],
+-    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['admin']],
++    'audit' => ['label' => 'Audit Log', 'roles' => ['admin']],
++    'advanced' => ['label' => 'Advanced / Developer', 'roles' => ['admin']],
  ];
  
  function can_access_section(array $roles, array $allowed): bool

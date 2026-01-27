@@ -133,9 +133,6 @@ function require_role(array $roles): void
         exit;
     }
     $userRoles = $user['roles'] ?? [];
-    if (in_array('super_admin', $userRoles, true)) {
-        return;
-    }
     foreach ($roles as $role) {
         if (in_array($role, $userRoles, true)) {
             return;
@@ -188,7 +185,7 @@ try {
     if ($maintenanceMode) {
         $user = current_user();
         $roles = $user['roles'] ?? [];
-        $allow = array_intersect($roles, ['super_admin', 'admin']);
+        $allow = array_intersect($roles, ['admin']);
         if (empty($allow)) {
             http_response_code(503);
             echo '<!DOCTYPE html><html><head><title>Maintenance</title></head><body><h1>Maintenance</h1><p>The site is currently undergoing maintenance. Please check back soon.</p></body></html>';

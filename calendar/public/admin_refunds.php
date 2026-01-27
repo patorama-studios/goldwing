@@ -4,7 +4,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 
-calendar_require_role(['SUPER_ADMIN', 'ADMIN', 'CHAPTER_LEADER']);
+calendar_require_role(['ADMIN', 'CHAPTER_LEADER']);
 $pdo = calendar_db();
 $user = calendar_current_user();
 calendar_require_tables($pdo, ['calendar_refund_requests', 'calendar_orders', 'calendar_events']);

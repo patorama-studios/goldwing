@@ -9,9 +9,9 @@ function access_control_role_aliases(): array
         'web_admin' => 'admin',
         'web admin' => 'admin',
         'web-admin' => 'admin',
-        'super admin' => 'super_admin',
-        'super-admin' => 'super_admin',
-        'superadmin' => 'super_admin',
+        'super admin' => 'admin',
+        'super-admin' => 'admin',
+        'superadmin' => 'admin',
     ];
 }
 
@@ -25,7 +25,6 @@ function access_control_roles(): array
         'treasurer',
         'store_manager',
         'admin',
-        'super_admin',
     ];
 }
 
@@ -39,7 +38,6 @@ function access_control_role_labels(): array
         'treasurer' => 'Treasurer',
         'store_manager' => 'Store Manager',
         'admin' => 'Admin',
-        'super_admin' => 'Super Admin',
     ];
 }
 
@@ -81,7 +79,6 @@ function get_current_role(): string
 {
     $roles = get_current_roles();
     $priority = [
-        'super_admin',
         'admin',
         'store_manager',
         'treasurer',
@@ -123,7 +120,6 @@ function access_control_default_registry(): array
         'treasurer',
         'store_manager',
         'admin',
-        'super_admin',
     ];
 
     return [
@@ -269,7 +265,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/calendar/admin',
             'match_type' => 'prefix',
             'nav_group' => 'Events',
-            'roles' => ['admin', 'committee', 'treasurer', 'super_admin'],
+            'roles' => ['admin', 'committee', 'treasurer'],
         ],
         [
             'page_key' => 'calendar_public',
@@ -293,7 +289,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/index.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader', 'super_admin'],
+            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader'],
         ],
         [
             'page_key' => 'admin_members',
@@ -301,7 +297,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/members/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader', 'super_admin'],
+            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader'],
         ],
         [
             'page_key' => 'admin_member_of_year',
@@ -309,7 +305,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/member-of-the-year',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'super_admin'],
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'admin_store',
@@ -317,7 +313,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/store/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'store_manager', 'super_admin'],
+            'roles' => ['admin', 'store_manager'],
         ],
         [
             'page_key' => 'admin_navigation',
@@ -325,7 +321,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/navigation.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'super_admin'],
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'admin_security',
@@ -333,7 +329,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/security/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'treasurer', 'super_admin'],
+            'roles' => ['admin', 'committee', 'treasurer'],
         ],
         [
             'page_key' => 'admin_ai_editor',
@@ -341,7 +337,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/page-builder',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'super_admin'],
+            'roles' => ['admin', 'committee'],
         ],
         [
             'page_key' => 'settings_hub',
@@ -349,7 +345,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/settings/index.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'store_manager', 'committee', 'treasurer', 'super_admin'],
+            'roles' => ['admin', 'store_manager', 'committee', 'treasurer'],
         ],
         [
             'page_key' => 'settings_access_control',
@@ -357,7 +353,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/settings/access-control.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['super_admin'],
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'settings_ai',
@@ -365,7 +361,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/settings/ai.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'super_admin'],
+            'roles' => ['admin', 'committee'],
         ],
         [
             'page_key' => 'settings_access_control_save',
@@ -373,7 +369,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/settings/access-control-save.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['super_admin'],
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'admin_root',
@@ -381,7 +377,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'super_admin'],
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'api_webhook',
@@ -437,7 +433,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/api/*',
             'match_type' => 'prefix',
             'nav_group' => 'API',
-            'roles' => ['admin', 'super_admin'],
+            'roles' => ['admin'],
         ],
     ];
 }
@@ -676,10 +672,6 @@ function can_access_path($rolesOrUser, string $path): bool
         $roles = ['public'];
     }
 
-    if (in_array('super_admin', $roles, true)) {
-        return true;
-    }
-
     $path = access_control_normalize_path($path);
     if (access_control_is_always_allowed($path)) {
         return true;
@@ -718,10 +710,6 @@ function enforce_page_access(): void
     }
 
     $roles = get_current_roles();
-    if (in_array('super_admin', $roles, true)) {
-        return;
-    }
-
     $allowedRoles = access_control_page_allowed_roles((int) $match['id']);
     if (in_array('public', $allowedRoles, true)) {
         return;

@@ -145,10 +145,10 @@ if ($event['type'] === 'checkout.session.completed') {
     calendar_send_email($user['email'], $subject, $body);
 
     if ($hasChapterId && $eventRow['scope'] === 'CHAPTER' && !empty($eventRow['chapter_id'])) {
-        $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
+        $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
         $stmt->execute(['chapter_id' => (int) $eventRow['chapter_id']]);
     } else {
-        $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin", "chapter_leader")');
+        $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "chapter_leader")');
         $stmt->execute();
     }
     $admins = $stmt->fetchAll();

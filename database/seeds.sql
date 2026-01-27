@@ -1,5 +1,4 @@
 INSERT INTO roles (name) VALUES
-('super_admin'),
 ('admin'),
 ('store_manager'),
 ('committee'),

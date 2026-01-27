@@ -1857,7 +1857,7 @@ if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'refunds'
     if ($method !== 'POST') {
         json_response(['error' => 'Method not allowed.'], 405);
     }
-    $user = require_roles_json(['committee', 'treasurer', 'admin', 'super_admin']);
+    $user = require_roles_json(['committee', 'treasurer', 'admin']);
     require_csrf_json($body);
     require_stepup_json($user);
     $orderId = (int) ($body['order_id'] ?? 0);

@@ -21,10 +21,10 @@ function store_table_exists(PDO $pdo, string $table): bool
 function store_permissions_map(): array
 {
     return [
-        'store_orders_view' => ['admin', 'super_admin', 'store_manager'],
-        'store_orders_manage' => ['admin', 'super_admin', 'store_manager'],
-        'store_refunds_manage' => ['admin', 'super_admin'],
-        'store_inventory_manage' => ['admin', 'super_admin', 'store_manager'],
+        'store_orders_view' => ['admin', 'store_manager'],
+        'store_orders_manage' => ['admin', 'store_manager'],
+        'store_refunds_manage' => ['admin'],
+        'store_inventory_manage' => ['admin', 'store_manager'],
     ];
 }
 
@@ -45,9 +45,6 @@ function store_user_can(?array $user, string $permission): bool
         }
     }
     $roles = $user['roles'] ?? [];
-    if (in_array('super_admin', $roles, true)) {
-        return true;
-    }
     $map = store_permissions_map();
     if (!isset($map[$permission])) {
         return false;

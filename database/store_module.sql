@@ -289,7 +289,7 @@ CREATE TABLE store_tickets (
   FOREIGN KEY (order_item_id) REFERENCES store_order_items(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO roles (name) VALUES ('super_admin'), ('store_manager');
+INSERT IGNORE INTO roles (name) VALUES ('admin'), ('store_manager');
 
 INSERT INTO store_settings (
   id,

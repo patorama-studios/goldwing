@@ -10,7 +10,7 @@ function admin_permission_registry(): array
             ['key' => 'admin.users.edit', 'label' => 'Edit users'],
             ['key' => 'admin.users.disable', 'label' => 'Disable users'],
             ['key' => 'admin.roles.view', 'label' => 'View roles'],
-            ['key' => 'admin.roles.manage', 'label' => 'Manage roles (Super Admin only)'],
+            ['key' => 'admin.roles.manage', 'label' => 'Manage roles'],
         ],
         'Membership' => [
             ['key' => 'admin.members.view', 'label' => 'View members'],
@@ -96,10 +96,9 @@ function admin_default_role_permissions(): array
 {
     $all = admin_permission_keys();
 
-    $admin = array_values(array_diff($all, ['admin.roles.manage', 'admin.integrations.manage']));
+    $admin = $all;
 
     return [
-        'super_admin' => $all,
         'admin' => $admin,
         'membership_admin' => [
             'admin.members.view',
@@ -200,12 +199,6 @@ function current_admin_can(string $permissionKey, ?array $user = null): bool
         return false;
     }
     $roles = normalize_access_roles($user['roles'] ?? []);
-    if (in_array('super_admin', $roles, true)) {
-        return true;
-    }
-    if ($permissionKey === 'admin.roles.manage') {
-        return false;
-    }
     if (!admin_permissions_tables_ready()) {
         $fallback = admin_permission_default_roles();
         $allowed = $fallback[$permissionKey] ?? [];

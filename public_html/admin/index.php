@@ -1643,7 +1643,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </div>
               <div class="flex items-center justify-between">
                 <span>Refund permissions</span>
-                <span class="text-slate-900 font-semibold">Admin, Treasurer, Super Admin</span>
+                <span class="text-slate-900 font-semibold">Admin, Treasurer</span>
               </div>
               <div class="pt-2">
                 <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>

@@ -331,7 +331,7 @@ $pageTitle = 'Checkout';
 <div class="grid gap-6">
   <h2>Checkout</h2>
   <?php
-    $settingsRoles = array_intersect($user['roles'] ?? [], ['admin', 'super_admin', 'store_manager']);
+    $settingsRoles = array_intersect($user['roles'] ?? [], ['admin', 'store_manager']);
   ?>
   <?php if ($settingsRoles): ?>
     <a class="text-sm text-blue-600" href="/admin/settings/index.php?section=store">Go to Store Settings</a>

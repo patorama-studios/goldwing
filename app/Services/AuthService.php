@@ -135,12 +135,12 @@ class AuthService
         ];
         self::recordLogin((int) $user['id']);
         $roleList = $user['roles'] ?? [];
-        $actorType = array_intersect($roleList, ['admin', 'super_admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager']) ? 'admin' : 'member';
+        $actorType = array_intersect($roleList, ['admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager']) ? 'admin' : 'member';
         ActivityLogger::log($actorType, (int) $user['id'], null, 'security.login_success', ['email' => $user['email']]);
 
         $fingerprint = TrustedDeviceService::fingerprint();
         $isNewDevice = TrustedDeviceService::record((int) $user['id'], $fingerprint);
-        $adminRoles = ['admin', 'super_admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager'];
+        $adminRoles = ['admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager'];
         if ($isNewDevice && count(array_intersect($roleList, $adminRoles)) > 0) {
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
             $safeEmail = htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8');

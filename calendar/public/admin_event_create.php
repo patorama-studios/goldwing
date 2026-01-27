@@ -5,7 +5,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/mailer.php';
 
-calendar_require_role(['SUPER_ADMIN', 'ADMIN', 'CHAPTER_LEADER', 'COMMITTEE', 'TREASURER']);
+calendar_require_role(['ADMIN', 'CHAPTER_LEADER', 'COMMITTEE', 'TREASURER']);
 $user = calendar_current_user();
 $pdo = calendar_db();
 calendar_require_tables($pdo, ['calendar_events']);
@@ -201,10 +201,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subject = 'New event created: ' . $title;
             $body = '<p>A new event has been created.</p><p><strong>' . calendar_e($title) . '</strong></p>';
             if ($scope === 'CHAPTER') {
-                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
                 $stmt->execute(['chapter_id' => $chapterId]);
             } else {
-                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("super_admin", "admin", "chapter_leader")');
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "chapter_leader")');
                 $stmt->execute();
             }
             $admins = $stmt->fetchAll();
