@@ -230,6 +230,7 @@ class MemberRepository
         if (!$row) {
             return null;
         }
+        $row['suburb'] = $row['city'] ?? '';
         $row['member_number_display'] = $row['member_number_display'] ?? self::formatMemberNumber($row);
         return $row;
     }
@@ -249,6 +250,8 @@ class MemberRepository
             'phone' => 'phone',
             'address_line1' => 'address_line1',
             'address_line2' => 'address_line2',
+            'suburb' => 'city',
+            'city' => 'city',
             'state' => 'state',
             'postcode' => 'postal_code',
             'country' => 'country',

@@ -17,8 +17,8 @@ class NotificationService
                     'enabled' => true,
                     'recipient_mode' => 'primary',
                     'custom_recipients' => '',
-                    'subject' => 'Set your password',
-                    'body' => '<p>Set your password:</p><p><a href="{{reset_link}}">Set password</a></p>',
+                    'subject' => 'Welcome to Goldwing - Set your password',
+                    'body' => '<p>Welcome! Your membership account has been created.</p><p>Please use the button below to set up your password so you can log into the member portal.</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 20px;background:#0055ff;color:#fff;text-decoration:none;border-radius:4px;">Set Password</a></p><p>If you have any issues, please contact the webmaster.</p>',
                     'from_name' => 'Australian Goldwing Association',
                     'from_email' => 'no-reply@goldwing.org.au',
                     'reply_to' => 'webmaster@goldwing.org.au',
@@ -89,8 +89,8 @@ class NotificationService
                     'enabled' => true,
                     'recipient_mode' => 'primary',
                     'custom_recipients' => '',
-                    'subject' => 'Membership approved - complete payment',
-                    'body' => '<p>Your membership has been approved. Please complete payment:</p><p><a href="{{payment_link}}">Pay now</a></p>',
+                    'subject' => 'Membership approved - Next Steps',
+                    'body' => '<p>Your membership has been approved! If you have not paid yet, please complete your payment:</p><p><a href="{{payment_link}}" style="display:inline-block;padding:10px 20px;background:#0055ff;color:#fff;text-decoration:none;border-radius:4px;">Pay now</a></p><p>You will also receive a separate email containing a link to set up your account password so you can access the portal.</p>',
                     'from_name' => 'Australian Goldwing Association',
                     'from_email' => 'no-reply@goldwing.org.au',
                     'reply_to' => 'webmaster@goldwing.org.au',
@@ -642,9 +642,6 @@ class NotificationService
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return '';
         }
-        if (!preg_match('/@([a-z0-9-]+\\.)*goldwing\\.org\\.au$/i', $email)) {
-            return '';
-        }
         return $email;
     }
 
@@ -697,7 +694,7 @@ class NotificationService
             foreach ($value as $item) {
                 $parts[] = self::stringifyContextValue($item);
             }
-            $parts = array_filter($parts, fn ($item) => $item !== '');
+            $parts = array_filter($parts, fn($item) => $item !== '');
             return implode(', ', $parts);
         }
         return (string) $value;

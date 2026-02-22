@@ -32,7 +32,7 @@ if (!in_array($tab, $allowedTabs, true)) {
     $tab = 'overview';
 }
 
- $memberId = (int) ($_POST['member_id'] ?? 0);
+$memberId = (int) ($_POST['member_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /admin/members/view.php');
@@ -1423,8 +1423,8 @@ switch ($action) {
         if (!$userId) {
             redirectWithFlash($memberId, 'roles', 'Member does not have a linked user account.', 'error');
         }
-        $requestedSystem = array_filter(array_map('trim', (array) ($_POST['roles_system'] ?? [])));
-        $requestedAdmin = array_filter(array_map('trim', (array) ($_POST['roles_admin'] ?? [])));
+        $requestedSystem = isset($_POST['roles_system_submitted']) ? array_filter(array_map('trim', (array) ($_POST['roles_system'] ?? []))) : [];
+        $requestedAdmin = isset($_POST['roles_admin_submitted']) ? array_filter(array_map('trim', (array) ($_POST['roles_admin'] ?? []))) : [];
         $requested = array_values(array_unique(array_merge($requestedSystem, $requestedAdmin)));
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT id, name FROM roles');
@@ -1891,10 +1891,11 @@ switch ($action) {
             $searchTerm = trim($_POST['query'] ?? '');
             $term = '%' . mb_strtolower($searchTerm) . '%';
             $numberTerm = '%' . ($searchTerm === '' ? '' : str_replace(' ', '', $searchTerm)) . '%';
-            $stmt = Database::connection()->prepare('SELECT id, first_name, last_name, email, member_number_base, member_number_suffix FROM members WHERE member_type = "ASSOCIATE" AND (full_member_id IS NULL OR full_member_id = 0 OR full_member_id <> :member_id) AND (LOWER(CONCAT(first_name, " ", last_name)) LIKE :term OR LOWER(email) LIKE :term OR COALESCE(CONCAT(member_number_base, CASE WHEN member_number_suffix > 0 THEN CONCAT(".", member_number_suffix) ELSE "" END), "") LIKE :number) ORDER BY last_name ASC, first_name ASC LIMIT 12');
+            $stmt = Database::connection()->prepare('SELECT id, first_name, last_name, email, member_number_base, member_number_suffix FROM members WHERE member_type = "ASSOCIATE" AND (full_member_id IS NULL OR full_member_id = 0 OR full_member_id <> :member_id) AND (LOWER(CONCAT(first_name, " ", last_name)) LIKE :term OR LOWER(email) LIKE :term_email OR COALESCE(CONCAT(member_number_base, CASE WHEN member_number_suffix > 0 THEN CONCAT(".", member_number_suffix) ELSE "" END), "") LIKE :number) ORDER BY last_name ASC, first_name ASC LIMIT 12');
             $stmt->execute([
                 'member_id' => $memberId,
                 'term' => $term,
+                'term_email' => $term,
                 'number' => $numberTerm,
             ]);
             $results = [];

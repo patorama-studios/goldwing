@@ -311,10 +311,10 @@ function store_calculate_shipping(float $subtotalAfterDiscount, array $settings,
     $threshold = (float) ($settings['shipping_free_threshold'] ?? 0);
     $flatRate = (float) ($settings['shipping_flat_rate'] ?? 0);
 
-    if ($freeEnabled && $threshold > 0 && $subtotalAfterDiscount >= $threshold) {
+    if ($freeEnabled && $threshold >= 0 && $subtotalAfterDiscount >= $threshold) {
         return 0.0;
     }
-    if ($flatEnabled && $flatRate > 0) {
+    if ($flatEnabled && $flatRate >= 0) {
         return round($flatRate, 2);
     }
     return 0.0;
