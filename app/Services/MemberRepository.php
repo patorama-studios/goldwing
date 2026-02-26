@@ -44,7 +44,7 @@ class MemberRepository
         return self::$memberNumberAvailable;
     }
 
-    private static function hasMemberColumn(PDO $pdo, string $column): bool
+    public static function hasMemberColumn(PDO $pdo, string $column): bool
     {
         if (array_key_exists($column, self::$memberColumnCache)) {
             return self::$memberColumnCache[$column];
@@ -437,15 +437,20 @@ class MemberRepository
         if (!empty($filters['q'])) {
             $raw = trim((string) $filters['q']);
             $value = '%' . mb_strtolower($raw) . '%';
-            $params['search'] = $value;
             $searchParts = [
-                'LOWER(m.first_name) LIKE :search',
-                'LOWER(m.last_name) LIKE :search',
-                'LOWER(m.email) LIKE :search',
-                'LOWER(COALESCE(m.phone, \'\')) LIKE :search',
-                'LOWER(' . $memberNumberExpr . ') LIKE :search',
-                'CAST(m.id AS CHAR) LIKE :search',
+                'LOWER(m.first_name) LIKE :search1',
+                'LOWER(m.last_name) LIKE :search2',
+                'LOWER(m.email) LIKE :search3',
+                'LOWER(COALESCE(m.phone, \'\')) LIKE :search4',
+                'LOWER(' . $memberNumberExpr . ') LIKE :search5',
+                'CAST(m.id AS CHAR) LIKE :search6',
             ];
+            $params['search1'] = $value;
+            $params['search2'] = $value;
+            $params['search3'] = $value;
+            $params['search4'] = $value;
+            $params['search5'] = $value;
+            $params['search6'] = $value;
             if ($raw !== '' && ctype_digit($raw)) {
                 $params['search_id'] = (int) $raw;
                 $searchParts[] = 'm.id = :search_id';

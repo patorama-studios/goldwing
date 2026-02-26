@@ -46,8 +46,10 @@ if ($filters['paid'] === 'paid') {
     $sql .= ' AND e.is_paid = 0';
 }
 if ($filters['search'] !== '') {
-    $sql .= ' AND (e.title LIKE :search OR e.description LIKE :search)';
-    $params['search'] = '%' . $filters['search'] . '%';
+    $sql .= ' AND (e.title LIKE :search1 OR e.description LIKE :search2)';
+    $searchTerm = '%' . $filters['search'] . '%';
+    $params['search1'] = $searchTerm;
+    $params['search2'] = $searchTerm;
 }
 $sql .= ' ORDER BY e.start_at ASC';
 $stmt = $pdo->prepare($sql);
@@ -97,6 +99,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -117,12 +120,14 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             --accent-strong: #2c45d6;
             --shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
         }
+
         body {
             margin: 0;
             font-family: "Manrope", "Open Sans", sans-serif;
             background: transparent;
             color: var(--ink);
         }
+
         .calendar-shell {
             max-width: 1120px;
             margin: 0 auto;
@@ -130,16 +135,19 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             display: grid;
             gap: 18px;
         }
+
         .calendar-controls {
             display: grid;
             gap: 12px;
         }
+
         .calendar-controls-top {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 12px;
             align-items: center;
         }
+
         .search-field {
             display: flex;
             align-items: center;
@@ -151,6 +159,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             min-height: 44px;
             box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
         }
+
         .search-field input {
             border: none;
             outline: none;
@@ -160,12 +169,14 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             font-family: inherit;
             background: transparent;
         }
+
         .calendar-actions {
             display: flex;
             align-items: center;
             gap: 12px;
             justify-content: flex-end;
         }
+
         .primary-btn {
             border: none;
             border-radius: 8px;
@@ -177,9 +188,11 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             transition: background 0.2s ease, box-shadow 0.2s ease;
             box-shadow: 0 10px 20px rgba(59, 87, 240, 0.18);
         }
+
         .primary-btn:hover {
             background: var(--accent-strong);
         }
+
         .view-toggle {
             display: inline-flex;
             border: 1px solid var(--line);
@@ -187,6 +200,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             overflow: hidden;
             background: var(--panel);
         }
+
         .view-toggle button {
             border: none;
             background: transparent;
@@ -197,31 +211,37 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             cursor: pointer;
             position: relative;
         }
+
         .view-toggle button.is-active {
             color: var(--ink);
             box-shadow: inset 0 -2px 0 var(--ink);
         }
+
         .filter-drawer {
             border: 1px solid var(--line);
             border-radius: 12px;
             padding: 12px 16px;
             background: #fafafa;
         }
+
         .filter-drawer summary {
             cursor: pointer;
             font-weight: 600;
             color: var(--muted);
             list-style: none;
         }
+
         .filter-drawer summary::-webkit-details-marker {
             display: none;
         }
+
         .filter-grid {
             display: grid;
             gap: 12px;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             margin-top: 12px;
         }
+
         .filter-grid label {
             display: grid;
             gap: 6px;
@@ -231,6 +251,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             letter-spacing: 0.08em;
             color: var(--muted);
         }
+
         .filter-grid input,
         .filter-grid select {
             border: 1px solid var(--line);
@@ -241,6 +262,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             color: var(--ink);
             font-family: inherit;
         }
+
         .calendar-header {
             display: flex;
             align-items: center;
@@ -248,11 +270,13 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             gap: 12px;
             flex-wrap: wrap;
         }
+
         .calendar-nav {
             display: flex;
             align-items: center;
             gap: 8px;
         }
+
         .icon-btn {
             width: 36px;
             height: 36px;
@@ -265,6 +289,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             color: var(--muted);
             cursor: pointer;
         }
+
         .ghost-btn {
             border: 1px solid var(--line);
             background: var(--panel);
@@ -275,6 +300,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             color: var(--ink);
             cursor: pointer;
         }
+
         .month-picker {
             display: inline-flex;
             align-items: center;
@@ -286,16 +312,19 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             color: var(--ink);
             cursor: pointer;
         }
+
         .month-picker span {
             display: inline-flex;
             align-items: center;
             gap: 6px;
         }
+
         .month-caret {
             width: 14px;
             height: 14px;
             color: var(--muted);
         }
+
         .month-input {
             position: absolute;
             opacity: 0;
@@ -303,6 +332,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             width: 0;
             height: 0;
         }
+
         .calendar-notice {
             display: flex;
             align-items: center;
@@ -313,6 +343,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             color: var(--ink);
             font-size: 14px;
         }
+
         .calendar-panel {
             border: 1px solid var(--line);
             border-radius: 16px;
@@ -320,9 +351,11 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             background: var(--panel);
             box-shadow: var(--shadow);
         }
+
         .event-panel {
             display: none;
         }
+
         .calendar-shell.is-event-view .calendar-controls,
         .calendar-shell.is-event-view .calendar-header,
         .calendar-shell.is-event-view .calendar-panel,
@@ -330,12 +363,15 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
         .calendar-shell.is-event-view .calendar-notice {
             display: none;
         }
+
         .calendar-shell.is-event-view .event-panel {
             display: block;
         }
+
         .event-panel .calendar-notice {
             margin-top: 12px;
         }
+
         .calendar-footer {
             display: flex;
             align-items: center;
@@ -343,6 +379,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             gap: 12px;
             flex-wrap: wrap;
         }
+
         .subscribe-button {
             display: inline-flex;
             align-items: center;
@@ -356,24 +393,29 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             text-decoration: none;
             background: #ffffff;
         }
+
         .subscribe-button:hover {
             color: var(--accent-strong);
             border-color: var(--accent-strong);
         }
+
         .calendar-subscribe-links {
             display: inline-flex;
             align-items: center;
             gap: 12px;
             font-size: 13px;
         }
+
         .calendar-subscribe-links a {
             color: var(--muted);
             font-weight: 600;
             text-decoration: none;
         }
+
         .calendar-subscribe-links a:hover {
             color: var(--ink);
         }
+
         .sr-only {
             position: absolute;
             width: 1px;
@@ -384,21 +426,25 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             clip: rect(0, 0, 0, 0);
             border: 0;
         }
+
         .fc {
             --fc-border-color: var(--line);
             --fc-today-bg-color: #f8fafc;
             --fc-page-bg-color: transparent;
             font-size: 14px;
         }
+
         .fc .fc-daygrid-day-number {
             padding: 10px;
             font-size: 15px;
             font-weight: 600;
             color: #4b5563;
         }
+
         .fc .fc-day-other .fc-daygrid-day-number {
             color: #9ca3af;
         }
+
         .fc .fc-col-header-cell-cushion {
             display: inline-block;
             padding: 10px 0;
@@ -408,38 +454,47 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             letter-spacing: 0.1em;
             color: var(--muted);
         }
+
         .fc .fc-daygrid-event {
             border-radius: 999px;
             padding: 2px 8px;
             font-size: 12px;
         }
+
         .fc .fc-list-day-cushion {
             background: #f9fafb;
         }
+
         .fc .fc-list-event-title a {
             color: var(--ink);
         }
+
         @media (max-width: 900px) {
             .calendar-shell {
                 padding: 18px;
             }
+
             .calendar-controls-top {
                 grid-template-columns: 1fr;
             }
+
             .calendar-actions {
                 flex-wrap: wrap;
                 justify-content: space-between;
             }
+
             .view-toggle {
                 width: 100%;
                 justify-content: space-between;
             }
+
             .calendar-header {
                 align-items: flex-start;
             }
         }
     </style>
 </head>
+
 <body>
     <main class="calendar-shell">
         <form method="get" class="calendar-controls">
@@ -447,9 +502,11 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                 <label class="search-field">
                     <span class="sr-only">Search for events</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M21 21l-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M21 21l-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                     </svg>
-                    <input type="text" name="search" value="<?php echo calendar_e($filters['search']); ?>" placeholder="Search for events">
+                    <input type="text" name="search" value="<?php echo calendar_e($filters['search']); ?>"
+                        placeholder="Search for events">
                 </label>
                 <div class="calendar-actions">
                     <button type="submit" class="primary-btn">Find Events</button>
@@ -467,7 +524,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                     <label>Chapter
                         <select name="chapter_id">
                             <option value="">All</option>
-                            <?php foreach ($chapters as $chapter) : ?>
+                            <?php foreach ($chapters as $chapter): ?>
                                 <option value="<?php echo (int) $chapter['id']; ?>" <?php echo ($filters['chapter_id'] == $chapter['id']) ? 'selected' : ''; ?>>
                                     <?php echo calendar_e($chapter['name']); ?>
                                 </option>
@@ -478,21 +535,26 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                         <select name="event_type">
                             <option value="">All</option>
                             <option value="in_person" <?php echo $filters['event_type'] === 'in_person' ? 'selected' : ''; ?>>In-person</option>
-                            <option value="online" <?php echo $filters['event_type'] === 'online' ? 'selected' : ''; ?>>Online</option>
-                            <option value="hybrid" <?php echo $filters['event_type'] === 'hybrid' ? 'selected' : ''; ?>>Hybrid</option>
+                            <option value="online" <?php echo $filters['event_type'] === 'online' ? 'selected' : ''; ?>>
+                                Online</option>
+                            <option value="hybrid" <?php echo $filters['event_type'] === 'hybrid' ? 'selected' : ''; ?>>
+                                Hybrid</option>
                         </select>
                     </label>
                     <label>Paid/Free
                         <select name="paid">
                             <option value="">All</option>
-                            <option value="paid" <?php echo $filters['paid'] === 'paid' ? 'selected' : ''; ?>>Paid</option>
-                            <option value="free" <?php echo $filters['paid'] === 'free' ? 'selected' : ''; ?>>Free</option>
+                            <option value="paid" <?php echo $filters['paid'] === 'paid' ? 'selected' : ''; ?>>Paid
+                            </option>
+                            <option value="free" <?php echo $filters['paid'] === 'free' ? 'selected' : ''; ?>>Free
+                            </option>
                         </select>
                     </label>
                     <label>Upcoming/Past
                         <select name="timeframe">
                             <option value="upcoming" <?php echo $filters['timeframe'] === 'upcoming' ? 'selected' : ''; ?>>Upcoming</option>
-                            <option value="past" <?php echo $filters['timeframe'] === 'past' ? 'selected' : ''; ?>>Past</option>
+                            <option value="past" <?php echo $filters['timeframe'] === 'past' ? 'selected' : ''; ?>>Past
+                            </option>
                         </select>
                     </label>
                 </div>
@@ -503,12 +565,14 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             <div class="calendar-nav">
                 <button type="button" class="icon-btn" data-action="prev" aria-label="Previous month">
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
                 <button type="button" class="icon-btn" data-action="next" aria-label="Next month">
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
                     </svg>
                 </button>
                 <button type="button" class="ghost-btn" data-action="today">This Month</button>
@@ -517,17 +581,19 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                 <button type="button" class="month-picker" id="monthPickerTrigger" aria-label="Choose month">
                     <span id="calendarTitle">Month</span>
                     <svg class="month-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
                 <input type="month" id="monthPicker" class="month-input" aria-hidden="true" tabindex="-1">
             </div>
         </div>
 
-        <?php if (empty($occurrences)) : ?>
+        <?php if (empty($occurrences)): ?>
             <div class="calendar-notice">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M7 4v4M17 4v4M4 10h16M5 20h14a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M7 4v4M17 4v4M4 10h16M5 20h14a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1z"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                 </svg>
                 <span><?php echo calendar_e($noticeText); ?></span>
             </div>
@@ -545,201 +611,205 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             <a class="subscribe-button" href="<?php echo calendar_e($icsUrl); ?>">
                 Subscribe to calendar
                 <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
                 </svg>
             </a>
             <div class="calendar-subscribe-links">
-                <a href="<?php echo calendar_e($googleCalendarUrl); ?>" target="_blank" rel="noopener">Add to Google Calendar</a>
-                <a href="<?php echo calendar_e($outlookCalendarUrl); ?>" target="_blank" rel="noopener">Add to Outlook</a>
+                <a href="<?php echo calendar_e($googleCalendarUrl); ?>" target="_blank" rel="noopener">Add to Google
+                    Calendar</a>
+                <a href="<?php echo calendar_e($outlookCalendarUrl); ?>" target="_blank" rel="noopener">Add to
+                    Outlook</a>
             </div>
         </div>
     </main>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var calendarEl = document.getElementById('calendar');
-    var titleEl = document.getElementById('calendarTitle');
-    var viewButtons = document.querySelectorAll('[data-view]');
-    var actionButtons = document.querySelectorAll('[data-action]');
-    var monthPicker = document.getElementById('monthPicker');
-    var monthTrigger = document.getElementById('monthPickerTrigger');
-    var shellEl = document.querySelector('.calendar-shell');
-    var eventPanel = document.getElementById('eventPanel');
-    var eventPanelContent = document.getElementById('eventPanelContent');
-    var dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var calendarEl = document.getElementById('calendar');
+            var titleEl = document.getElementById('calendarTitle');
+            var viewButtons = document.querySelectorAll('[data-view]');
+            var actionButtons = document.querySelectorAll('[data-action]');
+            var monthPicker = document.getElementById('monthPicker');
+            var monthTrigger = document.getElementById('monthPickerTrigger');
+            var shellEl = document.querySelector('.calendar-shell');
+            var eventPanel = document.getElementById('eventPanel');
+            var eventPanelContent = document.getElementById('eventPanelContent');
+            var dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
-    function formatMonthValue(date) {
-        var month = String(date.getMonth() + 1).padStart(2, '0');
-        return date.getFullYear() + '-' + month;
-    }
+            function formatMonthValue(date) {
+                var month = String(date.getMonth() + 1).padStart(2, '0');
+                return date.getFullYear() + '-' + month;
+            }
 
-    function updateTitle() {
-        var date = calendar.getDate();
-        titleEl.textContent = dateFormatter.format(date);
-        monthPicker.value = formatMonthValue(date);
-    }
+            function updateTitle() {
+                var date = calendar.getDate();
+                titleEl.textContent = dateFormatter.format(date);
+                monthPicker.value = formatMonthValue(date);
+            }
 
-    function updateViewButtons() {
-        var currentView = calendar.view.type;
-        viewButtons.forEach(function(button) {
-            var isActive = button.dataset.view === currentView;
-            button.classList.toggle('is-active', isActive);
-            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        });
-    }
+            function updateViewButtons() {
+                var currentView = calendar.view.type;
+                viewButtons.forEach(function (button) {
+                    var isActive = button.dataset.view === currentView;
+                    button.classList.toggle('is-active', isActive);
+                    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+            }
 
-    function buildEmbedUrl(url) {
-        if (!url) {
-            return '';
-        }
-        if (url.indexOf('embed=1') !== -1) {
-            return url;
-        }
-        return url + (url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
-    }
+            function buildEmbedUrl(url) {
+                if (!url) {
+                    return '';
+                }
+                if (url.indexOf('embed=1') !== -1) {
+                    return url;
+                }
+                return url + (url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
+            }
 
-    function hideEventPanel() {
-        shellEl.classList.remove('is-event-view');
-        eventPanel.hidden = true;
-        eventPanelContent.innerHTML = '';
-    }
+            function hideEventPanel() {
+                shellEl.classList.remove('is-event-view');
+                eventPanel.hidden = true;
+                eventPanelContent.innerHTML = '';
+            }
 
-    function bindEventPanel() {
-        var backLinks = eventPanelContent.querySelectorAll('[data-calendar-back]');
-        backLinks.forEach(function(link) {
-            link.addEventListener('click', function(event) {
-                event.preventDefault();
-                hideEventPanel();
-            });
-        });
+            function bindEventPanel() {
+                var backLinks = eventPanelContent.querySelectorAll('[data-calendar-back]');
+                backLinks.forEach(function (link) {
+                    link.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        hideEventPanel();
+                    });
+                });
 
-        var embedForms = eventPanelContent.querySelectorAll('form[data-calendar-embed-form="1"]');
-        embedForms.forEach(function(form) {
-            form.addEventListener('submit', function(event) {
-                event.preventDefault();
-                var action = buildEmbedUrl(form.getAttribute('action') || '');
-                if (!action) {
+                var embedForms = eventPanelContent.querySelectorAll('form[data-calendar-embed-form="1"]');
+                embedForms.forEach(function (form) {
+                    form.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        var action = buildEmbedUrl(form.getAttribute('action') || '');
+                        if (!action) {
+                            return;
+                        }
+                        var formData = new FormData(form);
+                        fetch(action, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin'
+                        })
+                            .then(function (response) {
+                                return response.text();
+                            })
+                            .then(function (html) {
+                                eventPanelContent.innerHTML = html;
+                                bindEventPanel();
+                            })
+                            .catch(function () {
+                                eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to update this event right now.</div>';
+                            });
+                    });
+                });
+            }
+
+            function showEventPanel(url) {
+                var embedUrl = buildEmbedUrl(url);
+                if (!embedUrl) {
                     return;
                 }
-                var formData = new FormData(form);
-                fetch(action, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                })
-                    .then(function(response) {
+                eventPanelContent.innerHTML = '<div class="calendar-notice">Loading event...</div>';
+                eventPanel.hidden = false;
+                shellEl.classList.add('is-event-view');
+                fetch(embedUrl, { credentials: 'same-origin' })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Request failed');
+                        }
                         return response.text();
                     })
-                    .then(function(html) {
+                    .then(function (html) {
                         eventPanelContent.innerHTML = html;
                         bindEventPanel();
                     })
-                    .catch(function() {
-                        eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to update this event right now.</div>';
+                    .catch(function () {
+                        eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to load this event. <a href="' + url + '">Open in a new page</a>.</div>';
                     });
-            });
-        });
-    }
+            }
 
-    function showEventPanel(url) {
-        var embedUrl = buildEmbedUrl(url);
-        if (!embedUrl) {
-            return;
-        }
-        eventPanelContent.innerHTML = '<div class="calendar-notice">Loading event...</div>';
-        eventPanel.hidden = false;
-        shellEl.classList.add('is-event-view');
-        fetch(embedUrl, { credentials: 'same-origin' })
-            .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('Request failed');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: false,
+                firstDay: 1,
+                dayHeaderContent: function (arg) {
+                    return arg.text.charAt(0);
+                },
+                height: 700,
+                events: '<?php echo calendar_e($feedUrl); ?>',
+                datesSet: function () {
+                    updateTitle();
+                    updateViewButtons();
+                },
+                eventClick: function (info) {
+                    if (info.event.url) {
+                        info.jsEvent.preventDefault();
+                        showEventPanel(info.event.url);
+                    }
+                },
+                eventDidMount: function (info) {
+                    if (info.event.extendedProps.status === 'cancelled') {
+                        info.el.style.opacity = '0.6';
+                    }
                 }
-                return response.text();
-            })
-            .then(function(html) {
-                eventPanelContent.innerHTML = html;
-                bindEventPanel();
-            })
-            .catch(function() {
-                eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to load this event. <a href="' + url + '">Open in a new page</a>.</div>';
             });
-    }
+            calendar.render();
 
-    var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: false,
-        firstDay: 1,
-        dayHeaderContent: function(arg) {
-            return arg.text.charAt(0);
-        },
-        height: 700,
-        events: '<?php echo calendar_e($feedUrl); ?>',
-        datesSet: function() {
-            updateTitle();
-            updateViewButtons();
-        },
-        eventClick: function(info) {
-            if (info.event.url) {
-                info.jsEvent.preventDefault();
-                showEventPanel(info.event.url);
-            }
-        },
-        eventDidMount: function(info) {
-            if (info.event.extendedProps.status === 'cancelled') {
-                info.el.style.opacity = '0.6';
-            }
-        }
-    });
-    calendar.render();
+            actionButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var action = button.dataset.action;
+                    if (action === 'prev') {
+                        calendar.prev();
+                    } else if (action === 'next') {
+                        calendar.next();
+                    } else if (action === 'today') {
+                        calendar.today();
+                    }
+                });
+            });
 
-    actionButtons.forEach(function(button) {
-        button.addEventListener('click', function() {
-            var action = button.dataset.action;
-            if (action === 'prev') {
-                calendar.prev();
-            } else if (action === 'next') {
-                calendar.next();
-            } else if (action === 'today') {
-                calendar.today();
-            }
+            viewButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var view = button.dataset.view;
+                    if (view) {
+                        calendar.changeView(view);
+                    }
+                });
+            });
+
+            monthTrigger.addEventListener('click', function () {
+                if (monthPicker.showPicker) {
+                    monthPicker.showPicker();
+                } else {
+                    monthPicker.focus();
+                    monthPicker.click();
+                }
+            });
+
+            monthPicker.addEventListener('change', function () {
+                if (!monthPicker.value) {
+                    return;
+                }
+                var parts = monthPicker.value.split('-');
+                if (parts.length !== 2) {
+                    return;
+                }
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10);
+                if (Number.isNaN(year) || Number.isNaN(month)) {
+                    return;
+                }
+                calendar.gotoDate(new Date(year, month - 1, 1));
+            });
         });
-    });
-
-    viewButtons.forEach(function(button) {
-        button.addEventListener('click', function() {
-            var view = button.dataset.view;
-            if (view) {
-                calendar.changeView(view);
-            }
-        });
-    });
-
-    monthTrigger.addEventListener('click', function() {
-        if (monthPicker.showPicker) {
-            monthPicker.showPicker();
-        } else {
-            monthPicker.focus();
-            monthPicker.click();
-        }
-    });
-
-    monthPicker.addEventListener('change', function() {
-        if (!monthPicker.value) {
-            return;
-        }
-        var parts = monthPicker.value.split('-');
-        if (parts.length !== 2) {
-            return;
-        }
-        var year = parseInt(parts[0], 10);
-        var month = parseInt(parts[1], 10);
-        if (Number.isNaN(year) || Number.isNaN(month)) {
-            return;
-        }
-        calendar.gotoDate(new Date(year, month - 1, 1));
-    });
-});
-</script>
+    </script>
 </body>
+
 </html>

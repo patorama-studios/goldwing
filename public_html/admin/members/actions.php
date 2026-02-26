@@ -1173,13 +1173,20 @@ switch ($action) {
             $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, 1);
         }
 
-        $stmt = $pdo->prepare('UPDATE members SET membership_type_id = :membership_type_id, member_type = :member_type, status = :status, updated_at = NOW() WHERE id = :id');
-        $stmt->execute([
-            'membership_type_id' => $membershipTypeId,
+        $updateFields = 'member_type = :member_type, status = :status, updated_at = NOW()';
+        $updateParams = [
             'member_type' => $memberTypeCode,
             'status' => $memberStatus,
             'id' => $memberId,
-        ]);
+        ];
+
+        if (MemberRepository::hasMemberColumn($pdo, 'membership_type_id')) {
+            $updateFields = 'membership_type_id = :membership_type_id, ' . $updateFields;
+            $updateParams['membership_type_id'] = $membershipTypeId;
+        }
+
+        $stmt = $pdo->prepare('UPDATE members SET ' . $updateFields . ' WHERE id = :id');
+        $stmt->execute($updateParams);
 
         $term = $memberTypeCode === 'LIFE' ? 'LIFE' : '1Y';
         $paidAt = ($periodStatus === 'ACTIVE') ? date('Y-m-d H:i:s') : null;

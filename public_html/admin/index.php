@@ -1302,7 +1302,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
             <h2 class="font-display text-xl font-bold text-gray-900 mb-4">System Health</h2>
             <p class="text-sm text-gray-600">Last renewal reminder:
-              <?= e($settingMap['last_renewal_reminder_run'] ?? 'N/A') ?></p>
+              <?= e($settingMap['last_renewal_reminder_run'] ?? 'N/A') ?>
+            </p>
             <p class="text-sm text-gray-600">Last expiry job: <?= e($settingMap['last_expire_run'] ?? 'N/A') ?></p>
             <p class="text-sm text-gray-600">Last daily summary: <?= e($settingMap['last_daily_summary_run'] ?? 'N/A') ?>
             </p>
@@ -1979,7 +1980,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <option value="">Select state</option>
                       <?php foreach ($noticeStates as $state): ?>
                         <option value="<?= e($state['code']) ?>" <?= $noticeFormState === $state['code'] ? 'selected' : '' ?>>
-                          <?= e($state['label']) ?> (<?= e($state['code']) ?>)</option>
+                          <?= e($state['label']) ?> (<?= e($state['code']) ?>)
+                        </option>
                       <?php endforeach; ?>
                     </select>
                   </label>
@@ -1989,7 +1991,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <option value="">Select chapter</option>
                       <?php foreach ($noticeChapters as $chapter): ?>
                         <option value="<?= e((string) $chapter['id']) ?>">
-                          <?= e($chapter['name']) ?>    <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
+                          <?= e($chapter['name']) ?>
+                          <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -2084,7 +2087,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <div class="flex-1">
                           <p class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></p>
                           <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
-                            <?= e($notice['created_by_name'] ?? 'Member') ?></p>
+                            <?= e($notice['created_by_name'] ?? 'Member') ?>
+                          </p>
                         </div>
                         <span
                           class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
@@ -2136,7 +2140,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <div class="p-4 space-y-2">
                         <h4 class="text-base font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
                         <p class="text-xs text-gray-500">
-                          <?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></p>
+                          <?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?>
+                        </p>
                         <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
                       </div>
                     </article>
@@ -2162,7 +2167,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <div>
                         <h4 class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
                         <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> • Requested by
-                          <?= e($notice['created_by_name'] ?? 'Member') ?>      <?= !empty($notice['created_by_email']) ? ' (' . e($notice['created_by_email']) . ')' : '' ?>
+                          <?= e($notice['created_by_name'] ?? 'Member') ?>
+                          <?= !empty($notice['created_by_email']) ? ' (' . e($notice['created_by_email']) . ')' : '' ?>
                         </p>
                         <p class="text-xs text-gray-400 mt-1">Submitted <?= e(format_date_au($notice['created_at'])) ?></p>
                       </div>
@@ -2478,8 +2484,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $where = [];
         $params = [];
         if ($search !== '') {
-          $where[] = '(title LIKE :search OR path LIKE :search OR file_name LIKE :search)';
-          $params['search'] = '%' . $search . '%';
+          $where[] = '(title LIKE :search1 OR path LIKE :search2 OR file_name LIKE :search3)';
+          $searchTerm = '%' . $search . '%';
+          $params['search1'] = $searchTerm;
+          $params['search2'] = $searchTerm;
+          $params['search3'] = $searchTerm;
         }
         if ($typeFilter !== '') {
           if ($typeFilter === 'other') {
@@ -2737,7 +2746,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <option value="">All sources</option>
                         <?php foreach ($sourceContexts as $context): ?>
                           <option value="<?= e($context) ?>" <?= $contextFilter === $context ? 'selected' : '' ?>>
-                            <?= e(ucfirst($context)) ?></option>
+                            <?= e(ucfirst($context)) ?>
+                          </option>
                         <?php endforeach; ?>
                       </select>
                       <label
@@ -2831,7 +2841,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                             <?php endif; ?>
                             <div
                               class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">
-                              <?= e($typeLabel) ?></div>
+                              <?= e($typeLabel) ?>
+                            </div>
                             <?php if ($missing): ?>
                               <div
                                 class="absolute bottom-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-ember/15 text-ember border border-ember/30 rounded-full">

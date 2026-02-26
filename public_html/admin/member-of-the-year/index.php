@@ -63,15 +63,23 @@ if ($selectedStatus !== 'all') {
     $params['status'] = $selectedStatus;
 }
 if ($q !== '') {
-    $where[] = '(LOWER(nominator_first_name) LIKE :term
-        OR LOWER(nominator_last_name) LIKE :term
-        OR LOWER(CONCAT(nominator_first_name, " ", nominator_last_name)) LIKE :term
-        OR LOWER(nominator_email) LIKE :term
-        OR LOWER(nominee_first_name) LIKE :term
-        OR LOWER(nominee_last_name) LIKE :term
-        OR LOWER(CONCAT(nominee_first_name, " ", nominee_last_name)) LIKE :term
-        OR LOWER(nominee_chapter) LIKE :term)';
-    $params['term'] = '%' . strtolower($q) . '%';
+    $where[] = '(LOWER(nominator_first_name) LIKE :term1
+        OR LOWER(nominator_last_name) LIKE :term2
+        OR LOWER(CONCAT(nominator_first_name, " ", nominator_last_name)) LIKE :term3
+        OR LOWER(nominator_email) LIKE :term4
+        OR LOWER(nominee_first_name) LIKE :term5
+        OR LOWER(nominee_last_name) LIKE :term6
+        OR LOWER(CONCAT(nominee_first_name, " ", nominee_last_name)) LIKE :term7
+        OR LOWER(nominee_chapter) LIKE :term8)';
+    $searchTerm = '%' . strtolower($q) . '%';
+    $params['term1'] = $searchTerm;
+    $params['term2'] = $searchTerm;
+    $params['term3'] = $searchTerm;
+    $params['term4'] = $searchTerm;
+    $params['term5'] = $searchTerm;
+    $params['term6'] = $searchTerm;
+    $params['term7'] = $searchTerm;
+    $params['term8'] = $searchTerm;
 }
 
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -132,22 +140,25 @@ $activePage = 'member-of-year';
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 ?>
 <div class="flex h-screen overflow-hidden">
-  <?php require __DIR__ . '/../../../app/Views/partials/backend_admin_sidebar.php'; ?>
-  <main class="flex-1 overflow-y-auto bg-background-light relative">
-    <?php $topbarTitle = $pageTitle; require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <?php if (!$tableReady): ?>
-        <div class="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
-          Member of the Year nominations are not available yet. Run the migration in <code>database/migrations/2025_04_22_member_of_year.sql</code>.
-        </div>
-      <?php endif; ?>
-      <?php if ($flash): ?>
-        <div class="rounded-2xl border border-gray-200 bg-white p-4 text-sm <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
-          <?= e($flash['message']) ?>
-        </div>
-      <?php endif; ?>
+    <?php require __DIR__ . '/../../../app/Views/partials/backend_admin_sidebar.php'; ?>
+    <main class="flex-1 overflow-y-auto bg-background-light relative">
+        <?php $topbarTitle = $pageTitle;
+        require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+            <?php if (!$tableReady): ?>
+                <div class="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+                    Member of the Year nominations are not available yet. Run the migration in
+                    <code>database/migrations/2025_04_22_member_of_year.sql</code>.
+                </div>
+            <?php endif; ?>
+            <?php if ($flash): ?>
+                <div
+                    class="rounded-2xl border border-gray-200 bg-white p-4 text-sm <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
+                    <?= e($flash['message']) ?>
+                </div>
+            <?php endif; ?>
 
-      <?php require __DIR__ . '/../../../app/Views/admin/member_of_year/MemberOfYearAdminList.php'; ?>
-    </div>
-  </main>
+            <?php require __DIR__ . '/../../../app/Views/admin/member_of_year/MemberOfYearAdminList.php'; ?>
+        </div>
+    </main>
 </div>
