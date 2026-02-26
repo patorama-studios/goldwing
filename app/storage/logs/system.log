@@ -1,1 +1,15 @@
 [19-Jan-2026 20:39:40 Australia/Sydney] [Admin] Password reset failed for member #9: SQLSTATE[HY093]: Invalid parameter number
+[21-Feb-2026 17:29:36 Australia/Sydney] PHP Fatal error:  Uncaught Error: Call to undefined method App\Services\SettingsService::getStoreSettings() in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1
+[21-Feb-2026 17:57:48 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1052 Column 'user_id' in field list is ambiguous in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->query('SELECT user_id,...')
+#1 {main}
+  thrown in Command line code on line 1
+[22-Feb-2026 15:12:47 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'goldwing.activity_logs' doesn't exist in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->query('SELECT * FROM a...')
+#1 {main}
+  thrown in Command line code on line 1

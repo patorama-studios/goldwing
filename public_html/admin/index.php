@@ -1027,7 +1027,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'path' => $relativePath,
                 'file_type' => $mime,
                 'file_size' => (int) ($file['size'] ?? 0),
-                'type' => $_POST['media_type'] ?? 'file',
+                'type' => (($_POST['media_type'] ?? 'file') === 'file' && $mime === 'application/pdf') ? 'pdf' : ($_POST['media_type'] ?? 'file'),
                 'title' => trim($_POST['title'] ?? $safeName),
                 'tags' => trim($_POST['tags'] ?? ''),
                 'visibility' => $_POST['visibility'] ?? $defaultVisibility,
@@ -1150,7 +1150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isLatest) {
           $pdo->query('UPDATE wings_issues SET is_latest = 0');
         }
-        $stmt = $pdo->prepare('UPDATE wings_issues SET title = :title, published_at = :published_at, is_latest = :is_latest, updated_at = NOW() WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE wings_issues SET title = :title, published_at = :published_at, is_latest = :is_latest WHERE id = :id');
         $stmt->execute(['title' => $title, 'published_at' => $publishedAt, 'is_latest' => $isLatest, 'id' => $issueId]);
         $alerts[] = ['type' => 'success', 'message' => 'Wings issue updated.'];
       }

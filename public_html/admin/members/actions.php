@@ -1115,13 +1115,17 @@ switch ($action) {
         if (!$period) {
             redirectWithFlash($memberId, $tab, 'No membership period found.', 'error');
         }
-        $stmt = $pdo->prepare('UPDATE membership_periods SET end_date = :end_date WHERE id = :id');
-        $stmt->execute(['end_date' => $normalizedRenewal, 'id' => $period['id']]);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.renewal_updated', [
-            'from' => $period['end_date'] ?? null,
-            'to' => $normalizedRenewal,
-        ]);
-        redirectWithFlash($memberId, $tab, 'Renewal date updated.');
+        try {
+            $stmt = $pdo->prepare('UPDATE membership_periods SET end_date = :end_date WHERE id = :id');
+            $stmt->execute(['end_date' => $normalizedRenewal, 'id' => $period['id']]);
+            ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.renewal_updated', [
+                'from' => $period['end_date'] ?? null,
+                'to' => $normalizedRenewal,
+            ]);
+            redirectWithFlash($memberId, $tab, 'Renewal date updated.');
+        } catch (Throwable $e) {
+            redirectWithFlash($memberId, $tab, 'Error updating renewal date: ' . $e->getMessage(), 'error');
+        }
         break;
 
     case 'manual_membership_order':

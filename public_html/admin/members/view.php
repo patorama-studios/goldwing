@@ -650,7 +650,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </div>
                 <h1 class="text-4xl font-bold text-gray-900 font-display">
-                  <?= e($member['first_name'] . ' ' . $member['last_name']) ?></h1>
+                  <?= e($member['first_name'] . ' ' . $member['last_name']) ?>
+                </h1>
               </div>
               <div class="flex flex-wrap items-center gap-3 mt-6">
                 <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
@@ -724,7 +725,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <div>
                         <h2 class="text-lg font-bold text-gray-900">Contact Card</h2>
                         <p class="text-xs text-gray-500">Master record for
-                          <?= e($member['first_name'] . ' ' . $member['last_name']) ?></p>
+                          <?= e($member['first_name'] . ' ' . $member['last_name']) ?>
+                        </p>
                       </div>
                     </div>
                     <span class="text-xs text-gray-400">Last login:
@@ -742,13 +744,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Full Name</h4>
                             <p class="text-sm font-medium text-gray-900">
-                              <?= e($member['first_name'] . ' ' . $member['last_name']) ?></p>
+                              <?= e($member['first_name'] . ' ' . $member['last_name']) ?>
+                            </p>
                           </div>
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Address</h4>
                             <?php if ($addressLines): ?>
                               <p class="text-sm font-medium text-gray-900 leading-relaxed">
-                                <?= implode('<br>', array_map(fn($line) => e($line), $addressLines)) ?></p>
+                                <?= implode('<br>', array_map(fn($line) => e($line), $addressLines)) ?>
+                              </p>
                             <?php else: ?>
                               <p class="text-sm text-gray-500">No address on file</p>
                             <?php endif; ?>
@@ -809,7 +813,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                     class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
                                     <div>
                                       <p class="text-sm font-semibold text-gray-900">
-                                        <?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?></p>
+                                        <?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
+                                      </p>
                                       <p class="text-xs text-gray-500">
                                         <?= e(\App\Services\MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>
                                       </p>
@@ -842,7 +847,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
                               <div>
                                 <p class="text-sm font-semibold text-gray-900">
-                                  <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?></p>
+                                  <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
+                                </p>
                                 <p class="text-xs text-gray-500">
                                   <?= e(\App\Services\MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
                                 </p>
@@ -1321,38 +1327,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           </div>
                           <div class="mt-5 text-sm font-medium text-gray-700 mb-2">Assistance flags</div>
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="assist_ute" <?= $profileMember['assist_ute'] ? 'checked' : '' ?>
-                                <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Ute/truck/trailer
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="assist_phone" <?= $profileMember['assist_phone'] ? 'checked' : '' ?>     <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Accept phone calls
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="assist_bed" <?= $profileMember['assist_bed'] ? 'checked' : '' ?>
-                                <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Provide bed/tent space
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="assist_tools" <?= $profileMember['assist_tools'] ? 'checked' : '' ?>     <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Provide tools/workshop
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="exclude_printed" <?= $profileMember['exclude_printed'] ? 'checked' : '' ?>     <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Exclude from printed directory
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                              <input type="checkbox" name="exclude_electronic" <?= $profileMember['exclude_electronic'] ? 'checked' : '' ?>     <?= $canEditFullProfile ? '' : 'disabled' ?>
-                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                              Exclude from electronic directory
-                            </label>
+                            <?php foreach (\App\Services\MemberRepository::directoryPreferences() as $letter => $info): ?>
+                              <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                <input type="checkbox" name="directory_pref_<?= e($letter) ?>" value="1"
+                                  <?= !empty($profileMember[$info['column']] ?? null) ? 'checked' : '' ?>
+                                  <?= $canEditFullProfile ? '' : 'disabled' ?>
+                                  class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                                <span><?= e($letter) ?> — <?= e($info['label']) ?></span>
+                              </label>
+                            <?php endforeach; ?>
                           </div>
                         </div>
                       <?php endif; ?>
@@ -1410,7 +1393,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <?php elseif ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
                       <div class="rounded-lg border border-gray-100 bg-white px-3 py-3 text-sm text-gray-700">
                         <p class="font-medium text-gray-900">
-                          <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?></p>
+                          <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
+                        </p>
                         <p class="text-xs text-gray-500">
                           <?= e(\App\Services\MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
                         </p>
@@ -1559,8 +1543,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="hidden" name="roles_system_submitted" value="1">
                   <input type="hidden" name="roles_admin_submitted" value="1">
                   <?php if ($userId <= 0): ?>
-                    <div class="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">Member is not
-                      linked to a user account yet; link the user before changing roles.</div>
+                    <div class="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700 mb-3">
+                      <strong class="block mb-1">⚠️ Roles cannot be assigned yet</strong>
+                      Roles apply to user login accounts, not membership records. This member does not have a user account
+                      yet. Send them a migration/activation link first.
+                    </div>
                   <?php endif; ?>
                   <div class="space-y-4">
                     <div>
@@ -2088,7 +2075,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div>
                             <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Order details</p>
                             <p class="text-lg font-semibold text-gray-900">
-                              <?= e($selectedMembershipOrder['order_number'] ?? 'M-' . $selectedMembershipOrder['id']) ?></p>
+                              <?= e($selectedMembershipOrder['order_number'] ?? 'M-' . $selectedMembershipOrder['id']) ?>
+                            </p>
                           </div>
                           <a class="text-xs font-semibold text-gray-600 underline"
                             href="<?= e(buildTabUrl($memberId, 'orders', ['orders_section' => 'membership'])) ?>">Clear</a>
@@ -2123,7 +2111,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div class="mt-3">
                             <p class="text-xs text-gray-500">Internal notes</p>
                             <p class="text-sm text-gray-700 whitespace-pre-line">
-                              <?= e($selectedMembershipOrder['internal_notes']) ?></p>
+                              <?= e($selectedMembershipOrder['internal_notes']) ?>
+                            </p>
                           </div>
                         <?php endif; ?>
                         <?php if ($canManualFix): ?>
@@ -2202,7 +2191,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                   <?php endif; ?>
                                 </td>
                                 <td class="px-3 py-2 text-gray-600">
-                                  <?= e(formatCurrency((int) round(((float) ($order['total'] ?? 0)) * 100))) ?></td>
+                                  <?= e(formatCurrency((int) round(((float) ($order['total'] ?? 0)) * 100))) ?>
+                                </td>
                                 <td class="px-3 py-2 text-gray-600"><?= e($paymentMethodLabel) ?></td>
                                 <td class="px-3 py-2">
                                   <span
@@ -2450,9 +2440,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                   class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($order['order_status'] ?? '') ?>"><?= ucfirst($order['order_status'] ?? 'Unknown') ?></span>
                               </td>
                               <td class="px-3 py-2 text-gray-600">
-                                <?= e(ucwords(str_replace('_', ' ', (string) ($order['payment_status'] ?? 'unpaid')))) ?></td>
+                                <?= e(ucwords(str_replace('_', ' ', (string) ($order['payment_status'] ?? 'unpaid')))) ?>
+                              </td>
                               <td class="px-3 py-2 text-gray-600">
-                                <?= e(ucfirst((string) ($order['fulfillment_status'] ?? 'unfulfilled'))) ?></td>
+                                <?= e(ucfirst((string) ($order['fulfillment_status'] ?? 'unfulfilled'))) ?>
+                              </td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatCurrency($order['total_cents'] ?? 0)) ?></td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'])) ?></td>
                               <td class="px-3 py-2 text-gray-600">
@@ -2484,7 +2476,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <select name="order_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
                             <?php foreach ($orders as $order): ?>
                               <option value="<?= e($order['id']) ?>"><?= e($order['order_number'] ?? $order['id']) ?> -
-                                <?= ucfirst($order['status'] ?? 'Unknown') ?></option>
+                                <?= ucfirst($order['status'] ?? 'Unknown') ?>
+                              </option>
                             <?php endforeach; ?>
                           </select>
                         </label>
@@ -2591,7 +2584,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <?php foreach ($orders as $order): ?>
                           <?php $remaining = OrderRepository::calculateRefundableCents((int) $order['id']); ?>
                           <option value="<?= e($order['id']) ?>"><?= e($order['order_number'] ?? $order['id']) ?> —
-                            <?= e(formatCurrency($remaining)) ?> refundable</option>
+                            <?= e(formatCurrency($remaining)) ?> refundable
+                          </option>
                         <?php endforeach; ?>
                       </select>
                     </label>
@@ -2635,7 +2629,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <option value="">Any</option>
                       <?php foreach (['admin', 'member', 'system'] as $actor): ?>
                         <option value="<?= e($actor) ?>" <?= $activityActor === $actor ? 'selected' : '' ?>>
-                          <?= ucfirst($actor) ?></option>
+                          <?= ucfirst($actor) ?>
+                        </option>
                       <?php endforeach; ?>
                     </select>
                   </label>
@@ -2686,7 +2681,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <details class="mt-3">
                           <summary class="cursor-pointer text-xs font-semibold text-gray-600">View email body</summary>
                           <div class="mt-2 rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                            <?= $emailSnapshot['body'] ?? '' ?></div>
+                            <?= $emailSnapshot['body'] ?? '' ?>
+                          </div>
                         </details>
                         <?php if ($canResend && !empty($entry['id'])): ?>
                           <form method="post" action="/admin/members/actions.php" class="mt-3">
