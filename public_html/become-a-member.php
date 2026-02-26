@@ -9,7 +9,7 @@ $user = current_user();
 $stripeSettings = StripeSettingsService::getSettings();
 $prices = $stripeSettings['membership_prices'] ?? [];
 if (!is_array($prices)) {
-    $prices = [];
+  $prices = [];
 }
 $allowBoth = !empty($stripeSettings['membership_allow_both_types']);
 $defaultTerm = (string) ($stripeSettings['membership_default_term'] ?? '12M');
@@ -17,14 +17,14 @@ $show24 = !empty($prices['FULL_24']) || !empty($prices['ASSOCIATE_24']);
 
 $member = null;
 if (!empty($user['member_id'])) {
-    $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id');
-    $stmt->execute(['id' => $user['member_id']]);
-    $member = $stmt->fetch();
+  $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id');
+  $stmt->execute(['id' => $user['member_id']]);
+  $member = $stmt->fetch();
 }
 
 $primaryName = $user['name'] ?? '';
 if ($primaryName === '' && $member) {
-    $primaryName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+  $primaryName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
 }
 $nameParts = preg_split('/\s+/', trim((string) $primaryName));
 $firstDefault = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
@@ -41,7 +41,8 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <p>Choose your membership, add any associates, and pay securely with Stripe.</p>
     </div>
 
-    <form id="membership-form" class="form-card" data-allow-both="<?= $allowBoth ? '1' : '0' ?>" data-guest="<?= $user ? '0' : '1' ?>">
+    <form id="membership-form" class="form-card" data-allow-both="<?= $allowBoth ? '1' : '0' ?>"
+      data-guest="<?= $user ? '0' : '1' ?>">
       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
       <input type="hidden" name="full_vehicle_payload" value="[]">
       <input type="hidden" name="associate_vehicle_payload" value="[]">
@@ -105,21 +106,25 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         <div class="form-grid two">
           <label class="form-field">
             <span class="form-label">First name</span>
-            <input class="form-input" name="first_name" value="<?= e(trim((string) ($_POST['first_name'] ?? $firstDefault))) ?>">
+            <input class="form-input" name="first_name"
+              value="<?= e(trim((string) ($_POST['first_name'] ?? $firstDefault))) ?>">
           </label>
           <label class="form-field">
             <span class="form-label">Last name</span>
-            <input class="form-input" name="last_name" value="<?= e(trim((string) ($_POST['last_name'] ?? $lastDefault))) ?>">
+            <input class="form-input" name="last_name"
+              value="<?= e(trim((string) ($_POST['last_name'] ?? $lastDefault))) ?>">
           </label>
         </div>
         <div class="form-grid two">
           <label class="form-field">
             <span class="form-label">Email</span>
-            <input class="form-input" type="email" name="email" value="<?= e(trim((string) ($_POST['email'] ?? ($user['email'] ?? '')))) ?>">
+            <input class="form-input" type="email" name="email"
+              value="<?= e(trim((string) ($_POST['email'] ?? ($user['email'] ?? '')))) ?>">
           </label>
           <label class="form-field">
             <span class="form-label">Phone (optional)</span>
-            <input class="form-input" name="phone" value="<?= e(trim((string) ($_POST['phone'] ?? ($member['phone'] ?? '')))) ?>">
+            <input class="form-input" name="phone"
+              value="<?= e(trim((string) ($_POST['phone'] ?? ($member['phone'] ?? '')))) ?>">
           </label>
         </div>
 
@@ -137,38 +142,45 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         <div class="form-grid two">
           <label class="form-field">
             <span class="form-label">Address line 1</span>
-            <input class="form-input" name="address_line1" value="<?= e(trim((string) ($_POST['address_line1'] ?? ($member['address_line1'] ?? '')))) ?>">
+            <input class="form-input" name="address_line1"
+              value="<?= e(trim((string) ($_POST['address_line1'] ?? ($member['address_line1'] ?? '')))) ?>">
           </label>
           <label class="form-field">
             <span class="form-label">Address line 2</span>
-            <input class="form-input" name="address_line2" value="<?= e(trim((string) ($_POST['address_line2'] ?? ($member['address_line2'] ?? '')))) ?>">
+            <input class="form-input" name="address_line2"
+              value="<?= e(trim((string) ($_POST['address_line2'] ?? ($member['address_line2'] ?? '')))) ?>">
           </label>
         </div>
         <div class="form-grid two">
           <label class="form-field">
             <span class="form-label">City</span>
-            <input class="form-input" name="city" value="<?= e(trim((string) ($_POST['city'] ?? ($member['city'] ?? '')))) ?>">
+            <input class="form-input" name="city"
+              value="<?= e(trim((string) ($_POST['city'] ?? ($member['city'] ?? '')))) ?>">
           </label>
           <label class="form-field">
             <span class="form-label">State</span>
-            <input class="form-input" name="state" value="<?= e(trim((string) ($_POST['state'] ?? ($member['state'] ?? '')))) ?>">
+            <input class="form-input" name="state"
+              value="<?= e(trim((string) ($_POST['state'] ?? ($member['state'] ?? '')))) ?>">
           </label>
         </div>
         <div class="form-grid two">
           <label class="form-field">
             <span class="form-label">Postcode</span>
-            <input class="form-input" name="postal_code" value="<?= e(trim((string) ($_POST['postal_code'] ?? ($member['postal_code'] ?? '')))) ?>">
+            <input class="form-input" name="postal_code"
+              value="<?= e(trim((string) ($_POST['postal_code'] ?? ($member['postal_code'] ?? '')))) ?>">
           </label>
           <label class="form-field">
             <span class="form-label">Country</span>
-            <input class="form-input" name="country" value="<?= e(trim((string) ($_POST['country'] ?? ($member['country'] ?? 'Australia')))) ?>">
+            <input class="form-input" name="country"
+              value="<?= e(trim((string) ($_POST['country'] ?? ($member['country'] ?? 'Australia')))) ?>">
           </label>
         </div>
       </section>
 
       <section class="form-section">
         <h3>Primary bike details</h3>
-        <p class="form-helper">Add bikes, trikes, sidecars, or trailers. Rego fields are optional but recommended.</p>
+        <p class="form-helper">Add bikes, trikes, sidecars, or trailers. Rego (Registration Number) fields are optional
+          but recommended.</p>
         <div class="vehicle-list" data-vehicle-list="full"></div>
         <button class="form-button secondary" type="button" data-add-vehicle="full">Add another vehicle</button>
       </section>
@@ -231,7 +243,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         <input class="form-input" type="text" data-field="year">
       </label>
       <label class="form-field">
-        <span class="form-label">Rego</span>
+        <span class="form-label">Rego / Registration Number</span>
         <input class="form-input" type="text" data-field="rego" maxlength="20">
       </label>
       <label class="form-field">
@@ -251,7 +263,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     </div>
     <div class="form-grid two" data-conditional="sidecar" hidden>
       <label class="form-field">
-        <span class="form-label">Sidecar rego</span>
+        <span class="form-label">Sidecar rego / Registration Number</span>
         <input class="form-input" type="text" data-field="sidecar_rego" maxlength="20">
       </label>
       <label class="form-field">
@@ -261,7 +273,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     </div>
     <div class="form-grid two" data-conditional="trailer" hidden>
       <label class="form-field">
-        <span class="form-label">Trailer rego</span>
+        <span class="form-label">Trailer rego / Registration Number</span>
         <input class="form-input" type="text" data-field="trailer_rego" maxlength="20">
       </label>
       <label class="form-field">
