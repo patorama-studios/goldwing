@@ -1204,15 +1204,9 @@ if ($user && $user['member_id']) {
     }
 
     if ($fallenTableExists) {
-      $fallenSql = 'SELECT * FROM fallen_wings WHERE status = "APPROVED"';
-      $fallenParams = [];
-      if ($fallenFilterYear > 0) {
-        $fallenSql .= ' AND year_of_passing = :year';
-        $fallenParams['year'] = $fallenFilterYear;
-      }
-      $fallenSql .= ' ORDER BY full_name ASC';
+      $fallenSql = 'SELECT * FROM fallen_wings WHERE status = "APPROVED" ORDER BY full_name ASC';
       $stmt = $pdo->prepare($fallenSql);
-      $stmt->execute($fallenParams);
+      $stmt->execute();
       $fallenWings = $stmt->fetchAll();
 
       $stmt = $pdo->query('SELECT DISTINCT year_of_passing FROM fallen_wings WHERE status = "APPROVED" AND year_of_passing IS NOT NULL ORDER BY year_of_passing DESC');
@@ -2828,17 +2822,21 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <h2 class="font-display text-2xl font-bold text-gray-900">Fallen Wings</h2>
               <p class="text-sm text-gray-500">Remembering members who have taken their final ride.</p>
             </div>
-            <form method="get" class="flex items-center gap-2">
-              <input type="hidden" name="page" value="fallen-wings">
-              <select name="fallen_year" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                <option value="0">All years</option>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="relative">
+                <span
+                  class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                <input id="fallen-search"
+                  class="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white w-full md:w-auto"
+                  placeholder="Search members..." type="search">
+              </div>
+              <select id="fallen-year" class="py-2 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white">
+                <option value="all">All years</option>
                 <?php foreach ($fallenYears as $yearOption): ?>
-                  <option value="<?= e((string) $yearOption) ?>" <?= $fallenFilterYear === (int) $yearOption ? 'selected' : '' ?>><?= e((string) $yearOption) ?></option>
+                  <option value="<?= e((string) $yearOption) ?>"><?= e((string) $yearOption) ?></option>
                 <?php endforeach; ?>
               </select>
-              <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
-                type="submit">Filter</button>
-            </form>
+            </div>
           </div>
           <?php if ($fallenMessage): ?>
             <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($fallenMessage) ?></div>
@@ -2865,7 +2863,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <?php if ($fallenWings): ?>
                 <ul class="divide-y">
                   <?php foreach ($fallenWings as $entry): ?>
-                    <li class="py-4">
+                    <li class="py-4 fallen-wing-card" data-name="<?= e(strtolower($entry['full_name'] ?? '')) ?>"
+                      data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
                       <div class="flex items-center justify-between gap-4">
                         <div>
                           <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?></p>
@@ -2895,6 +2894,45 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </li>
                   <?php endforeach; ?>
                 </ul>
+                <p id="fallen-empty" class="hidden text-sm text-gray-500 mt-4">No memorial entries match those filters.</p>
+                <script>
+                  (() => {
+                    const searchInput = document.getElementById('fallen-search');
+                    const yearSelect = document.getElementById('fallen-year');
+                    const cards = document.querySelectorAll('.fallen-wing-card');
+                    const emptyState = document.getElementById('fallen-empty');
+
+                    if (!searchInput || !yearSelect || !cards.length) {
+                      return;
+                    }
+
+                    const applyFilters = () => {
+                      const term = searchInput.value.trim().toLowerCase();
+                      const yearValue = yearSelect.value;
+                      let visibleCount = 0;
+
+                      cards.forEach((card) => {
+                        const name = card.dataset.name || '';
+                        const cardYear = card.dataset.year || '';
+                        const matchesTerm = term === '' || name.includes(term);
+                        const matchesYear = yearValue === 'all' || cardYear === yearValue;
+                        const isVisible = matchesTerm && matchesYear;
+
+                        card.classList.toggle('hidden', !isVisible);
+                        if (isVisible) {
+                          visibleCount += 1;
+                        }
+                      });
+
+                      if (emptyState) {
+                        emptyState.classList.toggle('hidden', visibleCount !== 0);
+                      }
+                    };
+
+                    searchInput.addEventListener('input', applyFilters);
+                    yearSelect.addEventListener('change', applyFilters);
+                  })();
+                </script>
               <?php else: ?>
                 <p class="text-sm text-gray-500">No memorial entries found.</p>
               <?php endif; ?>

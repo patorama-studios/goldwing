@@ -1,75 +1,78 @@
 <?php
 $mainSiteUrl = \App\Services\BaseUrlService::configuredBaseUrl();
 if ($mainSiteUrl === '') {
-    $mainSiteUrl = '/';
+  $mainSiteUrl = '/';
 }
 $items = [
-    ['key' => 'main-site', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
-    ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
-    ['key' => 'wings', 'label' => 'Wings', 'icon' => 'flight_takeoff', 'href' => '/member/index.php?page=wings'],
-    ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
-    [
-        'key' => 'notices',
-        'label' => 'Notice Board',
-        'icon' => 'campaign',
-        'children' => [
-            ['key' => 'notices-view', 'label' => 'View Notices', 'href' => '/member/index.php?page=notices-view'],
-            ['key' => 'notices-create', 'label' => 'Create Notice', 'href' => '/member/index.php?page=notices-create'],
-        ],
+  ['key' => 'main-site', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
+  ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
+  ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/member/index.php?page=wings'],
+  ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
+  [
+    'key' => 'notices',
+    'label' => 'Notice Board',
+    'icon' => 'campaign',
+    'children' => [
+      ['key' => 'notices-view', 'label' => 'View Notices', 'href' => '/member/index.php?page=notices-view'],
+      ['key' => 'notices-create', 'label' => 'Create Notice', 'href' => '/member/index.php?page=notices-create'],
     ],
-    ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
-    ['key' => 'member-of-the-year', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
-    ['key' => 'profile', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
-    ['key' => 'settings', 'label' => 'Settings', 'icon' => 'tune', 'href' => '/member/index.php?page=settings'],
-    ['key' => 'billing', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],
-    ['key' => 'history', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
+  ],
+  ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
+  ['key' => 'member-of-the-year', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
+  ['key' => 'profile', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
+  ['key' => 'settings', 'label' => 'Settings', 'icon' => 'tune', 'href' => '/member/index.php?page=settings'],
+  ['key' => 'billing', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],
+  ['key' => 'history', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
 ];
 $user = $user ?? current_user();
 $impersonation = function_exists('impersonation_context') ? impersonation_context() : null;
 $impersonationName = '';
 if ($impersonation) {
-    if (!empty($member) && is_array($member)) {
-        $impersonationName = trim((string) ($member['first_name'] ?? '') . ' ' . (string) ($member['last_name'] ?? ''));
-    }
-    if ($impersonationName === '') {
-        $impersonationName = trim((string) ($user['name'] ?? 'Member'));
-    }
-    if ($impersonationName === '') {
-        $impersonationName = 'Member';
-    }
+  if (!empty($member) && is_array($member)) {
+    $impersonationName = trim((string) ($member['first_name'] ?? '') . ' ' . (string) ($member['last_name'] ?? ''));
+  }
+  if ($impersonationName === '') {
+    $impersonationName = trim((string) ($user['name'] ?? 'Member'));
+  }
+  if ($impersonationName === '') {
+    $impersonationName = 'Member';
+  }
 }
 if (function_exists('can_access_path')) {
-    foreach ($items as &$item) {
-        if (!empty($item['children'])) {
-            $item['children'] = array_values(array_filter($item['children'], function ($child) use ($user) {
-                return !empty($child['href']) && can_access_path($user, $child['href']);
-            }));
-        }
+  foreach ($items as &$item) {
+    if (!empty($item['children'])) {
+      $item['children'] = array_values(array_filter($item['children'], function ($child) use ($user) {
+        return !empty($child['href']) && can_access_path($user, $child['href']);
+      }));
     }
-    unset($item);
-    $items = array_values(array_filter($items, function ($item) use ($user) {
-        if (!empty($item['href'])) {
-            return can_access_path($user, $item['href']);
-        }
-        if (!empty($item['children'])) {
-            return !empty($item['children']);
-        }
-        return false;
-    }));
+  }
+  unset($item);
+  $items = array_values(array_filter($items, function ($item) use ($user) {
+    if (!empty($item['href'])) {
+      return can_access_path($user, $item['href']);
+    }
+    if (!empty($item['children'])) {
+      return !empty($item['children']);
+    }
+    return false;
+  }));
 }
 $activePage = $activePage ?? 'dashboard';
 $activeSubPage = $activeSubPage ?? $activePage;
 $memberNumber = '';
 if (!empty($member)) {
-    $memberNumber = App\Services\MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix']);
+  $memberNumber = App\Services\MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix']);
 }
 ?>
-<aside class="w-64 flex flex-col bg-card-light border-r border-gray-200 shadow-sm z-40 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-200 ease-out md:translate-x-0 md:static md:flex" data-backend-sidebar aria-hidden="true">
+<aside
+  class="w-64 flex flex-col bg-card-light border-r border-gray-200 shadow-sm z-40 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-200 ease-out md:translate-x-0 md:static md:flex"
+  data-backend-sidebar aria-hidden="true">
   <?php if ($impersonation): ?>
     <div class="hidden md:block border-b border-amber-200 bg-amber-50 px-4 py-3">
       <form method="post" action="/member/impersonation_stop.php">
         <input type="hidden" name="csrf_token" value="<?= e(\App\Services\Csrf::token()) ?>">
-        <button class="inline-flex items-center gap-2 text-xs font-semibold text-amber-800 hover:text-amber-900" type="submit">
+        <button class="inline-flex items-center gap-2 text-xs font-semibold text-amber-800 hover:text-amber-900"
+          type="submit">
           &larr; Back to Admin
         </button>
       </form>
@@ -90,7 +93,8 @@ if (!empty($member)) {
       <?php if (!empty($item['children'])): ?>
         <?php $isActive = $activePage === $item['key']; ?>
         <details class="group" <?= $isActive ? 'open' : '' ?>>
-          <summary class="flex items-center justify-between gap-3 px-4 py-3 text-sm font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
+          <summary
+            class="flex items-center justify-between gap-3 px-4 py-3 text-sm font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
             <span class="flex items-center gap-3">
               <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
               <?= e($item['label']) ?>
@@ -100,7 +104,8 @@ if (!empty($member)) {
           <div class="ml-10 mt-2 space-y-1">
             <?php foreach ($item['children'] as $child): ?>
               <?php $isChildActive = $activeSubPage === $child['key']; ?>
-              <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($child['href']) ?>">
+              <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
+                href="<?= e($child['href']) ?>">
                 <span class="material-icons-outlined text-base">chevron_right</span>
                 <?= e($child['label']) ?>
               </a>
@@ -109,7 +114,8 @@ if (!empty($member)) {
         </details>
       <?php else: ?>
         <?php $isActive = $activePage === $item['key']; ?>
-        <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
+        <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
+          href="<?= e($item['href']) ?>">
           <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
           <?= e($item['label']) ?>
         </a>
@@ -130,7 +136,8 @@ if (!empty($member)) {
         <p class="text-xs text-gray-500 truncate">ID: <?= e($memberNumber) ?></p>
       </div>
     </div>
-    <a class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" href="/logout.php">
+    <a class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+      href="/logout.php">
       <span class="material-icons-outlined text-lg">logout</span>
       Logout
     </a>
