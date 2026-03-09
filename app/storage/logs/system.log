@@ -13,3 +13,13 @@ Stack trace:
 #0 Command line code(1): PDO->query('SELECT * FROM a...')
 #1 {main}
   thrown in Command line code on line 1
+[09-Mar-2026 19:47:28 Australia/Sydney] PHP Warning:  Undefined variable $pdo in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php on line 4
+[09-Mar-2026 19:47:28 Australia/Sydney] PHP Fatal error:  Uncaught Error: Call to a member function exec() on null in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php:4
+Stack trace:
+#0 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php on line 4
+[09-Mar-2026 19:47:58 Australia/Sydney] PHP Warning:  require_once(/Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/../../app/config/database.php): Failed to open stream: No such file or directory in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php on line 6
+[09-Mar-2026 19:47:58 Australia/Sydney] PHP Fatal error:  Uncaught Error: Failed opening required '/Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/../../app/config/database.php' (include_path='.:/opt/homebrew/Cellar/php/8.5.1_2/share/php/pear') in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php:6
+Stack trace:
+#0 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php on line 6

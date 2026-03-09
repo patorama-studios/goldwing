@@ -3246,8 +3246,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
               </svg>
-              <input type="text" placeholder="Search issues, dates, or keywords..."
-                class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-200 focus:ring-0 outline-none transition-colors hidden sm:block">
+              <input type="text" id="wings-admin-search" placeholder="Search issues..."
+                class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all">
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
               <button onclick="document.getElementById('new-wings-issue').showModal()"
@@ -3382,7 +3382,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     maintenance guides, and community stories.
                   </p>
 
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
                       <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Status</span>
                       <div class="flex items-center gap-1.5 font-semibold text-[#00BFA6]">
@@ -3396,16 +3396,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <?= date('F d, Y', strtotime($latestIssue['published_at'])) ?>
                       </div>
                     </div>
-                    <!-- Mock Data for look -->
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
                       <span
                         class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Downloads</span>
-                      <div class="font-semibold text-gray-900">12,482</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                      <span
-                        class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Subscribers</span>
-                      <div class="font-semibold text-gray-900">45,000+</div>
+                      <div class="font-semibold text-gray-900"><?= number_format((int) ($latestIssue['downloads'] ?? 0)) ?>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3421,26 +3416,24 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="space-y-6 pt-4">
             <div class="flex items-center justify-between">
               <h2 class="text-2xl font-bold font-display text-gray-900">Issue Archive</h2>
-              <div class="flex items-center gap-2">
-                <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg
-                    class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
-                    </path>
-                  </svg></button>
-                <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg
-                    class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
-                  </svg></button>
+              <div class="flex items-center gap-3">
+                <select id="wings-admin-sort"
+                  class="text-sm bg-gray-50 border border-gray-200 text-gray-700 rounded-lg py-1.5 pl-3 pr-8 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="title-asc">Title (A-Z)</option>
+                  <option value="title-desc">Title (Z-A)</option>
+                </select>
               </div>
             </div>
 
             <?php if (!empty($archiveIssues)): ?>
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <div id="wings-archive-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 <?php foreach ($archiveIssues as $issue): ?>
                   <div
-                    class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group relative">
+                    class="wings-admin-card bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group relative"
+                    data-title="<?= e(strtolower($issue['title'])) ?>"
+                    data-date="<?= strtotime($issue['published_at'] ?? '0') ?>">
                     <!-- Cover Image -->
                     <div class="aspect-[3/4] bg-gray-100 relative overflow-hidden">
                       <?php if (!empty($issue['cover_image_url'])): ?>
@@ -3491,7 +3484,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </div>
                     </div>
                     <!-- Info -->
-                    <div class="p-5 flex-grow flex flex-col justify-center">
+                    <div class="p-5 flex-grow flex flex-col justify-center relative">
                       <span
                         class="text-[10px] font-bold text-[#EB5E28] tracking-widest uppercase mb-1.5"><?= date('M Y', strtotime($issue['published_at'])) ?></span>
                       <h4 class="font-bold text-gray-900 text-[15px] leading-snug line-clamp-1 mb-1"
@@ -3499,10 +3492,69 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <p class="text-xs text-gray-500 italic">Published
                         <?= date('M jS, Y', strtotime($issue['published_at'])) ?>
                       </p>
+
+                      <div
+                        class="absolute bottom-5 right-5 flex items-center gap-1 text-[11px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md border border-gray-100"
+                        title="Downloads">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        <?= number_format((int) ($issue['downloads'] ?? 0)) ?>
+                      </div>
                     </div>
                   </div>
                 <?php endforeach; ?>
               </div>
+              <p id="wings-admin-empty" class="hidden py-12 text-center text-gray-500 font-medium text-sm">No issues match
+                your search.</p>
+              <script>
+                (() => {
+                  const searchInput = document.getElementById('wings-admin-search');
+                  const sortSelect = document.getElementById('wings-admin-sort');
+                  const grid = document.getElementById('wings-archive-grid');
+                  const emptyState = document.getElementById('wings-admin-empty');
+
+                  if (!searchInput || !sortSelect || !grid || !emptyState) return;
+
+                  const applyFiltersAndSort = () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    const sortVal = sortSelect.value;
+                    const cards = Array.from(grid.querySelectorAll('.wings-admin-card'));
+                    let visibleCount = 0;
+
+                    // Filter
+                    cards.forEach(card => {
+                      const title = card.dataset.title || '';
+                      const isVisible = term === '' || title.includes(term);
+                      card.style.display = isVisible ? '' : 'none';
+                      if (isVisible) visibleCount++;
+                    });
+
+                    emptyState.classList.toggle('hidden', visibleCount !== 0);
+
+                    // Sort
+                    const visibleCards = cards.filter(c => c.style.display !== 'none');
+                    visibleCards.sort((a, b) => {
+                      if (sortVal === 'date-desc' || sortVal === 'date-asc') {
+                        const dateA = parseInt(a.dataset.date, 10) || 0;
+                        const dateB = parseInt(b.dataset.date, 10) || 0;
+                        return sortVal === 'date-desc' ? dateB - dateA : dateA - dateB;
+                      } else {
+                        const titleA = a.dataset.title;
+                        const titleB = b.dataset.title;
+                        return sortVal === 'title-asc' ? titleA.localeCompare(titleB) : titleB.localeCompare(titleA);
+                      }
+                    });
+
+                    // Re-append to preserve DOM layout
+                    visibleCards.forEach(card => grid.appendChild(card));
+                  };
+
+                  searchInput.addEventListener('input', applyFiltersAndSort);
+                  sortSelect.addEventListener('change', applyFiltersAndSort);
+                })();
+              </script>
             <?php else: ?>
               <div class="py-12 text-center border-2 border-dashed border-gray-200 rounded-2xl">
                 <p class="text-gray-500 font-medium text-sm">No older issues in the archive.</p>

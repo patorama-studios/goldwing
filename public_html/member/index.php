@@ -1246,2043 +1246,2046 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <?php if ($page === 'dashboard'): ?>
-            <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-              <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                <span class="material-icons-outlined text-9xl text-primary transform rotate-12">verified</span>
+        <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+          <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <span class="material-icons-outlined text-9xl text-primary transform rotate-12">verified</span>
+          </div>
+          <div class="relative z-10">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                  <?php
+                  $welcomeName = trim((string) ($member['first_name'] ?? ''));
+                  if ($welcomeName === '') {
+                    $displayName = trim((string) ($user['name'] ?? ''));
+                    if ($displayName === '' || strcasecmp($displayName, 'member') === 0) {
+                      $displayName = trim((string) ($member['last_name'] ?? ''));
+                    }
+                    $welcomeName = $displayName !== '' ? $displayName : 'there';
+                  }
+                  ?>
+                  Welcome back, <span class="text-primary"><?= e($welcomeName) ?></span>
+                </h1>
+                <p class="text-gray-500">Manage your membership, view events, and stay updated.</p>
               </div>
-              <div class="relative z-10">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                  <div>
-                    <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                      <?php
-                      $welcomeName = trim((string) ($member['first_name'] ?? ''));
-                      if ($welcomeName === '') {
-                        $displayName = trim((string) ($user['name'] ?? ''));
-                        if ($displayName === '' || strcasecmp($displayName, 'member') === 0) {
-                          $displayName = trim((string) ($member['last_name'] ?? ''));
-                        }
-                        $welcomeName = $displayName !== '' ? $displayName : 'there';
-                      }
-                      ?>
-                      Welcome back, <span class="text-primary"><?= e($welcomeName) ?></span>
-                    </h1>
-                    <p class="text-gray-500">Manage your membership, view events, and stay updated.</p>
-                  </div>
-                  <span
-                    class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-gray-900 shadow-sm self-start md:self-center">
-                    <?= e($member['member_type'] ?? 'Member') ?> Member
-                  </span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
-                  <div>
-                    <p class="text-sm text-gray-500 mb-1">Membership #</p>
-                    <p class="text-lg font-semibold text-gray-900">
-                      <?= $member ? e(MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix'])) : 'N/A' ?>
-                    </p>
-                  </div>
-                  <div>
-                    <p class="text-sm text-gray-500 mb-1">Status</p>
-                    <div class="flex items-center gap-2">
-                      <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                      <p class="text-lg font-semibold text-gray-900"><?= e($member['status'] ?? 'N/A') ?></p>
-                    </div>
-                  </div>
-                  <div>
-                    <p class="text-sm text-gray-500 mb-1">Expiry Date</p>
-                    <p class="text-lg font-semibold text-gray-900">
-                      <?= ($member && $member['member_type'] === 'LIFE') ? 'No expiry' : e($membershipPeriod['end_date'] ?? 'N/A') ?>
-                    </p>
-                  </div>
+              <span
+                class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-gray-900 shadow-sm self-start md:self-center">
+                <?= e($member['member_type'] ?? 'Member') ?> Member
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
+              <div>
+                <p class="text-sm text-gray-500 mb-1">Membership #</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <?= $member ? e(MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix'])) : 'N/A' ?>
+                </p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500 mb-1">Status</p>
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                  <p class="text-lg font-semibold text-gray-900"><?= e($member['status'] ?? 'N/A') ?></p>
                 </div>
               </div>
-            </section>
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-green-100 rounded-lg text-green-600">
-                    <span class="material-icons-outlined">bolt</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Quick Actions</h2>
-                </div>
-                <div class="space-y-3 flex-1">
-                  <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                    href="/member/index.php?page=profile">
-                    <span class="font-medium text-gray-700 group-hover:text-green-700">Edit membership details</span>
-                    <span
-                      class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-                  </a>
-                  <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                    href="/member/index.php?page=billing">
-                    <span class="font-medium text-gray-700 group-hover:text-green-700">Billing & payments</span>
-                    <span
-                      class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-                  </a>
-                  <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                    href="/member/index.php?page=history">
-                    <span class="font-medium text-gray-700 group-hover:text-green-700">Membership history</span>
-                    <span
-                      class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-                  </a>
-                  <?php if ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
-                        <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
-                          href="/member/index.php?page=billing">
-                          <span class="font-medium">Complete payment</span>
-                          <span class="material-icons-outlined text-sm">payments</span>
-                        </a>
-                  <?php elseif ($membershipPeriod && $membershipPeriod['end_date'] && strtotime($membershipPeriod['end_date']) <= strtotime('+60 days')): ?>
-                        <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
-                          href="/member/index.php?page=billing">
-                          <span class="font-medium">Renew now</span>
-                          <span class="material-icons-outlined text-sm">payments</span>
-                        </a>
-                  <?php endif; ?>
-                </div>
+              <div>
+                <p class="text-sm text-gray-500 mb-1">Expiry Date</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <?= ($member && $member['member_type'] === 'LIFE') ? 'No expiry' : e($membershipPeriod['end_date'] ?? 'N/A') ?>
+                </p>
               </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
-                    <span class="material-icons-outlined">group</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Associates</h2>
-                </div>
-                <div class="bg-gray-50 rounded-xl p-4 flex-1">
-                  <?php if ($associates): ?>
-                        <ul class="space-y-4">
-                          <?php foreach ($associates as $assoc): ?>
-                                <li class="flex items-start gap-3">
-                                  <span class="w-2 h-2 mt-2 rounded-full bg-blue-500"></span>
-                                  <div>
-                                    <p class="text-sm font-medium text-gray-900">
-                                      <?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
-                                      (<?= e(MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>)
-                                    </p>
-                                    <span
-                                      class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded"><?= e($assoc['status']) ?></span>
-                                  </div>
-                                </li>
-                          <?php endforeach; ?>
-                        </ul>
-                  <?php elseif ($fullMember): ?>
-                        <p class="text-sm text-gray-600">Linked Full member:</p>
-                        <p class="text-base font-semibold text-gray-900">
-                          <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
-                        </p>
-                        <p class="text-sm text-gray-500">Member #:
-                          <?= e(MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
-                        </p>
-                        <p class="text-sm text-gray-500">Status: <?= e($fullMember['status']) ?></p>
-                  <?php else: ?>
-                        <p class="text-sm text-gray-500">No associates linked.</p>
-                  <?php endif; ?>
-                </div>
+            </div>
+          </div>
+        </section>
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-green-100 rounded-lg text-green-600">
+                <span class="material-icons-outlined">bolt</span>
               </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                    <span class="material-icons-outlined">receipt_long</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Billing Summary</h2>
-                </div>
-                <div class="space-y-4 flex-1">
-                  <div>
-                    <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Last Payment</p>
-                    <p class="text-gray-900 font-medium mt-1"><?= e($membershipPeriod['paid_at'] ?? 'N/A') ?></p>
-                  </div>
-                  <div>
-                    <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Status</p>
-                    <p class="text-green-600 font-medium mt-1 flex items-center gap-1">
-                      <span class="material-icons-outlined text-sm">check_circle</span>
-                      <?= e($membershipPeriod['status'] ?? 'N/A') ?>
-                    </p>
-                  </div>
-                </div>
-                <a class="mt-6 w-full py-2.5 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary hover:text-white transition-all font-medium text-sm"
+              <h2 class="font-display text-xl font-bold text-gray-900">Quick Actions</h2>
+            </div>
+            <div class="space-y-3 flex-1">
+              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+                href="/member/index.php?page=profile">
+                <span class="font-medium text-gray-700 group-hover:text-green-700">Edit membership details</span>
+                <span
+                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+                href="/member/index.php?page=billing">
+                <span class="font-medium text-gray-700 group-hover:text-green-700">Billing & payments</span>
+                <span
+                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+                href="/member/index.php?page=history">
+                <span class="font-medium text-gray-700 group-hover:text-green-700">Membership history</span>
+                <span
+                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <?php if ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
+                <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
                   href="/member/index.php?page=billing">
-                  Update payment method
+                  <span class="font-medium">Complete payment</span>
+                  <span class="material-icons-outlined text-sm">payments</span>
                 </a>
+              <?php elseif ($membershipPeriod && $membershipPeriod['end_date'] && strtotime($membershipPeriod['end_date']) <= strtotime('+60 days')): ?>
+                <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
+                  href="/member/index.php?page=billing">
+                  <span class="font-medium">Renew now</span>
+                  <span class="material-icons-outlined text-sm">payments</span>
+                </a>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
+                <span class="material-icons-outlined">group</span>
               </div>
-            </section>
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
-                    <span class="material-icons-outlined">badge</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Snapshot</h2>
-                </div>
-                <?php if ($member): ?>
-                      <div class="space-y-3 text-sm">
-                        <div class="flex flex-col pb-3 border-b border-gray-100">
-                          <span class="text-gray-500 text-xs uppercase">Email</span>
-                          <span class="font-medium text-gray-900 truncate"><?= e($member['email']) ?></span>
-                        </div>
-                        <div class="flex flex-col pb-3 border-b border-gray-100">
-                          <span class="text-gray-500 text-xs uppercase">Phone</span>
-                          <span class="font-medium text-gray-900 truncate"><?= e($member['phone'] ?? 'N/A') ?></span>
-                        </div>
-                        <div class="flex flex-col pb-3 border-b border-gray-100">
-                          <span class="text-gray-500 text-xs uppercase">Chapter</span>
-                          <span class="font-medium text-gray-900"><?= e($member['chapter_name'] ?? 'Unassigned') ?></span>
-                        </div>
-                        <div class="flex flex-col pb-3 border-b border-gray-100">
-                          <span class="text-gray-500 text-xs uppercase">Wings</span>
-                          <span class="font-medium text-gray-900"><?= e($member['wings_preference']) ?></span>
-                        </div>
-                        <div class="flex flex-col">
-                          <span class="text-gray-500 text-xs uppercase">Directory</span>
-                          <span class="font-medium text-gray-900"><?= e($member['privacy_level']) ?></span>
-                        </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Associates</h2>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 flex-1">
+              <?php if ($associates): ?>
+                <ul class="space-y-4">
+                  <?php foreach ($associates as $assoc): ?>
+                    <li class="flex items-start gap-3">
+                      <span class="w-2 h-2 mt-2 rounded-full bg-blue-500"></span>
+                      <div>
+                        <p class="text-sm font-medium text-gray-900">
+                          <?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
+                          (<?= e(MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>)
+                        </p>
+                        <span
+                          class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded"><?= e($assoc['status']) ?></span>
                       </div>
-                      <a class="mt-6 inline-flex items-center text-sm font-semibold text-secondary"
-                        href="/member/index.php?page=profile">
-                        Edit profile
-                        <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
-                      </a>
-                <?php endif; ?>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php elseif ($fullMember): ?>
+                <p class="text-sm text-gray-600">Linked Full member:</p>
+                <p class="text-base font-semibold text-gray-900">
+                  <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
+                </p>
+                <p class="text-sm text-gray-500">Member #:
+                  <?= e(MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
+                </p>
+                <p class="text-sm text-gray-500">Status: <?= e($fullMember['status']) ?></p>
+              <?php else: ?>
+                <p class="text-sm text-gray-500">No associates linked.</p>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
+                <span class="material-icons-outlined">receipt_long</span>
               </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                    <span class="material-icons-outlined">import_contacts</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Wings Magazine</h2>
+              <h2 class="font-display text-xl font-bold text-gray-900">Billing Summary</h2>
+            </div>
+            <div class="space-y-4 flex-1">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Last Payment</p>
+                <p class="text-gray-900 font-medium mt-1"><?= e($membershipPeriod['paid_at'] ?? 'N/A') ?></p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Status</p>
+                <p class="text-green-600 font-medium mt-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-sm">check_circle</span>
+                  <?= e($membershipPeriod['status'] ?? 'N/A') ?>
+                </p>
+              </div>
+            </div>
+            <a class="mt-6 w-full py-2.5 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary hover:text-white transition-all font-medium text-sm"
+              href="/member/index.php?page=billing">
+              Update payment method
+            </a>
+          </div>
+        </section>
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
+                <span class="material-icons-outlined">badge</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Snapshot</h2>
+            </div>
+            <?php if ($member): ?>
+              <div class="space-y-3 text-sm">
+                <div class="flex flex-col pb-3 border-b border-gray-100">
+                  <span class="text-gray-500 text-xs uppercase">Email</span>
+                  <span class="font-medium text-gray-900 truncate"><?= e($member['email']) ?></span>
                 </div>
-                <?php if ($wingsLatest): ?>
-                      <div class="flex items-start gap-4">
-                        <div class="w-24 aspect-[3/4] rounded-lg border border-gray-100 bg-white shadow-sm overflow-hidden">
-                          <?php if (!empty($wingsLatest['cover_image_url'])): ?>
-                                <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>"
-                                  class="h-full w-full object-cover">
-                          <?php else: ?>
-                                <div class="h-full w-full flex items-center justify-center bg-gray-50 text-gray-300">
-                                  <span class="material-icons-outlined text-3xl">auto_stories</span>
-                                </div>
-                          <?php endif; ?>
-                        </div>
-                        <div class="flex-1">
-                          <p class="text-sm text-gray-500">Latest issue</p>
-                          <p class="text-lg font-semibold text-gray-900"><?= e($wingsLatest['title']) ?></p>
-                          <div class="mt-3 flex flex-wrap gap-2">
-                            <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                              href="<?= e($wingsLatest['pdf_url']) ?>" target="_blank" rel="noopener">Read Now</a>
-                            <a class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
-                              href="/member/index.php?page=wings">Archive</a>
-                          </div>
-                        </div>
-                      </div>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No issues uploaded yet.</p>
-                <?php endif; ?>
-              </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
-                    <span class="material-icons-outlined">event</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Upcoming Events</h2>
+                <div class="flex flex-col pb-3 border-b border-gray-100">
+                  <span class="text-gray-500 text-xs uppercase">Phone</span>
+                  <span class="font-medium text-gray-900 truncate"><?= e($member['phone'] ?? 'N/A') ?></span>
                 </div>
-                <?php if ($upcomingEvents): ?>
-                      <ul class="space-y-3">
-                        <?php foreach ($upcomingEvents as $event): ?>
-                              <li>
-                                <a class="flex items-center justify-between gap-3 rounded-xl border border-transparent hover:border-teal-200 hover:bg-teal-50 px-2 py-2 transition"
-                                  href="<?= e($event['url']) ?>">
-                                  <div>
-                                    <p class="text-sm font-medium text-gray-900"><?= e($event['title']) ?></p>
-                                    <p class="text-xs text-gray-500">
-                                      <?= e($event['date_label']) ?>
-                                      <?php if (!empty($event['location'])): ?>
-                                            • <?= e($event['location']) ?>
-                                      <?php endif; ?>
-                                    </p>
-                                  </div>
-                                  <span class="material-icons-outlined text-gray-400">chevron_right</span>
-                                </a>
-                              </li>
-                        <?php endforeach; ?>
-                      </ul>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No upcoming events.</p>
-                <?php endif; ?>
-              </div>
-            </section>
-            <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-red-100 rounded-lg text-red-600">
-                    <span class="material-icons-outlined">campaign</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Notice Board</h2>
+                <div class="flex flex-col pb-3 border-b border-gray-100">
+                  <span class="text-gray-500 text-xs uppercase">Chapter</span>
+                  <span class="font-medium text-gray-900"><?= e($member['chapter_name'] ?? 'Unassigned') ?></span>
                 </div>
-                <?php if ($dashboardNotices): ?>
-                      <ul class="space-y-4">
-                        <?php foreach ($dashboardNotices as $notice): ?>
-                              <?php
-                              $avatar = $noticeAvatars[$notice['created_by']] ?? '';
-                              $categoryLabel = ucfirst($notice['category'] ?? 'notice');
-                              ?>
-                              <li class="rounded-xl border border-gray-100 bg-white p-4">
-                                <div class="flex items-center gap-3 mb-2">
-                                  <div
-                                    class="h-9 w-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center overflow-hidden">
-                                    <?php if (!empty($avatar)): ?>
-                                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>"
-                                            class="h-full w-full object-cover">
-                                    <?php else: ?>
-                                          <span class="material-icons-outlined text-sm">person</span>
-                                    <?php endif; ?>
-                                  </div>
-                                  <div class="flex-1">
-                                    <p class="text-sm font-semibold text-gray-900"><?= e($notice['title']) ?></p>
-                                    <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
-                                      <?= e($notice['created_by_name'] ?? 'Member') ?>
-                                    </p>
-                                  </div>
-                                </div>
-                                <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
-                              </li>
-                        <?php endforeach; ?>
-                      </ul>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No notices.</p>
-                <?php endif; ?>
-              </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                    <span class="material-icons-outlined">receipt</span>
-                  </div>
-                  <h2 class="font-display text-xl font-bold text-gray-900">Order History</h2>
+                <div class="flex flex-col pb-3 border-b border-gray-100">
+                  <span class="text-gray-500 text-xs uppercase">Wings</span>
+                  <span class="font-medium text-gray-900"><?= e($member['wings_preference']) ?></span>
                 </div>
-                <?php $recentOrders = array_slice($orderHistory, 0, 5); ?>
-                <?php if ($recentOrders): ?>
-                      <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                          <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                            <tr>
-                              <th class="py-2 pr-3">Date</th>
-                              <th class="py-2 pr-3">Type</th>
-                              <th class="py-2 pr-3">Amount</th>
-                              <th class="py-2">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody class="divide-y">
-                            <?php foreach ($recentOrders as $order): ?>
-                                  <tr>
-                                    <td class="py-2 pr-3 text-gray-600"><?= e($order['date']) ?></td>
-                                    <td class="py-2 pr-3 text-gray-900"><?= e(ucfirst($order['type'])) ?></td>
-                                    <td class="py-2 pr-3 text-gray-900">$<?= e($order['amount']) ?></td>
-                                    <td class="py-2 text-gray-600"><?= e(ucfirst($order['status'])) ?></td>
-                                  </tr>
-                            <?php endforeach; ?>
-                          </tbody>
-                        </table>
-                      </div>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No orders yet.</p>
-                <?php endif; ?>
+                <div class="flex flex-col">
+                  <span class="text-gray-500 text-xs uppercase">Directory</span>
+                  <span class="font-medium text-gray-900"><?= e($member['privacy_level']) ?></span>
+                </div>
               </div>
-            </section>
-      <?php elseif ($page === 'profile'): ?>
-            <?php
-            $directoryPrefs = MemberRepository::directoryPreferences();
-            $profileMembershipPeriod = $membershipPeriod;
-            if ($profileMemberId !== $member['id']) {
-              $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY end_date DESC LIMIT 1');
-              $stmt->execute(['member_id' => $profileMemberId]);
-              $profileMembershipPeriod = $stmt->fetch();
-            }
-            $profileMembershipOrders = $membershipOrders;
-            if ($profileMemberId !== $member['id']) {
-              $profileOrdersValue = $ordersMemberColumn ? orders_member_value($profileMember ?? [], $user ?? [], $ordersMemberColumn) : null;
-              if ($ordersMemberColumn && $profileOrdersValue) {
-                $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC');
-                $stmt->execute(['value' => $profileOrdersValue]);
-                $profileMembershipOrders = $stmt->fetchAll();
-              } else {
-                $profileMembershipOrders = [];
-              }
-            }
-            $profileLatestOrder = $profileMembershipOrders[0] ?? null;
-            $profileMemberNumber = '—';
-            if (!empty($profileMember['member_number_base'])) {
-              $profileMemberNumber = MembershipService::displayMembershipNumber((int) $profileMember['member_number_base'], (int) ($profileMember['member_number_suffix'] ?? 0));
-            } elseif (!empty($profileMember['member_number'])) {
-              $profileMemberNumber = $profileMember['member_number'];
-            }
-            $membershipTypeMap = [
-              'FULL' => 'Full Member',
-              'ASSOCIATE' => 'Associate Member',
-              'LIFE' => 'Life Member',
-            ];
-            $profileMembershipTypeLabel = $membershipTypeMap[strtoupper((string) ($profileMember['member_type'] ?? ''))] ?? 'Member';
-            $profileMembershipStatusKey = strtolower((string) ($profileMember['status'] ?? 'pending'));
-            $profileMembershipStatusLabel = ucfirst($profileMembershipStatusKey);
-            $profileAddressLines = array_filter([
-              trim((string) ($profileMember['address_line1'] ?? '')),
-              trim((string) ($profileMember['address_line2'] ?? '')),
-              trim((string) ($profileMember['city'] ?? '')),
-              trim((string) ($profileMember['state'] ?? '')),
-              trim((string) ($profileMember['postal_code'] ?? '')),
-              trim((string) ($profileMember['country'] ?? '')),
-            ], static fn($line) => $line !== '');
-            $primaryBike = null;
-            if (!empty($bikes) && !empty($bikeHasPrimary)) {
-              foreach ($bikes as $bike) {
-                if ((int) ($bike['is_primary'] ?? 0) === 1) {
-                  $primaryBike = $bike;
-                  break;
-                }
-              }
-            }
-            if (!$primaryBike && !empty($bikes)) {
-              $primaryBike = $bikes[0];
-            }
-            $primaryBikeYearLabel = $primaryBike ? ($primaryBike['year'] ?? '—') : '—';
-            $primaryBikeRegoLabel = $primaryBike ? ($primaryBike['rego'] ?? '—') : '—';
-            $profileRenewalLabel = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'LIFE' ? 'N/A' : format_date($profileMembershipPeriod['end_date'] ?? null);
-            $profileLastPaymentLabel = $profileLatestOrder ? format_datetime($profileLatestOrder['paid_at'] ?? $profileLatestOrder['created_at'] ?? null) : '—';
-            $profilePaymentMethodLabel = $profileLatestOrder ? ($profileLatestOrder['payment_method'] ?? '') : '';
-            $profilePaymentMethodLabel = $profilePaymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $profilePaymentMethodLabel)) : '—';
-            $profileStatusClasses = status_badge_classes($profileMembershipStatusKey);
-            $currentStatusLabel = strtoupper((string) ($profileMember['status'] ?? 'pending'));
-            $profileChapterName = $profileMember['chapter_name'] ?? 'Unassigned';
-            $joinedLabel = format_date($profileMember['created_at'] ?? null);
-            $twofaStatusLabel = $twofaEnabled ? 'Enabled' : 'Not enabled';
-            $twofaActionHref = $twofaEnabled ? '/member/2fa_verify.php' : '/member/2fa_enroll.php';
-            $twofaActionLabel = $twofaEnabled ? 'Manage 2FA' : 'Setup 2FA';
-            $profileActionUrl = '/member/index.php?page=profile';
-            if ($profileMemberId !== $member['id']) {
-              $profileActionUrl .= '&member_id=' . urlencode((string) $profileMemberId);
-            }
-            ?>
-            <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div class="border-b border-gray-100 px-8 py-6">
-                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                  <div>
-                    <div class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2 mb-3">
-                      <span class="material-icons-outlined text-[16px]">arrow_back</span>
-                      Member Profile
-                      <?php if ($profileMemberId !== $member['id']): ?>
-                            <span
-                              class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold"><?= e($profileContextLabel) ?></span>
-                      <?php endif; ?>
+              <a class="mt-6 inline-flex items-center text-sm font-semibold text-secondary"
+                href="/member/index.php?page=profile">
+                Edit profile
+                <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
+              </a>
+            <?php endif; ?>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                <span class="material-icons-outlined">import_contacts</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Wings Magazine</h2>
+            </div>
+            <?php if ($wingsLatest): ?>
+              <div class="flex items-start gap-4">
+                <div class="w-24 aspect-[3/4] rounded-lg border border-gray-100 bg-white shadow-sm overflow-hidden">
+                  <?php if (!empty($wingsLatest['cover_image_url'])): ?>
+                    <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>"
+                      class="h-full w-full object-cover">
+                  <?php else: ?>
+                    <div class="h-full w-full flex items-center justify-center bg-gray-50 text-gray-300">
+                      <span class="material-icons-outlined text-3xl">auto_stories</span>
                     </div>
-                    <div class="flex items-center gap-4">
-                      <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
-                        <?php if (!empty($avatarUrl)): ?>
-                              <img src="<?= e($avatarUrl) ?>"
-                                alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>"
-                                class="h-full w-full object-cover">
+                  <?php endif; ?>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm text-gray-500">Latest issue</p>
+                  <p class="text-lg font-semibold text-gray-900"><?= e($wingsLatest['title']) ?></p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                      href="<?= e($wingsLatest['pdf_url']) ?>" target="_blank" rel="noopener">Read Now</a>
+                    <a class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
+                      href="/member/index.php?page=wings">Archive</a>
+                  </div>
+                </div>
+              </div>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No issues uploaded yet.</p>
+            <?php endif; ?>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
+                <span class="material-icons-outlined">event</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Upcoming Events</h2>
+            </div>
+            <?php if ($upcomingEvents): ?>
+              <ul class="space-y-3">
+                <?php foreach ($upcomingEvents as $event): ?>
+                  <li>
+                    <a class="flex items-center justify-between gap-3 rounded-xl border border-transparent hover:border-teal-200 hover:bg-teal-50 px-2 py-2 transition"
+                      href="<?= e($event['url']) ?>">
+                      <div>
+                        <p class="text-sm font-medium text-gray-900"><?= e($event['title']) ?></p>
+                        <p class="text-xs text-gray-500">
+                          <?= e($event['date_label']) ?>
+                          <?php if (!empty($event['location'])): ?>
+                            • <?= e($event['location']) ?>
+                          <?php endif; ?>
+                        </p>
+                      </div>
+                      <span class="material-icons-outlined text-gray-400">chevron_right</span>
+                    </a>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No upcoming events.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-red-100 rounded-lg text-red-600">
+                <span class="material-icons-outlined">campaign</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Notice Board</h2>
+            </div>
+            <?php if ($dashboardNotices): ?>
+              <ul class="space-y-4">
+                <?php foreach ($dashboardNotices as $notice): ?>
+                  <?php
+                  $avatar = $noticeAvatars[$notice['created_by']] ?? '';
+                  $categoryLabel = ucfirst($notice['category'] ?? 'notice');
+                  ?>
+                  <li class="rounded-xl border border-gray-100 bg-white p-4">
+                    <div class="flex items-center gap-3 mb-2">
+                      <div
+                        class="h-9 w-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center overflow-hidden">
+                        <?php if (!empty($avatar)): ?>
+                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>"
+                            class="h-full w-full object-cover">
                         <?php else: ?>
-                              <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
-                                <?= e(substr($profileMember['first_name'] ?? '', 0, 1) . substr($profileMember['last_name'] ?? '', 0, 1)) ?>
-                              </span>
+                          <span class="material-icons-outlined text-sm">person</span>
                         <?php endif; ?>
                       </div>
-                      <div>
-                        <h1 class="text-4xl font-bold text-gray-900 font-display">
-                          <?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>
-                        </h1>
-                        <p class="text-sm text-gray-500">
-                          <?= e($profileContextNote !== '' ? $profileContextNote : 'Manage your personal profile information.') ?>
+                      <div class="flex-1">
+                        <p class="text-sm font-semibold text-gray-900"><?= e($notice['title']) ?></p>
+                        <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
+                          <?= e($notice['created_by_name'] ?? 'Member') ?>
                         </p>
                       </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 mt-6">
-                      <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                        <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                          <span class="material-icons-outlined text-[18px]">tag</span>
-                        </div>
-                        <div class="flex flex-col">
-                          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Member ID</span>
-                          <span class="text-sm font-bold text-gray-900"><?= e($profileMemberNumber) ?></span>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                        <div class="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                          <span class="material-icons-outlined text-[18px]">diversity_3</span>
-                        </div>
-                        <div class="flex flex-col">
-                          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Chapter</span>
-                          <span class="text-sm font-bold text-gray-900"><?= e($profileChapterName) ?></span>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                        <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                          <span class="material-icons-outlined text-[18px]">calendar_month</span>
-                        </div>
-                        <div class="flex flex-col">
-                          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Joined</span>
-                          <span class="text-sm font-bold text-gray-900"><?= e($joinedLabel) ?></span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="flex flex-col items-start gap-3">
-                    <span class="text-xs font-medium text-gray-500">Current Status</span>
-                    <div
-                      class="inline-flex items-center gap-2 rounded-lg bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-700 border border-yellow-200 uppercase tracking-wider">
-                      <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                      <?= e($currentStatusLabel) ?>
-                    </div>
-                    <?php if ($profileMemberId !== $member['id']): ?>
-                          <a href="/member/index.php?page=profile"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                            <span class="material-icons-outlined text-[16px]">arrow_back</span>
-                            Back to my profile
-                          </a>
-                    <?php endif; ?>
-                  </div>
-                </div>
+                    <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No notices.</p>
+            <?php endif; ?>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                <span class="material-icons-outlined">receipt</span>
               </div>
-              <div class="p-5 space-y-6">
-                <?php if ($profileMessage): ?>
-                      <div
-                        class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-                        <?= e($profileMessage) ?>
-                      </div>
-                <?php endif; ?>
-                <?php if ($profileError): ?>
-                      <div class="rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                        <?= e($profileError) ?>
-                      </div>
-                <?php endif; ?>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
-                      <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-                        <div class="bg-primary/10 p-2 rounded-lg text-primary">
-                          <span class="material-icons-outlined">badge</span>
-                        </div>
-                        <div>
-                          <h2 class="text-lg font-bold text-gray-900">Contact &amp; billing</h2>
-                          <p class="text-xs text-gray-500">Update contact details, billing address, and preferences for your
-                            membership.</p>
-                        </div>
-                      </div>
-                      <div class="p-8">
-                        <form method="post" action="/member/index.php?page=profile" class="space-y-8">
-                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                          <input type="hidden" name="action" value="update_profile">
-                          <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
-                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">Email</label>
-                              <input type="email" name="email" value="<?= e($profileMember['email']) ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                required>
-                            </div>
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">Phone</label>
-                              <input type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div class="md:col-span-2">
-                              <label class="text-sm font-medium text-gray-700">Billing address line 1</label>
-                              <input id="member_profile_address_line1" data-google-autocomplete="address"
-                                data-google-autocomplete-city="#member_profile_city"
-                                data-google-autocomplete-state="#member_profile_state"
-                                data-google-autocomplete-postal="#member_profile_postal"
-                                data-google-autocomplete-country="#member_profile_country" type="text" name="address_line1"
-                                value="<?= e($profileMember['address_line1'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div class="md:col-span-2">
-                              <label class="text-sm font-medium text-gray-700">Billing address line 2</label>
-                              <input id="member_profile_address_line2" type="text" name="address_line2"
-                                value="<?= e($profileMember['address_line2'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">City</label>
-                              <input id="member_profile_city" type="text" name="city"
-                                value="<?= e($profileMember['city'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">State</label>
-                              <input id="member_profile_state" type="text" name="state"
-                                value="<?= e($profileMember['state'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">Postal code</label>
-                              <input id="member_profile_postal" type="text" name="postal_code"
-                                value="<?= e($profileMember['postal_code'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                              <label class="text-sm font-medium text-gray-700">Country</label>
-                              <input id="member_profile_country" type="text" name="country"
-                                value="<?= e($profileMember['country'] ?? '') ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                          </div>
-                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="text-sm font-medium text-gray-700">
-                              Wings preference
-                              <select name="wings_preference"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                <option value="digital" <?= $profileMember['wings_preference'] === 'digital' ? 'selected' : '' ?>>Digital</option>
-                                <option value="print" <?= $profileMember['wings_preference'] === 'print' ? 'selected' : '' ?>>
-                                  Print</option>
-                                <option value="both" <?= $profileMember['wings_preference'] === 'both' ? 'selected' : '' ?>>Both
-                                </option>
-                              </select>
-                            </label>
-                            <label class="text-sm font-medium text-gray-700">
-                              Directory privacy
-                              <select name="privacy_level"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                <option value="A" <?= $profileMember['privacy_level'] === 'A' ? 'selected' : '' ?>>A — Name only
-                                </option>
-                                <option value="B" <?= $profileMember['privacy_level'] === 'B' ? 'selected' : '' ?>>B — Name +
-                                  Address</option>
-                                <option value="C" <?= $profileMember['privacy_level'] === 'C' ? 'selected' : '' ?>>C — Name +
-                                  Address + Phone</option>
-                                <option value="D" <?= $profileMember['privacy_level'] === 'D' ? 'selected' : '' ?>>D — Name +
-                                  Address + Email</option>
-                                <option value="E" <?= $profileMember['privacy_level'] === 'E' ? 'selected' : '' ?>>E — Name +
-                                  Address + Phone + Email</option>
-                                <option value="F" <?= $profileMember['privacy_level'] === 'F' ? 'selected' : '' ?>>F — Exclude
-                                  from directory</option>
-                              </select>
-                            </label>
-                          </div>
-                          <div>
-                            <p class="text-sm font-medium text-gray-700 mb-3">Directory preferences &amp; assistance</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
-                              <?php foreach ($directoryPrefs as $letter => $info): ?>
-                                    <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                                      <input type="checkbox" name="directory_pref_<?= e($letter) ?>" value="1"
-                                        <?= !empty($profileMember[$info['column']] ?? null) ? 'checked' : '' ?>
-                                        class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                                      <span><?= e($letter) ?> — <?= e($info['label']) ?></span>
-                                    </label>
-                              <?php endforeach; ?>
-                            </div>
-                          </div>
-                          <div class="flex justify-end">
-                            <button type="submit"
-                              class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save
-                              changes</button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-                      <div class="flex items-center gap-3">
-                        <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                          <span class="material-icons-outlined">card_membership</span>
-                        </div>
-                        <div>
-                          <h2 class="text-lg font-bold text-gray-900">Membership summary</h2>
-                          <p class="text-sm text-gray-500">Enrollment status, renewal, and primary bike.</p>
-                        </div>
-                      </div>
-                      <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Type</p>
-                          <p class="text-sm font-semibold text-gray-900"><?= e($profileMembershipTypeLabel) ?></p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Status</p>
-                          <span
-                            class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold <?= $profileStatusClasses ?>">
-                            <span
-                              class="w-2 h-2 rounded-full <?= strpos($profileStatusClasses, 'text-green') !== false ? 'bg-green-500' : 'bg-yellow-500' ?>"></span>
-                            <?= e($profileMembershipStatusLabel) ?>
-                          </span>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Joined</p>
-                          <p class="text-sm font-medium text-gray-900"><?= e($joinedLabel) ?></p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Renewal date</p>
-                          <p class="text-sm font-medium text-gray-900"><?= e($profileRenewalLabel) ?></p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Last payment</p>
-                          <p class="text-sm text-gray-500"><?= e($profileLastPaymentLabel) ?></p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Payment method</p>
-                          <p class="text-sm text-gray-500"><?= e($profilePaymentMethodLabel) ?></p>
-                        </div>
-                      </div>
-                      <div class="pt-4">
-                        <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">Primary bike</p>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Make</p>
-                            <p class="text-sm font-medium text-gray-900"><?= e($primaryBike['make'] ?? '—') ?></p>
-                          </div>
-                          <div>
-                            <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Model</p>
-                            <p class="text-sm font-medium text-gray-900"><?= e($primaryBike['model'] ?? '—') ?></p>
-                          </div>
-                          <div>
-                            <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Year</p>
-                            <p class="text-sm font-medium text-gray-900"><?= e($primaryBikeYearLabel) ?></p>
-                          </div>
-                          <div>
-                            <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Rego</p>
-                            <p class="text-sm font-medium text-gray-900"><?= e($primaryBikeRegoLabel) ?></p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="space-y-6">
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-                      <div class="flex items-center gap-3">
-                        <div class="p-2 bg-orange-50 rounded-lg text-orange-600">
-                          <span class="material-icons-outlined">bolt</span>
-                        </div>
-                        <div>
-                          <h3 class="font-display text-lg font-bold text-gray-900">Quick actions</h3>
-                          <p class="text-sm text-gray-500">Account essentials you can manage yourself.</p>
-                        </div>
-                      </div>
-                      <div class="space-y-3">
-                        <a class="w-full inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                          href="/member/reset_password.php">
-                          <span class="material-icons-outlined text-base">lock_reset</span>
-                          <span class="ml-2">Reset password</span>
-                        </a>
-                        <div
-                          class="flex items-center justify-between rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-900">
-                          <div>
-                            <p class="text-xs uppercase tracking-[0.3em] text-gray-400">Two-factor authentication</p>
-                            <p><?= e($twofaStatusLabel) ?>
-                              (<?= strtolower($twofaRequirement) === 'required' ? 'required' : 'optional' ?>)</p>
-                          </div>
-                          <a class="inline-flex items-center gap-1 text-xs font-semibold text-primary"
-                            href="<?= e($twofaActionHref) ?>">
-                            <?= e($twofaActionLabel) ?>
-                            <span class="material-icons-outlined text-[16px]">open_in_new</span>
-                          </a>
-                        </div>
-                        <a class="inline-flex items-center justify-center gap-2 rounded-full border border-primary bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20"
-                          href="/?page=membership">
-                          <span class="material-icons-outlined text-base">credit_card</span>
-                          Membership &amp; billing
-                        </a>
-                      </div>
-                    </div>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-                      <div class="flex items-center gap-3">
-                        <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                          <span class="material-icons-outlined">hub</span>
-                        </div>
-                        <div>
-                          <h3 class="font-display text-lg font-bold text-gray-900">Membership links</h3>
-                          <p class="text-sm text-gray-500">Manage linked member profiles.</p>
-                        </div>
-                      </div>
-                      <?php if (in_array($member['member_type'], ['FULL', 'LIFE'], true)): ?>
-                            <?php if ($associates): ?>
-                                  <ul class="space-y-3 text-sm text-gray-700">
-                                    <?php foreach ($associates as $assoc): ?>
-                                          <li
-                                            class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
-                                            <div>
-                                              <p class="font-medium text-gray-900"><?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
-                                              </p>
-                                              <p class="text-xs text-gray-500">
-                                                <?= e(MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>
-                                              </p>
-                                            </div>
-                                            <a class="inline-flex items-center text-xs font-semibold text-secondary"
-                                              href="/member/index.php?page=profile&member_id=<?= e((string) $assoc['id']) ?>">Edit</a>
-                                          </li>
-                                    <?php endforeach; ?>
-                                  </ul>
-                            <?php else: ?>
-                                  <p class="text-sm text-gray-500">No associates linked yet.</p>
-                            <?php endif; ?>
-                      <?php elseif ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
-                            <div class="rounded-lg border border-gray-100 bg-white px-3 py-3 text-sm text-gray-700">
-                              <p class="font-medium text-gray-900">
-                                <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
-                              </p>
-                              <p class="text-xs text-gray-500">
-                                <?= e(MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
-                              </p>
-                              <a class="mt-3 inline-flex items-center text-xs font-semibold text-secondary"
-                                href="/member/index.php?page=profile&member_id=<?= e((string) $fullMember['id']) ?>">Edit</a>
-                            </div>
-                      <?php else: ?>
-                            <p class="text-sm text-gray-500">No linked membership details available.</p>
-                      <?php endif; ?>
-                    </div>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-                      <div class="flex items-center gap-3">
-                        <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
-                          <span class="material-icons-outlined">group</span>
-                        </div>
-                        <div>
-                          <h3 class="font-display text-lg font-bold text-gray-900">Chapter change</h3>
-                          <p class="text-sm text-gray-500">Request a move to another chapter.</p>
-                        </div>
-                      </div>
-                      <?php if ($member['member_type'] === 'ASSOCIATE' && !empty($member['full_member_id'])): ?>
-                            <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                              Chapter changes are managed by the full member linked to this profile.
-                            </div>
-                      <?php else: ?>
-                            <form method="post" class="space-y-3">
-                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                              <input type="hidden" name="action" value="request_chapter">
-                              <select name="requested_chapter_id"
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                <option value="">Select chapter</option>
-                                <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
-                                      <?php
-                                      $chapterLabel = $chapter['name'];
-                                      if (!empty($chapter['state'])) {
-                                        $chapterLabel .= ' (' . $chapter['state'] . ')';
-                                      }
-                                      ?>
-                                      <option value="<?= e((string) $chapter['id']) ?>"><?= e($chapterLabel) ?></option>
-                                <?php endforeach; ?>
-                              </select>
-                              <button
-                                class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                                type="submit">Submit request</button>
-                            </form>
-                      <?php endif; ?>
-                      <?php if ($chapterRequests): ?>
-                            <div class="mt-4 space-y-2 text-sm text-gray-600">
-                              <?php foreach ($chapterRequests as $request): ?>
-                                    <div class="rounded-lg border border-gray-100 bg-white px-3 py-2">
-                                      <p class="font-semibold text-gray-900"><?= e($request['name']) ?></p>
-                                      <p class="text-xs text-gray-500">Requested: <?= e($request['requested_at']) ?></p>
-                                      <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Status:
-                                        <?= e($request['status']) ?>
-                                      </p>
-                                      <?php if (!empty($request['rejection_reason'])): ?>
-                                            <p class="mt-1 text-xs text-red-600">Reason: <?= e($request['rejection_reason']) ?></p>
-                                      <?php endif; ?>
-                                    </div>
-                              <?php endforeach; ?>
-                            </div>
-                      <?php endif; ?>
-                    </div>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-                      <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                          <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600">
-                            <span class="material-icons-outlined">two_wheeler</span>
-                          </div>
-                          <div>
-                            <h3 class="font-display text-lg font-bold text-gray-900">My bikes</h3>
-                            <p class="text-sm text-gray-500">Keep your garage up to date.</p>
-                          </div>
-                        </div>
-                        <span
-                          class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700"><?= count($bikes) ?>
-                          Bikes</span>
-                      </div>
-                      <?php if ($bikes): ?>
-                            <ul class="space-y-3 text-sm text-gray-700">
-                              <?php foreach ($bikes as $bike): ?>
-                                    <li class="rounded-xl border border-gray-100 bg-white p-3 space-y-3">
-                                      <div class="flex gap-3">
-                                        <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
-                                          <?php if (!empty($bike['image_url'])): ?>
-                                                <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>"
-                                                  class="h-full w-full object-cover">
-                                          <?php else: ?>
-                                                <span class="material-icons-outlined text-gray-300">two_wheeler</span>
-                                          <?php endif; ?>
-                                        </div>
-                                        <div class="flex-1">
-                                          <p class="font-semibold text-gray-900"><?= e($bike['make'] . ' ' . $bike['model']) ?></p>
-                                          <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?></p>
-                                          <?php
-                                          $bikeColor = $bike['color'] ?? ($bike['colour'] ?? '');
-                                          ?>
-                                          <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                                            <?php if (!empty($bike['rego'])): ?>
-                                                  <span
-                                                    class="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 font-semibold text-yellow-700">Rego
-                                                    / Reg#:
-                                                    <?= e($bike['rego']) ?></span>
-                                            <?php endif; ?>
-                                            <?php if (!empty($bikeColor)): ?>
-                                                  <span
-                                                    class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Colour:
-                                                    <?= e($bikeColor) ?></span>
-                                            <?php endif; ?>
-                                          </div>
-                                        </div>
-                                        <?php if ($canManageProfileBikes): ?>
-                                              <form method="post" action="<?= e($profileActionUrl) ?>" class="ml-auto">
-                                                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                                <input type="hidden" name="action" value="delete_bike">
-                                                <input type="hidden" name="bike_id" value="<?= e((string) $bike['id']) ?>">
-                                                <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
-                                                <button
-                                                  class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                                                  type="submit" onclick="return confirm('Remove this bike?');">Remove</button>
-                                              </form>
-                                        <?php endif; ?>
-                                      </div>
-                                      <?php if ($canManageProfileBikes): ?>
-                                            <?php $bikeId = (int) $bike['id']; ?>
-                                            <form method="post" action="<?= e($profileActionUrl) ?>"
-                                              class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                              <input type="hidden" name="action" value="update_bike">
-                                              <input type="hidden" name="bike_id" value="<?= e((string) $bikeId) ?>">
-                                              <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
-                                              <input type="text" name="bike_make" value="<?= e($bike['make'] ?? '') ?>" placeholder="Make"
-                                                required
-                                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                              <input type="text" name="bike_model" value="<?= e($bike['model'] ?? '') ?>" placeholder="Model"
-                                                required
-                                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                              <input type="number" name="bike_year" value="<?= e($bike['year'] ?? '') ?>" placeholder="Year"
-                                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                              <input type="text" name="bike_color" value="<?= e($bikeColor ?? '') ?>" placeholder="Colour"
-                                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                              <input type="text" name="bike_rego" value="<?= e($bike['rego'] ?? '') ?>"
-                                                placeholder="Rego / Registration Number"
-                                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                              <div class="flex items-center gap-3">
-                                                <div id="bike-image-preview-<?= e((string) $bikeId) ?>"
-                                                  class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
-                                                  <?php if (!empty($bike['image_url'])): ?>
-                                                        <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>"
-                                                          class="h-full w-full object-cover">
-                                                  <?php else: ?>
-                                                        <span class="material-icons-outlined">image</span>
-                                                  <?php endif; ?>
-                                                </div>
-                                                <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>"
-                                                  value="<?= e($bike['image_url'] ?? '') ?>">
-                                                <button type="button"
-                                                  class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
-                                                  data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>"
-                                                  data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>"
-                                                  data-upload-context="bikes">Update bike image</button>
-                                              </div>
-                                              <?php if (!empty($bikeHasPrimary)): ?>
-                                                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
-                                                      <input type="radio" name="is_primary" value="1" <?= (int) ($bike['is_primary'] ?? 0) === 1 ? 'checked' : '' ?> class="text-primary focus:ring-2 focus:ring-primary">
-                                                      Primary bike
-                                                    </label>
-                                              <?php endif; ?>
-                                              <button
-                                                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                                                type="submit">Save changes</button>
-                                            </form>
-                                      <?php endif; ?>
-                                    </li>
-                              <?php endforeach; ?>
-                            </ul>
-                      <?php else: ?>
-                            <p class="text-sm text-gray-500">No bikes saved yet.</p>
-                      <?php endif; ?>
-                      <?php if ($canManageProfileBikes): ?>
-                            <form method="post" action="<?= e($profileActionUrl) ?>" class="mt-4 space-y-2">
-                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                              <input type="hidden" name="action" value="add_bike">
-                              <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
-                              <input type="text" name="bike_make" placeholder="Make" required
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                              <input type="text" name="bike_model" placeholder="Model" required
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                              <input type="number" name="bike_year" placeholder="Year"
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                              <input type="text" name="bike_color" placeholder="Colour"
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                              <input type="text" name="bike_rego" placeholder="Rego / Registration Number"
-                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                              <div class="flex items-center gap-3">
-                                <div id="bike-image-preview"
-                                  class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
-                                  <span class="material-icons-outlined">image</span>
-                                </div>
-                                <input type="hidden" name="bike_image_url" id="bike-image-url-input">
-                                <button type="button"
-                                  class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
-                                  data-upload-trigger data-upload-target="bike-image-url-input"
-                                  data-upload-preview="bike-image-preview" data-upload-context="bikes">Upload bike image</button>
-                              </div>
-                              <button
-                                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                                type="submit">Add Bike</button>
-                            </form>
-                      <?php endif; ?>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-      <?php elseif ($page === 'settings'): ?>
-            <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900">Personal Settings</h1>
-                <p class="text-gray-500 mt-2">Control your timezone, profile image, and notification preferences.</p>
-              </div>
-              <div class="flex items-center gap-3 rounded-full border border-gray-100 bg-white px-4 py-2 shadow-sm">
-                <div
-                  class="h-10 w-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center overflow-hidden">
-                  <?php if (!empty($avatarUrl)): ?>
-                        <img src="<?= e($avatarUrl) ?>" alt="<?= e($user['name'] ?? 'Member') ?>"
-                          class="h-full w-full object-cover">
-                  <?php else: ?>
-                        <span class="material-icons-outlined">tune</span>
-                  <?php endif; ?>
-                </div>
-                <div class="text-sm">
-                  <p class="font-semibold text-gray-900"><?= e($user['name'] ?? 'Member') ?></p>
-                  <p class="text-primary font-medium">Account Settings</p>
-                </div>
-              </div>
-            </section>
-            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div class="lg:col-span-2 space-y-6">
-                <?php if ($profileMessage): ?>
-                      <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($profileMessage) ?></div>
-                <?php endif; ?>
-                <?php if ($profileError): ?>
-                      <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($profileError) ?></div>
-                <?php endif; ?>
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-6">
-                    <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                      <span class="material-icons-outlined">settings</span>
-                    </div>
-                    <div>
-                      <h2 class="font-display text-xl font-bold text-gray-900">Account Preferences</h2>
-                      <p class="text-sm text-gray-500">Keep your profile and alerts aligned with your needs.</p>
-                    </div>
-                  </div>
-                  <form method="post" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                    <input type="hidden" name="action" value="update_personal_settings">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <label class="text-sm font-medium text-gray-700">Timezone
-                        <input name="user_timezone"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          value="<?= e($userTimezone) ?>" placeholder="Australia/Sydney">
-                      </label>
-                      <div>
-                        <p class="text-sm font-medium text-gray-700">Profile image</p>
-                        <div class="mt-2 flex items-center gap-3">
-                          <div id="avatar-preview"
-                            class="h-14 w-14 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center overflow-hidden">
-                            <?php if (!empty($avatarUrl)): ?>
-                                  <img src="<?= e($avatarUrl) ?>" alt="<?= e($user['name'] ?? 'Member') ?>"
-                                    class="h-full w-full object-cover">
-                            <?php else: ?>
-                                  <span class="material-icons-outlined text-base">person</span>
-                            <?php endif; ?>
-                          </div>
-                          <input type="hidden" name="avatar_url" id="avatar-url-input" value="<?= e($avatarUrl) ?>">
-                          <button type="button"
-                            class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
-                            data-upload-trigger data-upload-target="avatar-url-input" data-upload-preview="avatar-preview"
-                            data-upload-context="avatars">Upload image</button>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-gray-700 mb-2">Account Notifications</p>
-                      <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                        <label class="flex items-center justify-between gap-3 text-sm text-gray-700">
-                          <span class="font-medium">Email notifications</span>
-                          <input type="checkbox" name="notify_master_enabled" <?= $masterNotificationsEnabled ? 'checked' : '' ?> class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                        </label>
-                        <label class="flex items-center justify-between gap-3 text-sm text-gray-700">
-                          <span class="font-medium">Unsubscribe from all non-essential emails</span>
-                          <input type="checkbox" name="notify_unsubscribe_all" <?= $unsubscribeAll ? 'checked' : '' ?>
-                            class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                        </label>
-                        <p class="text-xs text-gray-500">Mandatory security and billing emails still send when required.</p>
-                      </div>
-                      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <?php foreach ($notificationCategories as $key => $label): ?>
-                              <label
-                                class="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 text-sm text-gray-700">
-                                <input type="checkbox" name="notify_category[<?= e($key) ?>]"
-                                  <?= !empty($notificationPrefs['categories'][$key]) ? 'checked' : '' ?>
-                                  class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                                <?= e($label) ?>
-                              </label>
-                        <?php endforeach; ?>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <a class="text-sm text-slate-500" href="/member/index.php?page=settings">Cancel</a>
-                      <button
-                        class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                        type="submit">Save settings</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-              <div class="space-y-6">
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-3">
-                    <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
-                      <span class="material-icons-outlined">person</span>
-                    </div>
-                    <h3 class="font-display text-lg font-bold text-gray-900">Profile</h3>
-                  </div>
-                  <p class="text-sm text-gray-600">Update your membership details and contact information.</p>
-                  <a class="mt-4 inline-flex items-center text-sm font-semibold text-secondary"
-                    href="/member/index.php?page=profile">Edit profile</a>
-                </div>
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-3">
-                    <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-                      <span class="material-icons-outlined">shield</span>
-                    </div>
-                    <h3 class="font-display text-lg font-bold text-gray-900">Password & Security</h3>
-                  </div>
-                  <p class="text-sm text-gray-600">Reset your password or review account security.</p>
-                  <a class="mt-4 inline-flex items-center text-sm font-semibold text-secondary"
-                    href="/member/reset_password.php">Reset password</a>
-                </div>
-              </div>
-            </section>
-      <?php elseif ($page === 'activity'): ?>
-            <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900">Activity</h1>
-                <p class="text-gray-500 mt-2">Recent actions linked to your membership.</p>
-              </div>
-            </section>
-            <section class="mt-6 space-y-4">
-              <?php if ($memberActivity): ?>
-                    <?php foreach ($memberActivity as $entry): ?>
-                          <?php
-                          $actionKey = $entry['action'] ?? 'activity';
-                          $metadata = [];
-                          if (!empty($entry['metadata'])) {
-                            $decoded = json_decode((string) $entry['metadata'], true);
-                            if (is_array($decoded)) {
-                              $metadata = $decoded;
-                            }
-                          }
-                          $label = $actionKey === 'email.sent' ? 'Email sent' : ucwords(str_replace(['.', '_'], ' ', $actionKey));
-                          ?>
-                          <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                            <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-gray-500">
-                              <span><?= e(format_datetime_au($entry['created_at'] ?? 'now')) ?></span>
-                              <span><?= e(ucfirst($entry['actor_type'] ?? 'system')) ?></span>
-                            </div>
-                            <p class="mt-2 text-sm font-semibold text-gray-900"><?= e($label) ?></p>
-                            <?php if ($actionKey !== 'email.sent' && !empty($metadata)): ?>
-                                  <p class="text-xs text-gray-500 mt-1"><?= e(json_encode($metadata, JSON_UNESCAPED_SLASHES)) ?></p>
-                            <?php endif; ?>
-                          </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Order History</h2>
+            </div>
+            <?php $recentOrders = array_slice($orderHistory, 0, 5); ?>
+            <?php if ($recentOrders): ?>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                    <tr>
+                      <th class="py-2 pr-3">Date</th>
+                      <th class="py-2 pr-3">Type</th>
+                      <th class="py-2 pr-3">Amount</th>
+                      <th class="py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <?php foreach ($recentOrders as $order): ?>
+                      <tr>
+                        <td class="py-2 pr-3 text-gray-600"><?= e($order['date']) ?></td>
+                        <td class="py-2 pr-3 text-gray-900"><?= e(ucfirst($order['type'])) ?></td>
+                        <td class="py-2 pr-3 text-gray-900">$<?= e($order['amount']) ?></td>
+                        <td class="py-2 text-gray-600"><?= e(ucfirst($order['status'])) ?></td>
+                      </tr>
                     <?php endforeach; ?>
-              <?php else: ?>
-                    <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">No activity recorded yet.
-                    </div>
-              <?php endif; ?>
-            </section>
-      <?php elseif ($page === 'wings'): ?>
-            <?php $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll(); ?>
-            <?php $latestIssue = $wingsLatest ?: ($issues[0] ?? null); ?>
-            <?php
-            $issueYears = [];
-            foreach ($issues as $issue) {
-              if (!empty($issue['published_at'])) {
-                $yearValue = date('Y', strtotime($issue['published_at']));
-                $issueYears[$yearValue] = true;
-              }
+                  </tbody>
+                </table>
+              </div>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No orders yet.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+      <?php elseif ($page === 'profile'): ?>
+        <?php
+        $directoryPrefs = MemberRepository::directoryPreferences();
+        $profileMembershipPeriod = $membershipPeriod;
+        if ($profileMemberId !== $member['id']) {
+          $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY end_date DESC LIMIT 1');
+          $stmt->execute(['member_id' => $profileMemberId]);
+          $profileMembershipPeriod = $stmt->fetch();
+        }
+        $profileMembershipOrders = $membershipOrders;
+        if ($profileMemberId !== $member['id']) {
+          $profileOrdersValue = $ordersMemberColumn ? orders_member_value($profileMember ?? [], $user ?? [], $ordersMemberColumn) : null;
+          if ($ordersMemberColumn && $profileOrdersValue) {
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC');
+            $stmt->execute(['value' => $profileOrdersValue]);
+            $profileMembershipOrders = $stmt->fetchAll();
+          } else {
+            $profileMembershipOrders = [];
+          }
+        }
+        $profileLatestOrder = $profileMembershipOrders[0] ?? null;
+        $profileMemberNumber = '—';
+        if (!empty($profileMember['member_number_base'])) {
+          $profileMemberNumber = MembershipService::displayMembershipNumber((int) $profileMember['member_number_base'], (int) ($profileMember['member_number_suffix'] ?? 0));
+        } elseif (!empty($profileMember['member_number'])) {
+          $profileMemberNumber = $profileMember['member_number'];
+        }
+        $membershipTypeMap = [
+          'FULL' => 'Full Member',
+          'ASSOCIATE' => 'Associate Member',
+          'LIFE' => 'Life Member',
+        ];
+        $profileMembershipTypeLabel = $membershipTypeMap[strtoupper((string) ($profileMember['member_type'] ?? ''))] ?? 'Member';
+        $profileMembershipStatusKey = strtolower((string) ($profileMember['status'] ?? 'pending'));
+        $profileMembershipStatusLabel = ucfirst($profileMembershipStatusKey);
+        $profileAddressLines = array_filter([
+          trim((string) ($profileMember['address_line1'] ?? '')),
+          trim((string) ($profileMember['address_line2'] ?? '')),
+          trim((string) ($profileMember['city'] ?? '')),
+          trim((string) ($profileMember['state'] ?? '')),
+          trim((string) ($profileMember['postal_code'] ?? '')),
+          trim((string) ($profileMember['country'] ?? '')),
+        ], static fn($line) => $line !== '');
+        $primaryBike = null;
+        if (!empty($bikes) && !empty($bikeHasPrimary)) {
+          foreach ($bikes as $bike) {
+            if ((int) ($bike['is_primary'] ?? 0) === 1) {
+              $primaryBike = $bike;
+              break;
             }
-            $issueYearOptions = array_keys($issueYears);
-            rsort($issueYearOptions);
-            ?>
-            <section class="space-y-6">
-              <div class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-                <div class="absolute -top-8 -right-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl"></div>
-                <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                  <span class="material-icons-outlined text-9xl text-primary transform rotate-12">auto_stories</span>
+          }
+        }
+        if (!$primaryBike && !empty($bikes)) {
+          $primaryBike = $bikes[0];
+        }
+        $primaryBikeYearLabel = $primaryBike ? ($primaryBike['year'] ?? '—') : '—';
+        $primaryBikeRegoLabel = $primaryBike ? ($primaryBike['rego'] ?? '—') : '—';
+        $profileRenewalLabel = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'LIFE' ? 'N/A' : format_date($profileMembershipPeriod['end_date'] ?? null);
+        $profileLastPaymentLabel = $profileLatestOrder ? format_datetime($profileLatestOrder['paid_at'] ?? $profileLatestOrder['created_at'] ?? null) : '—';
+        $profilePaymentMethodLabel = $profileLatestOrder ? ($profileLatestOrder['payment_method'] ?? '') : '';
+        $profilePaymentMethodLabel = $profilePaymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $profilePaymentMethodLabel)) : '—';
+        $profileStatusClasses = status_badge_classes($profileMembershipStatusKey);
+        $currentStatusLabel = strtoupper((string) ($profileMember['status'] ?? 'pending'));
+        $profileChapterName = $profileMember['chapter_name'] ?? 'Unassigned';
+        $joinedLabel = format_date($profileMember['created_at'] ?? null);
+        $twofaStatusLabel = $twofaEnabled ? 'Enabled' : 'Not enabled';
+        $twofaActionHref = $twofaEnabled ? '/member/2fa_verify.php' : '/member/2fa_enroll.php';
+        $twofaActionLabel = $twofaEnabled ? 'Manage 2FA' : 'Setup 2FA';
+        $profileActionUrl = '/member/index.php?page=profile';
+        if ($profileMemberId !== $member['id']) {
+          $profileActionUrl .= '&member_id=' . urlencode((string) $profileMemberId);
+        }
+        ?>
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div class="border-b border-gray-100 px-8 py-6">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+              <div>
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2 mb-3">
+                  <span class="material-icons-outlined text-[16px]">arrow_back</span>
+                  Member Profile
+                  <?php if ($profileMemberId !== $member['id']): ?>
+                    <span
+                      class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold"><?= e($profileContextLabel) ?></span>
+                  <?php endif; ?>
                 </div>
-                <?php if ($latestIssue): ?>
-                      <div class="relative z-10 grid grid-cols-1 lg:grid-cols-[360px,1fr] gap-8 items-center">
-                        <div class="w-full max-w-[360px] xl:max-w-[420px]">
-                          <div class="aspect-[3/4] rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden">
-                            <?php if (!empty($latestIssue['cover_image_url'])): ?>
-                                  <img alt="<?= e($latestIssue['title']) ?>" class="w-full h-full object-cover"
-                                    src="<?= e($latestIssue['cover_image_url']) ?>">
-                            <?php else: ?>
-                                  <div class="w-full h-full flex items-center justify-center bg-gray-50">
-                                    <span class="material-icons-outlined text-6xl text-gray-300">import_contacts</span>
-                                  </div>
-                            <?php endif; ?>
-                          </div>
-                        </div>
-                        <div class="space-y-4">
-                          <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                            <span
-                              class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-gray-900">Latest
-                              Issue</span>
-                            <?php if (!empty($latestIssue['published_at'])): ?>
-                                  <span>Released <?= e(format_date_au($latestIssue['published_at'])) ?></span>
-                            <?php endif; ?>
-                          </div>
-                          <div>
-                            <h2 class="font-display text-3xl md:text-4xl font-bold text-gray-900"><?= e($latestIssue['title']) ?>
-                            </h2>
-                            <p class="text-base text-gray-600 mt-3">Catch up on the newest issue and explore past editions in the
-                              archive.</p>
-                          </div>
-                          <div class="flex flex-wrap gap-3">
-                            <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                              href="<?= e($latestIssue['pdf_url']) ?>" target="_blank" rel="noopener">
-                              <span class="material-icons-outlined text-base">menu_book</span>
-                              <span class="ml-2">Read Online</span>
-                            </a>
-                            <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                              href="<?= e($latestIssue['pdf_url']) ?>" download>
-                              <span class="material-icons-outlined text-base">download</span>
-                              <span class="ml-2">Download PDF</span>
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                <?php else: ?>
-                      <div class="relative z-10">
-                        <h2 class="font-display text-2xl font-bold text-gray-900 mb-2">Wings Magazine</h2>
-                        <p class="text-sm text-gray-500">No issues available.</p>
-                      </div>
-                <?php endif; ?>
-              </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-3">
-                    <h3 class="font-display text-lg font-bold text-gray-900">Archive</h3>
-                    <?php if ($issues): ?>
-                          <span id="wings-count" class="text-sm text-gray-500"><?= count($issues) ?> issues</span>
+                <div class="flex items-center gap-4">
+                  <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
+                    <?php if (!empty($avatarUrl)): ?>
+                      <img src="<?= e($avatarUrl) ?>"
+                        alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>"
+                        class="h-full w-full object-cover">
+                    <?php else: ?>
+                      <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
+                        <?= e(substr($profileMember['first_name'] ?? '', 0, 1) . substr($profileMember['last_name'] ?? '', 0, 1)) ?>
+                      </span>
                     <?php endif; ?>
                   </div>
-                  <?php if ($issues): ?>
-                        <div class="flex flex-wrap items-center gap-3">
-                          <div class="relative">
-                            <span
-                              class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
-                            <input id="wings-search" class="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                              placeholder="Search issues..." type="search">
-                          </div>
-                          <select id="wings-year" class="py-2 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white">
-                            <option value="all">All years</option>
-                            <?php foreach ($issueYearOptions as $yearOption): ?>
-                                  <option value="<?= e($yearOption) ?>"><?= e($yearOption) ?></option>
-                            <?php endforeach; ?>
-                          </select>
-                        </div>
-                  <?php endif; ?>
+                  <div>
+                    <h1 class="text-4xl font-bold text-gray-900 font-display">
+                      <?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>
+                    </h1>
+                    <p class="text-sm text-gray-500">
+                      <?= e($profileContextNote !== '' ? $profileContextNote : 'Manage your personal profile information.') ?>
+                    </p>
+                  </div>
                 </div>
-                <?php if ($issues): ?>
-                      <div id="wings-archive-grid" class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        <?php foreach ($issues as $issue): ?>
-                              <?php
-                              $publishedLabel = '';
-                              $publishedYear = '';
-                              if (!empty($issue['published_at'])) {
-                                $publishedLabel = format_date_au($issue['published_at']);
-                                $publishedYear = date('Y', strtotime($issue['published_at']));
-                              }
-                              $issueTitle = strtolower($issue['title'] ?? '');
-                              ?>
-                              <article
-                                class="wings-issue-card group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                                data-title="<?= e($issueTitle) ?>" data-year="<?= e($publishedYear) ?>">
-                                <div class="aspect-[3/4] bg-gray-50 overflow-hidden">
-                                  <?php if (!empty($issue['cover_image_url'])): ?>
-                                        <img alt="<?= e($issue['title']) ?>"
-                                          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                          src="<?= e($issue['cover_image_url']) ?>">
-                                  <?php else: ?>
-                                        <div class="w-full h-full flex items-center justify-center">
-                                          <span class="material-icons-outlined text-4xl text-gray-300">menu_book</span>
-                                        </div>
-                                  <?php endif; ?>
-                                </div>
-                                <div class="p-4 space-y-2">
-                                  <h4 class="text-base font-semibold text-gray-900"><?= e($issue['title']) ?></h4>
-                                  <?php if ($publishedLabel): ?>
-                                        <p class="text-xs text-gray-500"><?= e($publishedLabel) ?></p>
-                                  <?php endif; ?>
-                                  <a class="inline-flex items-center text-sm font-semibold text-secondary"
-                                    href="<?= e($issue['pdf_url']) ?>">
-                                    Read issue
-                                    <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
-                                  </a>
-                                </div>
-                              </article>
-                        <?php endforeach; ?>
-                      </div>
-                      <p id="wings-empty" class="hidden text-sm text-gray-500 mt-4">No issues match those filters.</p>
-                      <script>
-                        (() => {
-                          const searchInput = document.getElementById('wings-search');
-                          const yearSelect = document.getElementById('wings-year');
-                          const cards = document.querySelectorAll('.wings-issue-card');
-                          const emptyState = document.getElementById('wings-empty');
-                          const countLabel = document.getElementById('wings-count');
-
-                          if (!searchInput || !yearSelect || !cards.length) {
-                            return;
-                          }
-
-                          const applyFilters = () => {
-                            const term = searchInput.value.trim().toLowerCase();
-                            const yearValue = yearSelect.value;
-                            let visibleCount = 0;
-
-                            cards.forEach((card) => {
-                              const title = card.dataset.title || '';
-                              const cardYear = card.dataset.year || '';
-                              const matchesTerm = term === '' || title.includes(term);
-                              const matchesYear = yearValue === 'all' || cardYear === yearValue;
-                              const isVisible = matchesTerm && matchesYear;
-
-                              card.classList.toggle('hidden', !isVisible);
-                              if (isVisible) {
-                                visibleCount += 1;
-                              }
-                            });
-
-                            if (countLabel) {
-                              countLabel.textContent = `${visibleCount} issue${visibleCount === 1 ? '' : 's'}`;
-                            }
-                            if (emptyState) {
-                              emptyState.classList.toggle('hidden', visibleCount !== 0);
-                            }
-                          };
-
-                          searchInput.addEventListener('input', applyFilters);
-                          yearSelect.addEventListener('change', applyFilters);
-                          applyFilters();
-                        })();
-                      </script>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500 mt-3">No issues available.</p>
-                <?php endif; ?>
-              </div>
-            </section>
-      <?php elseif ($page === 'notices-create'): ?>
-            <section class="space-y-6">
-              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <h2 class="font-display text-2xl font-bold text-gray-900">Create Notice</h2>
-                  <p class="text-sm text-gray-500">Submit a notice for admin or committee approval.</p>
-                </div>
-              </div>
-              <?php if ($noticeMessage): ?>
-                    <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($noticeMessage) ?></div>
-              <?php endif; ?>
-              <?php if ($noticeError): ?>
-                    <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($noticeError) ?></div>
-              <?php endif; ?>
-              <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-6">
-                    <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                      <span class="material-icons-outlined">edit_square</span>
+                <div class="flex flex-wrap items-center gap-3 mt-6">
+                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                    <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                      <span class="material-icons-outlined text-[18px]">tag</span>
                     </div>
-                    <div>
-                      <h3 class="font-display text-xl font-bold text-gray-900">Notice Details</h3>
-                      <p class="text-sm text-gray-500">Choose who should receive the notice.</p>
+                    <div class="flex flex-col">
+                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Member ID</span>
+                      <span class="text-sm font-bold text-gray-900"><?= e($profileMemberNumber) ?></span>
                     </div>
                   </div>
-                  <form method="post" class="space-y-4" id="notice-create-form">
-                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                    <input type="hidden" name="action" value="create_notice">
-                    <input type="hidden" name="notice_content" id="notice-content-input">
-                    <input type="hidden" name="notice_attachment_url" id="notice-attachment-url">
-                    <input type="hidden" name="notice_attachment_type" id="notice-attachment-type">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <label class="text-sm font-medium text-gray-700">Title
-                        <input type="text" name="notice_title"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                      </label>
-                      <label class="text-sm font-medium text-gray-700">Category
-                        <select name="notice_category"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                          <option value="notice">Notice</option>
-                          <option value="advert">Advert</option>
-                          <option value="announcement">Important Announcement</option>
-                        </select>
-                      </label>
+                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                    <div class="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <span class="material-icons-outlined text-[18px]">diversity_3</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <label class="text-sm font-medium text-gray-700">Audience
-                        <select name="notice_audience_scope" id="notice-audience-scope"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                          <option value="all">All members</option>
-                          <option value="state">State</option>
-                          <option value="chapter">Chapter</option>
-                        </select>
-                      </label>
-                      <label class="text-sm font-medium text-gray-700">State
-                        <select name="notice_audience_state" id="notice-audience-state"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" disabled>
-                          <option value="">Select state</option>
-                          <?php foreach ($noticeStates as $state): ?>
-                                <option value="<?= e($state['code']) ?>" <?= ($noticeFormState ?? '') === $state['code'] ? 'selected' : '' ?>><?= e($state['label']) ?> (<?= e($state['code']) ?>)</option>
-                          <?php endforeach; ?>
-                        </select>
-                      </label>
-                      <label class="text-sm font-medium text-gray-700">Chapter
-                        <select name="notice_audience_chapter" id="notice-audience-chapter"
-                          class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" disabled>
-                          <option value="">Select chapter</option>
-                          <?php foreach ($noticeChapters as $chapter): ?>
-                                <option value="<?= e((string) $chapter['id']) ?>">
-                                  <?= e($chapter['name']) ?>
-                                  <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
-                                </option>
-                          <?php endforeach; ?>
-                        </select>
-                      </label>
+                    <div class="flex flex-col">
+                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Chapter</span>
+                      <span class="text-sm font-bold text-gray-900"><?= e($profileChapterName) ?></span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                    <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <span class="material-icons-outlined text-[18px]">calendar_month</span>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Joined</span>
+                      <span class="text-sm font-bold text-gray-900"><?= e($joinedLabel) ?></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-col items-start gap-3">
+                <span class="text-xs font-medium text-gray-500">Current Status</span>
+                <div
+                  class="inline-flex items-center gap-2 rounded-lg bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-700 border border-yellow-200 uppercase tracking-wider">
+                  <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                  <?= e($currentStatusLabel) ?>
+                </div>
+                <?php if ($profileMemberId !== $member['id']): ?>
+                  <a href="/member/index.php?page=profile"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    <span class="material-icons-outlined text-[16px]">arrow_back</span>
+                    Back to my profile
+                  </a>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+          <div class="p-5 space-y-6">
+            <?php if ($profileMessage): ?>
+              <div
+                class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+                <?= e($profileMessage) ?>
+              </div>
+            <?php endif; ?>
+            <?php if ($profileError): ?>
+              <div class="rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+                <?= e($profileError) ?>
+              </div>
+            <?php endif; ?>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+                  <div class="p-6 border-b border-gray-100 flex items-center gap-3">
+                    <div class="bg-primary/10 p-2 rounded-lg text-primary">
+                      <span class="material-icons-outlined">badge</span>
                     </div>
                     <div>
-                      <p class="text-sm font-medium text-gray-700 mb-2">Description</p>
-                      <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs"
-                        id="notice-toolbar">
-                        <select id="notice-font" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
-                          <option value="">Font</option>
-                          <option value="Georgia, serif">Georgia</option>
-                          <option value="Times New Roman, serif">Times</option>
-                          <option value="Arial, sans-serif">Arial</option>
-                          <option value="Verdana, sans-serif">Verdana</option>
-                        </select>
-                        <select id="notice-size" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
-                          <option value="2">Small</option>
-                          <option value="3" selected>Normal</option>
-                          <option value="4">Large</option>
-                          <option value="5">XL</option>
-                        </select>
-                        <input type="color" id="notice-color" class="h-7 w-8 border border-gray-200 rounded">
-                        <button type="button" data-command="bold"
-                          class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
-                        <button type="button" data-command="italic"
-                          class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
-                        <button type="button" data-command="underline"
-                          class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
-                        <button type="button" data-command="insertUnorderedList"
-                          class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
-                        <button type="button" id="notice-link"
-                          class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
-                      </div>
-                      <div id="notice-editor"
-                        class="mt-2 min-h-[160px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none"
-                        contenteditable="true"></div>
+                      <h2 class="text-lg font-bold text-gray-900">Contact &amp; billing</h2>
+                      <p class="text-xs text-gray-500">Update contact details, billing address, and preferences for your
+                        membership.</p>
                     </div>
-                    <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4" id="notice-upload-zone">
-                      <div class="flex items-center justify-between gap-3">
+                  </div>
+                  <div class="p-8">
+                    <form method="post" action="/member/index.php?page=profile" class="space-y-8">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="update_profile">
+                      <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <p class="text-sm font-semibold text-gray-700">Attachment (image or PDF)</p>
-                          <p class="text-xs text-gray-500">Drag & drop or browse to upload.</p>
+                          <label class="text-sm font-medium text-gray-700">Email</label>
+                          <input type="email" name="email" value="<?= e($profileMember['email']) ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                            required>
                         </div>
-                        <input type="file" id="notice-attachment-input" accept="image/*,application/pdf" class="text-xs">
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">Phone</label>
+                          <input type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="text-sm font-medium text-gray-700">Billing address line 1</label>
+                          <input id="member_profile_address_line1" data-google-autocomplete="address"
+                            data-google-autocomplete-city="#member_profile_city"
+                            data-google-autocomplete-state="#member_profile_state"
+                            data-google-autocomplete-postal="#member_profile_postal"
+                            data-google-autocomplete-country="#member_profile_country" type="text" name="address_line1"
+                            value="<?= e($profileMember['address_line1'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="text-sm font-medium text-gray-700">Billing address line 2</label>
+                          <input id="member_profile_address_line2" type="text" name="address_line2"
+                            value="<?= e($profileMember['address_line2'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">City</label>
+                          <input id="member_profile_city" type="text" name="city"
+                            value="<?= e($profileMember['city'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">State</label>
+                          <input id="member_profile_state" type="text" name="state"
+                            value="<?= e($profileMember['state'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">Postal code</label>
+                          <input id="member_profile_postal" type="text" name="postal_code"
+                            value="<?= e($profileMember['postal_code'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">Country</label>
+                          <input id="member_profile_country" type="text" name="country"
+                            value="<?= e($profileMember['country'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
                       </div>
-                      <div id="notice-attachment-preview" class="mt-3 hidden"></div>
-                    </div>
-                    <button
-                      class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                      type="submit">Submit for approval</button>
-                  </form>
-                </div>
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-                  <div class="flex items-center gap-3">
-                    <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                      <span class="material-icons-outlined">info</span>
-                    </div>
-                    <div>
-                      <h3 class="font-display text-lg font-bold text-gray-900">Posting Tips</h3>
-                      <p class="text-sm text-gray-500">Keep notices clear and actionable.</p>
-                    </div>
-                  </div>
-                  <ul class="text-sm text-gray-600 space-y-2">
-                    <li>Choose the right audience before posting.</li>
-                    <li>Use a PDF for detailed flyers or notices.</li>
-                    <li>Admins and committee approve notices before publishing.</li>
-                  </ul>
-                </div>
-              </div>
-            </section>
-      <?php elseif ($page === 'notices-view'): ?>
-            <section class="space-y-6">
-              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <h2 class="font-display text-2xl font-bold text-gray-900">Notice Board</h2>
-                  <p class="text-sm text-gray-500">Browse the latest approved notices.</p>
-                </div>
-                <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1 text-sm">
-                  <button type="button" data-notice-view="list"
-                    class="px-3 py-1.5 rounded-md font-semibold text-gray-700">List view</button>
-                  <button type="button" data-notice-view="grid"
-                    class="px-3 py-1.5 rounded-md font-semibold text-gray-700">Grid view</button>
-                </div>
-              </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center justify-between mb-4">
-                  <h3 class="font-display text-xl font-bold text-gray-900">Current Notices</h3>
-                </div>
-                <?php if ($noticeBoardNotices): ?>
-                      <div id="notice-list" class="space-y-4">
-                        <?php foreach ($noticeBoardNotices as $notice): ?>
-                              <?php
-                              $creatorId = $notice['created_by'] ?? null;
-                              $avatar = ($creatorId && isset($noticeAvatars[$creatorId])) ? $noticeAvatars[$creatorId] : '';
-                              $category = $notice['category'] ?? 'notice';
-                              $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
-                              ?>
-                              <article class="border border-gray-100 rounded-2xl p-5 bg-white">
-                                <div class="flex items-center gap-3 mb-3">
-                                  <div
-                                    class="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center overflow-hidden">
-                                    <?php if (!empty($avatar)): ?>
-                                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>"
-                                            class="h-full w-full object-cover">
-                                    <?php else: ?>
-                                          <span class="material-icons-outlined text-sm">person</span>
-                                    <?php endif; ?>
-                                  </div>
-                                  <div class="flex-1">
-                                    <p class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></p>
-                                    <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
-                                      <?= e($notice['created_by_name'] ?? 'Member') ?>
-                                    </p>
-                                  </div>
-                                  <span
-                                    class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
-                                </div>
-                                <?php if (!empty($notice['attachment_url'])): ?>
-                                      <div class="mb-3 rounded-xl border border-gray-100 overflow-hidden">
-                                        <?php if (($notice['attachment_type'] ?? '') === 'pdf'): ?>
-                                              <object data="<?= e($notice['attachment_url']) ?>#page=1&zoom=page-fit" type="application/pdf"
-                                                class="w-full h-72">
-                                                <div class="p-4 text-sm text-gray-500">PDF attached. <a class="text-secondary font-semibold"
-                                                    href="<?= e($notice['attachment_url']) ?>">Open</a></div>
-                                              </object>
-                                        <?php else: ?>
-                                              <img src="<?= e($notice['attachment_url']) ?>" alt="<?= e($notice['title']) ?>"
-                                                class="w-full h-72 object-cover">
-                                        <?php endif; ?>
-                                      </div>
-                                <?php endif; ?>
-                                <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
-                              </article>
-                        <?php endforeach; ?>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="text-sm font-medium text-gray-700">
+                          Wings preference
+                          <select name="wings_preference"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <option value="digital" <?= $profileMember['wings_preference'] === 'digital' ? 'selected' : '' ?>>Digital</option>
+                            <option value="print" <?= $profileMember['wings_preference'] === 'print' ? 'selected' : '' ?>>
+                              Print</option>
+                            <option value="both" <?= $profileMember['wings_preference'] === 'both' ? 'selected' : '' ?>>Both
+                            </option>
+                          </select>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                          Directory privacy
+                          <select name="privacy_level"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <option value="A" <?= $profileMember['privacy_level'] === 'A' ? 'selected' : '' ?>>A — Name only
+                            </option>
+                            <option value="B" <?= $profileMember['privacy_level'] === 'B' ? 'selected' : '' ?>>B — Name +
+                              Address</option>
+                            <option value="C" <?= $profileMember['privacy_level'] === 'C' ? 'selected' : '' ?>>C — Name +
+                              Address + Phone</option>
+                            <option value="D" <?= $profileMember['privacy_level'] === 'D' ? 'selected' : '' ?>>D — Name +
+                              Address + Email</option>
+                            <option value="E" <?= $profileMember['privacy_level'] === 'E' ? 'selected' : '' ?>>E — Name +
+                              Address + Phone + Email</option>
+                            <option value="F" <?= $profileMember['privacy_level'] === 'F' ? 'selected' : '' ?>>F — Exclude
+                              from directory</option>
+                          </select>
+                        </label>
                       </div>
-                      <div id="notice-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        <?php foreach ($noticeBoardNotices as $notice): ?>
-                              <?php
-                              $category = $notice['category'] ?? 'notice';
-                              $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
-                              ?>
-                              <article class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                                <div class="relative aspect-[210/297] bg-gray-50">
-                                  <?php if (!empty($notice['attachment_url'])): ?>
-                                        <?php if (($notice['attachment_type'] ?? '') === 'pdf'): ?>
-                                              <object data="<?= e($notice['attachment_url']) ?>#page=1&zoom=page-fit" type="application/pdf"
-                                                class="w-full h-full">
-                                                <div class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">PDF</div>
-                                              </object>
-                                        <?php else: ?>
-                                              <img src="<?= e($notice['attachment_url']) ?>" alt="<?= e($notice['title']) ?>"
-                                                class="w-full h-full object-cover">
-                                        <?php endif; ?>
-                                  <?php else: ?>
-                                        <div class="h-full w-full flex items-center justify-center text-gray-300">
-                                          <span class="material-icons-outlined text-5xl">campaign</span>
-                                        </div>
-                                  <?php endif; ?>
-                                  <span
-                                    class="absolute top-3 left-3 inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-700"><?= e($categoryLabel) ?></span>
-                                </div>
-                                <div class="p-4 space-y-2">
-                                  <h4 class="text-base font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
-                                  <p class="text-xs text-gray-500">
-                                    <?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?>
-                                  </p>
-                                  <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
-                                </div>
-                              </article>
-                        <?php endforeach; ?>
-                      </div>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No notices available.</p>
-                <?php endif; ?>
-              </div>
-            </section>
-      <?php elseif ($page === 'fallen-wings'): ?>
-            <section class="space-y-6">
-              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h2 class="font-display text-2xl font-bold text-gray-900">Fallen Wings</h2>
-                  <p class="text-sm text-gray-500">Remembering members who have taken their final ride.</p>
-                </div>
-                <form method="get" class="flex items-center gap-2">
-                  <input type="hidden" name="page" value="fallen-wings">
-                  <select name="fallen_year" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                    <option value="0">All years</option>
-                    <?php foreach ($fallenYears as $yearOption): ?>
-                          <option value="<?= e((string) $yearOption) ?>" <?= $fallenFilterYear === (int) $yearOption ? 'selected' : '' ?>><?= e((string) $yearOption) ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
-                    type="submit">Filter</button>
-                </form>
-              </div>
-              <?php if ($fallenMessage): ?>
-                    <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($fallenMessage) ?></div>
-              <?php endif; ?>
-              <?php if ($fallenError): ?>
-                    <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($fallenError) ?></div>
-              <?php endif; ?>
-              <?php if (!$fallenTableExists): ?>
-                    <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">
-                      Fallen Wings table not found. Run the migration to enable memorial submissions.
-                    </div>
-              <?php endif; ?>
-              <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-6">
-                    <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                      <span class="material-icons-outlined">military_tech</span>
-                    </div>
-                    <div>
-                      <h3 class="font-display text-xl font-bold text-gray-900">Memorial Roll</h3>
-                      <p class="text-sm text-gray-500">Alphabetical by default, filter by year to narrow the list.</p>
-                    </div>
-                  </div>
-                  <?php if ($fallenWings): ?>
-                        <ul class="divide-y">
-                          <?php foreach ($fallenWings as $entry): ?>
-                                <li class="py-4">
-                                  <div class="flex items-center justify-between gap-4">
-                                    <div>
-                                      <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?></p>
-                                      <?php if (!empty($entry['member_number'])): ?>
-                                            <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
-                                      <?php endif; ?>
-                                      <?php if (!empty($entry['tribute'])): ?>
-                                            <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
-                                      <?php endif; ?>
-                                      <?php if (!empty($entry['pdf_url'])): ?>
-                                            <a href="<?= e($entry['pdf_url']) ?>" target="_blank" class="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:text-primary-dark">
-                                              <span class="material-icons-outlined text-sm">picture_as_pdf</span>
-                                              View Document
-                                            </a>
-                                      <?php endif; ?>
-                                    </div>
-                                    <div class="flex items-center gap-4 text-right">
-                                      <span class="text-sm font-semibold text-gray-500"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
-                                      <?php if (!empty($entry['image_url'])): ?>
-                                            <img src="<?= e($entry['image_url']) ?>" alt="Tribute image" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
-                                      <?php endif; ?>
-                                    </div>
-                                  </div>
-                                </li>
+                      <div>
+                        <p class="text-sm font-medium text-gray-700 mb-3">Directory preferences &amp; assistance</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
+                          <?php foreach ($directoryPrefs as $letter => $info): ?>
+                            <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                              <input type="checkbox" name="directory_pref_<?= e($letter) ?>" value="1"
+                                <?= !empty($profileMember[$info['column']] ?? null) ? 'checked' : '' ?>
+                                class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                              <span><?= e($letter) ?> — <?= e($info['label']) ?></span>
+                            </label>
                           <?php endforeach; ?>
-                        </ul>
-                  <?php else: ?>
-                        <p class="text-sm text-gray-500">No memorial entries found.</p>
-                  <?php endif; ?>
-                </div>
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                  <div class="flex items-center gap-3 mb-4">
-                    <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                      <span class="material-icons-outlined">add_circle</span>
-                    </div>
-                    <div>
-                      <h3 class="font-display text-lg font-bold text-gray-900">Submit a Memorial</h3>
-                      <p class="text-sm text-gray-500">Requests are reviewed by committee.</p>
-                    </div>
+                        </div>
+                      </div>
+                      <div class="flex justify-end">
+                        <button type="submit"
+                          class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save
+                          changes</button>
+                      </div>
+                    </form>
                   </div>
-                  <form method="post" enctype="multipart/form-data" class="space-y-3">
-                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                    <input type="hidden" name="action" value="submit_fallen_wings">
-                    <input type="text" name="fallen_name" placeholder="Member full name"
-                      value="<?= e(empty($fallenMessage) ? ($_POST['fallen_name'] ?? '') : '') ?>"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                    <input type="date" name="fallen_date"
-                      value="<?= e(empty($fallenMessage) ? ($_POST['fallen_date'] ?? '') : '') ?>"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900-01-01"
-                      max="<?= e(date('Y-m-d')) ?>" required>
-                    <input type="text" name="fallen_member_number" maxlength="120" placeholder="Member number (optional)"
-                      value="<?= e(empty($fallenMessage) ? ($_POST['fallen_member_number'] ?? '') : '') ?>"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\\-]+">
-                    <textarea name="fallen_tribute" rows="4" placeholder="Optional tribute or note"
-                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(empty($fallenMessage) ? ($_POST['fallen_tribute'] ?? '') : '') ?></textarea>
-                    <div>
-                      <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Photograph</label>
-                      <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                    </div>
-                    <div>
-                      <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Document (PDF)</label>
-                      <input type="file" name="tribute_pdf" accept=".pdf"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                    </div>
-                    <button
-                      class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                      type="submit">Submit request</button>
-                  </form>
                 </div>
-              </div>
-            </section>
-      <?php elseif ($page === 'store'): ?>
-            <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 class="font-display text-2xl font-bold text-gray-900 mb-2">Store</h2>
-              <p class="text-sm text-gray-500">Browse the members-only store.</p>
-              <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold mt-4"
-                href="/store">Go to Store</a>
-            </section>
-      <?php elseif ($page === 'billing'): ?>
-            <section class="space-y-6">
-              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <h2 class="font-display text-2xl font-bold text-gray-900">Billing & Payments</h2>
-                  <p class="text-sm text-gray-500">Manage payment methods, shipping details, and recent orders.</p>
-                </div>
-                <?php if ($customerPortalEnabled): ?>
-                      <button id="billing-portal"
-                        class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold">Manage
-                        payment details</button>
-                <?php endif; ?>
-              </div>
-              <?php if ($billingMessage): ?>
-                    <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($billingMessage) ?></div>
-              <?php endif; ?>
-              <?php if ($billingError): ?>
-                    <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($billingError) ?></div>
-              <?php endif; ?>
-              <?php
-              $pendingPeriod = null;
-              $pendingMembershipOrder = null;
-              $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
-              if ($member) {
-                $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id AND status = "PENDING_PAYMENT" ORDER BY created_at DESC LIMIT 1');
-                $stmt->execute(['member_id' => $member['id']]);
-                $pendingPeriod = $stmt->fetch();
-                $pendingMembershipOrder = null;
-                if ($ordersMemberColumn && $ordersMemberValue) {
-                  $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
-                  $stmt->execute(['value' => $ordersMemberValue]);
-                  $pendingMembershipOrder = $stmt->fetch();
-                }
-              }
-              if (!$pendingMembershipOrder && $pendingPeriod && $member) {
-                $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
-                $memberTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
-                $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
-                $pricingPeriodKey = $termKey === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
-                $priceCents = MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, $pricingPeriodKey) ?? 0;
-                $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
-                $amount = round($priceCents / 100, 2);
-                $order = MembershipOrderService::createMembershipOrder((int) $member['id'], (int) ($pendingPeriod['id'] ?? 0), $amount, [
-                  'payment_method' => 'stripe',
-                  'payment_status' => 'pending',
-                  'fulfillment_status' => 'pending',
-                  'currency' => $pricingCurrency,
-                  'term' => $termKey,
-                  'item_name' => 'Membership renewal ' . $termKey,
-                ]);
-                if ($order) {
-                  $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
-                  $stmt->execute(['id' => $order['id'] ?? 0]);
-                  $pendingMembershipOrder = $stmt->fetch();
-                }
-              }
-              $renewEligible = false;
-              if ($member && strtoupper((string) ($member['member_type'] ?? '')) !== 'LIFE' && !empty($membershipPeriod['end_date'])) {
-                $renewEligible = strtotime((string) $membershipPeriod['end_date']) <= strtotime('+60 days');
-              }
-              if (!empty($membershipPeriod['status']) && strtoupper((string) $membershipPeriod['status']) === 'LAPSED') {
-                $renewEligible = true;
-              }
-              ?>
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
                   <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-                      <span class="material-icons-outlined">credit_card</span>
+                    <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                      <span class="material-icons-outlined">card_membership</span>
                     </div>
                     <div>
-                      <h3 class="font-display text-lg font-bold text-gray-900">Membership status</h3>
-                      <p class="text-sm text-gray-500">Track membership status and pending payments.</p>
+                      <h2 class="text-lg font-bold text-gray-900">Membership summary</h2>
+                      <p class="text-sm text-gray-500">Enrollment status, renewal, and primary bike.</p>
                     </div>
                   </div>
-                  <?php
-                  $billingMembershipTypeLabel = 'Member';
-                  if ($member) {
-                    $memberTypeKey = strtoupper((string) ($member['member_type'] ?? ''));
-                    $billingMembershipTypeLabel = match ($memberTypeKey) {
-                      'FULL' => 'Full Member',
-                      'ASSOCIATE' => 'Associate Member',
-                      'LIFE' => 'Life Member',
-                      default => 'Member',
-                    };
-                  }
-                  $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
-                  $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
-                  ?>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-600">
+                  <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
                     <div>
                       <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Type</p>
-                      <p class="text-sm font-semibold text-gray-900"><?= e($billingMembershipTypeLabel) ?></p>
+                      <p class="text-sm font-semibold text-gray-900"><?= e($profileMembershipTypeLabel) ?></p>
                     </div>
                     <div>
                       <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Status</p>
                       <span
-                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= status_badge_classes($billingStatusLabel) ?>"><?= e($billingStatusLabel) ?></span>
+                        class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold <?= $profileStatusClasses ?>">
+                        <span
+                          class="w-2 h-2 rounded-full <?= strpos($profileStatusClasses, 'text-green') !== false ? 'bg-green-500' : 'bg-yellow-500' ?>"></span>
+                        <?= e($profileMembershipStatusLabel) ?>
+                      </span>
                     </div>
                     <div>
-                      <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Expiry</p>
-                      <p class="text-sm font-semibold text-gray-900"><?= e($billingExpiryLabel) ?></p>
+                      <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Joined</p>
+                      <p class="text-sm font-medium text-gray-900"><?= e($joinedLabel) ?></p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Renewal date</p>
+                      <p class="text-sm font-medium text-gray-900"><?= e($profileRenewalLabel) ?></p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Last payment</p>
+                      <p class="text-sm text-gray-500"><?= e($profileLastPaymentLabel) ?></p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Payment method</p>
+                      <p class="text-sm text-gray-500"><?= e($profilePaymentMethodLabel) ?></p>
                     </div>
                   </div>
-                  <?php if ($pendingMembershipOrder): ?>
-                        <?php
-                        $pendingPaymentMethod = strtolower((string) ($pendingMembershipOrder['payment_method'] ?? 'stripe'));
-                        $pendingStatus = strtolower((string) ($pendingMembershipOrder['payment_status'] ?? 'pending'));
-                        ?>
-                        <div
-                          class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 space-y-2">
-                          <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="pt-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">Primary bike</p>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Make</p>
+                        <p class="text-sm font-medium text-gray-900"><?= e($primaryBike['make'] ?? '—') ?></p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Model</p>
+                        <p class="text-sm font-medium text-gray-900"><?= e($primaryBike['model'] ?? '—') ?></p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Year</p>
+                        <p class="text-sm font-medium text-gray-900"><?= e($primaryBikeYearLabel) ?></p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-[0.3em] mb-1">Rego</p>
+                        <p class="text-sm font-medium text-gray-900"><?= e($primaryBikeRegoLabel) ?></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="space-y-6">
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+                  <div class="flex items-center gap-3">
+                    <div class="p-2 bg-orange-50 rounded-lg text-orange-600">
+                      <span class="material-icons-outlined">bolt</span>
+                    </div>
+                    <div>
+                      <h3 class="font-display text-lg font-bold text-gray-900">Quick actions</h3>
+                      <p class="text-sm text-gray-500">Account essentials you can manage yourself.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-3">
+                    <a class="w-full inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      href="/member/reset_password.php">
+                      <span class="material-icons-outlined text-base">lock_reset</span>
+                      <span class="ml-2">Reset password</span>
+                    </a>
+                    <div
+                      class="flex items-center justify-between rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-900">
+                      <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-gray-400">Two-factor authentication</p>
+                        <p><?= e($twofaStatusLabel) ?>
+                          (<?= strtolower($twofaRequirement) === 'required' ? 'required' : 'optional' ?>)</p>
+                      </div>
+                      <a class="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                        href="<?= e($twofaActionHref) ?>">
+                        <?= e($twofaActionLabel) ?>
+                        <span class="material-icons-outlined text-[16px]">open_in_new</span>
+                      </a>
+                    </div>
+                    <a class="inline-flex items-center justify-center gap-2 rounded-full border border-primary bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20"
+                      href="/?page=membership">
+                      <span class="material-icons-outlined text-base">credit_card</span>
+                      Membership &amp; billing
+                    </a>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+                  <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                      <span class="material-icons-outlined">hub</span>
+                    </div>
+                    <div>
+                      <h3 class="font-display text-lg font-bold text-gray-900">Membership links</h3>
+                      <p class="text-sm text-gray-500">Manage linked member profiles.</p>
+                    </div>
+                  </div>
+                  <?php if (in_array($member['member_type'], ['FULL', 'LIFE'], true)): ?>
+                    <?php if ($associates): ?>
+                      <ul class="space-y-3 text-sm text-gray-700">
+                        <?php foreach ($associates as $assoc): ?>
+                          <li
+                            class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
                             <div>
-                              Pending order <span
-                                class="font-semibold"><?= e($pendingMembershipOrder['order_number'] ?? '') ?></span>
+                              <p class="font-medium text-gray-900"><?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
+                              </p>
+                              <p class="text-xs text-gray-500">
+                                <?= e(MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>
+                              </p>
                             </div>
-                            <span
-                              class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
-                          </div>
-                          <?php if ($pendingPaymentMethod === 'stripe'): ?>
-                                <form method="post" class="mt-2">
-                                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                  <input type="hidden" name="action" value="membership_order_pay">
-                                  <input type="hidden" name="order_id" value="<?= e((string) $pendingMembershipOrder['id']) ?>">
-                                  <button
-                                    class="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900"
-                                    type="submit">Pay now</button>
-                                </form>
-                          <?php elseif ($pendingPaymentMethod === 'bank_transfer'): ?>
-                                <?php if ($bankInstructions !== ''): ?>
-                                      <div class="rounded-lg bg-white/80 px-3 py-2 text-xs text-gray-700 whitespace-pre-line">
-                                        <?= e($bankInstructions) ?>
-                                      </div>
-                                <?php else: ?>
-                                      <p class="text-xs text-gray-600">Bank transfer instructions will be emailed to you.</p>
-                                <?php endif; ?>
-                          <?php else: ?>
-                                <p class="text-xs text-gray-600">Awaiting payment approval.</p>
+                            <a class="inline-flex items-center text-xs font-semibold text-secondary"
+                              href="/member/index.php?page=profile&member_id=<?= e((string) $assoc['id']) ?>">Edit</a>
+                          </li>
+                        <?php endforeach; ?>
+                      </ul>
+                    <?php else: ?>
+                      <p class="text-sm text-gray-500">No associates linked yet.</p>
+                    <?php endif; ?>
+                  <?php elseif ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
+                    <div class="rounded-lg border border-gray-100 bg-white px-3 py-3 text-sm text-gray-700">
+                      <p class="font-medium text-gray-900">
+                        <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
+                      </p>
+                      <p class="text-xs text-gray-500">
+                        <?= e(MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
+                      </p>
+                      <a class="mt-3 inline-flex items-center text-xs font-semibold text-secondary"
+                        href="/member/index.php?page=profile&member_id=<?= e((string) $fullMember['id']) ?>">Edit</a>
+                    </div>
+                  <?php else: ?>
+                    <p class="text-sm text-gray-500">No linked membership details available.</p>
+                  <?php endif; ?>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+                  <div class="flex items-center gap-3">
+                    <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
+                      <span class="material-icons-outlined">group</span>
+                    </div>
+                    <div>
+                      <h3 class="font-display text-lg font-bold text-gray-900">Chapter change</h3>
+                      <p class="text-sm text-gray-500">Request a move to another chapter.</p>
+                    </div>
+                  </div>
+                  <?php if ($member['member_type'] === 'ASSOCIATE' && !empty($member['full_member_id'])): ?>
+                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                      Chapter changes are managed by the full member linked to this profile.
+                    </div>
+                  <?php else: ?>
+                    <form method="post" class="space-y-3">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="request_chapter">
+                      <select name="requested_chapter_id"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Select chapter</option>
+                        <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
+                          <?php
+                          $chapterLabel = $chapter['name'];
+                          if (!empty($chapter['state'])) {
+                            $chapterLabel .= ' (' . $chapter['state'] . ')';
+                          }
+                          ?>
+                          <option value="<?= e((string) $chapter['id']) ?>"><?= e($chapterLabel) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <button
+                        class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        type="submit">Submit request</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if ($chapterRequests): ?>
+                    <div class="mt-4 space-y-2 text-sm text-gray-600">
+                      <?php foreach ($chapterRequests as $request): ?>
+                        <div class="rounded-lg border border-gray-100 bg-white px-3 py-2">
+                          <p class="font-semibold text-gray-900"><?= e($request['name']) ?></p>
+                          <p class="text-xs text-gray-500">Requested: <?= e($request['requested_at']) ?></p>
+                          <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Status:
+                            <?= e($request['status']) ?>
+                          </p>
+                          <?php if (!empty($request['rejection_reason'])): ?>
+                            <p class="mt-1 text-xs text-red-600">Reason: <?= e($request['rejection_reason']) ?></p>
                           <?php endif; ?>
                         </div>
-                  <?php else: ?>
-                        <p class="text-sm text-gray-600">No pending membership payments.</p>
-                  <?php endif; ?>
-                  <?php if ($renewEligible && !$pendingMembershipOrder): ?>
-                        <form method="post">
-                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                          <input type="hidden" name="action" value="membership_renew">
-                          <button
-                            class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700"
-                            type="submit">Renew membership</button>
-                        </form>
-                  <?php endif; ?>
-                  <?php if (!$customerPortalEnabled): ?>
-                        <p class="text-xs text-gray-500">Customer portal is disabled. Contact support for card updates.</p>
+                      <?php endforeach; ?>
+                    </div>
                   <?php endif; ?>
                 </div>
-                <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-                  <div class="flex items-center gap-3">
-                    <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
-                      <span class="material-icons-outlined">local_shipping</span>
+                <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                      <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600">
+                        <span class="material-icons-outlined">two_wheeler</span>
+                      </div>
+                      <div>
+                        <h3 class="font-display text-lg font-bold text-gray-900">My bikes</h3>
+                        <p class="text-sm text-gray-500">Keep your garage up to date.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 class="font-display text-lg font-bold text-gray-900">Shipping Address</h3>
-                      <p class="text-sm text-gray-500">Keep your shipping details current for store orders.</p>
-                    </div>
+                    <span
+                      class="inline-flex items-center rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700"><?= count($bikes) ?>
+                      Bikes</span>
                   </div>
-                  <form method="post" class="space-y-3">
-                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                    <input type="hidden" name="action" value="update_shipping">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <input id="member_shipping_address_line1" data-google-autocomplete="address"
-                        data-google-autocomplete-city="#member_shipping_city"
-                        data-google-autocomplete-state="#member_shipping_state"
-                        data-google-autocomplete-postal="#member_shipping_postal"
-                        data-google-autocomplete-country="#member_shipping_country" type="text" name="shipping_address_line1"
-                        placeholder="Address line 1"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['address_line1'] ?? '') ?>">
-                      <input id="member_shipping_address_line2" type="text" name="shipping_address_line2"
-                        placeholder="Address line 2"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['address_line2'] ?? '') ?>">
-                      <input id="member_shipping_city" type="text" name="shipping_city" placeholder="City"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['city'] ?? '') ?>">
-                      <input id="member_shipping_state" type="text" name="shipping_state" placeholder="State"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['state'] ?? '') ?>">
-                      <input id="member_shipping_postal" type="text" name="shipping_postal_code" placeholder="Postal code"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['postal_code'] ?? '') ?>">
-                      <input id="member_shipping_country" type="text" name="shipping_country" placeholder="Country"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                        value="<?= e($member['country'] ?? '') ?>">
-                    </div>
-                    <button
-                      class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                      type="submit">Save shipping address</button>
-                  </form>
+                  <?php if ($bikes): ?>
+                    <ul class="space-y-3 text-sm text-gray-700">
+                      <?php foreach ($bikes as $bike): ?>
+                        <li class="rounded-xl border border-gray-100 bg-white p-3 space-y-3">
+                          <div class="flex gap-3">
+                            <div class="h-16 w-20 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
+                              <?php if (!empty($bike['image_url'])): ?>
+                                <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>"
+                                  class="h-full w-full object-cover">
+                              <?php else: ?>
+                                <span class="material-icons-outlined text-gray-300">two_wheeler</span>
+                              <?php endif; ?>
+                            </div>
+                            <div class="flex-1">
+                              <p class="font-semibold text-gray-900"><?= e($bike['make'] . ' ' . $bike['model']) ?></p>
+                              <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?></p>
+                              <?php
+                              $bikeColor = $bike['color'] ?? ($bike['colour'] ?? '');
+                              ?>
+                              <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <?php if (!empty($bike['rego'])): ?>
+                                  <span
+                                    class="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 font-semibold text-yellow-700">Rego
+                                    / Reg#:
+                                    <?= e($bike['rego']) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($bikeColor)): ?>
+                                  <span
+                                    class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Colour:
+                                    <?= e($bikeColor) ?></span>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                            <?php if ($canManageProfileBikes): ?>
+                              <form method="post" action="<?= e($profileActionUrl) ?>" class="ml-auto">
+                                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                                <input type="hidden" name="action" value="delete_bike">
+                                <input type="hidden" name="bike_id" value="<?= e((string) $bike['id']) ?>">
+                                <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                                <button
+                                  class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                                  type="submit" onclick="return confirm('Remove this bike?');">Remove</button>
+                              </form>
+                            <?php endif; ?>
+                          </div>
+                          <?php if ($canManageProfileBikes): ?>
+                            <?php $bikeId = (int) $bike['id']; ?>
+                            <form method="post" action="<?= e($profileActionUrl) ?>"
+                              class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                              <input type="hidden" name="action" value="update_bike">
+                              <input type="hidden" name="bike_id" value="<?= e((string) $bikeId) ?>">
+                              <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                              <input type="text" name="bike_make" value="<?= e($bike['make'] ?? '') ?>" placeholder="Make"
+                                required
+                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_model" value="<?= e($bike['model'] ?? '') ?>" placeholder="Model"
+                                required
+                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="number" name="bike_year" value="<?= e($bike['year'] ?? '') ?>" placeholder="Year"
+                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_color" value="<?= e($bikeColor ?? '') ?>" placeholder="Colour"
+                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <input type="text" name="bike_rego" value="<?= e($bike['rego'] ?? '') ?>"
+                                placeholder="Rego / Registration Number"
+                                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <div class="flex items-center gap-3">
+                                <div id="bike-image-preview-<?= e((string) $bikeId) ?>"
+                                  class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
+                                  <?php if (!empty($bike['image_url'])): ?>
+                                    <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>"
+                                      class="h-full w-full object-cover">
+                                  <?php else: ?>
+                                    <span class="material-icons-outlined">image</span>
+                                  <?php endif; ?>
+                                </div>
+                                <input type="hidden" name="bike_image_url" id="bike-image-url-input-<?= e((string) $bikeId) ?>"
+                                  value="<?= e($bike['image_url'] ?? '') ?>">
+                                <button type="button"
+                                  class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
+                                  data-upload-trigger data-upload-target="bike-image-url-input-<?= e((string) $bikeId) ?>"
+                                  data-upload-preview="bike-image-preview-<?= e((string) $bikeId) ?>"
+                                  data-upload-context="bikes">Update bike image</button>
+                              </div>
+                              <?php if (!empty($bikeHasPrimary)): ?>
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
+                                  <input type="radio" name="is_primary" value="1" <?= (int) ($bike['is_primary'] ?? 0) === 1 ? 'checked' : '' ?> class="text-primary focus:ring-2 focus:ring-primary">
+                                  Primary bike
+                                </label>
+                              <?php endif; ?>
+                              <button
+                                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                                type="submit">Save changes</button>
+                            </form>
+                          <?php endif; ?>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php else: ?>
+                    <p class="text-sm text-gray-500">No bikes saved yet.</p>
+                  <?php endif; ?>
+                  <?php if ($canManageProfileBikes): ?>
+                    <form method="post" action="<?= e($profileActionUrl) ?>" class="mt-4 space-y-2">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="add_bike">
+                      <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                      <input type="text" name="bike_make" placeholder="Make" required
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_model" placeholder="Model" required
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="number" name="bike_year" placeholder="Year"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_color" placeholder="Colour"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <input type="text" name="bike_rego" placeholder="Rego / Registration Number"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                      <div class="flex items-center gap-3">
+                        <div id="bike-image-preview"
+                          class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden">
+                          <span class="material-icons-outlined">image</span>
+                        </div>
+                        <input type="hidden" name="bike_image_url" id="bike-image-url-input">
+                        <button type="button"
+                          class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
+                          data-upload-trigger data-upload-target="bike-image-url-input"
+                          data-upload-preview="bike-image-preview" data-upload-context="bikes">Upload bike image</button>
+                      </div>
+                      <button
+                        class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                        type="submit">Add Bike</button>
+                    </form>
+                  <?php endif; ?>
                 </div>
               </div>
-              <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div class="flex items-center justify-between mb-4">
+            </div>
+          </div>
+        </section>
+      <?php elseif ($page === 'settings'): ?>
+        <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900">Personal Settings</h1>
+            <p class="text-gray-500 mt-2">Control your timezone, profile image, and notification preferences.</p>
+          </div>
+          <div class="flex items-center gap-3 rounded-full border border-gray-100 bg-white px-4 py-2 shadow-sm">
+            <div
+              class="h-10 w-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center overflow-hidden">
+              <?php if (!empty($avatarUrl)): ?>
+                <img src="<?= e($avatarUrl) ?>" alt="<?= e($user['name'] ?? 'Member') ?>"
+                  class="h-full w-full object-cover">
+              <?php else: ?>
+                <span class="material-icons-outlined">tune</span>
+              <?php endif; ?>
+            </div>
+            <div class="text-sm">
+              <p class="font-semibold text-gray-900"><?= e($user['name'] ?? 'Member') ?></p>
+              <p class="text-primary font-medium">Account Settings</p>
+            </div>
+          </div>
+        </section>
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <?php if ($profileMessage): ?>
+              <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($profileMessage) ?></div>
+            <?php endif; ?>
+            <?php if ($profileError): ?>
+              <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($profileError) ?></div>
+            <?php endif; ?>
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-6">
+                <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                  <span class="material-icons-outlined">settings</span>
+                </div>
+                <div>
+                  <h2 class="font-display text-xl font-bold text-gray-900">Account Preferences</h2>
+                  <p class="text-sm text-gray-500">Keep your profile and alerts aligned with your needs.</p>
+                </div>
+              </div>
+              <form method="post" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="update_personal_settings">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="text-sm font-medium text-gray-700">Timezone
+                    <input name="user_timezone"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      value="<?= e($userTimezone) ?>" placeholder="Australia/Sydney">
+                  </label>
                   <div>
-                    <h3 class="font-display text-lg font-bold text-gray-900">Order History</h3>
-                    <p class="text-sm text-gray-500">All membership and store payments in one place.</p>
+                    <p class="text-sm font-medium text-gray-700">Profile image</p>
+                    <div class="mt-2 flex items-center gap-3">
+                      <div id="avatar-preview"
+                        class="h-14 w-14 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center overflow-hidden">
+                        <?php if (!empty($avatarUrl)): ?>
+                          <img src="<?= e($avatarUrl) ?>" alt="<?= e($user['name'] ?? 'Member') ?>"
+                            class="h-full w-full object-cover">
+                        <?php else: ?>
+                          <span class="material-icons-outlined text-base">person</span>
+                        <?php endif; ?>
+                      </div>
+                      <input type="hidden" name="avatar_url" id="avatar-url-input" value="<?= e($avatarUrl) ?>">
+                      <button type="button"
+                        class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
+                        data-upload-trigger data-upload-target="avatar-url-input" data-upload-preview="avatar-preview"
+                        data-upload-context="avatars">Upload image</button>
+                    </div>
                   </div>
                 </div>
-                <?php if ($orderHistory): ?>
-                      <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                          <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                            <tr>
-                              <th class="py-2 pr-3">Date</th>
-                              <th class="py-2 pr-3">Items</th>
-                              <th class="py-2 pr-3">Status</th>
-                              <th class="py-2 pr-3">Amount</th>
-                              <th class="py-2 pr-3">Renewal</th>
-                              <th class="py-2">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody class="divide-y">
-                            <?php foreach ($orderHistory as $order): ?>
-                                  <tr>
-                                    <td class="py-3 pr-3 text-gray-600"><?= e($order['date']) ?></td>
-                                    <td class="py-3 pr-3 text-gray-900">
-                                      <div class="space-y-1">
-                                        <?php foreach ($order['items'] as $item): ?>
-                                              <div><?= e($item['label']) ?> <span
-                                                  class="text-xs text-gray-500">x<?= e((string) $item['quantity']) ?></span></div>
-                                        <?php endforeach; ?>
-                                        <?php if (!empty($order['is_manual'])): ?>
-                                              <span
-                                                class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Manual</span>
-                                        <?php endif; ?>
-                                      </div>
-                                    </td>
-                                    <td class="py-3 pr-3 text-gray-600"><?= e(ucfirst($order['status'])) ?></td>
-                                    <td class="py-3 pr-3 text-gray-900">$<?= e($order['amount']) ?></td>
-                                    <td class="py-3 pr-3 text-gray-600">
-                                      <?php if ($order['type'] === 'membership' && !empty($order['days_remaining_label'])): ?>
-                                            <?= e($order['days_remaining_label']) ?>
-                                      <?php else: ?>
-                                            &mdash;
-                                      <?php endif; ?>
-                                    </td>
-                                    <td class="py-3 text-gray-600">
-                                      <?php if ($order['type'] === 'membership' && in_array(strtolower((string) ($order['payment_status'] ?? $order['status'] ?? '')), ['pending', 'failed'], true) && in_array(strtolower((string) ($order['payment_method'] ?? 'stripe')), ['stripe', 'card', ''], true)): ?>
-                                            <form method="post">
-                                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                              <input type="hidden" name="action" value="membership_order_pay">
-                                              <input type="hidden" name="order_id" value="<?= e((string) ($order['order_id'] ?? '')) ?>">
-                                              <button
-                                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary text-xs font-semibold text-primary hover:bg-primary/10"
-                                                type="submit">Pay now</button>
-                                            </form>
-                                      <?php elseif ($order['type'] === 'store' && !empty($order['order_id'])): ?>
-                                            <form method="post" action="/store/cart">
-                                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                              <input type="hidden" name="action" value="reorder">
-                                              <input type="hidden" name="order_id" value="<?= e((string) $order['order_id']) ?>">
-                                              <button
-                                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                                                type="submit">Reorder</button>
-                                            </form>
-                                      <?php else: ?>
-                                            &mdash;
-                                      <?php endif; ?>
-                                    </td>
-                                  </tr>
-                            <?php endforeach; ?>
-                          </tbody>
-                        </table>
-                      </div>
-                <?php else: ?>
-                      <p class="text-sm text-gray-500">No orders found.</p>
+                <div>
+                  <p class="text-sm font-medium text-gray-700 mb-2">Account Notifications</p>
+                  <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                    <label class="flex items-center justify-between gap-3 text-sm text-gray-700">
+                      <span class="font-medium">Email notifications</span>
+                      <input type="checkbox" name="notify_master_enabled" <?= $masterNotificationsEnabled ? 'checked' : '' ?> class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                    </label>
+                    <label class="flex items-center justify-between gap-3 text-sm text-gray-700">
+                      <span class="font-medium">Unsubscribe from all non-essential emails</span>
+                      <input type="checkbox" name="notify_unsubscribe_all" <?= $unsubscribeAll ? 'checked' : '' ?>
+                        class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                    </label>
+                    <p class="text-xs text-gray-500">Mandatory security and billing emails still send when required.</p>
+                  </div>
+                  <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <?php foreach ($notificationCategories as $key => $label): ?>
+                      <label
+                        class="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 text-sm text-gray-700">
+                        <input type="checkbox" name="notify_category[<?= e($key) ?>]"
+                          <?= !empty($notificationPrefs['categories'][$key]) ? 'checked' : '' ?>
+                          class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                        <?= e($label) ?>
+                      </label>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <a class="text-sm text-slate-500" href="/member/index.php?page=settings">Cancel</a>
+                  <button
+                    class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                    type="submit">Save settings</button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="space-y-6">
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
+                  <span class="material-icons-outlined">person</span>
+                </div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Profile</h3>
+              </div>
+              <p class="text-sm text-gray-600">Update your membership details and contact information.</p>
+              <a class="mt-4 inline-flex items-center text-sm font-semibold text-secondary"
+                href="/member/index.php?page=profile">Edit profile</a>
+            </div>
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                  <span class="material-icons-outlined">shield</span>
+                </div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Password & Security</h3>
+              </div>
+              <p class="text-sm text-gray-600">Reset your password or review account security.</p>
+              <a class="mt-4 inline-flex items-center text-sm font-semibold text-secondary"
+                href="/member/reset_password.php">Reset password</a>
+            </div>
+          </div>
+        </section>
+      <?php elseif ($page === 'activity'): ?>
+        <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900">Activity</h1>
+            <p class="text-gray-500 mt-2">Recent actions linked to your membership.</p>
+          </div>
+        </section>
+        <section class="mt-6 space-y-4">
+          <?php if ($memberActivity): ?>
+            <?php foreach ($memberActivity as $entry): ?>
+              <?php
+              $actionKey = $entry['action'] ?? 'activity';
+              $metadata = [];
+              if (!empty($entry['metadata'])) {
+                $decoded = json_decode((string) $entry['metadata'], true);
+                if (is_array($decoded)) {
+                  $metadata = $decoded;
+                }
+              }
+              $label = $actionKey === 'email.sent' ? 'Email sent' : ucwords(str_replace(['.', '_'], ' ', $actionKey));
+              ?>
+              <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-gray-500">
+                  <span><?= e(format_datetime_au($entry['created_at'] ?? 'now')) ?></span>
+                  <span><?= e(ucfirst($entry['actor_type'] ?? 'system')) ?></span>
+                </div>
+                <p class="mt-2 text-sm font-semibold text-gray-900"><?= e($label) ?></p>
+                <?php if ($actionKey !== 'email.sent' && !empty($metadata)): ?>
+                  <p class="text-xs text-gray-500 mt-1"><?= e(json_encode($metadata, JSON_UNESCAPED_SLASHES)) ?></p>
                 <?php endif; ?>
               </div>
-            </section>
-            <?php if ($customerPortalEnabled): ?>
-                  <script>
-                    const portalButton = document.getElementById('billing-portal');
-                    if (portalButton) {
-                      portalButton.addEventListener('click', async () => {
-                        const response = await fetch('/api/billing/portal');
-                        const data = await response.json();
-                        if (data.url) {
-                          window.location.href = data.url;
-                          return;
-                        }
-                        alert(data.error || 'Unable to open billing portal.');
-                      });
-                    }
-                  </script>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">No activity recorded yet.
+            </div>
+          <?php endif; ?>
+        </section>
+      <?php elseif ($page === 'wings'): ?>
+        <?php $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll(); ?>
+        <?php $latestIssue = $wingsLatest ?: ($issues[0] ?? null); ?>
+        <?php
+        $issueYears = [];
+        foreach ($issues as $issue) {
+          if (!empty($issue['published_at'])) {
+            $yearValue = date('Y', strtotime($issue['published_at']));
+            $issueYears[$yearValue] = true;
+          }
+        }
+        $issueYearOptions = array_keys($issueYears);
+        rsort($issueYearOptions);
+        ?>
+        <section class="space-y-6">
+          <div class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+            <div class="absolute -top-8 -right-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl"></div>
+            <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+              <span class="material-icons-outlined text-9xl text-primary transform rotate-12">auto_stories</span>
+            </div>
+            <?php if ($latestIssue): ?>
+              <div class="relative z-10 grid grid-cols-1 lg:grid-cols-[360px,1fr] gap-8 items-center">
+                <div class="w-full max-w-[360px] xl:max-w-[420px]">
+                  <div class="aspect-[3/4] rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden">
+                    <?php if (!empty($latestIssue['cover_image_url'])): ?>
+                      <img alt="<?= e($latestIssue['title']) ?>" class="w-full h-full object-cover"
+                        src="<?= e($latestIssue['cover_image_url']) ?>">
+                    <?php else: ?>
+                      <div class="w-full h-full flex items-center justify-center bg-gray-50">
+                        <span class="material-icons-outlined text-6xl text-gray-300">import_contacts</span>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="space-y-4">
+                  <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                    <span
+                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-gray-900">Latest
+                      Issue</span>
+                    <?php if (!empty($latestIssue['published_at'])): ?>
+                      <span>Released <?= e(format_date_au($latestIssue['published_at'])) ?></span>
+                    <?php endif; ?>
+                  </div>
+                  <div>
+                    <h2 class="font-display text-3xl md:text-4xl font-bold text-gray-900"><?= e($latestIssue['title']) ?>
+                    </h2>
+                    <p class="text-base text-gray-600 mt-3">Catch up on the newest issue and explore past editions in the
+                      archive.</p>
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                      href="/member/download_wings.php?id=<?= $latestIssue['id'] ?>" target="_blank" rel="noopener">
+                      <span class="material-icons-outlined text-base">menu_book</span>
+                      <span class="ml-2">Read Online</span>
+                    </a>
+                    <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                      href="/member/download_wings.php?id=<?= $latestIssue['id'] ?>" download>
+                      <span class="material-icons-outlined text-base">download</span>
+                      <span class="ml-2">Download PDF</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            <?php else: ?>
+              <div class="relative z-10">
+                <h2 class="font-display text-2xl font-bold text-gray-900 mb-2">Wings Magazine</h2>
+                <p class="text-sm text-gray-500">No issues available.</p>
+              </div>
             <?php endif; ?>
-      <?php elseif ($page === 'history'): ?>
-            <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 class="font-display text-2xl font-bold text-gray-900 mb-4">Membership History</h2>
-              <?php
-              $history = [];
-              if ($member) {
-                $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC');
-                $stmt->execute(['member_id' => $member['id']]);
-                $history = $stmt->fetchAll();
-              }
-              ?>
-              <?php if ($history): ?>
-                    <div class="overflow-x-auto">
-                      <table class="w-full text-sm">
-                        <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                          <tr>
-                            <th class="py-2 pr-3">Term</th>
-                            <th class="py-2 pr-3">Start</th>
-                            <th class="py-2 pr-3">End</th>
-                            <th class="py-2">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                          <?php foreach ($history as $period): ?>
-                                <tr>
-                                  <td class="py-2 pr-3 text-gray-900"><?= e($period['term']) ?></td>
-                                  <td class="py-2 pr-3 text-gray-600"><?= e($period['start_date']) ?></td>
-                                  <td class="py-2 pr-3 text-gray-600"><?= e($period['end_date'] ?? 'No expiry') ?></td>
-                                  <td class="py-2 text-gray-600"><?= e($period['status']) ?></td>
-                                </tr>
-                          <?php endforeach; ?>
-                        </tbody>
-                      </table>
-                    </div>
-              <?php else: ?>
-                    <p class="text-sm text-gray-500">No membership history yet.</p>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <h3 class="font-display text-lg font-bold text-gray-900">Archive</h3>
+                <?php if ($issues): ?>
+                  <span id="wings-count" class="text-sm text-gray-500"><?= count($issues) ?> issues</span>
+                <?php endif; ?>
+              </div>
+              <?php if ($issues): ?>
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="relative">
+                    <span
+                      class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                    <input id="wings-search" class="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                      placeholder="Search issues..." type="search">
+                  </div>
+                  <select id="wings-year" class="py-2 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white">
+                    <option value="all">All years</option>
+                    <?php foreach ($issueYearOptions as $yearOption): ?>
+                      <option value="<?= e($yearOption) ?>"><?= e($yearOption) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
               <?php endif; ?>
-            </section>
+            </div>
+            <?php if ($issues): ?>
+              <div id="wings-archive-grid" class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <?php foreach ($issues as $issue): ?>
+                  <?php
+                  $publishedLabel = '';
+                  $publishedYear = '';
+                  if (!empty($issue['published_at'])) {
+                    $publishedLabel = format_date_au($issue['published_at']);
+                    $publishedYear = date('Y', strtotime($issue['published_at']));
+                  }
+                  $issueTitle = strtolower($issue['title'] ?? '');
+                  ?>
+                  <article
+                    class="wings-issue-card group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    data-title="<?= e($issueTitle) ?>" data-year="<?= e($publishedYear) ?>">
+                    <div class="aspect-[3/4] bg-gray-50 overflow-hidden">
+                      <?php if (!empty($issue['cover_image_url'])): ?>
+                        <img alt="<?= e($issue['title']) ?>"
+                          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          src="<?= e($issue['cover_image_url']) ?>">
+                      <?php else: ?>
+                        <div class="w-full h-full flex items-center justify-center">
+                          <span class="material-icons-outlined text-4xl text-gray-300">menu_book</span>
+                        </div>
+                      <?php endif; ?>
+                    </div>
+                    <div class="p-4 space-y-2">
+                      <h4 class="text-base font-semibold text-gray-900"><?= e($issue['title']) ?></h4>
+                      <?php if ($publishedLabel): ?>
+                        <p class="text-xs text-gray-500"><?= e($publishedLabel) ?></p>
+                      <?php endif; ?>
+                      <a class="inline-flex items-center text-sm font-semibold text-secondary"
+                        href="/member/download_wings.php?id=<?= $issue['id'] ?>">
+                        Read issue
+                        <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
+                      </a>
+                    </div>
+                  </article>
+                <?php endforeach; ?>
+              </div>
+              <p id="wings-empty" class="hidden text-sm text-gray-500 mt-4">No issues match those filters.</p>
+              <script>
+                (() => {
+                  const searchInput = document.getElementById('wings-search');
+                  const yearSelect = document.getElementById('wings-year');
+                  const cards = document.querySelectorAll('.wings-issue-card');
+                  const emptyState = document.getElementById('wings-empty');
+                  const countLabel = document.getElementById('wings-count');
+
+                  if (!searchInput || !yearSelect || !cards.length) {
+                    return;
+                  }
+
+                  const applyFilters = () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    const yearValue = yearSelect.value;
+                    let visibleCount = 0;
+
+                    cards.forEach((card) => {
+                      const title = card.dataset.title || '';
+                      const cardYear = card.dataset.year || '';
+                      const matchesTerm = term === '' || title.includes(term);
+                      const matchesYear = yearValue === 'all' || cardYear === yearValue;
+                      const isVisible = matchesTerm && matchesYear;
+
+                      card.classList.toggle('hidden', !isVisible);
+                      if (isVisible) {
+                        visibleCount += 1;
+                      }
+                    });
+
+                    if (countLabel) {
+                      countLabel.textContent = `${visibleCount} issue${visibleCount === 1 ? '' : 's'}`;
+                    }
+                    if (emptyState) {
+                      emptyState.classList.toggle('hidden', visibleCount !== 0);
+                    }
+                  };
+
+                  searchInput.addEventListener('input', applyFilters);
+                  yearSelect.addEventListener('change', applyFilters);
+                  applyFilters();
+                })();
+              </script>
+            <?php else: ?>
+              <p class="text-sm text-gray-500 mt-3">No issues available.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+      <?php elseif ($page === 'notices-create'): ?>
+        <section class="space-y-6">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Create Notice</h2>
+              <p class="text-sm text-gray-500">Submit a notice for admin or committee approval.</p>
+            </div>
+          </div>
+          <?php if ($noticeMessage): ?>
+            <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($noticeMessage) ?></div>
+          <?php endif; ?>
+          <?php if ($noticeError): ?>
+            <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($noticeError) ?></div>
+          <?php endif; ?>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-6">
+                <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
+                  <span class="material-icons-outlined">edit_square</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-xl font-bold text-gray-900">Notice Details</h3>
+                  <p class="text-sm text-gray-500">Choose who should receive the notice.</p>
+                </div>
+              </div>
+              <form method="post" class="space-y-4" id="notice-create-form">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="create_notice">
+                <input type="hidden" name="notice_content" id="notice-content-input">
+                <input type="hidden" name="notice_attachment_url" id="notice-attachment-url">
+                <input type="hidden" name="notice_attachment_type" id="notice-attachment-type">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="text-sm font-medium text-gray-700">Title
+                    <input type="text" name="notice_title"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+                  </label>
+                  <label class="text-sm font-medium text-gray-700">Category
+                    <select name="notice_category"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                      <option value="notice">Notice</option>
+                      <option value="advert">Advert</option>
+                      <option value="announcement">Important Announcement</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <label class="text-sm font-medium text-gray-700">Audience
+                    <select name="notice_audience_scope" id="notice-audience-scope"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                      <option value="all">All members</option>
+                      <option value="state">State</option>
+                      <option value="chapter">Chapter</option>
+                    </select>
+                  </label>
+                  <label class="text-sm font-medium text-gray-700">State
+                    <select name="notice_audience_state" id="notice-audience-state"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" disabled>
+                      <option value="">Select state</option>
+                      <?php foreach ($noticeStates as $state): ?>
+                        <option value="<?= e($state['code']) ?>" <?= ($noticeFormState ?? '') === $state['code'] ? 'selected' : '' ?>><?= e($state['label']) ?> (<?= e($state['code']) ?>)</option>
+                      <?php endforeach; ?>
+                    </select>
+                  </label>
+                  <label class="text-sm font-medium text-gray-700">Chapter
+                    <select name="notice_audience_chapter" id="notice-audience-chapter"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" disabled>
+                      <option value="">Select chapter</option>
+                      <?php foreach ($noticeChapters as $chapter): ?>
+                        <option value="<?= e((string) $chapter['id']) ?>">
+                          <?= e($chapter['name']) ?>
+                          <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                  </label>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-700 mb-2">Description</p>
+                  <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs"
+                    id="notice-toolbar">
+                    <select id="notice-font" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
+                      <option value="">Font</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Times New Roman, serif">Times</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                    </select>
+                    <select id="notice-size" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
+                      <option value="2">Small</option>
+                      <option value="3" selected>Normal</option>
+                      <option value="4">Large</option>
+                      <option value="5">XL</option>
+                    </select>
+                    <input type="color" id="notice-color" class="h-7 w-8 border border-gray-200 rounded">
+                    <button type="button" data-command="bold"
+                      class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
+                    <button type="button" data-command="italic"
+                      class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
+                    <button type="button" data-command="underline"
+                      class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
+                    <button type="button" data-command="insertUnorderedList"
+                      class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
+                    <button type="button" id="notice-link"
+                      class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
+                  </div>
+                  <div id="notice-editor"
+                    class="mt-2 min-h-[160px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none"
+                    contenteditable="true"></div>
+                </div>
+                <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4" id="notice-upload-zone">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-semibold text-gray-700">Attachment (image or PDF)</p>
+                      <p class="text-xs text-gray-500">Drag & drop or browse to upload.</p>
+                    </div>
+                    <input type="file" id="notice-attachment-input" accept="image/*,application/pdf" class="text-xs">
+                  </div>
+                  <div id="notice-attachment-preview" class="mt-3 hidden"></div>
+                </div>
+                <button
+                  class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                  type="submit">Submit for approval</button>
+              </form>
+            </div>
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                  <span class="material-icons-outlined">info</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Posting Tips</h3>
+                  <p class="text-sm text-gray-500">Keep notices clear and actionable.</p>
+                </div>
+              </div>
+              <ul class="text-sm text-gray-600 space-y-2">
+                <li>Choose the right audience before posting.</li>
+                <li>Use a PDF for detailed flyers or notices.</li>
+                <li>Admins and committee approve notices before publishing.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      <?php elseif ($page === 'notices-view'): ?>
+        <section class="space-y-6">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Notice Board</h2>
+              <p class="text-sm text-gray-500">Browse the latest approved notices.</p>
+            </div>
+            <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1 text-sm">
+              <button type="button" data-notice-view="list"
+                class="px-3 py-1.5 rounded-md font-semibold text-gray-700">List view</button>
+              <button type="button" data-notice-view="grid"
+                class="px-3 py-1.5 rounded-md font-semibold text-gray-700">Grid view</button>
+            </div>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-display text-xl font-bold text-gray-900">Current Notices</h3>
+            </div>
+            <?php if ($noticeBoardNotices): ?>
+              <div id="notice-list" class="space-y-4">
+                <?php foreach ($noticeBoardNotices as $notice): ?>
+                  <?php
+                  $creatorId = $notice['created_by'] ?? null;
+                  $avatar = ($creatorId && isset($noticeAvatars[$creatorId])) ? $noticeAvatars[$creatorId] : '';
+                  $category = $notice['category'] ?? 'notice';
+                  $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
+                  ?>
+                  <article class="border border-gray-100 rounded-2xl p-5 bg-white">
+                    <div class="flex items-center gap-3 mb-3">
+                      <div
+                        class="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center overflow-hidden">
+                        <?php if (!empty($avatar)): ?>
+                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>"
+                            class="h-full w-full object-cover">
+                        <?php else: ?>
+                          <span class="material-icons-outlined text-sm">person</span>
+                        <?php endif; ?>
+                      </div>
+                      <div class="flex-1">
+                        <p class="text-lg font-semibold text-gray-900"><?= e($notice['title']) ?></p>
+                        <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
+                          <?= e($notice['created_by_name'] ?? 'Member') ?>
+                        </p>
+                      </div>
+                      <span
+                        class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
+                    </div>
+                    <?php if (!empty($notice['attachment_url'])): ?>
+                      <div class="mb-3 rounded-xl border border-gray-100 overflow-hidden">
+                        <?php if (($notice['attachment_type'] ?? '') === 'pdf'): ?>
+                          <object data="<?= e($notice['attachment_url']) ?>#page=1&zoom=page-fit" type="application/pdf"
+                            class="w-full h-72">
+                            <div class="p-4 text-sm text-gray-500">PDF attached. <a class="text-secondary font-semibold"
+                                href="<?= e($notice['attachment_url']) ?>">Open</a></div>
+                          </object>
+                        <?php else: ?>
+                          <img src="<?= e($notice['attachment_url']) ?>" alt="<?= e($notice['title']) ?>"
+                            class="w-full h-72 object-cover">
+                        <?php endif; ?>
+                      </div>
+                    <?php endif; ?>
+                    <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
+                  </article>
+                <?php endforeach; ?>
+              </div>
+              <div id="notice-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <?php foreach ($noticeBoardNotices as $notice): ?>
+                  <?php
+                  $category = $notice['category'] ?? 'notice';
+                  $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
+                  ?>
+                  <article class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="relative aspect-[210/297] bg-gray-50">
+                      <?php if (!empty($notice['attachment_url'])): ?>
+                        <?php if (($notice['attachment_type'] ?? '') === 'pdf'): ?>
+                          <object data="<?= e($notice['attachment_url']) ?>#page=1&zoom=page-fit" type="application/pdf"
+                            class="w-full h-full">
+                            <div class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">PDF</div>
+                          </object>
+                        <?php else: ?>
+                          <img src="<?= e($notice['attachment_url']) ?>" alt="<?= e($notice['title']) ?>"
+                            class="w-full h-full object-cover">
+                        <?php endif; ?>
+                      <?php else: ?>
+                        <div class="h-full w-full flex items-center justify-center text-gray-300">
+                          <span class="material-icons-outlined text-5xl">campaign</span>
+                        </div>
+                      <?php endif; ?>
+                      <span
+                        class="absolute top-3 left-3 inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-700"><?= e($categoryLabel) ?></span>
+                    </div>
+                    <div class="p-4 space-y-2">
+                      <h4 class="text-base font-semibold text-gray-900"><?= e($notice['title']) ?></h4>
+                      <p class="text-xs text-gray-500">
+                        <?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?>
+                      </p>
+                      <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
+                    </div>
+                  </article>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No notices available.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+      <?php elseif ($page === 'fallen-wings'): ?>
+        <section class="space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Fallen Wings</h2>
+              <p class="text-sm text-gray-500">Remembering members who have taken their final ride.</p>
+            </div>
+            <form method="get" class="flex items-center gap-2">
+              <input type="hidden" name="page" value="fallen-wings">
+              <select name="fallen_year" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                <option value="0">All years</option>
+                <?php foreach ($fallenYears as $yearOption): ?>
+                  <option value="<?= e((string) $yearOption) ?>" <?= $fallenFilterYear === (int) $yearOption ? 'selected' : '' ?>><?= e((string) $yearOption) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
+                type="submit">Filter</button>
+            </form>
+          </div>
+          <?php if ($fallenMessage): ?>
+            <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($fallenMessage) ?></div>
+          <?php endif; ?>
+          <?php if ($fallenError): ?>
+            <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($fallenError) ?></div>
+          <?php endif; ?>
+          <?php if (!$fallenTableExists): ?>
+            <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">
+              Fallen Wings table not found. Run the migration to enable memorial submissions.
+            </div>
+          <?php endif; ?>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-6">
+                <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                  <span class="material-icons-outlined">military_tech</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-xl font-bold text-gray-900">Memorial Roll</h3>
+                  <p class="text-sm text-gray-500">Alphabetical by default, filter by year to narrow the list.</p>
+                </div>
+              </div>
+              <?php if ($fallenWings): ?>
+                <ul class="divide-y">
+                  <?php foreach ($fallenWings as $entry): ?>
+                    <li class="py-4">
+                      <div class="flex items-center justify-between gap-4">
+                        <div>
+                          <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?></p>
+                          <?php if (!empty($entry['member_number'])): ?>
+                            <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
+                          <?php endif; ?>
+                          <?php if (!empty($entry['tribute'])): ?>
+                            <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
+                          <?php endif; ?>
+                          <?php if (!empty($entry['pdf_url'])): ?>
+                            <a href="<?= e($entry['pdf_url']) ?>" target="_blank"
+                              class="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:text-primary-dark">
+                              <span class="material-icons-outlined text-sm">picture_as_pdf</span>
+                              View Document
+                            </a>
+                          <?php endif; ?>
+                        </div>
+                        <div class="flex items-center gap-4 text-right">
+                          <span
+                            class="text-sm font-semibold text-gray-500"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
+                          <?php if (!empty($entry['image_url'])): ?>
+                            <img src="<?= e($entry['image_url']) ?>" alt="Tribute image"
+                              class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php else: ?>
+                <p class="text-sm text-gray-500">No memorial entries found.</p>
+              <?php endif; ?>
+            </div>
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
+                  <span class="material-icons-outlined">add_circle</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Submit a Memorial</h3>
+                  <p class="text-sm text-gray-500">Requests are reviewed by committee.</p>
+                </div>
+              </div>
+              <form method="post" enctype="multipart/form-data" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="submit_fallen_wings">
+                <input type="text" name="fallen_name" placeholder="Member full name"
+                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_name'] ?? '') : '') ?>"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+                <input type="date" name="fallen_date"
+                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_date'] ?? '') : '') ?>"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900-01-01"
+                  max="<?= e(date('Y-m-d')) ?>" required>
+                <input type="text" name="fallen_member_number" maxlength="120" placeholder="Member number (optional)"
+                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_member_number'] ?? '') : '') ?>"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\\-]+">
+                <textarea name="fallen_tribute" rows="4" placeholder="Optional tribute or note"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(empty($fallenMessage) ? ($_POST['fallen_tribute'] ?? '') : '') ?></textarea>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Photograph</label>
+                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Document (PDF)</label>
+                  <input type="file" name="tribute_pdf" accept=".pdf"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                </div>
+                <button
+                  class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                  type="submit">Submit request</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      <?php elseif ($page === 'store'): ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h2 class="font-display text-2xl font-bold text-gray-900 mb-2">Store</h2>
+          <p class="text-sm text-gray-500">Browse the members-only store.</p>
+          <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold mt-4"
+            href="/store">Go to Store</a>
+        </section>
+      <?php elseif ($page === 'billing'): ?>
+        <section class="space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Billing & Payments</h2>
+              <p class="text-sm text-gray-500">Manage payment methods, shipping details, and recent orders.</p>
+            </div>
+            <?php if ($customerPortalEnabled): ?>
+              <button id="billing-portal"
+                class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold">Manage
+                payment details</button>
+            <?php endif; ?>
+          </div>
+          <?php if ($billingMessage): ?>
+            <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($billingMessage) ?></div>
+          <?php endif; ?>
+          <?php if ($billingError): ?>
+            <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($billingError) ?></div>
+          <?php endif; ?>
+          <?php
+          $pendingPeriod = null;
+          $pendingMembershipOrder = null;
+          $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+          if ($member) {
+            $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id AND status = "PENDING_PAYMENT" ORDER BY created_at DESC LIMIT 1');
+            $stmt->execute(['member_id' => $member['id']]);
+            $pendingPeriod = $stmt->fetch();
+            $pendingMembershipOrder = null;
+            if ($ordersMemberColumn && $ordersMemberValue) {
+              $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' IN ("pending", "failed") ORDER BY created_at DESC LIMIT 1');
+              $stmt->execute(['value' => $ordersMemberValue]);
+              $pendingMembershipOrder = $stmt->fetch();
+            }
+          }
+          if (!$pendingMembershipOrder && $pendingPeriod && $member) {
+            $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
+            $memberTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+            $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+            $pricingPeriodKey = $termKey === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
+            $priceCents = MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, $pricingPeriodKey) ?? 0;
+            $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+            $amount = round($priceCents / 100, 2);
+            $order = MembershipOrderService::createMembershipOrder((int) $member['id'], (int) ($pendingPeriod['id'] ?? 0), $amount, [
+              'payment_method' => 'stripe',
+              'payment_status' => 'pending',
+              'fulfillment_status' => 'pending',
+              'currency' => $pricingCurrency,
+              'term' => $termKey,
+              'item_name' => 'Membership renewal ' . $termKey,
+            ]);
+            if ($order) {
+              $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+              $stmt->execute(['id' => $order['id'] ?? 0]);
+              $pendingMembershipOrder = $stmt->fetch();
+            }
+          }
+          $renewEligible = false;
+          if ($member && strtoupper((string) ($member['member_type'] ?? '')) !== 'LIFE' && !empty($membershipPeriod['end_date'])) {
+            $renewEligible = strtotime((string) $membershipPeriod['end_date']) <= strtotime('+60 days');
+          }
+          if (!empty($membershipPeriod['status']) && strtoupper((string) $membershipPeriod['status']) === 'LAPSED') {
+            $renewEligible = true;
+          }
+          ?>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                  <span class="material-icons-outlined">credit_card</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Membership status</h3>
+                  <p class="text-sm text-gray-500">Track membership status and pending payments.</p>
+                </div>
+              </div>
+              <?php
+              $billingMembershipTypeLabel = 'Member';
+              if ($member) {
+                $memberTypeKey = strtoupper((string) ($member['member_type'] ?? ''));
+                $billingMembershipTypeLabel = match ($memberTypeKey) {
+                  'FULL' => 'Full Member',
+                  'ASSOCIATE' => 'Associate Member',
+                  'LIFE' => 'Life Member',
+                  default => 'Member',
+                };
+              }
+              $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
+              $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
+              ?>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-600">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Type</p>
+                  <p class="text-sm font-semibold text-gray-900"><?= e($billingMembershipTypeLabel) ?></p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Status</p>
+                  <span
+                    class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= status_badge_classes($billingStatusLabel) ?>"><?= e($billingStatusLabel) ?></span>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Expiry</p>
+                  <p class="text-sm font-semibold text-gray-900"><?= e($billingExpiryLabel) ?></p>
+                </div>
+              </div>
+              <?php if ($pendingMembershipOrder): ?>
+                <?php
+                $pendingPaymentMethod = strtolower((string) ($pendingMembershipOrder['payment_method'] ?? 'stripe'));
+                $pendingStatus = strtolower((string) ($pendingMembershipOrder['payment_status'] ?? 'pending'));
+                ?>
+                <div
+                  class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 space-y-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      Pending order <span
+                        class="font-semibold"><?= e($pendingMembershipOrder['order_number'] ?? '') ?></span>
+                    </div>
+                    <span
+                      class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
+                  </div>
+                  <?php if ($pendingPaymentMethod === 'stripe'): ?>
+                    <form method="post" class="mt-2">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="membership_order_pay">
+                      <input type="hidden" name="order_id" value="<?= e((string) $pendingMembershipOrder['id']) ?>">
+                      <button
+                        class="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900"
+                        type="submit">Pay now</button>
+                    </form>
+                  <?php elseif ($pendingPaymentMethod === 'bank_transfer'): ?>
+                    <?php if ($bankInstructions !== ''): ?>
+                      <div class="rounded-lg bg-white/80 px-3 py-2 text-xs text-gray-700 whitespace-pre-line">
+                        <?= e($bankInstructions) ?>
+                      </div>
+                    <?php else: ?>
+                      <p class="text-xs text-gray-600">Bank transfer instructions will be emailed to you.</p>
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <p class="text-xs text-gray-600">Awaiting payment approval.</p>
+                  <?php endif; ?>
+                </div>
+              <?php else: ?>
+                <p class="text-sm text-gray-600">No pending membership payments.</p>
+              <?php endif; ?>
+              <?php if ($renewEligible && !$pendingMembershipOrder): ?>
+                <form method="post">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="membership_renew">
+                  <button
+                    class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700"
+                    type="submit">Renew membership</button>
+                </form>
+              <?php endif; ?>
+              <?php if (!$customerPortalEnabled): ?>
+                <p class="text-xs text-gray-500">Customer portal is disabled. Contact support for card updates.</p>
+              <?php endif; ?>
+            </div>
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
+                  <span class="material-icons-outlined">local_shipping</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Shipping Address</h3>
+                  <p class="text-sm text-gray-500">Keep your shipping details current for store orders.</p>
+                </div>
+              </div>
+              <form method="post" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="update_shipping">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input id="member_shipping_address_line1" data-google-autocomplete="address"
+                    data-google-autocomplete-city="#member_shipping_city"
+                    data-google-autocomplete-state="#member_shipping_state"
+                    data-google-autocomplete-postal="#member_shipping_postal"
+                    data-google-autocomplete-country="#member_shipping_country" type="text" name="shipping_address_line1"
+                    placeholder="Address line 1"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['address_line1'] ?? '') ?>">
+                  <input id="member_shipping_address_line2" type="text" name="shipping_address_line2"
+                    placeholder="Address line 2"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['address_line2'] ?? '') ?>">
+                  <input id="member_shipping_city" type="text" name="shipping_city" placeholder="City"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['city'] ?? '') ?>">
+                  <input id="member_shipping_state" type="text" name="shipping_state" placeholder="State"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['state'] ?? '') ?>">
+                  <input id="member_shipping_postal" type="text" name="shipping_postal_code" placeholder="Postal code"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['postal_code'] ?? '') ?>">
+                  <input id="member_shipping_country" type="text" name="shipping_country" placeholder="Country"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value="<?= e($member['country'] ?? '') ?>">
+                </div>
+                <button
+                  class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                  type="submit">Save shipping address</button>
+              </form>
+            </div>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Order History</h3>
+                <p class="text-sm text-gray-500">All membership and store payments in one place.</p>
+              </div>
+            </div>
+            <?php if ($orderHistory): ?>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                    <tr>
+                      <th class="py-2 pr-3">Date</th>
+                      <th class="py-2 pr-3">Items</th>
+                      <th class="py-2 pr-3">Status</th>
+                      <th class="py-2 pr-3">Amount</th>
+                      <th class="py-2 pr-3">Renewal</th>
+                      <th class="py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <?php foreach ($orderHistory as $order): ?>
+                      <tr>
+                        <td class="py-3 pr-3 text-gray-600"><?= e($order['date']) ?></td>
+                        <td class="py-3 pr-3 text-gray-900">
+                          <div class="space-y-1">
+                            <?php foreach ($order['items'] as $item): ?>
+                              <div><?= e($item['label']) ?> <span
+                                  class="text-xs text-gray-500">x<?= e((string) $item['quantity']) ?></span></div>
+                            <?php endforeach; ?>
+                            <?php if (!empty($order['is_manual'])): ?>
+                              <span
+                                class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Manual</span>
+                            <?php endif; ?>
+                          </div>
+                        </td>
+                        <td class="py-3 pr-3 text-gray-600"><?= e(ucfirst($order['status'])) ?></td>
+                        <td class="py-3 pr-3 text-gray-900">$<?= e($order['amount']) ?></td>
+                        <td class="py-3 pr-3 text-gray-600">
+                          <?php if ($order['type'] === 'membership' && !empty($order['days_remaining_label'])): ?>
+                            <?= e($order['days_remaining_label']) ?>
+                          <?php else: ?>
+                            &mdash;
+                          <?php endif; ?>
+                        </td>
+                        <td class="py-3 text-gray-600">
+                          <?php if ($order['type'] === 'membership' && in_array(strtolower((string) ($order['payment_status'] ?? $order['status'] ?? '')), ['pending', 'failed'], true) && in_array(strtolower((string) ($order['payment_method'] ?? 'stripe')), ['stripe', 'card', ''], true)): ?>
+                            <form method="post">
+                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                              <input type="hidden" name="action" value="membership_order_pay">
+                              <input type="hidden" name="order_id" value="<?= e((string) ($order['order_id'] ?? '')) ?>">
+                              <button
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary text-xs font-semibold text-primary hover:bg-primary/10"
+                                type="submit">Pay now</button>
+                            </form>
+                          <?php elseif ($order['type'] === 'store' && !empty($order['order_id'])): ?>
+                            <form method="post" action="/store/cart">
+                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                              <input type="hidden" name="action" value="reorder">
+                              <input type="hidden" name="order_id" value="<?= e((string) $order['order_id']) ?>">
+                              <button
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                type="submit">Reorder</button>
+                            </form>
+                          <?php else: ?>
+                            &mdash;
+                          <?php endif; ?>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No orders found.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+        <?php if ($customerPortalEnabled): ?>
+          <script>
+            const portalButton = document.getElementById('billing-portal');
+            if (portalButton) {
+              portalButton.addEventListener('click', async () => {
+                const response = await fetch('/api/billing/portal');
+                const data = await response.json();
+                if (data.url) {
+                  window.location.href = data.url;
+                  return;
+                }
+                alert(data.error || 'Unable to open billing portal.');
+              });
+            }
+          </script>
+        <?php endif; ?>
+      <?php elseif ($page === 'history'): ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h2 class="font-display text-2xl font-bold text-gray-900 mb-4">Membership History</h2>
+          <?php
+          $history = [];
+          if ($member) {
+            $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC');
+            $stmt->execute(['member_id' => $member['id']]);
+            $history = $stmt->fetchAll();
+          }
+          ?>
+          <?php if ($history): ?>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                  <tr>
+                    <th class="py-2 pr-3">Term</th>
+                    <th class="py-2 pr-3">Start</th>
+                    <th class="py-2 pr-3">End</th>
+                    <th class="py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <?php foreach ($history as $period): ?>
+                    <tr>
+                      <td class="py-2 pr-3 text-gray-900"><?= e($period['term']) ?></td>
+                      <td class="py-2 pr-3 text-gray-600"><?= e($period['start_date']) ?></td>
+                      <td class="py-2 pr-3 text-gray-600"><?= e($period['end_date'] ?? 'No expiry') ?></td>
+                      <td class="py-2 text-gray-600"><?= e($period['status']) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php else: ?>
+            <p class="text-sm text-gray-500">No membership history yet.</p>
+          <?php endif; ?>
+        </section>
       <?php else: ?>
-            <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 class="font-display text-2xl font-bold text-gray-900">Member Portal</h2>
-              <p class="text-sm text-gray-500">Page not found.</p>
-            </section>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h2 class="font-display text-2xl font-bold text-gray-900">Member Portal</h2>
+          <p class="text-sm text-gray-500">Page not found.</p>
+        </section>
       <?php endif; ?>
     </div>
     <div id="upload-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4"
