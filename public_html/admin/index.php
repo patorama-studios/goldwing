@@ -1205,8 +1205,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isLatest) {
           $pdo->query('UPDATE wings_issues SET is_latest = 0');
         }
-        $stmt = $pdo->prepare('UPDATE wings_issues SET title = :title, published_at = :published_at, is_latest = :is_latest WHERE id = :id');
-        $stmt->execute(['title' => $title, 'published_at' => $publishedAt, 'is_latest' => $isLatest, 'id' => $issueId]);
+
+        $uploadDir = __DIR__ . '/../uploads/';
+        if (!is_dir($uploadDir)) {
+          mkdir($uploadDir, 0755, true);
+        }
+
+        $sql = 'UPDATE wings_issues SET title = :title, published_at = :published_at, is_latest = :is_latest';
+        $params = [
+          'title' => $title,
+          'published_at' => $publishedAt,
+          'is_latest' => $isLatest,
+          'id' => $issueId
+        ];
+
+        if (!empty($_POST['remove_pdf'])) {
+          $sql .= ', pdf_url = NULL';
+        } elseif (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] === UPLOAD_ERR_OK) {
+          $finfo = new finfo(FILEINFO_MIME_TYPE);
+          $mime = $finfo->file($_FILES['pdf_file']['tmp_name']) ?: '';
+          if ($mime === 'application/pdf') {
+            $pdfName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $_FILES['pdf_file']['name']);
+            if (move_uploaded_file($_FILES['pdf_file']['tmp_name'], $uploadDir . $pdfName)) {
+              $sql .= ', pdf_url = :pdf_url';
+              $params['pdf_url'] = '/uploads/' . $pdfName;
+            }
+          } else {
+            $alerts[] = ['type' => 'error', 'message' => 'New PDF file is not a valid PDF.'];
+          }
+        }
+
+        if (!empty($_POST['remove_cover'])) {
+          $sql .= ', cover_image_url = NULL';
+        } elseif (isset($_FILES['cover_file']) && $_FILES['cover_file']['error'] === UPLOAD_ERR_OK) {
+          $finfo = new finfo(FILEINFO_MIME_TYPE);
+          $mime = $finfo->file($_FILES['cover_file']['tmp_name']) ?: '';
+          if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'])) {
+            $coverName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $_FILES['cover_file']['name']);
+            if (move_uploaded_file($_FILES['cover_file']['tmp_name'], $uploadDir . $coverName)) {
+              $sql .= ', cover_image_url = :cover_url';
+              $params['cover_url'] = '/uploads/' . $coverName;
+            }
+          } else {
+            $alerts[] = ['type' => 'error', 'message' => 'New Cover image is not a valid image.'];
+          }
+        }
+
+        $sql .= ' WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $alerts[] = ['type' => 'success', 'message' => 'Wings issue updated.'];
       }
     }
@@ -2462,856 +2509,903 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div>
             <h1 class="font-display text-2xl font-bold text-gray-900">Fallen Wings Memorials</h1>
             <p class="text-sm text-gray-500">Approve , reject, or edit memorial submissions.</p>
+          </div>
+          <?php if (!$fallenTableExists): ?>
+            <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">
+              Fallen Wings table not found. Run the migration to enable memorial approvals.
             </div>
-            <?php if (!$fallenTableExists): ?>
-                <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">
-                  Fallen Wings table not found. Run the migration to enable memorial approvals.
-                </div>
-            <?php endif; ?>
-          
-            <?php $editFallenId = (int) ($_GET['edit_fallen'] ?? 0); ?>
-          
-            <div class="space-y-4">
-              <h2 class="text-lg font-semibold text-gray-900">Pending submissions</h2>
-              <?php if ($pendingMemorials): ?>
-                  <?php foreach ($pendingMemorials as $entry): ?>
-                      <div
-                        class="border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                          <div class="flex items-center gap-3">
-                              <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?> (<?= e((string) $entry['year_of_passing']) ?>)</p>
-                              <?php if (!empty($entry['image_url'])): ?>
-                                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Image</span>
-                              <?php endif; ?>
-                              <?php if (!empty($entry['pdf_url'])): ?>
-                                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
-                              <?php endif; ?>
-                          </div>
-                          <?php if (!empty($entry['member_number'])): ?>
-                              <p class="text-xs text-gray-500 mt-1">Member #: <?= e($entry['member_number']) ?></p>
-                          <?php endif; ?>
-                          <?php if (!empty($entry['tribute'])): ?>
-                              <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
-                          <?php endif; ?>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <form method="post">
-                            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                            <input type="hidden" name="action" value="approve_fallen">
-                            <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                            <button
-                              class="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-gray-900 text-xs font-semibold"
-                              type="submit">Approve</button>
-                          </form>
-                          <form method="post">
-                            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                            <input type="hidden" name="action" value="reject_fallen">
-                            <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                            <button
-                              class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
-                              type="submit">Reject</button>
-                          </form>
-                          <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">Edit</a>
-                        </div>
-                      </div>
-                  <?php endforeach; ?>
-              <?php else: ?>
-                  <p class="text-sm text-gray-500">No pending submissions.</p>
-              <?php endif; ?>
-            </div>
-            <div class="space-y-4">
-              <h2 class="text-lg font-semibold text-gray-900">Approved memorials</h2>
-              <?php if ($approvedMemorials): ?>
-                  <ul class="divide-y space-y-4">
-                    <?php foreach ($approvedMemorials as $entry): ?>
-                        <?php if ($editFallenId === (int) $entry['id']): ?>
-                            <li class="pt-4 border-t border-gray-100 first:border-0 first:pt-0">
-                               <form method="post" enctype="multipart/form-data" class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
-                                   <div class="flex items-center justify-between mb-2">
-                                       <h3 class="text-sm font-semibold text-gray-900">Edit Memorial</h3>
-                                       <a href="?page=fallen-wings" class="text-xs text-gray-500 hover:text-gray-900">Cancel</a>
-                                   </div>
-                                   <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                   <input type="hidden" name="action" value="edit_fallen_wings">
-                                   <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                           
-                                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                       <div>
-                                           <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
-                                           <input type="text" name="full_name" value="<?= e($entry['full_name']) ?>" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                                       </div>
-                                       <div>
-                                           <label class="block text-xs font-semibold text-gray-700 mb-1">Year of Passing</label>
-                                           <input type="number" name="year_of_passing" value="<?= e((string) $entry['year_of_passing']) ?>" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900" max="<?= date('Y') ?>" required>
-                                       </div>
-                                   </div>
-                           
-                                   <div>
-                                       <label class="block text-xs font-semibold text-gray-700 mb-1">Member Number</label>
-                                       <input type="text" name="member_number" value="<?= e($entry['member_number'] ?? '') ?>" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\-]+">
-                                   </div>
-                           
-                                   <div>
-                                       <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute Text</label>
-                                       <textarea name="tribute" rows="4" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e($entry['tribute'] ?? '') ?></textarea>
-                                   </div>
-                           
-                                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                       <div>
-                                           <label class="block text-xs font-semibold text-gray-700 mb-1">Replace Image</label>
-                                           <?php if (!empty($entry['image_url'])): ?>
-                                               <div class="mb-2">
-                                                  <img src="<?= e($entry['image_url']) ?>" class="h-12 w-auto object-contain rounded" alt="Current Image">
-                                               </div>
-                                           <?php endif; ?>
-                                           <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                                       </div>
-                                       <div>
-                                           <label class="block text-xs font-semibold text-gray-700 mb-1">Replace PDF</label>
-                                           <?php if (!empty($entry['pdf_url'])): ?>
-                                               <div class="mb-2 text-xs">
-                                                  <a href="<?= e($entry['pdf_url']) ?>" target="_blank" class="text-primary hover:underline">View Current PDF</a>
-                                               </div>
-                                           <?php endif; ?>
-                                           <input type="file" name="tribute_pdf" accept=".pdf" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                                       </div>
-                                   </div>
-                           
-                                   <div class="flex justify-end pt-2">
-                                       <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">Save Changes</button>
-                                   </div>
-                               </form>
-                            </li>
-                        <?php else: ?>
-                            <li class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 first:border-0 first:pt-0">
-                              <div>
-                                <div class="flex items-center gap-2">
-                                    <p class="text-sm text-gray-800 font-medium"><?= e($entry['full_name']) ?></p>
-                                    <?php if (!empty($entry['image_url'])): ?>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Img</span>
-                                    <?php endif; ?>
-                                    <?php if (!empty($entry['pdf_url'])): ?>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
-                                    <?php endif; ?>
-                                </div>
-                                <?php if (!empty($entry['member_number'])): ?>
-                                    <p class="text-xs text-gray-500 mt-0.5">Member #: <?= e($entry['member_number']) ?></p>
-                                <?php endif; ?>
-                                <?php if (!empty($entry['tribute'])): ?>
-                                    <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
-                                <?php endif; ?>
-                              </div>
-                              <div class="flex items-center gap-4 whitespace-nowrap">
-                                  <span class="text-sm font-semibold text-gray-600"><?= e((string) $entry['year_of_passing']) ?></span>
-                                  <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>" class="text-xs font-semibold text-gray-500 hover:text-gray-900 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200">Edit</a>
-                              </div>
-                            </li>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                  </ul>
-              <?php else: ?>
-                  <p class="text-sm text-gray-500">No approved memorials yet.</p>
-              <?php endif; ?>
-            </div>
-          </section>
-      <?php elseif ($page === 'media'): ?>
-          <?php
-          $search = trim($_GET['search'] ?? '');
-          $typeFilter = trim($_GET['type'] ?? '');
-          $contextFilter = trim($_GET['context'] ?? '');
-          $unusedOnly = !empty($_GET['unused']);
+          <?php endif; ?>
 
-          $where = [];
-          $params = [];
-          if ($search !== '') {
-            $where[] = '(title LIKE :search1 OR path LIKE :search2 OR file_name LIKE :search3)';
-            $searchTerm = '%' . $search . '%';
-            $params['search1'] = $searchTerm;
-            $params['search2'] = $searchTerm;
-            $params['search3'] = $searchTerm;
-          }
-          if ($typeFilter !== '') {
-            if ($typeFilter === 'other') {
-              $where[] = "type NOT IN ('image','video','pdf','file')";
-            } else {
-              $where[] = 'type = :type';
-              $params['type'] = $typeFilter;
-            }
-          }
-          if ($contextFilter !== '') {
-            $where[] = 'source_context = :context';
-            $params['context'] = $contextFilter;
-          }
-          $sql = 'SELECT * FROM media';
-          if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-          }
-          $sql .= ' ORDER BY created_at DESC';
-          $stmt = $pdo->prepare($sql);
-          $stmt->execute($params);
-          $media = $stmt->fetchAll();
-          $referenceCounts = MediaService::referenceCounts($media);
-          if ($unusedOnly) {
-            $media = array_values(array_filter($media, function ($item) use ($referenceCounts) {
-              if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
-                return false;
-              }
-              $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath((string) ($item['path'] ?? ''));
-              if (!$pathKey) {
-                return true;
-              }
-              return ($referenceCounts[$pathKey] ?? 0) === 0;
-            }));
-          }
-          $sourceContexts = $pdo->query('SELECT DISTINCT source_context FROM media WHERE source_context IS NOT NULL AND source_context <> "" ORDER BY source_context ASC')->fetchAll(PDO::FETCH_COLUMN, 0);
-          $recentCutoff = strtotime('-7 days');
-          $newCount = 0;
-          $sharedCount = 0;
-          $typeCounts = ['image' => 0, 'video' => 0, 'pdf' => 0, 'file' => 0];
-          foreach ($media as $item) {
-            $typeKey = strtolower($item['type'] ?? 'file');
-            if (!isset($typeCounts[$typeKey])) {
-              $typeKey = 'file';
-            }
-            $typeCounts[$typeKey] += 1;
-            $createdAt = isset($item['created_at']) ? strtotime($item['created_at']) : false;
-            if ($createdAt && $createdAt >= $recentCutoff) {
-              $newCount += 1;
-            }
-            if (($item['visibility'] ?? '') !== 'admin') {
-              $sharedCount += 1;
-            }
-          }
-          $uploadDir = __DIR__ . '/../uploads';
-          $mediaBytes = directory_size_bytes($uploadDir);
-          $mediaUsageMb = round($mediaBytes / 1024 / 1024, 1);
-          $storageLimitMb = (float) SettingsService::getGlobal('media.storage_limit_mb', 5120);
-          $usagePercent = $storageLimitMb > 0 ? min(100, ($mediaUsageMb / $storageLimitMb) * 100) : 0;
-          $usageLabel = $mediaUsageMb >= 1024 ? round($mediaUsageMb / 1024, 1) . ' GB' : round($mediaUsageMb, 1) . ' MB';
-          $limitLabel = $storageLimitMb >= 1024 ? round($storageLimitMb / 1024, 1) . ' GB' : round($storageLimitMb, 0) . ' MB';
-          ?>
-          <section class="relative overflow-hidden rounded-3xl border border-line bg-atmosphere p-6 shadow-soft">
-            <div class="pointer-events-none absolute inset-0">
-              <div class="absolute -top-24 right-0 h-52 w-52 rounded-full bg-primary/20 blur-3xl"></div>
-              <div class="absolute bottom-10 left-24 h-60 w-60 rounded-full bg-ocean/20 blur-3xl"></div>
-            </div>
-            <div class="relative flex flex-col gap-6">
-              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-up">
-                <div>
-                  <p class="text-[10px] uppercase tracking-[0.3em] text-ocean/80">Media</p>
-                  <h1 class="font-display text-2xl text-ink">Media Library</h1>
-                  <p class="text-sm text-slate-500">Uploads are stored in /public_html/uploads/ and logged here.</p>
+          <?php $editFallenId = (int) ($_GET['edit_fallen'] ?? 0); ?>
+
+          <div class="space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Pending submissions</h2>
+            <?php if ($pendingMemorials): ?>
+              <?php foreach ($pendingMemorials as $entry): ?>
+                <div
+                  class="border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div class="flex items-center gap-3">
+                      <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?>
+                        (<?= e((string) $entry['year_of_passing']) ?>)</p>
+                      <?php if (!empty($entry['image_url'])): ?>
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Image</span>
+                      <?php endif; ?>
+                      <?php if (!empty($entry['pdf_url'])): ?>
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                      <?php endif; ?>
+                    </div>
+                    <?php if (!empty($entry['member_number'])): ?>
+                      <p class="text-xs text-gray-500 mt-1">Member #: <?= e($entry['member_number']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($entry['tribute'])): ?>
+                      <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
+                    <?php endif; ?>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <form method="post">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="approve_fallen">
+                      <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+                      <button
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-gray-900 text-xs font-semibold"
+                        type="submit">Approve</button>
+                    </form>
+                    <form method="post">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="reject_fallen">
+                      <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+                      <button
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
+                        type="submit">Reject</button>
+                    </form>
+                    <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
+                      class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">Edit</a>
+                  </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-3">
-                  <form method="get" class="relative hidden md:block">
-                    <input type="hidden" name="page" value="media">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                      <span class="material-icons-outlined text-lg">search</span>
-                    </span>
-                    <input
-                      class="w-64 pl-10 pr-4 py-2 text-sm bg-white/80 border border-line rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary placeholder-slate-400 text-ink"
-                      placeholder="Search media..." type="text" name="search" value="<?= e($search) ?>">
-                  </form>
-                  <form method="post">
-                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                    <input type="hidden" name="action" value="sync_media_index">
-                    <button
-                      class="inline-flex items-center gap-2 bg-sand hover:bg-sand/70 text-ink px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors"
-                      type="submit">
-                      <span class="material-icons-outlined text-lg">sync</span>
-                      Sync Media Index
-                    </button>
-                  </form>
-                  <a href="#media-upload"
-                    class="inline-flex items-center gap-2 bg-ink hover:bg-primary-strong text-white px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors">
-                    <span class="material-icons-outlined text-lg">cloud_upload</span>
-                    Upload
-                  </a>
-                </div>
-              </div>
-              <div class="grid lg:grid-cols-[260px_1fr] gap-6">
-                <aside class="space-y-6">
-                  <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in">
-                    <div class="flex items-center justify-between">
-                      <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Storage</h2>
-                      <span class="text-xs font-medium text-ink"><?= e($usageLabel) ?></span>
-                    </div>
-                    <div class="mt-4 h-2 rounded-full bg-sand">
-                      <div class="h-2 rounded-full bg-gradient-to-r from-primary to-ember"
-                        style="width: <?= e((string) $usagePercent) ?>%"></div>
-                    </div>
-                    <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
-                      <span><?= e($usageLabel) ?> of <?= e($limitLabel) ?></span>
-                      <span><?= e((string) count($media)) ?> items</span>
-                    </div>
-                  </div>
-                  <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-1">
-                    <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 mb-3">Collections</h2>
-                    <div class="flex flex-wrap gap-2">
-                      <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Photos
-                        <?= e((string) $typeCounts['image']) ?></span>
-                      <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Videos
-                        <?= e((string) $typeCounts['video']) ?></span>
-                      <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Docs
-                        <?= e((string) ($typeCounts['pdf'] + $typeCounts['file'])) ?></span>
-                    </div>
-                    <p class="mt-4 text-xs text-slate-500"><span
-                        class="font-semibold text-ink"><?= e((string) $sharedCount) ?></span> shared items</p>
-                  </div>
-                  <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-2">
-                    <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 mb-3">Visibility</h2>
-                    <div class="space-y-2 text-sm text-slate-600">
-                      <p class="flex items-center justify-between"><span>Public + Member</span><span
-                          class="font-semibold text-ink"><?= e((string) $sharedCount) ?></span></p>
-                      <p class="flex items-center justify-between"><span>Admin only</span><span
-                          class="font-semibold text-ink"><?= e((string) (count($media) - $sharedCount)) ?></span></p>
-                    </div>
-                  </div>
-                </aside>
-                <section class="space-y-6">
-                  <div class="grid md:grid-cols-3 gap-4 animate-fade-up">
-                    <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
-                      <div>
-                        <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Items</p>
-                        <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) count($media)) ?></p>
-                        <p class="text-xs text-slate-500">Across <?= e((string) count(array_filter($typeCounts))) ?> types
-                        </p>
-                      </div>
-                      <div class="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center">
-                        <span class="material-icons-outlined">perm_media</span>
-                      </div>
-                    </div>
-                    <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
-                      <div>
-                        <p class="text-xs uppercase tracking-[0.24em] text-slate-500">New</p>
-                        <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) $newCount) ?></p>
-                        <p class="text-xs text-slate-500">Uploaded this week</p>
-                      </div>
-                      <div class="h-10 w-10 rounded-full bg-ember/15 text-ember flex items-center justify-center">
-                        <span class="material-icons-outlined">bolt</span>
-                      </div>
-                    </div>
-                    <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
-                      <div>
-                        <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Shared</p>
-                        <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) $sharedCount) ?></p>
-                        <p class="text-xs text-slate-500">Visible to members</p>
-                      </div>
-                      <div class="h-10 w-10 rounded-full bg-ocean/15 text-ocean flex items-center justify-center">
-                        <span class="material-icons-outlined">group</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div id="media-upload"
-                    class="relative overflow-hidden bg-gradient-to-br from-paper via-sand to-white border border-line rounded-2xl p-6 shadow-card animate-fade-up stagger-1">
-                    <div class="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/20 blur-2xl"></div>
-                    <div class="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-ocean/15 blur-2xl"></div>
-                    <div class="relative space-y-4">
-                      <div>
-                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Upload</p>
-                        <h2 class="mt-2 font-display text-xl text-ink">Add media to the library</h2>
-                        <p class="mt-1 text-sm text-slate-500">Images, PDFs, videos, and files are supported.</p>
-                      </div>
-                      <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <?php endforeach; ?>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No pending submissions.</p>
+            <?php endif; ?>
+          </div>
+          <div class="space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Approved memorials</h2>
+            <?php if ($approvedMemorials): ?>
+              <ul class="divide-y space-y-4">
+                <?php foreach ($approvedMemorials as $entry): ?>
+                  <?php if ($editFallenId === (int) $entry['id']): ?>
+                    <li class="pt-4 border-t border-gray-100 first:border-0 first:pt-0">
+                      <form method="post" enctype="multipart/form-data"
+                        class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
+                        <div class="flex items-center justify-between mb-2">
+                          <h3 class="text-sm font-semibold text-gray-900">Edit Memorial</h3>
+                          <a href="?page=fallen-wings" class="text-xs text-gray-500 hover:text-gray-900">Cancel</a>
+                        </div>
                         <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                        <div>
-                          <label class="text-sm font-medium text-slate-700">Title</label>
-                          <input type="text" name="title"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                        <input type="hidden" name="action" value="edit_fallen_wings">
+                        <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
+                            <input type="text" name="full_name" value="<?= e($entry['full_name']) ?>"
+                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Year of Passing</label>
+                            <input type="number" name="year_of_passing" value="<?= e((string) $entry['year_of_passing']) ?>"
+                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900"
+                              max="<?= date('Y') ?>" required>
+                          </div>
                         </div>
+
                         <div>
-                          <label class="text-sm font-medium text-slate-700">Video Embed URL (YouTube/Vimeo)</label>
-                          <input type="text" name="embed_url"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                            placeholder="https://...">
+                          <label class="block text-xs font-semibold text-gray-700 mb-1">Member Number</label>
+                          <input type="text" name="member_number" value="<?= e($entry['member_number'] ?? '') ?>"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                            pattern="[A-Za-z0-9.\-]+">
                         </div>
+
                         <div>
-                          <label class="text-sm font-medium text-slate-700">File</label>
-                          <input type="file" name="media_file"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-sand file:px-3 file:py-1.5 file:text-sm file:font-semibold">
+                          <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute Text</label>
+                          <textarea name="tribute" rows="4"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e($entry['tribute'] ?? '') ?></textarea>
                         </div>
-                        <div>
-                          <label class="text-sm font-medium text-slate-700">Type</label>
-                          <select name="media_type"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
-                            <option value="image">Image</option>
-                            <option value="pdf">PDF</option>
-                            <option value="video">Video</option>
-                            <option value="file">File</option>
-                          </select>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Replace Image</label>
+                            <?php if (!empty($entry['image_url'])): ?>
+                              <div class="mb-2">
+                                <img src="<?= e($entry['image_url']) ?>" class="h-12 w-auto object-contain rounded"
+                                  alt="Current Image">
+                              </div>
+                            <?php endif; ?>
+                            <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
+                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Replace PDF</label>
+                            <?php if (!empty($entry['pdf_url'])): ?>
+                              <div class="mb-2 text-xs">
+                                <a href="<?= e($entry['pdf_url']) ?>" target="_blank" class="text-primary hover:underline">View
+                                  Current PDF</a>
+                              </div>
+                            <?php endif; ?>
+                            <input type="file" name="tribute_pdf" accept=".pdf"
+                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                          </div>
                         </div>
-                        <div>
-                          <label class="text-sm font-medium text-slate-700">Visibility</label>
-                          <select name="visibility"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
-                            <option value="public">Public</option>
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label class="text-sm font-medium text-slate-700">Tags</label>
-                          <input type="text" name="tags"
-                            class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
-                        </div>
-                        <div class="md:col-span-2">
-                          <button
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors"
-                            type="submit">
-                            <span class="material-icons-outlined text-lg">cloud_upload</span>
-                            Upload
-                          </button>
+
+                        <div class="flex justify-end pt-2">
+                          <button type="submit"
+                            class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">Save
+                            Changes</button>
                         </div>
                       </form>
+                    </li>
+                  <?php else: ?>
+                    <li
+                      class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 first:border-0 first:pt-0">
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm text-gray-800 font-medium"><?= e($entry['full_name']) ?></p>
+                          <?php if (!empty($entry['image_url'])): ?>
+                            <span
+                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Img</span>
+                          <?php endif; ?>
+                          <?php if (!empty($entry['pdf_url'])): ?>
+                            <span
+                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                          <?php endif; ?>
+                        </div>
+                        <?php if (!empty($entry['member_number'])): ?>
+                          <p class="text-xs text-gray-500 mt-0.5">Member #: <?= e($entry['member_number']) ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($entry['tribute'])): ?>
+                          <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
+                        <?php endif; ?>
+                      </div>
+                      <div class="flex items-center gap-4 whitespace-nowrap">
+                        <span class="text-sm font-semibold text-gray-600"><?= e((string) $entry['year_of_passing']) ?></span>
+                        <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
+                          class="text-xs font-semibold text-gray-500 hover:text-gray-900 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200">Edit</a>
+                      </div>
+                    </li>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </ul>
+            <?php else: ?>
+              <p class="text-sm text-gray-500">No approved memorials yet.</p>
+            <?php endif; ?>
+          </div>
+        </section>
+      <?php elseif ($page === 'media'): ?>
+        <?php
+        $search = trim($_GET['search'] ?? '');
+        $typeFilter = trim($_GET['type'] ?? '');
+        $contextFilter = trim($_GET['context'] ?? '');
+        $unusedOnly = !empty($_GET['unused']);
+
+        $where = [];
+        $params = [];
+        if ($search !== '') {
+          $where[] = '(title LIKE :search1 OR path LIKE :search2 OR file_name LIKE :search3)';
+          $searchTerm = '%' . $search . '%';
+          $params['search1'] = $searchTerm;
+          $params['search2'] = $searchTerm;
+          $params['search3'] = $searchTerm;
+        }
+        if ($typeFilter !== '') {
+          if ($typeFilter === 'other') {
+            $where[] = "type NOT IN ('image','video','pdf','file')";
+          } else {
+            $where[] = 'type = :type';
+            $params['type'] = $typeFilter;
+          }
+        }
+        if ($contextFilter !== '') {
+          $where[] = 'source_context = :context';
+          $params['context'] = $contextFilter;
+        }
+        $sql = 'SELECT * FROM media';
+        if ($where) {
+          $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY created_at DESC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $media = $stmt->fetchAll();
+        $referenceCounts = MediaService::referenceCounts($media);
+        if ($unusedOnly) {
+          $media = array_values(array_filter($media, function ($item) use ($referenceCounts) {
+            if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
+              return false;
+            }
+            $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath((string) ($item['path'] ?? ''));
+            if (!$pathKey) {
+              return true;
+            }
+            return ($referenceCounts[$pathKey] ?? 0) === 0;
+          }));
+        }
+        $sourceContexts = $pdo->query('SELECT DISTINCT source_context FROM media WHERE source_context IS NOT NULL AND source_context <> "" ORDER BY source_context ASC')->fetchAll(PDO::FETCH_COLUMN, 0);
+        $recentCutoff = strtotime('-7 days');
+        $newCount = 0;
+        $sharedCount = 0;
+        $typeCounts = ['image' => 0, 'video' => 0, 'pdf' => 0, 'file' => 0];
+        foreach ($media as $item) {
+          $typeKey = strtolower($item['type'] ?? 'file');
+          if (!isset($typeCounts[$typeKey])) {
+            $typeKey = 'file';
+          }
+          $typeCounts[$typeKey] += 1;
+          $createdAt = isset($item['created_at']) ? strtotime($item['created_at']) : false;
+          if ($createdAt && $createdAt >= $recentCutoff) {
+            $newCount += 1;
+          }
+          if (($item['visibility'] ?? '') !== 'admin') {
+            $sharedCount += 1;
+          }
+        }
+        $uploadDir = __DIR__ . '/../uploads';
+        $mediaBytes = directory_size_bytes($uploadDir);
+        $mediaUsageMb = round($mediaBytes / 1024 / 1024, 1);
+        $storageLimitMb = (float) SettingsService::getGlobal('media.storage_limit_mb', 5120);
+        $usagePercent = $storageLimitMb > 0 ? min(100, ($mediaUsageMb / $storageLimitMb) * 100) : 0;
+        $usageLabel = $mediaUsageMb >= 1024 ? round($mediaUsageMb / 1024, 1) . ' GB' : round($mediaUsageMb, 1) . ' MB';
+        $limitLabel = $storageLimitMb >= 1024 ? round($storageLimitMb / 1024, 1) . ' GB' : round($storageLimitMb, 0) . ' MB';
+        ?>
+        <section class="relative overflow-hidden rounded-3xl border border-line bg-atmosphere p-6 shadow-soft">
+          <div class="pointer-events-none absolute inset-0">
+            <div class="absolute -top-24 right-0 h-52 w-52 rounded-full bg-primary/20 blur-3xl"></div>
+            <div class="absolute bottom-10 left-24 h-60 w-60 rounded-full bg-ocean/20 blur-3xl"></div>
+          </div>
+          <div class="relative flex flex-col gap-6">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-up">
+              <div>
+                <p class="text-[10px] uppercase tracking-[0.3em] text-ocean/80">Media</p>
+                <h1 class="font-display text-2xl text-ink">Media Library</h1>
+                <p class="text-sm text-slate-500">Uploads are stored in /public_html/uploads/ and logged here.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <form method="get" class="relative hidden md:block">
+                  <input type="hidden" name="page" value="media">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <span class="material-icons-outlined text-lg">search</span>
+                  </span>
+                  <input
+                    class="w-64 pl-10 pr-4 py-2 text-sm bg-white/80 border border-line rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary placeholder-slate-400 text-ink"
+                    placeholder="Search media..." type="text" name="search" value="<?= e($search) ?>">
+                </form>
+                <form method="post">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="sync_media_index">
+                  <button
+                    class="inline-flex items-center gap-2 bg-sand hover:bg-sand/70 text-ink px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors"
+                    type="submit">
+                    <span class="material-icons-outlined text-lg">sync</span>
+                    Sync Media Index
+                  </button>
+                </form>
+                <a href="#media-upload"
+                  class="inline-flex items-center gap-2 bg-ink hover:bg-primary-strong text-white px-4 py-2 rounded-lg text-sm font-medium shadow-soft transition-colors">
+                  <span class="material-icons-outlined text-lg">cloud_upload</span>
+                  Upload
+                </a>
+              </div>
+            </div>
+            <div class="grid lg:grid-cols-[260px_1fr] gap-6">
+              <aside class="space-y-6">
+                <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in">
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Storage</h2>
+                    <span class="text-xs font-medium text-ink"><?= e($usageLabel) ?></span>
+                  </div>
+                  <div class="mt-4 h-2 rounded-full bg-sand">
+                    <div class="h-2 rounded-full bg-gradient-to-r from-primary to-ember"
+                      style="width: <?= e((string) $usagePercent) ?>%"></div>
+                  </div>
+                  <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span><?= e($usageLabel) ?> of <?= e($limitLabel) ?></span>
+                    <span><?= e((string) count($media)) ?> items</span>
+                  </div>
+                </div>
+                <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-1">
+                  <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 mb-3">Collections</h2>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Photos
+                      <?= e((string) $typeCounts['image']) ?></span>
+                    <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Videos
+                      <?= e((string) $typeCounts['video']) ?></span>
+                    <span class="px-3 py-1 text-xs font-medium rounded-full bg-sand text-ink">Docs
+                      <?= e((string) ($typeCounts['pdf'] + $typeCounts['file'])) ?></span>
+                  </div>
+                  <p class="mt-4 text-xs text-slate-500"><span
+                      class="font-semibold text-ink"><?= e((string) $sharedCount) ?></span> shared items</p>
+                </div>
+                <div class="bg-paper border border-line rounded-2xl p-4 shadow-soft animate-float-in stagger-2">
+                  <h2 class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 mb-3">Visibility</h2>
+                  <div class="space-y-2 text-sm text-slate-600">
+                    <p class="flex items-center justify-between"><span>Public + Member</span><span
+                        class="font-semibold text-ink"><?= e((string) $sharedCount) ?></span></p>
+                    <p class="flex items-center justify-between"><span>Admin only</span><span
+                        class="font-semibold text-ink"><?= e((string) (count($media) - $sharedCount)) ?></span></p>
+                  </div>
+                </div>
+              </aside>
+              <section class="space-y-6">
+                <div class="grid md:grid-cols-3 gap-4 animate-fade-up">
+                  <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Items</p>
+                      <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) count($media)) ?></p>
+                      <p class="text-xs text-slate-500">Across <?= e((string) count(array_filter($typeCounts))) ?> types
+                      </p>
+                    </div>
+                    <div class="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center">
+                      <span class="material-icons-outlined">perm_media</span>
                     </div>
                   </div>
-                  <div class="bg-paper border border-line rounded-2xl p-5 shadow-soft animate-fade-up stagger-2">
-                    <form method="get" class="flex flex-wrap items-center justify-between gap-4 mb-5">
-                      <input type="hidden" name="page" value="media">
-                      <?php if ($search !== ''): ?>
-                          <input type="hidden" name="search" value="<?= e($search) ?>">
-                      <?php endif; ?>
-                      <div class="flex flex-wrap items-center gap-2">
-                        <select name="type"
-                          class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
-                          <option value="">All types</option>
-                          <option value="image" <?= $typeFilter === 'image' ? 'selected' : '' ?>>Images</option>
-                          <option value="video" <?= $typeFilter === 'video' ? 'selected' : '' ?>>Videos</option>
-                          <option value="pdf" <?= $typeFilter === 'pdf' ? 'selected' : '' ?>>PDFs</option>
-                          <option value="file" <?= $typeFilter === 'file' ? 'selected' : '' ?>>Files</option>
-                          <option value="other" <?= $typeFilter === 'other' ? 'selected' : '' ?>>Other</option>
-                        </select>
-                        <select name="context"
-                          class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
-                          <option value="">All sources</option>
-                          <?php foreach ($sourceContexts as $context): ?>
-                              <option value="<?= e($context) ?>" <?= $contextFilter === $context ? 'selected' : '' ?>>
-                                <?= e(ucfirst($context)) ?>
-                              </option>
-                          <?php endforeach; ?>
-                        </select>
-                        <label
-                          class="inline-flex items-center gap-2 text-xs text-slate-600 px-2 py-1.5 border border-line rounded-full bg-sand">
-                          <input type="checkbox" name="unused" value="1" <?= $unusedOnly ? 'checked' : '' ?>>
-                          Unused only
-                        </label>
-                        <button class="px-3 py-1.5 rounded-full bg-primary/15 text-ink text-xs font-semibold"
-                          type="submit">Apply</button>
-                        <a class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors"
-                          href="/admin/index.php?page=media">Reset</a>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <label class="inline-flex items-center gap-2 text-xs text-slate-600">
-                          <input id="media-select-all" type="checkbox" class="rounded border-line">
-                          Select all
-                        </label>
-                        <button class="px-3 py-1.5 rounded-full bg-ember/15 text-ember text-xs font-semibold" type="button"
-                          id="bulk-delete-trigger">Bulk Delete</button>
-                      </div>
-                    </form>
-                    <div id="bulk-action-bar"
-                      class="hidden items-center justify-between gap-3 rounded-lg border border-ember/30 bg-ember/5 px-3 py-2 text-xs text-ember">
-                      <span><span id="bulk-selected-count">0</span> selected</span>
-                      <button class="px-3 py-1.5 rounded-full bg-ember text-white text-xs font-semibold" type="button"
-                        id="bulk-delete-trigger-alt">Delete selected</button>
+                  <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.24em] text-slate-500">New</p>
+                      <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) $newCount) ?></p>
+                      <p class="text-xs text-slate-500">Uploaded this week</p>
                     </div>
-                    <form id="bulk-delete-form" method="post" class="hidden">
+                    <div class="h-10 w-10 rounded-full bg-ember/15 text-ember flex items-center justify-center">
+                      <span class="material-icons-outlined">bolt</span>
+                    </div>
+                  </div>
+                  <div class="bg-paper border border-line rounded-xl p-4 shadow-soft flex items-center justify-between">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Shared</p>
+                      <p class="mt-2 text-2xl font-semibold text-ink"><?= e((string) $sharedCount) ?></p>
+                      <p class="text-xs text-slate-500">Visible to members</p>
+                    </div>
+                    <div class="h-10 w-10 rounded-full bg-ocean/15 text-ocean flex items-center justify-center">
+                      <span class="material-icons-outlined">group</span>
+                    </div>
+                  </div>
+                </div>
+                <div id="media-upload"
+                  class="relative overflow-hidden bg-gradient-to-br from-paper via-sand to-white border border-line rounded-2xl p-6 shadow-card animate-fade-up stagger-1">
+                  <div class="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/20 blur-2xl"></div>
+                  <div class="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-ocean/15 blur-2xl"></div>
+                  <div class="relative space-y-4">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Upload</p>
+                      <h2 class="mt-2 font-display text-xl text-ink">Add media to the library</h2>
+                      <p class="mt-1 text-sm text-slate-500">Images, PDFs, videos, and files are supported.</p>
+                    </div>
+                    <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                      <input type="hidden" name="action" value="bulk_delete_media">
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">Title</label>
+                        <input type="text" name="title"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                      </div>
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">Video Embed URL (YouTube/Vimeo)</label>
+                        <input type="text" name="embed_url"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                          placeholder="https://...">
+                      </div>
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">File</label>
+                        <input type="file" name="media_file"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-sand file:px-3 file:py-1.5 file:text-sm file:font-semibold">
+                      </div>
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">Type</label>
+                        <select name="media_type"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
+                          <option value="image">Image</option>
+                          <option value="pdf">PDF</option>
+                          <option value="video">Video</option>
+                          <option value="file">File</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">Visibility</label>
+                        <select name="visibility"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
+                          <option value="public">Public</option>
+                          <option value="member">Member</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-sm font-medium text-slate-700">Tags</label>
+                        <input type="text" name="tags"
+                          class="mt-1 w-full rounded-lg border border-line bg-white/80 px-3 py-2 text-sm text-ink focus:ring-2 focus:ring-primary/40">
+                      </div>
+                      <div class="md:col-span-2">
+                        <button
+                          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors"
+                          type="submit">
+                          <span class="material-icons-outlined text-lg">cloud_upload</span>
+                          Upload
+                        </button>
+                      </div>
                     </form>
-                    <?php if (empty($media)): ?>
-                        <div class="text-sm text-slate-500">No media has been uploaded yet.</div>
-                    <?php else: ?>
-                        <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                          <?php foreach ($media as $item): ?>
-                              <?php
-                              $type = strtolower($item['type'] ?? 'file');
-                              $title = $item['title'] ?: basename($item['path'] ?? '');
-                              $path = $item['path'] ?? '';
-                              $previewUrl = $item['thumbnail_url'] ?? '';
-                              if ($previewUrl === '' && $type === 'image' && $path !== '') {
-                                $previewUrl = $path;
-                              }
-                              $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath($path);
-                              $usedCount = $pathKey ? ($referenceCounts[$pathKey] ?? 0) : 0;
-                              if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
-                                $usedCount += 1;
-                              }
-                              $missing = false;
-                              if ($pathKey) {
-                                $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
-                                $missing = !is_file($absolutePath);
-                              }
-                              $rawSize = isset($item['file_size']) ? (int) $item['file_size'] : null;
-                              if ($rawSize === null && !$missing && $pathKey) {
-                                $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
-                                $rawSize = is_file($absolutePath) ? filesize($absolutePath) : null;
-                              }
-                              $sizeLabel = format_bytes($rawSize);
-                              $sourceContext = $item['source_context'] ?? '';
-                              $createdLabel = '';
-                              if (!empty($item['created_at'])) {
-                                $createdAt = strtotime($item['created_at']);
-                                $createdLabel = $createdAt ? format_date_au(date('Y-m-d H:i:s', $createdAt)) : '';
-                              }
-                              $visibility = ucfirst($item['visibility'] ?? 'member');
-                              $typeLabel = strtoupper($type);
-                              $icon = 'insert_drive_file';
-                              if ($type === 'video') {
-                                $icon = 'play_circle';
-                              } elseif ($type === 'pdf') {
-                                $icon = 'picture_as_pdf';
-                              } elseif ($type === 'image') {
-                                $icon = 'photo';
-                              }
-                              ?>
+                  </div>
+                </div>
+                <div class="bg-paper border border-line rounded-2xl p-5 shadow-soft animate-fade-up stagger-2">
+                  <form method="get" class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                    <input type="hidden" name="page" value="media">
+                    <?php if ($search !== ''): ?>
+                      <input type="hidden" name="search" value="<?= e($search) ?>">
+                    <?php endif; ?>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <select name="type"
+                        class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
+                        <option value="">All types</option>
+                        <option value="image" <?= $typeFilter === 'image' ? 'selected' : '' ?>>Images</option>
+                        <option value="video" <?= $typeFilter === 'video' ? 'selected' : '' ?>>Videos</option>
+                        <option value="pdf" <?= $typeFilter === 'pdf' ? 'selected' : '' ?>>PDFs</option>
+                        <option value="file" <?= $typeFilter === 'file' ? 'selected' : '' ?>>Files</option>
+                        <option value="other" <?= $typeFilter === 'other' ? 'selected' : '' ?>>Other</option>
+                      </select>
+                      <select name="context"
+                        class="text-sm bg-paper border border-line rounded-lg px-3 py-2 text-slate-600 focus:ring-2 focus:ring-primary/40">
+                        <option value="">All sources</option>
+                        <?php foreach ($sourceContexts as $context): ?>
+                          <option value="<?= e($context) ?>" <?= $contextFilter === $context ? 'selected' : '' ?>>
+                            <?= e(ucfirst($context)) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                      <label
+                        class="inline-flex items-center gap-2 text-xs text-slate-600 px-2 py-1.5 border border-line rounded-full bg-sand">
+                        <input type="checkbox" name="unused" value="1" <?= $unusedOnly ? 'checked' : '' ?>>
+                        Unused only
+                      </label>
+                      <button class="px-3 py-1.5 rounded-full bg-primary/15 text-ink text-xs font-semibold"
+                        type="submit">Apply</button>
+                      <a class="px-3 py-1.5 rounded-full bg-sand text-slate-600 text-xs font-medium hover:text-ink transition-colors"
+                        href="/admin/index.php?page=media">Reset</a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+                        <input id="media-select-all" type="checkbox" class="rounded border-line">
+                        Select all
+                      </label>
+                      <button class="px-3 py-1.5 rounded-full bg-ember/15 text-ember text-xs font-semibold" type="button"
+                        id="bulk-delete-trigger">Bulk Delete</button>
+                    </div>
+                  </form>
+                  <div id="bulk-action-bar"
+                    class="hidden items-center justify-between gap-3 rounded-lg border border-ember/30 bg-ember/5 px-3 py-2 text-xs text-ember">
+                    <span><span id="bulk-selected-count">0</span> selected</span>
+                    <button class="px-3 py-1.5 rounded-full bg-ember text-white text-xs font-semibold" type="button"
+                      id="bulk-delete-trigger-alt">Delete selected</button>
+                  </div>
+                  <form id="bulk-delete-form" method="post" class="hidden">
+                    <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                    <input type="hidden" name="action" value="bulk_delete_media">
+                  </form>
+                  <?php if (empty($media)): ?>
+                    <div class="text-sm text-slate-500">No media has been uploaded yet.</div>
+                  <?php else: ?>
+                    <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                      <?php foreach ($media as $item): ?>
+                        <?php
+                        $type = strtolower($item['type'] ?? 'file');
+                        $title = $item['title'] ?: basename($item['path'] ?? '');
+                        $path = $item['path'] ?? '';
+                        $previewUrl = $item['thumbnail_url'] ?? '';
+                        if ($previewUrl === '' && $type === 'image' && $path !== '') {
+                          $previewUrl = $path;
+                        }
+                        $pathKey = $item['file_path'] ?? MediaService::normalizeUploadsPath($path);
+                        $usedCount = $pathKey ? ($referenceCounts[$pathKey] ?? 0) : 0;
+                        if (!empty($item['source_table']) && !empty($item['source_record_id'])) {
+                          $usedCount += 1;
+                        }
+                        $missing = false;
+                        if ($pathKey) {
+                          $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
+                          $missing = !is_file($absolutePath);
+                        }
+                        $rawSize = isset($item['file_size']) ? (int) $item['file_size'] : null;
+                        if ($rawSize === null && !$missing && $pathKey) {
+                          $absolutePath = __DIR__ . '/../uploads/' . ltrim($pathKey, '/');
+                          $rawSize = is_file($absolutePath) ? filesize($absolutePath) : null;
+                        }
+                        $sizeLabel = format_bytes($rawSize);
+                        $sourceContext = $item['source_context'] ?? '';
+                        $createdLabel = '';
+                        if (!empty($item['created_at'])) {
+                          $createdAt = strtotime($item['created_at']);
+                          $createdLabel = $createdAt ? format_date_au(date('Y-m-d H:i:s', $createdAt)) : '';
+                        }
+                        $visibility = ucfirst($item['visibility'] ?? 'member');
+                        $typeLabel = strtoupper($type);
+                        $icon = 'insert_drive_file';
+                        if ($type === 'video') {
+                          $icon = 'play_circle';
+                        } elseif ($type === 'pdf') {
+                          $icon = 'picture_as_pdf';
+                        } elseif ($type === 'image') {
+                          $icon = 'photo';
+                        }
+                        ?>
+                        <div
+                          class="group bg-white border border-line rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all">
+                          <div class="relative h-36 bg-sand flex items-center justify-center">
+                            <label
+                              class="absolute top-3 right-3 z-20 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-600 bg-paper/90 border border-line rounded-full px-2 py-1">
+                              <input type="checkbox" form="bulk-delete-form" class="rounded border-line" name="media_ids[]"
+                                value="<?= e((string) $item['id']) ?>" data-media-checkbox>
+                              Select
+                            </label>
+                            <?php if ($previewUrl): ?>
+                              <img alt="<?= e($title) ?>" class="w-full h-full object-cover" src="<?= e($previewUrl) ?>">
+                            <?php else: ?>
+                              <span class="material-icons-outlined text-5xl text-ember"><?= e($icon) ?></span>
+                            <?php endif; ?>
+                            <div
+                              class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">
+                              <?= e($typeLabel) ?>
+                            </div>
+                            <?php if ($missing): ?>
                               <div
-                                class="group bg-white border border-line rounded-2xl overflow-hidden shadow-soft hover:shadow-card transition-all">
-                                <div class="relative h-36 bg-sand flex items-center justify-center">
-                                  <label
-                                    class="absolute top-3 right-3 z-20 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-600 bg-paper/90 border border-line rounded-full px-2 py-1">
-                                    <input type="checkbox" form="bulk-delete-form" class="rounded border-line" name="media_ids[]"
-                                      value="<?= e((string) $item['id']) ?>" data-media-checkbox>
-                                    Select
-                                  </label>
-                                  <?php if ($previewUrl): ?>
-                                      <img alt="<?= e($title) ?>" class="w-full h-full object-cover" src="<?= e($previewUrl) ?>">
-                                  <?php else: ?>
-                                      <span class="material-icons-outlined text-5xl text-ember"><?= e($icon) ?></span>
-                                  <?php endif; ?>
-                                  <div
-                                    class="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-paper/90 border border-line rounded-full text-ink">
-                                    <?= e($typeLabel) ?>
-                                  </div>
-                                  <?php if ($missing): ?>
-                                      <div
-                                        class="absolute bottom-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-ember/15 text-ember border border-ember/30 rounded-full">
-                                        Missing media</div>
-                                  <?php endif; ?>
-                                  <?php if ($path): ?>
-                                      <a class="absolute inset-0 z-10 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                                        href="<?= e($path) ?>" target="_blank" rel="noopener">
-                                        <span class="material-icons-outlined text-2xl text-white">open_in_new</span>
-                                      </a>
-                                  <?php endif; ?>
-                                </div>
-                                <div class="p-4 space-y-2">
-                                  <div class="flex items-start justify-between gap-2">
-                                    <h3 class="text-sm font-semibold text-ink truncate" title="<?= e($title) ?>"><?= e($title) ?>
-                                    </h3>
-                                    <span
-                                      class="text-[10px] uppercase tracking-[0.16em] text-slate-400"><?= e($visibility) ?></span>
-                                  </div>
-                                  <p class="text-xs text-slate-500 truncate" title="<?= e($path) ?>"><?= e($path) ?></p>
-                                  <div class="flex items-center justify-between text-xs text-slate-500">
-                                    <span><?= e($createdLabel ?: 'N/A') ?></span>
-                                    <code
-                                      class="text-[11px] bg-sand/70 text-ink px-2 py-1 rounded-lg">[media:<?= e((string) $item['id']) ?>]</code>
-                                  </div>
-                                  <div class="flex items-center justify-between text-xs text-slate-500">
-                                    <span><?= e($sizeLabel) ?></span>
-                                    <span><?= e($sourceContext !== '' ? ucfirst($sourceContext) : 'Unknown') ?></span>
-                                  </div>
-                                  <div class="flex items-center justify-between text-xs text-slate-500">
-                                    <span>Used in <?= e((string) $usedCount) ?></span>
-                                    <form method="post" data-media-delete>
-                                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                                      <input type="hidden" name="action" value="delete_media">
-                                      <input type="hidden" name="media_id" value="<?= e((string) $item['id']) ?>">
-                                      <button class="text-ember font-semibold hover:text-ember/80" type="submit">Delete</button>
-                                    </form>
-                                  </div>
-                                </div>
-                              </div>
-                          <?php endforeach; ?>
-                        </div>
-                        <div id="bulk-delete-modal"
-                          class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
-                          <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-card">
-                            <h3 class="text-lg font-semibold text-ink">Confirm bulk delete</h3>
-                            <p class="text-sm text-slate-600 mt-2">You are about to delete <span id="bulk-delete-count"
-                                class="font-semibold text-ink">0</span> item(s). This is permanent.</p>
-                            <div class="mt-4 flex justify-end gap-2">
-                              <button id="bulk-delete-cancel" type="button"
-                                class="px-3 py-1.5 rounded-lg border border-line text-sm text-slate-600">Cancel</button>
-                              <button id="bulk-delete-confirm" type="button"
-                                class="px-3 py-1.5 rounded-lg bg-ember text-white text-sm font-semibold">Delete</button>
+                                class="absolute bottom-3 left-3 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-ember/15 text-ember border border-ember/30 rounded-full">
+                                Missing media</div>
+                            <?php endif; ?>
+                            <?php if ($path): ?>
+                              <a class="absolute inset-0 z-10 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                href="<?= e($path) ?>" target="_blank" rel="noopener">
+                                <span class="material-icons-outlined text-2xl text-white">open_in_new</span>
+                              </a>
+                            <?php endif; ?>
+                          </div>
+                          <div class="p-4 space-y-2">
+                            <div class="flex items-start justify-between gap-2">
+                              <h3 class="text-sm font-semibold text-ink truncate" title="<?= e($title) ?>"><?= e($title) ?>
+                              </h3>
+                              <span
+                                class="text-[10px] uppercase tracking-[0.16em] text-slate-400"><?= e($visibility) ?></span>
+                            </div>
+                            <p class="text-xs text-slate-500 truncate" title="<?= e($path) ?>"><?= e($path) ?></p>
+                            <div class="flex items-center justify-between text-xs text-slate-500">
+                              <span><?= e($createdLabel ?: 'N/A') ?></span>
+                              <code
+                                class="text-[11px] bg-sand/70 text-ink px-2 py-1 rounded-lg">[media:<?= e((string) $item['id']) ?>]</code>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-500">
+                              <span><?= e($sizeLabel) ?></span>
+                              <span><?= e($sourceContext !== '' ? ucfirst($sourceContext) : 'Unknown') ?></span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-500">
+                              <span>Used in <?= e((string) $usedCount) ?></span>
+                              <form method="post" data-media-delete>
+                                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                                <input type="hidden" name="action" value="delete_media">
+                                <input type="hidden" name="media_id" value="<?= e((string) $item['id']) ?>">
+                                <button class="text-ember font-semibold hover:text-ember/80" type="submit">Delete</button>
+                              </form>
                             </div>
                           </div>
                         </div>
-                        <script>
-                          (() => {
-                            const selectAll = document.getElementById('media-select-all');
-                            const checkboxes = Array.from(document.querySelectorAll('[data-media-checkbox]'));
-                            const bulkBtn = document.getElementById('bulk-delete-trigger');
-                            const bulkBar = document.getElementById('bulk-action-bar');
-                            const bulkAltBtn = document.getElementById('bulk-delete-trigger-alt');
-                            const bulkCount = document.getElementById('bulk-selected-count');
-                            const modal = document.getElementById('bulk-delete-modal');
-                            const countEl = document.getElementById('bulk-delete-count');
-                            const confirmBtn = document.getElementById('bulk-delete-confirm');
-                            const cancelBtn = document.getElementById('bulk-delete-cancel');
-                            const bulkForm = document.getElementById('bulk-delete-form');
+                      <?php endforeach; ?>
+                    </div>
+                    <div id="bulk-delete-modal"
+                      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+                      <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-card">
+                        <h3 class="text-lg font-semibold text-ink">Confirm bulk delete</h3>
+                        <p class="text-sm text-slate-600 mt-2">You are about to delete <span id="bulk-delete-count"
+                            class="font-semibold text-ink">0</span> item(s). This is permanent.</p>
+                        <div class="mt-4 flex justify-end gap-2">
+                          <button id="bulk-delete-cancel" type="button"
+                            class="px-3 py-1.5 rounded-lg border border-line text-sm text-slate-600">Cancel</button>
+                          <button id="bulk-delete-confirm" type="button"
+                            class="px-3 py-1.5 rounded-lg bg-ember text-white text-sm font-semibold">Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                    <script>
+                      (() => {
+                        const selectAll = document.getElementById('media-select-all');
+                        const checkboxes = Array.from(document.querySelectorAll('[data-media-checkbox]'));
+                        const bulkBtn = document.getElementById('bulk-delete-trigger');
+                        const bulkBar = document.getElementById('bulk-action-bar');
+                        const bulkAltBtn = document.getElementById('bulk-delete-trigger-alt');
+                        const bulkCount = document.getElementById('bulk-selected-count');
+                        const modal = document.getElementById('bulk-delete-modal');
+                        const countEl = document.getElementById('bulk-delete-count');
+                        const confirmBtn = document.getElementById('bulk-delete-confirm');
+                        const cancelBtn = document.getElementById('bulk-delete-cancel');
+                        const bulkForm = document.getElementById('bulk-delete-form');
 
-                            const selectedCount = () => checkboxes.filter((box) => box.checked).length;
-                            const syncSelectAll = () => {
-                              if (!selectAll) {
-                                return;
-                              }
-                              const count = selectedCount();
-                              selectAll.checked = count > 0 && count === checkboxes.length;
-                              selectAll.indeterminate = count > 0 && count < checkboxes.length;
-                              if (bulkBar && bulkCount) {
-                                bulkCount.textContent = count.toString();
-                                bulkBar.classList.toggle('hidden', count === 0);
-                                bulkBar.classList.toggle('flex', count > 0);
-                              }
-                            };
+                        const selectedCount = () => checkboxes.filter((box) => box.checked).length;
+                        const syncSelectAll = () => {
+                          if (!selectAll) {
+                            return;
+                          }
+                          const count = selectedCount();
+                          selectAll.checked = count > 0 && count === checkboxes.length;
+                          selectAll.indeterminate = count > 0 && count < checkboxes.length;
+                          if (bulkBar && bulkCount) {
+                            bulkCount.textContent = count.toString();
+                            bulkBar.classList.toggle('hidden', count === 0);
+                            bulkBar.classList.toggle('flex', count > 0);
+                          }
+                        };
 
+                        checkboxes.forEach((box) => {
+                          box.addEventListener('change', syncSelectAll);
+                        });
+                        if (selectAll) {
+                          selectAll.addEventListener('change', () => {
                             checkboxes.forEach((box) => {
-                              box.addEventListener('change', syncSelectAll);
+                              box.checked = selectAll.checked;
                             });
-                            if (selectAll) {
-                              selectAll.addEventListener('change', () => {
-                                checkboxes.forEach((box) => {
-                                  box.checked = selectAll.checked;
-                                });
-                                syncSelectAll();
-                              });
-                            }
-                            const openModal = () => {
-                              if (!modal || !countEl) {
-                                return;
-                              }
-                              const count = selectedCount();
-                              if (count === 0) {
-                                alert('Select at least one item to delete.');
-                                return;
-                              }
-                              countEl.textContent = count.toString();
-                              modal.classList.remove('hidden');
-                              modal.classList.add('flex');
-                            };
+                            syncSelectAll();
+                          });
+                        }
+                        const openModal = () => {
+                          if (!modal || !countEl) {
+                            return;
+                          }
+                          const count = selectedCount();
+                          if (count === 0) {
+                            alert('Select at least one item to delete.');
+                            return;
+                          }
+                          countEl.textContent = count.toString();
+                          modal.classList.remove('hidden');
+                          modal.classList.add('flex');
+                        };
 
-                            if (bulkBtn && modal && countEl && confirmBtn && cancelBtn && bulkForm) {
-                              bulkBtn.addEventListener('click', openModal);
-                              if (bulkAltBtn) {
-                                bulkAltBtn.addEventListener('click', openModal);
-                              }
-                              cancelBtn.addEventListener('click', () => {
-                                modal.classList.add('hidden');
-                                modal.classList.remove('flex');
-                              });
-                              confirmBtn.addEventListener('click', () => {
-                                bulkForm.submit();
-                              });
-                            }
+                        if (bulkBtn && modal && countEl && confirmBtn && cancelBtn && bulkForm) {
+                          bulkBtn.addEventListener('click', openModal);
+                          if (bulkAltBtn) {
+                            bulkAltBtn.addEventListener('click', openModal);
+                          }
+                          cancelBtn.addEventListener('click', () => {
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                          });
+                          confirmBtn.addEventListener('click', () => {
+                            bulkForm.submit();
+                          });
+                        }
 
-                            document.querySelectorAll('[data-media-delete]').forEach((form) => {
-                              form.addEventListener('submit', async (event) => {
-                                event.preventDefault();
-                                if (!confirm('Delete this media item? This is permanent.')) {
-                                  return;
-                                }
-                                const button = form.querySelector('button[type=\"submit\"]');
-                                const label = button ? button.textContent : '';
-                                if (button) {
-                                  button.disabled = true;
-                                  button.textContent = 'Deleting...';
-                                }
-                                const data = new FormData(form);
-                                data.append('ajax', '1');
-                                try {
-                                  const response = await fetch(window.location.href, {
-                                    method: 'POST',
-                                    body: data,
-                                    headers: {
-                                      'X-Requested-With': 'fetch',
-                                    },
-                                  });
-                                  const result = await response.json();
-                                  if (result && result.ok) {
-                                    window.location.reload();
-                                  } else {
-                                    alert(result.error || 'Unable to delete media.');
-                                  }
-                                } catch (err) {
-                                  alert('Unable to delete media.');
-                                }
-                                if (button) {
-                                  button.disabled = false;
-                                  button.textContent = label;
-                                }
+                        document.querySelectorAll('[data-media-delete]').forEach((form) => {
+                          form.addEventListener('submit', async (event) => {
+                            event.preventDefault();
+                            if (!confirm('Delete this media item? This is permanent.')) {
+                              return;
+                            }
+                            const button = form.querySelector('button[type=\"submit\"]');
+                            const label = button ? button.textContent : '';
+                            if (button) {
+                              button.disabled = true;
+                              button.textContent = 'Deleting...';
+                            }
+                            const data = new FormData(form);
+                            data.append('ajax', '1');
+                            try {
+                              const response = await fetch(window.location.href, {
+                                method: 'POST',
+                                body: data,
+                                headers: {
+                                  'X-Requested-With': 'fetch',
+                                },
                               });
-                            });
-                          })();
-                        </script>
-                    <?php endif; ?>
-                  </div>
-                </section>
-              </div>
+                              const result = await response.json();
+                              if (result && result.ok) {
+                                window.location.reload();
+                              } else {
+                                alert(result.error || 'Unable to delete media.');
+                              }
+                            } catch (err) {
+                              alert('Unable to delete media.');
+                            }
+                            if (button) {
+                              button.disabled = false;
+                              button.textContent = label;
+                            }
+                          });
+                        });
+                      })();
+                    </script>
+                  <?php endif; ?>
+                </div>
+              </section>
             </div>
-          </section>
+          </div>
+        </section>
       <?php elseif ($page === 'wings'): ?>
-          <?php $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll(); ?>
-          <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
-            <h1 class="font-display text-2xl font-bold text-gray-900">Wings Magazine</h1>
-            <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-              <div>
-                <label class="text-sm font-medium text-gray-700">Title</label>
-                <input type="text" name="title" class="mt-1" required>
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-700">Published Date</label>
-                <input type="date" name="published_at" class="mt-1" value="<?= e(date('Y-m-d')) ?>">
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-700">PDF File</label>
-                <input type="file" name="pdf_file" class="mt-1" required>
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-700">Cover Image (optional)</label>
-                <input type="file" name="cover_file" class="mt-1">
-              </div>
-              <div class="md:col-span-2 flex items-center gap-2">
-                <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="is_latest"
-                    value="1"> Set as latest</label>
-              </div>
-              <div class="md:col-span-2">
-                <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                  type="submit">Upload Issue</button>
-              </div>
-            </form>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                  <tr>
-                    <th class="py-2 pr-3">Title</th>
-                    <th class="py-2 pr-3">Published</th>
-                    <th class="py-2 pr-3">Latest</th>
-                    <th class="py-2">PDF</th>
-                    <th class="py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y relative z-0">
-                  <?php foreach ($issues as $issue): ?>
-                      <tr>
-                        <td class="py-2 pr-3 text-gray-900"><?= e($issue['title']) ?></td>
-                        <td class="py-2 pr-3 text-gray-600"><?= e($issue['published_at']) ?></td>
-                        <td class="py-2 pr-3 text-gray-600"><?= $issue['is_latest'] ? 'Yes' : 'No' ?></td>
-                        <td class="py-2"><a class="text-secondary font-semibold" href="<?= e($issue['pdf_url']) ?>"
-                            target="_blank">Download</a></td>
-                        <td class="py-2 text-right space-x-2">
-                          <button type="button" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                            onclick="document.getElementById('edit-wings-<?= $issue['id'] ?>').showModal()">Edit</button>
-                          <button type="button" class="text-rose-600 hover:text-rose-900 text-sm font-medium"
-                            onclick="document.getElementById('delete-wings-<?= $issue['id'] ?>').showModal()">Delete</button>
-
-                          <dialog id="edit-wings-<?= $issue['id'] ?>"
-                            class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
-                            <form method="post" class="space-y-4 text-left">
-                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                              <input type="hidden" name="action" value="edit_wings_issue">
-                              <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
-                              <h3 class="font-display font-bold text-lg">Edit Wings Issue</h3>
-                              <div>
-                                <label class="text-sm font-bold block mb-1">Title</label>
-                                <input type="text" name="title" class="w-full border-gray-300 rounded px-3 py-2"
-                                  value="<?= e($issue['title']) ?>" required>
-                              </div>
-                              <div>
-                                <label class="text-sm font-bold block mb-1">Published Date</label>
-                                <input type="date" name="published_at" class="w-full border-gray-300 rounded px-3 py-2"
-                                  value="<?= e($issue['published_at']) ?>" required>
-                              </div>
-                              <div class="flex items-center gap-2">
-                                <label class="text-sm text-gray-600"><input type="checkbox" name="is_latest" value="1"
-                                    <?= $issue['is_latest'] ? 'checked' : '' ?>> Set as latest</label>
-                              </div>
-                              <div class="flex gap-3 justify-end pt-4">
-                                <button type="button" class="px-4 py-2 font-semibold text-gray-600"
-                                  onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
-                                <button type="submit"
-                                  class="px-4 py-2 font-semibold bg-primary rounded text-gray-900">Save</button>
-                              </div>
-                            </form>
-                          </dialog>
-
-                          <dialog id="delete-wings-<?= $issue['id'] ?>"
-                            class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
-                            <form method="post" class="space-y-4 text-left">
-                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                              <input type="hidden" name="action" value="delete_wings_issue">
-                              <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
-                              <h3 class="font-display font-bold text-lg text-rose-600">Delete Issue?</h3>
-                              <p class="text-sm text-gray-600 whitespace-normal">Are you sure you want to permanently delete
-                                this issue (<?= e($issue['title']) ?>)? This will remove it from the directory list.</p>
-                              <div class="flex gap-3 justify-end pt-4">
-                                <button type="button" class="px-4 py-2 font-semibold text-gray-600"
-                                  onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
-                                <button type="submit"
-                                  class="px-4 py-2 font-semibold bg-rose-600 text-white rounded">Delete</button>
-                              </div>
-                            </form>
-                          </dialog>
-                        </td>
-                      </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
+        <?php $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll(); ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+          <h1 class="font-display text-2xl font-bold text-gray-900">Wings Magazine</h1>
+          <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+            <div>
+              <label class="text-sm font-medium text-gray-700">Title</label>
+              <input type="text" name="title" class="mt-1" required>
             </div>
-          </section>
+            <div>
+              <label class="text-sm font-medium text-gray-700">Published Date</label>
+              <input type="date" name="published_at" class="mt-1" value="<?= e(date('Y-m-d')) ?>">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">PDF File</label>
+              <input type="file" name="pdf_file" class="mt-1" required>
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">Cover Image (optional)</label>
+              <input type="file" name="cover_file" class="mt-1">
+            </div>
+            <div class="md:col-span-2 flex items-center gap-2">
+              <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="is_latest"
+                  value="1"> Set as latest</label>
+            </div>
+            <div class="md:col-span-2">
+              <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                type="submit">Upload Issue</button>
+            </div>
+          </form>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                <tr>
+                  <th class="py-2 pr-3">Title</th>
+                  <th class="py-2 pr-3">Published</th>
+                  <th class="py-2 pr-3">Latest</th>
+                  <th class="py-2">PDF</th>
+                  <th class="py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y relative z-0">
+                <?php foreach ($issues as $issue): ?>
+                  <tr>
+                    <td class="py-2 pr-3 text-gray-900"><?= e($issue['title']) ?></td>
+                    <td class="py-2 pr-3 text-gray-600"><?= e($issue['published_at']) ?></td>
+                    <td class="py-2 pr-3 text-gray-600"><?= $issue['is_latest'] ? 'Yes' : 'No' ?></td>
+                    <td class="py-2"><a class="text-secondary font-semibold" href="<?= e($issue['pdf_url']) ?>"
+                        target="_blank">Download</a></td>
+                    <td class="py-2 text-right space-x-2">
+                      <button type="button" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                        onclick="document.getElementById('edit-wings-<?= $issue['id'] ?>').showModal()">Edit</button>
+                      <button type="button" class="text-rose-600 hover:text-rose-900 text-sm font-medium"
+                        onclick="document.getElementById('delete-wings-<?= $issue['id'] ?>').showModal()">Delete</button>
+
+                      <dialog id="edit-wings-<?= $issue['id'] ?>"
+                        class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
+                        <form method="post" enctype="multipart/form-data" class="space-y-4 text-left">
+                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                          <input type="hidden" name="action" value="edit_wings_issue">
+                          <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
+                          <h3 class="font-display font-bold text-lg">Edit Wings Issue</h3>
+                          <div>
+                            <label class="text-sm font-bold block mb-1">Title</label>
+                            <input type="text" name="title" class="w-full border-gray-300 rounded px-3 py-2"
+                              value="<?= e($issue['title']) ?>" required>
+                          </div>
+                          <div>
+                            <label class="text-sm font-bold block mb-1">Published Date</label>
+                            <input type="date" name="published_at" class="w-full border-gray-300 rounded px-3 py-2"
+                              value="<?= e($issue['published_at']) ?>" required>
+                          </div>
+                          <div>
+                            <label class="text-sm font-bold block mb-1">Replace PDF</label>
+                            <input type="file" name="pdf_file" accept=".pdf"
+                              class="w-full border-gray-300 rounded px-3 py-2 text-sm">
+                            <?php if (!empty($issue['pdf_url'])): ?>
+                              <div class="mt-2 flex items-center justify-between">
+                                <a href="<?= e($issue['pdf_url']) ?>" target="_blank"
+                                  class="text-xs text-primary hover:underline">View Current</a>
+                                <label class="text-xs text-red-600 flex items-center gap-1"><input type="checkbox"
+                                    name="remove_pdf" value="1"> Remove PDF</label>
+                              </div>
+                            <?php endif; ?>
+                          </div>
+                          <div>
+                            <label class="text-sm font-bold block mb-1">Replace Cover Image</label>
+                            <input type="file" name="cover_file" accept=".jpg,.jpeg,.png,.webp"
+                              class="w-full border-gray-300 rounded px-3 py-2 text-sm">
+                            <?php if (!empty($issue['cover_image_url'])): ?>
+                              <div class="mt-2 flex items-center justify-between">
+                                <a href="<?= e($issue['cover_image_url']) ?>" target="_blank"
+                                  class="text-xs text-primary hover:underline">View Current</a>
+                                <label class="text-xs text-red-600 flex items-center gap-1"><input type="checkbox"
+                                    name="remove_cover" value="1"> Remove Cover</label>
+                              </div>
+                            <?php endif; ?>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-600"><input type="checkbox" name="is_latest" value="1"
+                                <?= $issue['is_latest'] ? 'checked' : '' ?>> Set as latest</label>
+                          </div>
+                          <div class="flex gap-3 justify-end pt-4">
+                            <button type="button" class="px-4 py-2 font-semibold text-gray-600"
+                              onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                            <button type="submit"
+                              class="px-4 py-2 font-semibold bg-primary rounded text-gray-900">Save</button>
+                          </div>
+                        </form>
+                      </dialog>
+
+                      <dialog id="delete-wings-<?= $issue['id'] ?>"
+                        class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
+                        <form method="post" class="space-y-4 text-left">
+                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                          <input type="hidden" name="action" value="delete_wings_issue">
+                          <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
+                          <h3 class="font-display font-bold text-lg text-rose-600">Delete Issue?</h3>
+                          <p class="text-sm text-gray-600 whitespace-normal">Are you sure you want to permanently delete
+                            this issue (<?= e($issue['title']) ?>)? This will remove it from the directory list.</p>
+                          <div class="flex gap-3 justify-end pt-4">
+                            <button type="button" class="px-4 py-2 font-semibold text-gray-600"
+                              onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                            <button type="submit"
+                              class="px-4 py-2 font-semibold bg-rose-600 text-white rounded">Delete</button>
+                          </div>
+                        </form>
+                      </dialog>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </section>
       <?php elseif ($page === 'ai-editor'): ?>
-          <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h1 class="font-display text-2xl font-bold text-gray-900 mb-2">AI Page Builder</h1>
-            <p class="text-sm text-gray-500 mb-4">Open the interactive page builder to edit front-facing pages.</p>
-            <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-              href="/admin/page-builder">Open AI Page Builder</a>
-          </section>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 class="font-display text-2xl font-bold text-gray-900 mb-2">AI Page Builder</h1>
+          <p class="text-sm text-gray-500 mb-4">Open the interactive page builder to edit front-facing pages.</p>
+          <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+            href="/admin/page-builder">Open AI Page Builder</a>
+        </section>
       <?php elseif ($page === 'audit'): ?>
-          <?php $audit = $pdo->query('SELECT a.*, u.name FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 50')->fetchAll(); ?>
-          <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Audit Log</h1>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="text-left text-xs uppercase text-gray-500 border-b">
+        <?php $audit = $pdo->query('SELECT a.*, u.name FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 50')->fetchAll(); ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Audit Log</h1>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                <tr>
+                  <th class="py-2 pr-3">User</th>
+                  <th class="py-2 pr-3">Action</th>
+                  <th class="py-2 pr-3">Details</th>
+                  <th class="py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <?php foreach ($audit as $row): ?>
                   <tr>
-                    <th class="py-2 pr-3">User</th>
-                    <th class="py-2 pr-3">Action</th>
-                    <th class="py-2 pr-3">Details</th>
-                    <th class="py-2">Date</th>
+                    <td class="py-2 pr-3 text-gray-900"><?= e($row['name'] ?? 'System') ?></td>
+                    <td class="py-2 pr-3 text-gray-600"><?= e($row['action']) ?></td>
+                    <td class="py-2 pr-3 text-gray-600"><?= e($row['details']) ?></td>
+                    <td class="py-2 text-gray-600"><?= e($row['created_at']) ?></td>
                   </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <?php foreach ($audit as $row): ?>
-                      <tr>
-                        <td class="py-2 pr-3 text-gray-900"><?= e($row['name'] ?? 'System') ?></td>
-                        <td class="py-2 pr-3 text-gray-600"><?= e($row['action']) ?></td>
-                        <td class="py-2 pr-3 text-gray-600"><?= e($row['details']) ?></td>
-                        <td class="py-2 text-gray-600"><?= e($row['created_at']) ?></td>
-                      </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </section>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </section>
       <?php elseif ($page === 'reports'): ?>
-          <?php $counts = $pdo->query("SELECT status, COUNT(*) as c FROM members GROUP BY status")->fetchAll(); ?>
-          <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Reports & Exports</h1>
-            <p class="text-sm text-gray-500">Export tools can be added here. Current member status counts:</p>
-            <ul class="mt-3 space-y-2 text-sm text-gray-700">
-              <?php foreach ($counts as $row): ?>
-                  <li><?= e($row['status']) ?>: <?= e((string) $row['c']) ?></li>
-              <?php endforeach; ?>
-            </ul>
-          </section>
+        <?php $counts = $pdo->query("SELECT status, COUNT(*) as c FROM members GROUP BY status")->fetchAll(); ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Reports & Exports</h1>
+          <p class="text-sm text-gray-500">Export tools can be added here. Current member status counts:</p>
+          <ul class="mt-3 space-y-2 text-sm text-gray-700">
+            <?php foreach ($counts as $row): ?>
+              <li><?= e($row['status']) ?>: <?= e((string) $row['c']) ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </section>
       <?php else: ?>
-          <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h1 class="font-display text-2xl font-bold text-gray-900">Admin CRM</h1>
-            <p class="text-sm text-gray-500">Page not found.</p>
-          </section>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 class="font-display text-2xl font-bold text-gray-900">Admin CRM</h1>
+          <p class="text-sm text-gray-500">Page not found.</p>
+        </section>
       <?php endif; ?>
     </div>
   </main>
