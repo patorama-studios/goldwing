@@ -1,0 +1,1 @@
+curl -X POST http://localhost:8000/admin/members/actions.php -H "Cookie: PHPSESSID=49684620b1d0325541cda952c30929de" -d "csrf_token=838488550c9589dd6e8aad33954928f0436a84f502f82cecc0ba1dbe19ec1666&member_id=9&tab=roles&action=roles_update"

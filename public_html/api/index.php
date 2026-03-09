@@ -636,13 +636,54 @@ if ($resource === 'stripe') {
             ]);
         }
 
-        $amountCents = (int) round(((float) $totals['total']) * 100);
-        $payload = [
-            'amount' => $amountCents,
-            'currency' => 'aud',
-            'automatic_payment_methods' => ['enabled' => true],
+        $successUrl = BaseUrlService::buildUrl('/store/orders/' . $orderNumber . '?success=1');
+        $cancelUrl = BaseUrlService::buildUrl('/store/cart?cancel=1');
+
+        $lineItems = [];
+        foreach ($itemsWithDiscount as $item) {
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => 'aud',
+                    'product_data' => [
+                        'name' => $item['title_snapshot'] . ($item['variant_snapshot'] ? ' (' . $item['variant_snapshot'] . ')' : ''),
+                    ],
+                    'unit_amount' => (int) round($item['unit_price_final'] * 100),
+                ],
+                'quantity' => (int) $item['quantity'],
+            ];
+        }
+
+        if (($totals['shipping_total'] ?? 0) > 0) {
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => 'aud',
+                    'product_data' => ['name' => 'Shipping'],
+                    'unit_amount' => (int) round($totals['shipping_total'] * 100),
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        if (($totals['processing_fee_total'] ?? 0) > 0) {
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => 'aud',
+                    'product_data' => ['name' => 'Payment processing fee'],
+                    'unit_amount' => (int) round($totals['processing_fee_total'] * 100),
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        $sessionPayload = [
+            'mode' => 'payment',
+            'success_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+            'customer_email' => $customerEmail,
+            'line_items' => $lineItems,
             'metadata' => [
                 'order_id' => (string) $orderId,
+                'channel_id' => (string) $channelId,
                 'order_type' => 'store',
                 'store_order_id' => (string) $storeOrderId,
                 'store_order_number' => (string) $orderNumber,
@@ -651,38 +692,28 @@ if ($resource === 'stripe') {
                 'cart_id' => (string) ($cart['id'] ?? ''),
             ],
         ];
-        if (!empty($stripeSettings['send_receipts'])) {
-            $payload['receipt_email'] = $customerEmail;
-        }
-        if ($requiresShipping && $fulfillment === 'shipping') {
-            $payload['shipping'] = [
-                'name' => $shipping['name'],
-                'phone' => $guestPhone !== '' ? $guestPhone : null,
-                'address' => [
-                    'line1' => $shipping['line1'],
-                    'line2' => $shipping['line2'],
-                    'city' => $shipping['city'],
-                    'state' => $shipping['state'],
-                    'postal_code' => $shipping['postal'],
-                    'country' => 'AU',
-                ],
-            ];
+
+        try {
+            $session = StripeService::createCheckoutSessionForOrder($activeKeys['secret_key'], $sessionPayload);
+        } catch (Throwable $e) {
+            json_response(['error' => 'Unable to start checkout.'], 500);
         }
 
-        $intent = StripeService::createPaymentIntent($payload, 'store_order_' . $storeOrderId);
-        if (!$intent || empty($intent['client_secret'])) {
+        if (empty($session['id'])) {
             json_response(['error' => 'Unable to start checkout.'], 500);
         }
 
         $stmt = $pdo->prepare('UPDATE store_orders SET stripe_payment_intent_id = :payment_intent_id WHERE id = :id');
-        $stmt->execute(['payment_intent_id' => $intent['id'] ?? '', 'id' => $storeOrderId]);
+        $stmt->execute(['payment_intent_id' => $session['payment_intent'] ?? '', 'id' => $storeOrderId]);
         $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :payment_intent_id, payment_method = "stripe", payment_status = "pending", updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['payment_intent_id' => $intent['id'] ?? '', 'id' => $orderId]);
+        $stmt->execute(['payment_intent_id' => $session['payment_intent'] ?? '', 'id' => $orderId]);
+        
         $stmt = $pdo->prepare('UPDATE store_carts SET status = "converted", updated_at = NOW() WHERE id = :id');
         $stmt->execute(['id' => $cart['id']]);
 
         json_response([
-            'client_secret' => $intent['client_secret'],
+            'client_secret' => $session['client_secret'] ?? '',
+            'url' => $session['url'] ?? '',
             'orderId' => $orderId,
             'storeOrderId' => $storeOrderId,
         ]);
