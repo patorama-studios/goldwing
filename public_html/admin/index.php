@@ -3221,141 +3221,450 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
       <?php elseif ($page === 'wings'): ?>
-        <?php $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll(); ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
-          <h1 class="font-display text-2xl font-bold text-gray-900">Wings Magazine</h1>
-          <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-            <div>
-              <label class="text-sm font-medium text-gray-700">Title</label>
-              <input type="text" name="title" class="mt-1" required>
+        <?php
+        $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll();
+        $latestIssue = null;
+        $archiveIssues = [];
+        foreach ($issues as $iss) {
+          if ($iss['is_latest']) {
+            $latestIssue = $iss;
+          } else {
+            $archiveIssues[] = $iss;
+          }
+        }
+        if (!$latestIssue && count($issues) > 0) {
+          $latestIssue = $issues[0];
+          $archiveIssues = array_slice($issues, 1);
+        }
+        ?>
+        <div class="space-y-8">
+          <!-- Header -->
+          <div class="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div class="relative w-full max-w-md">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input type="text" placeholder="Search issues, dates, or keywords..."
+                class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-200 focus:ring-0 outline-none transition-colors hidden sm:block">
             </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700">Published Date</label>
-              <input type="date" name="published_at" class="mt-1" value="<?= e(date('Y-m-d')) ?>">
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <button onclick="document.getElementById('new-wings-issue').showModal()"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#EB5E28] hover:bg-[#D95322] text-white text-sm font-semibold transition-colors shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Upload New Issue
+              </button>
+              <div class="w-px h-8 bg-gray-200 hidden sm:block"></div>
+              <button class="text-gray-400 hover:text-gray-600 hidden sm:block relative">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9">
+                  </path>
+                </svg>
+              </button>
             </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700">PDF File</label>
-              <input type="file" name="pdf_file" class="mt-1" required>
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700">Cover Image (optional)</label>
-              <input type="file" name="cover_file" class="mt-1">
-            </div>
-            <div class="md:col-span-2 flex items-center gap-2">
-              <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="is_latest"
-                  value="1"> Set as latest</label>
-            </div>
-            <div class="md:col-span-2">
-              <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                type="submit">Upload Issue</button>
-            </div>
-          </form>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th class="py-2 pr-3">Title</th>
-                  <th class="py-2 pr-3">Published</th>
-                  <th class="py-2 pr-3">Latest</th>
-                  <th class="py-2">PDF</th>
-                  <th class="py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y relative z-0">
-                <?php foreach ($issues as $issue): ?>
-                  <tr>
-                    <td class="py-2 pr-3 text-gray-900"><?= e($issue['title']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($issue['published_at']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= $issue['is_latest'] ? 'Yes' : 'No' ?></td>
-                    <td class="py-2"><a class="text-secondary font-semibold" href="<?= e($issue['pdf_url']) ?>"
-                        target="_blank">Download</a></td>
-                    <td class="py-2 text-right space-x-2">
-                      <button type="button" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                        onclick="document.getElementById('edit-wings-<?= $issue['id'] ?>').showModal()">Edit</button>
-                      <button type="button" class="text-rose-600 hover:text-rose-900 text-sm font-medium"
-                        onclick="document.getElementById('delete-wings-<?= $issue['id'] ?>').showModal()">Delete</button>
-
-                      <dialog id="edit-wings-<?= $issue['id'] ?>"
-                        class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
-                        <form method="post" enctype="multipart/form-data" class="space-y-4 text-left">
-                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                          <input type="hidden" name="action" value="edit_wings_issue">
-                          <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
-                          <h3 class="font-display font-bold text-lg">Edit Wings Issue</h3>
-                          <div>
-                            <label class="text-sm font-bold block mb-1">Title</label>
-                            <input type="text" name="title" class="w-full border-gray-300 rounded px-3 py-2"
-                              value="<?= e($issue['title']) ?>" required>
-                          </div>
-                          <div>
-                            <label class="text-sm font-bold block mb-1">Published Date</label>
-                            <input type="date" name="published_at" class="w-full border-gray-300 rounded px-3 py-2"
-                              value="<?= e($issue['published_at']) ?>" required>
-                          </div>
-                          <div>
-                            <label class="text-sm font-bold block mb-1">Replace PDF</label>
-                            <input type="file" name="pdf_file" accept=".pdf"
-                              class="w-full border-gray-300 rounded px-3 py-2 text-sm">
-                            <?php if (!empty($issue['pdf_url'])): ?>
-                              <div class="mt-2 flex items-center justify-between">
-                                <a href="<?= e($issue['pdf_url']) ?>" target="_blank"
-                                  class="text-xs text-primary hover:underline">View Current</a>
-                                <label class="text-xs text-red-600 flex items-center gap-1"><input type="checkbox"
-                                    name="remove_pdf" value="1"> Remove PDF</label>
-                              </div>
-                            <?php endif; ?>
-                          </div>
-                          <div>
-                            <label class="text-sm font-bold block mb-1">Replace Cover Image</label>
-                            <input type="file" name="cover_file" accept=".jpg,.jpeg,.png,.webp"
-                              class="w-full border-gray-300 rounded px-3 py-2 text-sm">
-                            <?php if (!empty($issue['cover_image_url'])): ?>
-                              <div class="mt-2 flex items-center justify-between">
-                                <a href="<?= e($issue['cover_image_url']) ?>" target="_blank"
-                                  class="text-xs text-primary hover:underline">View Current</a>
-                                <label class="text-xs text-red-600 flex items-center gap-1"><input type="checkbox"
-                                    name="remove_cover" value="1"> Remove Cover</label>
-                              </div>
-                            <?php endif; ?>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <label class="text-sm text-gray-600"><input type="checkbox" name="is_latest" value="1"
-                                <?= $issue['is_latest'] ? 'checked' : '' ?>> Set as latest</label>
-                          </div>
-                          <div class="flex gap-3 justify-end pt-4">
-                            <button type="button" class="px-4 py-2 font-semibold text-gray-600"
-                              onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
-                            <button type="submit"
-                              class="px-4 py-2 font-semibold bg-primary rounded text-gray-900">Save</button>
-                          </div>
-                        </form>
-                      </dialog>
-
-                      <dialog id="delete-wings-<?= $issue['id'] ?>"
-                        class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
-                        <form method="post" class="space-y-4 text-left">
-                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                          <input type="hidden" name="action" value="delete_wings_issue">
-                          <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
-                          <h3 class="font-display font-bold text-lg text-rose-600">Delete Issue?</h3>
-                          <p class="text-sm text-gray-600 whitespace-normal">Are you sure you want to permanently delete
-                            this issue (<?= e($issue['title']) ?>)? This will remove it from the directory list.</p>
-                          <div class="flex gap-3 justify-end pt-4">
-                            <button type="button" class="px-4 py-2 font-semibold text-gray-600"
-                              onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
-                            <button type="submit"
-                              class="px-4 py-2 font-semibold bg-rose-600 text-white rounded">Delete</button>
-                          </div>
-                        </form>
-                      </dialog>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
           </div>
-        </section>
+
+          <!-- Upload Modal -->
+          <dialog id="new-wings-issue"
+            class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-lg my-auto mx-auto border-0 isolate">
+            <form method="post" enctype="multipart/form-data" class="space-y-4 text-left">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <h3 class="font-display font-bold text-xl mb-4 text-gray-900">Upload New Issue</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="text-sm font-bold text-gray-700 block mb-1">Title</label>
+                  <input type="text" name="title"
+                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none"
+                    required>
+                </div>
+                <div>
+                  <label class="text-sm font-bold text-gray-700 block mb-1">Published Date</label>
+                  <input type="date" name="published_at"
+                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none"
+                    value="<?= e(date('Y-m-d')) ?>" required>
+                </div>
+                <div>
+                  <label class="text-sm font-bold text-gray-700 block mb-1">PDF File</label>
+                  <input type="file" name="pdf_file" accept=".pdf"
+                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none"
+                    required>
+                </div>
+                <div>
+                  <label class="text-sm font-bold text-gray-700 block mb-1">Cover Image (optional)</label>
+                  <input type="file" name="cover_file" accept=".jpg,.jpeg,.png,.webp"
+                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none">
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input type="checkbox" name="is_latest" value="1"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    Set as active/latest issue
+                  </label>
+                </div>
+              </div>
+              <div class="flex gap-3 justify-end pt-4 mt-4 border-t border-gray-100">
+                <button type="button"
+                  class="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                  onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                <button type="submit"
+                  class="px-4 py-2 font-semibold bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors">Upload</button>
+              </div>
+            </form>
+          </dialog>
+
+          <!-- Latest Issue Section -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-2xl font-bold font-display text-gray-900">Latest Issue</h2>
+              <span
+                class="px-3 py-1 rounded-full bg-orange-100 text-[#EB5E28] text-xs font-black tracking-widest uppercase">Active
+                Now</span>
+            </div>
+
+            <?php if ($latestIssue): ?>
+              <div class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-8">
+                <!-- Cover -->
+                <div
+                  class="flex-none w-full md:w-64 aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden relative shadow-sm group">
+                  <?php if (!empty($latestIssue['cover_image_url'])): ?>
+                    <img src="<?= e($latestIssue['cover_image_url']) ?>" alt="<?= e($latestIssue['title']) ?>"
+                      class="w-full h-full object-cover">
+                  <?php else: ?>
+                    <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                      <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                        </path>
+                      </svg>
+                      <span class="text-sm font-medium">No Cover</span>
+                    </div>
+                  <?php endif; ?>
+                  <div
+                    class="absolute bottom-4 left-4 bg-[#EB5E28] text-white text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded shadow-sm">
+                    <?= date('M Y', strtotime($latestIssue['published_at'])) ?>
+                  </div>
+                </div>
+
+                <!-- Details -->
+                <div class="flex-grow flex flex-col justify-center">
+                  <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                    <h3 class="text-2xl font-bold font-display text-gray-900"><?= e($latestIssue['title']) ?></h3>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <button onclick="document.getElementById('edit-wings-<?= $latestIssue['id'] ?>').showModal()"
+                        class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                        title="Edit Issue">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                          </path>
+                        </svg>
+                      </button>
+                      <a href="<?= e($latestIssue['pdf_url']) ?>" target="_blank"
+                        class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                        title="View PDF">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                          </path>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+
+                  <p class="text-gray-600 text-base leading-relaxed mb-8 max-w-3xl">
+                    View the latest issue of Wings Magazine. Keep up to date on all things Goldwing, touring events,
+                    maintenance guides, and community stories.
+                  </p>
+
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Status</span>
+                      <div class="flex items-center gap-1.5 font-semibold text-[#00BFA6]">
+                        <div class="w-2 h-2 rounded-full bg-[#00BFA6]"></div>
+                        Published
+                      </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Date</span>
+                      <div class="font-semibold text-gray-900">
+                        <?= date('F d, Y', strtotime($latestIssue['published_at'])) ?>
+                      </div>
+                    </div>
+                    <!-- Mock Data for look -->
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <span
+                        class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Downloads</span>
+                      <div class="font-semibold text-gray-900">12,482</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <span
+                        class="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Subscribers</span>
+                      <div class="font-semibold text-gray-900">45,000+</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <?php else: ?>
+              <div class="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
+                <p class="text-gray-500 font-medium">No published issues found.</p>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <!-- Issue Archive Section -->
+          <div class="space-y-6 pt-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-2xl font-bold font-display text-gray-900">Issue Archive</h2>
+              <div class="flex items-center gap-2">
+                <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg
+                    class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
+                    </path>
+                  </svg></button>
+                <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg
+                    class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                  </svg></button>
+              </div>
+            </div>
+
+            <?php if (!empty($archiveIssues)): ?>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <?php foreach ($archiveIssues as $issue): ?>
+                  <div
+                    class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group relative">
+                    <!-- Cover Image -->
+                    <div class="aspect-[3/4] bg-gray-100 relative overflow-hidden">
+                      <?php if (!empty($issue['cover_image_url'])): ?>
+                        <img src="<?= e($issue['cover_image_url']) ?>" alt="<?= e($issue['title']) ?>"
+                          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                      <?php else: ?>
+                        <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                          <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                            </path>
+                          </svg>
+                        </div>
+                      <?php endif; ?>
+
+                      <!-- Hover Actions Overlay -->
+                      <div
+                        class="absolute inset-0 bg-gray-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-[2px]">
+                        <button onclick="document.getElementById('edit-wings-<?= $issue['id'] ?>').showModal()"
+                          class="w-10 h-10 rounded-full bg-white text-gray-900 flex items-center justify-center hover:scale-110 transition-transform"
+                          title="Edit">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                            </path>
+                          </svg>
+                        </button>
+                        <button onclick="document.getElementById('delete-wings-<?= $issue['id'] ?>').showModal()"
+                          class="w-10 h-10 rounded-full bg-white text-rose-600 flex items-center justify-center hover:scale-110 transition-transform"
+                          title="Delete">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                            </path>
+                          </svg>
+                        </button>
+                        <a href="<?= e($issue['pdf_url']) ?>" target="_blank"
+                          class="w-10 h-10 rounded-full bg-white text-gray-900 flex items-center justify-center hover:scale-110 transition-transform"
+                          title="View PDF">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                            </path>
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                    <!-- Info -->
+                    <div class="p-5 flex-grow flex flex-col justify-center">
+                      <span
+                        class="text-[10px] font-bold text-[#EB5E28] tracking-widest uppercase mb-1.5"><?= date('M Y', strtotime($issue['published_at'])) ?></span>
+                      <h4 class="font-bold text-gray-900 text-[15px] leading-snug line-clamp-1 mb-1"
+                        title="<?= e($issue['title']) ?>"><?= e($issue['title']) ?></h4>
+                      <p class="text-xs text-gray-500 italic">Published
+                        <?= date('M jS, Y', strtotime($issue['published_at'])) ?>
+                      </p>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <div class="py-12 text-center border-2 border-dashed border-gray-200 rounded-2xl">
+                <p class="text-gray-500 font-medium text-sm">No older issues in the archive.</p>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <!-- Pre-existing dialogs (Edit/Delete) remain mapped to $issues loop -->
+          <?php foreach ($issues as $issue): ?>
+            <dialog id="edit-wings-<?= $issue['id'] ?>"
+              class="p-0 rounded-2xl shadow-2xl backdrop:bg-gray-900/40 w-full max-w-3xl my-auto mx-auto border-0 isolate overflow-hidden">
+              <form method="post" enctype="multipart/form-data" class="flex flex-col md:flex-row h-full w-full relative">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="edit_wings_issue">
+                <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
+
+                <!-- Left Column: Media -->
+                <div
+                  class="bg-gray-50 flex-none w-full md:w-5/12 p-8 border-r border-gray-100 flex flex-col gap-6 text-left">
+                  <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Cover Preview</h4>
+                    <div
+                      class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative aspect-[3/4] flex items-center justify-center group bg-gray-100">
+                      <?php if (!empty($issue['cover_image_url'])): ?>
+                        <img src="<?= e($issue['cover_image_url']) ?>" alt="Cover" class="w-full h-full object-cover">
+                      <?php else: ?>
+                        <div class="text-gray-400 text-sm font-medium">No Cover Image</div>
+                      <?php endif; ?>
+                      <div
+                        class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                        <input type="file" name="cover_file" accept=".jpg,.jpeg,.png,.webp"
+                          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-sm" title="Upload new cover">
+                        <span
+                          class="text-white text-sm font-semibold bg-gray-900/60 shadow px-4 py-2 rounded-lg pointer-events-none">Replace
+                          Cover</span>
+                      </div>
+                    </div>
+                    <?php if (!empty($issue['cover_image_url'])): ?>
+                      <div class="mt-3 text-right">
+                        <label
+                          class="text-[11px] font-bold uppercase tracking-wide text-red-500 hover:text-red-700 cursor-pointer flex items-center justify-end gap-1.5 transition-colors">
+                          <input type="checkbox" name="remove_cover" value="1"
+                            class="rounded border-red-300 text-red-600 focus:ring-red-600 w-3.5 h-3.5">
+                          Remove Cover
+                        </label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+
+                  <div>
+                    <div
+                      class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-3 relative group transition-all hover:border-gray-300 hover:shadow">
+                      <div class="flex-none flex items-center justify-center w-10 h-10 bg-red-50 text-red-600 rounded-lg">
+                        <svg class="w-5 h-5 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                            clip-rule="evenodd"></path>
+                        </svg>
+                      </div>
+                      <div class="flex-grow min-w-0 pr-6">
+                        <?php if (!empty($issue['pdf_url'])): ?>
+                          <a href="<?= e($issue['pdf_url']) ?>" target="_blank"
+                            class="text-xs font-bold text-gray-900 truncate block hover:underline"
+                            title="<?= e(basename($issue['pdf_url'])) ?>"><?= e(basename($issue['pdf_url'])) ?></a>
+                          <p class="text-[10px] text-gray-500 mt-0.5">Click to replace PDF</p>
+                        <?php else: ?>
+                          <p class="text-xs font-bold text-gray-900">No PDF uploaded</p>
+                          <p class="text-[10px] text-gray-500 mt-0.5">Click to upload PDF</p>
+                        <?php endif; ?>
+                      </div>
+                      <input type="file" name="pdf_file" accept=".pdf"
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="Upload new PDF">
+                      <?php if (!empty($issue['pdf_url'])): ?>
+                        <label
+                          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 cursor-pointer z-10 transition-colors"
+                          title="Remove PDF" onclick="event.stopPropagation()">
+                          <input type="checkbox" name="remove_pdf" value="1" class="sr-only peer">
+                          <svg class="w-5 h-5 peer-checked:text-red-600" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                            </path>
+                          </svg>
+                        </label>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Column: Details -->
+                <div class="bg-white flex-grow p-10 flex flex-col items-stretch relative text-left">
+                  <button type="button" class="absolute top-6 right-6 text-gray-400 hover:text-gray-900 transition-colors"
+                    onclick="this.closest('dialog').close()"><svg class="w-6 h-6" fill="none" stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                      </path>
+                    </svg></button>
+
+                  <h3 class="font-display font-bold text-2xl text-gray-900 mb-8 mt-1">Edit Magazine Issue</h3>
+
+                  <div class="space-y-6 flex-grow">
+                    <div>
+                      <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Issue
+                        Title</label>
+                      <input type="text" name="title"
+                        class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                        value="<?= e($issue['title']) ?>" required>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-5">
+                      <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Publication
+                          Date</label>
+                        <input type="date" name="published_at"
+                          class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                          value="<?= e($issue['published_at']) ?>" required>
+                      </div>
+                      <div>
+                        <label
+                          class="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Status</label>
+                        <div
+                          class="h-[50px] flex items-center px-4 bg-gray-50 border border-gray-100 rounded-xl hover:bg-white hover:border-blue-200 transition-colors">
+                          <label class="flex items-center gap-3 text-sm text-gray-900 cursor-pointer w-full">
+                            <input type="checkbox" name="is_latest" value="1"
+                              class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                              <?= $issue['is_latest'] ? 'checked' : '' ?>>
+                            <span class="font-medium">Latest Issue</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex gap-4 justify-end pt-8 mt-auto">
+                    <button type="button"
+                      class="px-6 py-3 font-bold text-sm text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                      onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                    <button type="submit"
+                      class="px-6 py-3 font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm hover:shadow-md transition-all">Save
+                      Changes</button>
+                  </div>
+                </div>
+              </form>
+            </dialog>
+
+            <dialog id="delete-wings-<?= $issue['id'] ?>"
+              class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
+              <form method="post" class="space-y-4 text-left">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="delete_wings_issue">
+                <input type="hidden" name="issue_id" value="<?= $issue['id'] ?>">
+                <h3 class="font-display font-bold text-lg text-rose-600">Delete Issue?</h3>
+                <p class="text-sm text-gray-600 whitespace-normal">Are you sure you want to permanently delete
+                  this issue (<?= e($issue['title']) ?>)? This will remove it from the directory list.</p>
+                <div class="flex gap-3 justify-end pt-4">
+                  <button type="button" class="px-4 py-2 font-semibold text-gray-600"
+                    onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                  <button type="submit" class="px-4 py-2 font-semibold bg-rose-600 text-white rounded">Delete</button>
+                </div>
+              </form>
+            </dialog>
+          <?php endforeach; ?>
+        </div>
       <?php elseif ($page === 'ai-editor'): ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <h1 class="font-display text-2xl font-bold text-gray-900 mb-2">AI Page Builder</h1>
