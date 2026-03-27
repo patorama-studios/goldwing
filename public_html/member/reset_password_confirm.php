@@ -6,7 +6,7 @@ use App\Services\Csrf;
 use App\Services\PasswordPolicyService;
 use App\Services\SecuritySettingsService;
 
-$token = $_GET['token'] ?? '';
+$token = trim($_GET['token'] ?? '');
 $message = '';
 $error = '';
 
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($error) {
             ActivityLogger::log('system', null, null, 'security.password_reset_attempt', ['ip' => $ip]);
         } else {
-            $token = $_POST['token'] ?? '';
+            $token = trim($_POST['token'] ?? '');
             $password = $_POST['password'] ?? '';
             $confirmPassword = $_POST['confirm_password'] ?? '';
 

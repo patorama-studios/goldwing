@@ -21,6 +21,9 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $events = $stmt->fetchAll();
 
+$stmtMyEvents = $pdo->prepare('SELECT * FROM calendar_events WHERE created_by = :user_id AND status IN ("pending", "rejected") ORDER BY created_at DESC');
+$stmtMyEvents->execute(['user_id' => $user['id']]);
+$myEvents = $stmtMyEvents->fetchAll();
 $rangeStart = new DateTime('now', new DateTimeZone('UTC'));
 $rangeEnd = (clone $rangeStart)->modify('+30 days');
 
@@ -49,7 +52,10 @@ $occurrences = array_slice($occurrences, 0, 15);
 </head>
 <body>
 <div class="calendar-container">
-    <h1>Upcoming Events for You</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h1 style="margin: 0;">Upcoming Events for You</h1>
+        <a href="member_event_submit.php" style="padding: 8px 16px; background: #111; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; white-space: nowrap;">Submit Event</a>
+    </div>
     <p class="muted">Showing your chapter and national events in the next 30 days.</p>
 
     <?php if (empty($occurrences)) : ?>
@@ -65,6 +71,24 @@ $occurrences = array_slice($occurrences, 0, 15);
                         <?php echo calendar_e($event['title']); ?>
                     </a>
                     <div class="muted"><?php echo calendar_format_dt($start, $event['timezone']); ?></div>
+                </li>
+            <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($myEvents)) : ?>
+        <h2 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1.25rem;">My Submitted Events</h2>
+        <ul class="list">
+            <?php foreach ($myEvents as $myEvent) : ?>
+                <li style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong><?php echo calendar_e($myEvent['title']); ?></strong>
+                        <div class="muted" style="margin-top: 4px;">Submitted on <?php echo date('M j, Y', strtotime($myEvent['created_at'])); ?></div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 9999px; text-transform: uppercase; <?php echo $myEvent['status'] === 'pending' ? 'background: #fef08a; color: #854d0e;' : 'background: #fecaca; color: #991b1b;'; ?>">
+                            <?php echo calendar_e($myEvent['status']); ?>
+                        </span>
+                    </div>
                 </li>
             <?php endforeach; ?>
         </ul>

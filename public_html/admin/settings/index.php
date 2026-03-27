@@ -363,10 +363,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $toast = 'Security settings saved.';
             } elseif ($section === 'integrations') {
                 SettingsService::setGlobal((int) $user['id'], 'integrations.email_provider', normalize_text($_POST['integrations_email_provider'] ?? 'php_mail'));
+                
+                $newResend = normalize_text($_POST['integrations_resend_api_key'] ?? '');
+                if ($newResend !== '') {
+                    SettingsService::setGlobal((int) $user['id'], 'integrations.resend_api_key', $newResend, ['encrypt' => true]);
+                }
+                
                 SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_host', normalize_text($_POST['integrations_smtp_host'] ?? ''));
                 SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_port', (int) ($_POST['integrations_smtp_port'] ?? 587));
                 SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_user', normalize_text($_POST['integrations_smtp_user'] ?? ''));
-                SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_password', normalize_text($_POST['integrations_smtp_password'] ?? ''), ['encrypt' => true]);
+                
+                $newSmtpPass = normalize_text($_POST['integrations_smtp_password'] ?? '');
+                if ($newSmtpPass !== '') {
+                    SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_password', $newSmtpPass, ['encrypt' => true]);
+                }
                 SettingsService::setGlobal((int) $user['id'], 'integrations.smtp_encryption', normalize_text($_POST['integrations_smtp_encryption'] ?? 'tls'));
                 SettingsService::setGlobal((int) $user['id'], 'integrations.youtube_embeds_enabled', isset($_POST['integrations_youtube']));
                 SettingsService::setGlobal((int) $user['id'], 'integrations.vimeo_embeds_enabled', isset($_POST['integrations_vimeo']));
@@ -653,7 +663,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         'payments' => ['payments.stripe.mode', 'payments.stripe.publishable_key'],
                         'notifications' => ['notifications.from_email', 'notifications.weekly_digest_enabled'],
                         'security' => ['security.force_https', 'security.password_min_length'],
-                        'integrations' => ['integrations.email_provider', 'integrations.youtube_embeds_enabled'],
+                        'integrations' => ['integrations.email_provider', 'integrations.youtube_embeds_enabled', 'integrations.resend_api_key'],
                         'media' => ['media.allowed_types', 'media.max_upload_mb'],
                         'events' => ['events.visibility_default', 'events.timezone'],
                         'membership_pricing' => [
@@ -1631,7 +1641,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <option value="php_mail" <?= $provider === 'php_mail' ? 'selected' : '' ?>>PHP Mail</option>
                       <option value="smtp" <?= $provider === 'smtp' ? 'selected' : '' ?>>SMTP</option>
                       <option value="mailgun" <?= $provider === 'mailgun' ? 'selected' : '' ?>>Mailgun</option>
+                      <option value="resend" <?= $provider === 'resend' ? 'selected' : '' ?>>Resend</option>
                     </select>
+                  </label>
+                  <label class="text-sm text-slate-600">Resend API Key
+                    <?php $resendMask = SettingsService::getMaskedSecret('integrations.resend_api_key'); ?>
+                    <input name="integrations_resend_api_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm <?= $resendMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $resendMask['configured'] ? 'Configured (ends in ' . e($resendMask['last4']) . ') - leave blank to keep' : 're_...' ?>" value="">
                   </label>
                   <label class="text-sm text-slate-600">SMTP host
                     <input name="integrations_smtp_host" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_host', '')) ?>">
@@ -1643,7 +1658,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <input name="integrations_smtp_user" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_user', '')) ?>">
                   </label>
                   <label class="text-sm text-slate-600">SMTP password
-                    <input name="integrations_smtp_password" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="">
+                    <?php $smtpMask = SettingsService::getMaskedSecret('integrations.smtp_password'); ?>
+                    <input name="integrations_smtp_password" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm <?= $smtpMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $smtpMask['configured'] ? 'Configured - leave blank to keep' : '' ?>" value="">
                   </label>
                   <label class="text-sm text-slate-600">SMTP encryption
                     <select name="integrations_smtp_encryption" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">

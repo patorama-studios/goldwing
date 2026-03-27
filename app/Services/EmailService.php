@@ -45,6 +45,48 @@ class EmailService
                 'helo' => SettingsService::getGlobal('site.base_url', ''),
             ];
             $sent = SmtpMailer::send($smtpConfig, $from, $fromName, $to, $subject, $message, $replyTo);
+        } elseif ($provider === 'resend') {
+            $apiKey = SettingsService::getGlobal('integrations.resend_api_key', '');
+            if ($apiKey !== '') {
+                $payload = [
+                    'from' => ($fromName !== '' ? $fromName . ' <' . $from . '>' : $from),
+                    'to' => $to,
+                    'subject' => $subject,
+                    'html' => $message,
+                ];
+                if ($replyTo !== '') {
+                    $payload['reply_to'] = $replyTo;
+                }
+                
+                $ch = curl_init('https://api.resend.com/emails');
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($payload),
+                    CURLOPT_HTTPHEADER => [
+                        'Authorization: Bearer ' . $apiKey,
+                        'Content-Type: application/json'
+                    ],
+                    CURLOPT_TIMEOUT => 15,
+                ]);
+                $response = curl_exec($ch);
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    $sent = true;
+                } else {
+                    ActivityLogger::log('system', null, null, 'email.resend_error', [
+                        'recipient' => $to,
+                        'status' => $statusCode,
+                        'response' => $response
+                    ]);
+                }
+            } else {
+                 ActivityLogger::log('system', null, null, 'email.resend_missing_key', [
+                     'recipient' => $to,
+                 ]);
+            }
         }
         if (!$sent) {
             $headers = 'From: ' . $fromName . ' <' . $from . ">\r\n";

@@ -432,6 +432,7 @@ class SettingsService
             ],
             'integrations' => [
                 'email_provider' => 'php_mail',
+                'resend_api_key' => '',
                 'smtp_host' => '',
                 'smtp_port' => 587,
                 'smtp_user' => '',

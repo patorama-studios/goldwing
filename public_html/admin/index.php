@@ -1051,8 +1051,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!is_dir($uploadDir)) {
               mkdir($uploadDir, 0755, true);
             }
-            $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
-            $targetPath = $uploadDir . $safeName;
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['php', 'phtml', 'php3', 'php4', 'php5', 'shtml', 'cgi', 'pl', 'py', 'sh', 'phar', 'htaccess'])) {
+              $alerts[] = ['type' => 'error', 'message' => 'File extension is not allowed.'];
+            } else {
+              $baseName = basename($file['name'], '.' . $ext);
+              $safeName = uniqid() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $baseName) . ($ext ? '.' . $ext : '');
+              $targetPath = $uploadDir . $safeName;
             if (move_uploaded_file($file['tmp_name'], $targetPath)) {
               $optimizeImages = SettingsService::getGlobal('media.image_optimization_enabled', false);
               if ($optimizeImages && strpos($mime, 'image/') === 0) {
@@ -1095,6 +1100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
           }
         }
+        }
       } else {
         $alerts[] = ['type' => 'error', 'message' => 'Upload error.'];
       }
@@ -1121,12 +1127,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $alerts[] = ['type' => 'error', 'message' => 'PDF file type is not allowed.'];
           $pdfOk = false;
         }
+        $pdfExt = strtolower(pathinfo($pdfFile['name'], PATHINFO_EXTENSION));
+        if ($pdfExt !== 'pdf') {
+          $alerts[] = ['type' => 'error', 'message' => 'PDF extension is required.'];
+          $pdfOk = false;
+        }
         if (!$pdfOk) {
           $pdfFile['error'] = UPLOAD_ERR_EXTENSION;
         }
       }
       if ($pdfFile['error'] === UPLOAD_ERR_OK) {
-        $pdfName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $pdfFile['name']);
+        $pdfBaseName = basename($pdfFile['name'], '.pdf');
+        $pdfName = uniqid('pdf_') . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $pdfBaseName) . '.pdf';
         $pdfPath = $uploadDir . $pdfName;
         if (move_uploaded_file($pdfFile['tmp_name'], $pdfPath)) {
           $coverUrl = null;
@@ -1140,10 +1152,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               if (is_array($allowedTypes) && $allowedTypes && !in_array($coverMime, $allowedTypes, true)) {
                 $alerts[] = ['type' => 'error', 'message' => 'Cover file type is not allowed.'];
               } else {
-                $coverName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $coverFile['name']);
-                $coverPath = $uploadDir . $coverName;
-                if (move_uploaded_file($coverFile['tmp_name'], $coverPath)) {
-                  $coverUrl = '/uploads/' . $coverName;
+                $ext = strtolower(pathinfo($coverFile['name'], PATHINFO_EXTENSION));
+                if (in_array($ext, ['php', 'phtml', 'php3', 'php4', 'php5', 'shtml', 'cgi', 'pl', 'py', 'sh', 'phar', 'htaccess'])) {
+                  $alerts[] = ['type' => 'error', 'message' => 'Cover file extension is not allowed.'];
+                } else {
+                  $coverBaseName = basename($coverFile['name'], '.' . $ext);
+                  $coverName = uniqid('cover_') . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $coverBaseName) . ($ext ? '.' . $ext : '');
+                  $coverPath = $uploadDir . $coverName;
+                  if (move_uploaded_file($coverFile['tmp_name'], $coverPath)) {
+                    $coverUrl = '/uploads/' . $coverName;
+                  }
                 }
               }
             }
@@ -1225,7 +1243,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $finfo = new finfo(FILEINFO_MIME_TYPE);
           $mime = $finfo->file($_FILES['pdf_file']['tmp_name']) ?: '';
           if ($mime === 'application/pdf') {
-            $pdfName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $_FILES['pdf_file']['name']);
+            $pdfBaseName = basename($_FILES['pdf_file']['name'], '.pdf');
+            $pdfName = uniqid('pdf_') . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $pdfBaseName) . '.pdf';
             if (move_uploaded_file($_FILES['pdf_file']['tmp_name'], $uploadDir . $pdfName)) {
               $sql .= ', pdf_url = :pdf_url';
               $params['pdf_url'] = '/uploads/' . $pdfName;
@@ -1241,7 +1260,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $finfo = new finfo(FILEINFO_MIME_TYPE);
           $mime = $finfo->file($_FILES['cover_file']['tmp_name']) ?: '';
           if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'])) {
-            $coverName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $_FILES['cover_file']['name']);
+            $ext = strtolower(pathinfo($_FILES['cover_file']['name'], PATHINFO_EXTENSION));
+            $baseName = basename($_FILES['cover_file']['name'], '.' . $ext);
+            $coverName = uniqid('cover_') . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $baseName) . ($ext ? '.' . $ext : '');
             if (move_uploaded_file($_FILES['cover_file']['tmp_name'], $uploadDir . $coverName)) {
               $sql .= ', cover_image_url = :cover_url';
               $params['cover_url'] = '/uploads/' . $coverName;

@@ -11,25 +11,46 @@ calendar_require_tables($pdo, ['calendar_events', 'calendar_event_rsvps', 'calen
 $success = '';
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete') {
-    calendar_csrf_verify();
-    $eventId = (int) ($_POST['event_id'] ?? 0);
-    if ($eventId) {
-        $pdo->beginTransaction();
-        try {
-            $stmt = $pdo->prepare('DELETE FROM calendar_event_rsvps WHERE event_id = :event_id');
-            $stmt->execute(['event_id' => $eventId]);
-            $stmt = $pdo->prepare('DELETE FROM calendar_event_tickets WHERE event_id = :event_id');
-            $stmt->execute(['event_id' => $eventId]);
-            $stmt = $pdo->prepare('DELETE FROM calendar_refund_requests WHERE event_id = :event_id');
-            $stmt->execute(['event_id' => $eventId]);
-            $stmt = $pdo->prepare('DELETE FROM calendar_events WHERE id = :event_id');
-            $stmt->execute(['event_id' => $eventId]);
-            $pdo->commit();
-            $success = 'Event deleted.';
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-            $error = 'Unable to delete event.';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    if (in_array($action, ['delete', 'approve', 'reject'])) {
+        calendar_csrf_verify();
+        $eventId = (int) ($_POST['event_id'] ?? 0);
+        if ($eventId) {
+            if ($action === 'delete') {
+                $pdo->beginTransaction();
+                try {
+                    $stmt = $pdo->prepare('DELETE FROM calendar_event_rsvps WHERE event_id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $stmt = $pdo->prepare('DELETE FROM calendar_event_tickets WHERE event_id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $stmt = $pdo->prepare('DELETE FROM calendar_refund_requests WHERE event_id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $stmt = $pdo->prepare('DELETE FROM calendar_events WHERE id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $pdo->commit();
+                    $success = 'Event deleted.';
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    $error = 'Unable to delete event.';
+                }
+            } elseif ($action === 'approve') {
+                try {
+                    $stmt = $pdo->prepare('UPDATE calendar_events SET status = "published" WHERE id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $success = 'Event approved and published.';
+                } catch (Throwable $e) {
+                    $error = 'Unable to approve event.';
+                }
+            } elseif ($action === 'reject') {
+                try {
+                    $stmt = $pdo->prepare('UPDATE calendar_events SET status = "rejected" WHERE id = :event_id');
+                    $stmt->execute(['event_id' => $eventId]);
+                    $success = 'Event rejected.';
+                } catch (Throwable $e) {
+                    $error = 'Unable to reject event.';
+                }
+            }
         }
     }
 }
@@ -87,21 +108,44 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </thead>
               <tbody class="divide-y">
                 <?php foreach ($events as $event) : ?>
-                  <tr>
+                  <tr class="<?php echo $event['status'] === 'pending' ? 'bg-amber-50' : ''; ?>">
                     <td class="py-2 pr-3 text-gray-900 font-medium"><?php echo calendar_e($event['title']); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e(calendar_human_scope($event['scope'])); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e($event['chapter_name'] ?? '-'); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e(calendar_format_dt($event['start_at'], $event['timezone'])); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e(calendar_format_dt($event['end_at'], $event['timezone'])); ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e($event['status']); ?></td>
+                    <td class="py-2 pr-3 text-gray-600">
+                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold <?php
+                        echo $event['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            ($event['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800');
+                      ?>">
+                        <?php echo calendar_e($event['status']); ?>
+                      </span>
+                    </td>
                     <td class="py-2">
                       <div class="flex flex-wrap items-center gap-3">
                         <a class="text-secondary font-semibold" href="admin_event_view.php?id=<?php echo (int) $event['id']; ?>">View</a>
+                        
+                        <?php if ($event['status'] === 'pending') : ?>
+                          <form method="post" class="inline">
+                            <?php echo calendar_csrf_field(); ?>
+                            <input type="hidden" name="action" value="approve">
+                            <input type="hidden" name="event_id" value="<?php echo (int) $event['id']; ?>">
+                            <button type="submit" class="text-emerald-600 font-semibold hover:text-emerald-800">Approve</button>
+                          </form>
+                          <form method="post" class="inline" onsubmit="return confirm('Refuse this event?');">
+                            <?php echo calendar_csrf_field(); ?>
+                            <input type="hidden" name="action" value="reject">
+                            <input type="hidden" name="event_id" value="<?php echo (int) $event['id']; ?>">
+                            <button type="submit" class="text-orange-600 font-semibold hover:text-orange-800">Reject</button>
+                          </form>
+                        <?php endif; ?>
+
                         <form method="post" onsubmit="return confirm('Delete this event? This cannot be undone.');">
                           <?php echo calendar_csrf_field(); ?>
                           <input type="hidden" name="action" value="delete">
                           <input type="hidden" name="event_id" value="<?php echo (int) $event['id']; ?>">
-                          <button type="submit" class="text-red-600 font-semibold">Delete</button>
+                          <button type="submit" class="text-red-600 font-semibold hover:text-red-800">Delete</button>
                         </form>
                       </div>
                     </td>
