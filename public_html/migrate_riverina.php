@@ -1,8 +1,12 @@
 <?php
-require_once __DIR__ . '/app/bootstrap.php';
+require_once __DIR__ . '/../app/bootstrap.php';
+require_login();
+if (!current_admin_can('admin.members.import_export')) {
+    die("Unauthorized. You must be an admin to run this migration.");
+}
 $pdo = db();
 
-$jsonFile = __DIR__ . '/riverina_members.json';
+$jsonFile = __DIR__ . '/../riverina_members.json';
 if (!file_exists($jsonFile)) {
     die("JSON file not found. Please ensure riverina_members.json exists in root.\n");
 }
