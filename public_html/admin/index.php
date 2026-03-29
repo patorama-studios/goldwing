@@ -2523,7 +2523,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         }
         if ($fallenTableExists) {
           $pendingMemorials = $pdo->query('SELECT * FROM fallen_wings WHERE status = "PENDING" ORDER BY created_at DESC')->fetchAll();
-          $approvedMemorials = $pdo->query('SELECT * FROM fallen_wings WHERE status = "APPROVED" ORDER BY full_name ASC')->fetchAll();
+          $approvedMemorials = $pdo->query('SELECT *, SUBSTRING_INDEX(full_name, " ", -1) AS last_name FROM fallen_wings WHERE status = "APPROVED" ORDER BY last_name ASC, full_name ASC')->fetchAll();
         }
         ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
@@ -2668,11 +2668,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </form>
                     </li>
                   <?php else: ?>
+                    <?php
+                    $parts = explode(' ', trim($entry['full_name'] ?? ''));
+                    if (count($parts) > 1) {
+                        $last = array_pop($parts);
+                        $formattedName = $last . ', ' . implode(' ', $parts);
+                    } else {
+                        $formattedName = $entry['full_name'] ?? '';
+                    }
+                    ?>
                     <li
                       class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 first:border-0 first:pt-0">
                       <div>
                         <div class="flex items-center gap-2">
-                          <p class="text-sm text-gray-800 font-medium"><?= e($entry['full_name']) ?></p>
+                          <p class="text-sm text-gray-800 font-medium"><?= e($formattedName) ?></p>
                           <?php if (!empty($entry['image_url'])): ?>
                             <span
                               class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Img</span>

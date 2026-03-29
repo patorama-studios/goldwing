@@ -41,10 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = $errors[0];
                 } else {
                     $tokenHash = hash('sha256', $token);
-                    $stmt = $pdo->prepare('SELECT * FROM password_resets WHERE token_hash = :token_hash AND expires_at > NOW() AND used_at IS NULL ORDER BY created_at DESC LIMIT 1');
+                    $stmt = $pdo->prepare('SELECT * FROM password_resets WHERE token_hash = :token_hash AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1');
                     $stmt->execute(['token_hash' => $tokenHash]);
                     $reset = $stmt->fetch();
                     if ($reset) {
+                        if ($reset['used_at'] !== null) {
+                            $error = 'This password reset link has already been used. Please request a new one.';
+                        } else {
                         $userId = (int) $reset['user_id'];
                         $hash = password_hash($password, PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
@@ -94,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ActivityLogger::log('system', null, null, 'security.password_reset_completed', ['user_id' => $userId]);
                         header('Location: /login.php?reset=1');
                         exit;
+                        }
                     } else {
                         $error = 'Invalid or expired token.';
                     }
@@ -119,7 +123,7 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
                 <?php if ($error): ?>
                     <div class="alert error"><?= e($error) ?></div>
                 <?php endif; ?>
-                <form method="post">
+                <form method="post" onsubmit="if(this.dataset.submitted) return false; this.dataset.submitted = true; const btn = this.querySelector('button[type=submit]'); if(btn) { btn.disabled = true; btn.innerText = 'Updating...'; }">
                     <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                     <input type="hidden" name="token" value="<?= e($token) ?>">
                     <div class="form-group">

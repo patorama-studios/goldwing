@@ -31,5 +31,26 @@ if (empty($issue['pdf_url'])) {
     exit;
 }
 
-header('Location: ' . $issue['pdf_url']);
+$url = $issue['pdf_url'];
+
+// If it's an external URL, redirect
+if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+    header('Location: ' . $url);
+    exit;
+}
+
+// Serve local files directly to bypass directory protection or path issues
+$pdfPath = realpath(__DIR__ . '/..' . $url);
+if (!$pdfPath || !file_exists($pdfPath)) {
+    http_response_code(404);
+    echo "PDF file not found on server.";
+    exit;
+}
+
+header('Content-Type: application/pdf');
+header('Content-Disposition: inline; filename="' . basename($pdfPath) . '"');
+header('Cache-Control: private, max-age=0, must-revalidate');
+header('Pragma: public');
+header('Content-Length: ' . filesize($pdfPath));
+readfile($pdfPath);
 exit;

@@ -93,7 +93,7 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
         <?php if ($error): ?>
           <div class="alert error"><?= e($error) ?></div>
         <?php endif; ?>
-        <form method="post">
+        <form method="post" onsubmit="if(this.dataset.submitted) return false; this.dataset.submitted = true; const btn = this.querySelector('button[type=submit]'); if(btn) { btn.disabled = true; btn.innerText = 'Sending...'; }">
           <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
           <div class="form-group">
             <label>Email</label>

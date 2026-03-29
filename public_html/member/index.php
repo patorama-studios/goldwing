@@ -278,6 +278,40 @@ if ($user && $user['member_id']) {
           $stmt = $pdo->prepare('INSERT INTO chapter_change_requests (member_id, requested_chapter_id, status, requested_at) VALUES (:member_id, :chapter_id, "PENDING", NOW())');
           $stmt->execute(['member_id' => $member['id'], 'chapter_id' => $requestedChapter]);
           $profileMessage = 'Chapter change request submitted.';
+
+          try {
+            $stmtChapter = $pdo->prepare('SELECT name FROM chapters WHERE id = :id');
+            $stmtChapter->execute(['id' => $requestedChapter]);
+            $requestedChapterName = $stmtChapter->fetchColumn() ?: 'Unknown Chapter';
+            
+            $memberFullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+            $memberNumberObj = App\Services\MembershipService::displayMembershipNumber((int) ($member['member_number_base'] ?? 0), (int) ($member['member_number_suffix'] ?? 0));
+            $memberNumber = $memberNumberObj ?: 'Unknown';
+            
+            $adminEmails = [];
+            $stmtEmails = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee", "chapter_leader") AND u.is_active = 1');
+            foreach ($stmtEmails->fetchAll() as $row) {
+              if (!empty($row['email'])) {
+                $adminEmails[] = $row['email'];
+              }
+            }
+            $adminEmails = array_values(array_unique($adminEmails));
+            if ($adminEmails) {
+              $subject = 'Chapter Change Request: ' . $memberFullName;
+              $body = '<p>A member has requested to change their chapter.</p>'
+                . '<ul>'
+                . '<li><strong>Member:</strong> ' . htmlspecialchars($memberFullName) . '</li>'
+                . '<li><strong>Member #:</strong> ' . htmlspecialchars($memberNumber) . '</li>'
+                . '<li><strong>Requested Chapter:</strong> ' . htmlspecialchars($requestedChapterName) . '</li>'
+                . '</ul>'
+                . '<p>Please log in to the admin dashboard under Member Management to review and approve or reject this request.</p>';
+              foreach ($adminEmails as $email) {
+                EmailService::send($email, $subject, $body, ['is_transactional' => true]);
+              }
+            }
+          } catch (Throwable $e) {
+            // Silently fail email sending so it doesn't break the user request.
+          }
         }
       } elseif ($_POST['action'] === 'add_bike') {
         $make = trim($_POST['bike_make'] ?? '');
@@ -1204,7 +1238,7 @@ if ($user && $user['member_id']) {
     }
 
     if ($fallenTableExists) {
-      $fallenSql = 'SELECT * FROM fallen_wings WHERE status = "APPROVED" ORDER BY full_name ASC';
+      $fallenSql = 'SELECT *, SUBSTRING_INDEX(full_name, " ", -1) AS last_name FROM fallen_wings WHERE status = "APPROVED" ORDER BY last_name ASC, full_name ASC';
       $stmt = $pdo->prepare($fallenSql);
       $stmt->execute();
       $fallenWings = $stmt->fetchAll();
@@ -1236,6 +1270,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
+    <?php require __DIR__ . '/../../app/Views/partials/feedback_widget.php'; ?>
     <?php $topbarTitle = $pageTitle;
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -2863,11 +2898,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <?php if ($fallenWings): ?>
                 <ul class="divide-y">
                   <?php foreach ($fallenWings as $entry): ?>
-                    <li class="py-4 fallen-wing-card" data-name="<?= e(strtolower($entry['full_name'] ?? '')) ?>"
+                    <?php
+                    $parts = explode(' ', trim($entry['full_name'] ?? ''));
+                    if (count($parts) > 1) {
+                        $last = array_pop($parts);
+                        $formattedName = $last . ', ' . implode(' ', $parts);
+                    } else {
+                        $formattedName = $entry['full_name'] ?? '';
+                    }
+                    ?>
+                    <li class="py-4 fallen-wing-card" data-name="<?= e(strtolower($formattedName)) ?>"
                       data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
                       <div class="flex items-center justify-between gap-4">
                         <div>
-                          <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?></p>
+                          <p class="text-base font-semibold text-gray-900"><?= e($formattedName) ?></p>
                           <?php if (!empty($entry['member_number'])): ?>
                             <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
                           <?php endif; ?>

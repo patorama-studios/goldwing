@@ -23,3 +23,43 @@ Stack trace:
 Stack trace:
 #0 {main}
   thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/migration_wings_downloads.php on line 6
+[27-Mar-2026 13:46:18 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'token' doesn't have a default value in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php:1688
+Stack trace:
+#0 /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php(1688): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php on line 1688
+[27-Mar-2026 13:46:32 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'token' doesn't have a default value in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php:1688
+Stack trace:
+#0 /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php(1688): PDOStatement->execute(Array)
+#1 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/admin/members/actions.php on line 1688
+[27-Mar-2026 13:47:24 Australia/Sydney] PHP Fatal error:  Uncaught Error: Class "Database" not found in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1
+[27-Mar-2026 13:49:01 Australia/Sydney] PHP Fatal error:  Uncaught Error: Class "Database" not found in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1
+[27-Mar-2026 14:05:55 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'created_at' doesn't have a default value in Command line code:1
+Stack trace:
+#0 Command line code(1): PDOStatement->execute()
+#1 {main}
+  thrown in Command line code on line 1
+[27-Mar-2026 15:45:03 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'goldwing.global_settings' doesn't exist in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->query('SELECT setting_...')
+#1 {main}
+  thrown in Command line code on line 1
+[27-Mar-2026 15:45:17 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'goldwing.settings' doesn't exist in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->query('SELECT setting_...')
+#1 {main}
+  thrown in Command line code on line 1
+[27-Mar-2026 15:53:30 Australia/Sydney] [Admin] Password reset email sent for member #9.
+[27-Mar-2026 16:13:30 Australia/Sydney] [Admin] Password reset email sent for member #9.
+[27-Mar-2026 17:25:39 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'roles' in 'field list' in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->query('SELECT email, r...')
+#1 {main}
+  thrown in Command line code on line 1

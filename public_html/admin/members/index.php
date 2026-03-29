@@ -201,6 +201,37 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?= e($flash['message']) ?>
         </div>
       <?php endif; ?>
+      <?php
+      $pendingChapterRequests = [];
+      try {
+          $pendingChapterStmt = $pdo->query('SELECT ccr.member_id, m.first_name, m.last_name FROM chapter_change_requests ccr JOIN members m ON m.id = ccr.member_id WHERE ccr.status = "PENDING" ORDER BY ccr.requested_at ASC LIMIT 10');
+          if ($pendingChapterStmt) {
+              $pendingChapterRequests = $pendingChapterStmt->fetchAll(PDO::FETCH_ASSOC);
+          }
+      } catch (Throwable $e) {
+      }
+      if ($pendingChapterRequests && ($chapterRestriction === null || AdminMemberAccess::isFullAccess($user))):
+      ?>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <span class="material-icons-outlined text-amber-600 mt-0.5">warning</span>
+            <div class="text-sm text-amber-900">
+              <strong class="font-semibold text-amber-900">Pending Chapter Change Requests</strong>
+              <p class="mt-1 text-amber-800">
+                The following members have requested to change their chapter:
+                <?php
+                $links = [];
+                foreach ($pendingChapterRequests as $req) {
+                  $links[] = '<a href="/admin/members/view.php?id=' . e($req['member_id']) . '&tab=profile" class="font-medium underline hover:text-amber-900">' . e(trim(($req['first_name'] ?? '') . ' ' . ($req['last_name'] ?? ''))) . '</a>';
+                }
+                echo implode(', ', $links);
+                if (count($pendingChapterRequests) === 10) { echo ', and more...'; }
+                ?>
+              </p>
+            </div>
+          </div>
+        </div>
+      <?php endif; ?>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
