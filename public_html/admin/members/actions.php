@@ -48,6 +48,9 @@ function redirectWithFlash(int $memberId, string $tab, string $message, string $
     }
     $_SESSION['members_flash'] = $flash;
     $params = array_merge(['id' => $memberId, 'tab' => $tab], array_filter($extraParams, static fn($value) => $value !== null));
+    if (!isset($params['orders_section']) && !empty($_POST['orders_section'])) {
+        $params['orders_section'] = $_POST['orders_section'];
+    }
     header('Location: /admin/members/view.php?' . http_build_query($params));
     exit;
 }
@@ -1109,7 +1112,7 @@ switch ($action) {
         if (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
             $normalizedRenewal = null;
         }
-        $stmt = $pdo->prepare('SELECT id, end_date FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC, end_date DESC LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, end_date FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC, id DESC LIMIT 1');
         $stmt->execute(['member_id' => $memberId]);
         $period = $stmt->fetch();
         if (!$period) {

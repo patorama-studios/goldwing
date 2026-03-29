@@ -61,7 +61,14 @@ $activePage = $activePage ?? 'dashboard';
 $activeSubPage = $activeSubPage ?? $activePage;
 $memberNumber = '';
 if (!empty($member)) {
-  $memberNumber = App\Services\MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix']);
+  $display = $member['member_number_display'] ?? ($member['member_number'] ?? '');
+  if ($display === '') {
+    if (isset($member['member_number_base'], $member['member_number_suffix'])) {
+      $memberNumber = \App\Services\MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix']);
+    }
+  } else {
+    $memberNumber = $display;
+  }
 }
 ?>
 <aside
