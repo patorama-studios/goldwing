@@ -28,7 +28,7 @@ $items = [
         'icon' => 'settings',
         'children' => $settingsChildren,
     ],
-    ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members', 'permission' => 'admin.members.view'],
+    ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],
     ['key' => 'applications', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
     ['key' => 'payments', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
     ['key' => 'events', 'label' => 'Events', 'icon' => 'event', 'href' => '/admin/index.php?page=events', 'permission' => 'admin.events.manage'],

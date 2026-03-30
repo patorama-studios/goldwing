@@ -1,4 +1,5 @@
 <?php
+if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 use App\Services\Csrf;
 
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;

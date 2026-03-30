@@ -1,4 +1,5 @@
 <?php
+if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 $products = $pdo->query('SELECT * FROM store_products WHERE track_inventory = 1 ORDER BY title ASC')->fetchAll();
 $alertsList = [];
 foreach ($products as $product) {

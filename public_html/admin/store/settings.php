@@ -1,4 +1,5 @@
 <?php
+if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 require_once __DIR__ . '/../../../app/bootstrap.php';
 require_once __DIR__ . '/../../../includes/store_helpers.php';
 

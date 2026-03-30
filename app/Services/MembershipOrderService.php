@@ -130,10 +130,15 @@ class MembershipOrderService
     public static function activateMembershipForOrder(array $order, array $metadata = []): bool
     {
         $memberId = (int) ($order['member_id'] ?? 0);
+        if ($memberId <= 0) {
+            $memberId = isset($metadata['member_id']) ? (int) $metadata['member_id'] : 0;
+        }
+
         $periodId = (int) ($order['membership_period_id'] ?? 0);
         if ($periodId <= 0) {
             $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
         }
+
         if ($memberId <= 0 || $periodId <= 0) {
             return false;
         }
@@ -147,7 +152,9 @@ class MembershipOrderService
         }
 
         $term = strtoupper((string) ($period['term'] ?? '1Y'));
-        $today = new DateTimeImmutable('today');
+        // Prevent Stripe webhook delays from pushing start dates into the next pro-rata bucket
+        $baseDate = !empty($order['created_at']) ? $order['created_at'] : 'today';
+        $today = new DateTimeImmutable($baseDate);
         $startDate = $today->format('Y-m-d');
         $endDate = null;
 
@@ -190,7 +197,10 @@ class MembershipOrderService
         $stmt = $pdo->prepare('UPDATE members SET status = "ACTIVE", updated_at = NOW() WHERE id = :id');
         $stmt->execute(['id' => $memberId]);
 
-        $stmt = $pdo->prepare('UPDATE orders SET status = "paid", payment_status = "accepted", fulfillment_status = "active", paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id');
+        $orderSets = ['status = "paid"', 'paid_at = COALESCE(paid_at, NOW())', 'updated_at = NOW()'];
+        if (self::hasOrderColumn($pdo, 'payment_status')) $orderSets[] = 'payment_status = "accepted"';
+        if (self::hasOrderColumn($pdo, 'fulfillment_status')) $orderSets[] = 'fulfillment_status = "active"';
+        $stmt = $pdo->prepare('UPDATE orders SET ' . implode(', ', $orderSets) . ' WHERE id = :id');
         $stmt->execute(['id' => (int) ($order['id'] ?? 0)]);
 
         ActivityLogger::log('system', null, $memberId, 'membership.activated', [

@@ -1,4 +1,5 @@
 <?php
+if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 use App\Services\Csrf;
 use App\Services\SettingsService;
 use App\Services\MediaService;

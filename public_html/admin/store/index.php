@@ -86,6 +86,8 @@ $storeNavItems = [
 ];
 $activeNavKey = $page === 'order' ? 'orders' : $page;
 
+define('IN_STORE_ADMIN', true);
+
 ob_start();
 require $viewFile;
 $viewContent = ob_get_clean();

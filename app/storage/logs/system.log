@@ -63,3 +63,8 @@ Stack trace:
 #0 Command line code(1): PDO->query('SELECT email, r...')
 #1 {main}
   thrown in Command line code on line 1
+[30-Mar-2026 13:20:52 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'u.roles' in 'field list' in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO->prepare('SELECT u.roles,...')
+#1 {main}
+  thrown in Command line code on line 1

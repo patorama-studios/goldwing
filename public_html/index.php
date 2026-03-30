@@ -40,10 +40,12 @@ if ($page) {
 $heroTitle = 'Welcome to the Australian Goldwing Association';
 $heroLead = 'Rides, events, and member services for Goldwing riders across Australia.';
 if ($page && $canView) {
-    $heroTitle = $page['title'];
-    $plainContent = trim(strip_tags(PageService::liveHtml($page)));
-    if ($plainContent !== '') {
-        $heroLead = $plainContent;
+    if ($pageSlug !== 'home') {
+        $heroTitle = $page['title'];
+        $plainContent = trim(strip_tags(PageService::liveHtml($page)));
+        if ($plainContent !== '') {
+            $heroLead = $plainContent;
+        }
     }
 } elseif ($page && !$canView) {
     $heroTitle = 'Members Only';

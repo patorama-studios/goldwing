@@ -70,21 +70,28 @@ $storeOrderItems = [];
 $orderHistory = [];
 $bikes = [];
 $chapterRequests = [];
-$billingMessage = '';
-$billingError = '';
+$billingMessage = $_SESSION['flash_billing_message'] ?? '';
+$billingError = $_SESSION['flash_billing_error'] ?? '';
 $fallenWings = [];
 $fallenYears = [];
 $fallenFilterYear = 0;
-$fallenMessage = '';
-$fallenError = '';
+$fallenMessage = $_SESSION['flash_fallen_message'] ?? '';
+$fallenError = $_SESSION['flash_fallen_error'] ?? '';
 $fallenTableExists = false;
-$noticeMessage = '';
-$noticeError = '';
+$noticeMessage = $_SESSION['flash_notice_message'] ?? '';
+$noticeError = $_SESSION['flash_notice_error'] ?? '';
 $noticeAvatars = [];
 $noticeStates = [];
 $noticeChapters = [];
-$profileMessage = '';
-$profileError = '';
+$profileMessage = $_SESSION['flash_profile_message'] ?? '';
+$profileError = $_SESSION['flash_profile_error'] ?? '';
+
+unset(
+  $_SESSION['flash_billing_message'], $_SESSION['flash_billing_error'],
+  $_SESSION['flash_fallen_message'], $_SESSION['flash_fallen_error'],
+  $_SESSION['flash_notice_message'], $_SESSION['flash_notice_error'],
+  $_SESSION['flash_profile_message'], $_SESSION['flash_profile_error']
+);
 $memberActivity = [];
 
 if ($page === 'billing') {
@@ -235,7 +242,7 @@ if ($user && $user['member_id']) {
           $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id');
           $stmt->execute(['id' => $targetMemberId]);
           $targetMember = $stmt->fetch();
-          $canEditTarget = (bool) $targetMember;
+          $canEditTarget = false; // Associates cannot edit Full member details
         }
 
         if (!$canEditTarget || !$targetMember) {
@@ -335,9 +342,7 @@ if ($user && $user['member_id']) {
           && !empty($member['full_member_id'])
           && $targetBikeMemberId === (int) $member['full_member_id']
         ) {
-          $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id');
-          $stmt->execute(['id' => $targetBikeMemberId]);
-          $canAddBike = (bool) $stmt->fetchColumn();
+          $canAddBike = false; // Associates cannot add bikes to Full member
         }
 
         if (!$canAddBike) {
@@ -415,9 +420,7 @@ if ($user && $user['member_id']) {
           && !empty($member['full_member_id'])
           && $targetBikeMemberId === (int) $member['full_member_id']
         ) {
-          $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id');
-          $stmt->execute(['id' => $targetBikeMemberId]);
-          $canUpdateBike = (bool) $stmt->fetchColumn();
+          $canUpdateBike = false; // Associates cannot update bikes for Full member
         }
 
         if (!$canUpdateBike || $bikeId <= 0) {
@@ -486,9 +489,7 @@ if ($user && $user['member_id']) {
           && !empty($member['full_member_id'])
           && $targetBikeMemberId === (int) $member['full_member_id']
         ) {
-          $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id');
-          $stmt->execute(['id' => $targetBikeMemberId]);
-          $canDeleteBike = (bool) $stmt->fetchColumn();
+          $canDeleteBike = false; // Associates cannot delete bikes for Full member
         }
 
         if (!$canDeleteBike || $bikeId <= 0) {
@@ -916,6 +917,25 @@ if ($user && $user['member_id']) {
           }
         }
       }
+
+      if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if ($profileMessage) $_SESSION['flash_profile_message'] = $profileMessage;
+        if ($profileError) $_SESSION['flash_profile_error'] = $profileError;
+        if ($billingMessage) $_SESSION['flash_billing_message'] = $billingMessage;
+        if ($billingError) $_SESSION['flash_billing_error'] = $billingError;
+        if ($noticeMessage) $_SESSION['flash_notice_message'] = $noticeMessage;
+        if ($noticeError) $_SESSION['flash_notice_error'] = $noticeError;
+        if ($fallenMessage) $_SESSION['flash_fallen_message'] = $fallenMessage;
+        if ($fallenError) $_SESSION['flash_fallen_error'] = $fallenError;
+
+        $queryArr = ['page' => $page];
+        if (!empty($_GET['member_id'])) {
+          $queryArr['member_id'] = (string) $_GET['member_id'];
+        }
+        $redirectUrl = '/member/index.php?' . http_build_query($queryArr);
+        header('Location: ' . $redirectUrl);
+        exit;
+      }
       $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
       $stmt->execute(['id' => $user['member_id']]);
       $member = $stmt->fetch();
@@ -960,18 +980,12 @@ if ($user && $user['member_id']) {
       }
     }
 
-    $canManageProfileBikes = $profileMemberId === (int) $member['id'];
-    if (!$canManageProfileBikes && in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
-      $canManageProfileBikes = (bool) array_filter($associates, fn($assoc) => (int) ($assoc['id'] ?? 0) === $profileMemberId);
+    $canEditProfile = $profileMemberId === (int) $member['id'];
+    if (!$canEditProfile && in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
+      $canEditProfile = (bool) array_filter($associates, fn($assoc) => (int) ($assoc['id'] ?? 0) === $profileMemberId);
     }
-    if (
-      !$canManageProfileBikes
-      && $member['member_type'] === 'ASSOCIATE'
-      && $fullMember
-      && (int) ($fullMember['id'] ?? 0) === $profileMemberId
-    ) {
-      $canManageProfileBikes = true;
-    }
+    // Also use this for managing bikes
+    $canManageProfileBikes = $canEditProfile;
 
     $memberChapterId = $member['chapter_id'] ?? null;
     $australianStates = [
@@ -1779,22 +1793,25 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php endif; ?>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
-                  <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-                    <div class="bg-primary/10 p-2 rounded-lg text-primary">
-                      <span class="material-icons-outlined">badge</span>
+                <form method="post" action="/member/index.php?page=profile" class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                  <input type="hidden" name="action" value="update_profile">
+                  <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                  <div class="sticky top-16 z-10 bg-white/95 backdrop-blur-sm p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                      <div class="bg-primary/10 p-2 rounded-lg text-primary">
+                        <span class="material-icons-outlined">badge</span>
+                      </div>
+                      <div>
+                        <h2 class="text-lg font-bold text-gray-900">Contact &amp; billing</h2>
+                        <p class="text-xs text-gray-500">Update contact details, billing address, and preferences for your membership.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 class="text-lg font-bold text-gray-900">Contact &amp; billing</h2>
-                      <p class="text-xs text-gray-500">Update contact details, billing address, and preferences for your
-                        membership.</p>
-                    </div>
+                    <?php if ($canEditProfile): ?>
+                      <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold shadow-sm hover:bg-primary/90">Save changes</button>
+                    <?php endif; ?>
                   </div>
-                  <div class="p-8">
-                    <form method="post" action="/member/index.php?page=profile" class="space-y-8">
-                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                      <input type="hidden" name="action" value="update_profile">
-                      <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
+                  <fieldset class="p-8 space-y-8" <?php if (!$canEditProfile) echo 'disabled'; ?>>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label class="text-sm font-medium text-gray-700">Email</label>
@@ -1892,14 +1909,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <?php endforeach; ?>
                         </div>
                       </div>
-                      <div class="flex justify-end">
-                        <button type="submit"
-                          class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save
-                          changes</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
+                      <?php if ($canEditProfile): ?>
+                        <div class="flex justify-end">
+                          <button type="submit"
+                            class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save
+                            changes</button>
+                        </div>
+                      <?php endif; ?>
+                  </fieldset>
+                </form>
                 <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
                   <div class="flex items-center gap-3">
                     <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
@@ -2062,11 +2080,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       Chapter changes are managed by the full member linked to this profile.
                     </div>
                   <?php else: ?>
+                    <?php
+                      $hasPendingChapterRequest = count(array_filter($chapterRequests, fn($r) => strtoupper($r['status']) === 'PENDING')) > 0;
+                    ?>
                     <form method="post" class="space-y-3">
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                       <input type="hidden" name="action" value="request_chapter">
                       <select name="requested_chapter_id"
-                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20" <?php if ($hasPendingChapterRequest) echo 'disabled'; ?>>
                         <option value="">Select chapter</option>
                         <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
                           <?php
@@ -2078,22 +2099,44 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <option value="<?= e((string) $chapter['id']) ?>"><?= e($chapterLabel) ?></option>
                         <?php endforeach; ?>
                       </select>
-                      <button
-                        class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                        type="submit">Submit request</button>
+                      <?php if ($hasPendingChapterRequest): ?>
+                        <div class="mt-2 text-xs text-amber-600 font-semibold bg-amber-50 rounded-lg p-2.5 border border-amber-100 flex items-center gap-2">
+                          <span class="material-icons-outlined text-[16px]">info</span>
+                          You already have a pending chapter change request.
+                        </div>
+                      <?php else: ?>
+                        <button
+                          class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                          type="submit">Submit request</button>
+                      <?php endif; ?>
                     </form>
                   <?php endif; ?>
                   <?php if ($chapterRequests): ?>
-                    <div class="mt-4 space-y-2 text-sm text-gray-600">
+                    <div class="mt-4 space-y-3 text-sm text-gray-600">
                       <?php foreach ($chapterRequests as $request): ?>
-                        <div class="rounded-lg border border-gray-100 bg-white px-3 py-2">
-                          <p class="font-semibold text-gray-900"><?= e($request['name']) ?></p>
-                          <p class="text-xs text-gray-500">Requested: <?= e($request['requested_at']) ?></p>
-                          <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Status:
-                            <?= e($request['status']) ?>
+                        <?php 
+                        $statusClass = match(strtoupper($request['status'])) {
+                          'PENDING' => 'bg-amber-100 text-amber-700 border-amber-200',
+                          'APPROVED' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                          'REJECTED' => 'bg-red-100 text-red-700 border-red-200',
+                          default => 'bg-gray-100 text-gray-700 border-gray-200'
+                        };
+                        ?>
+                        <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                          <div class="flex items-center justify-between mb-2">
+                            <p class="font-bold text-gray-900"><?= e($request['name']) ?></p>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border <?= $statusClass ?>">
+                              <?= e($request['status']) ?>
+                            </span>
+                          </div>
+                          <p class="text-xs text-gray-500 flex items-center gap-1.5">
+                            <span class="material-icons-outlined text-[14px]">calendar_today</span>
+                            Requested: <?= e(format_datetime($request['requested_at'])) ?>
                           </p>
                           <?php if (!empty($request['rejection_reason'])): ?>
-                            <p class="mt-1 text-xs text-red-600">Reason: <?= e($request['rejection_reason']) ?></p>
+                            <div class="mt-3 bg-red-50 text-red-600 text-xs p-2.5 rounded-lg border border-red-100">
+                              <span class="font-semibold">Reason for rejection:</span> <?= e($request['rejection_reason']) ?>
+                            </div>
                           <?php endif; ?>
                         </div>
                       <?php endforeach; ?>

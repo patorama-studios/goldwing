@@ -548,6 +548,9 @@ class PaymentWebhookService
     private static function markMembershipPaid(array $order, array $metadata): void
     {
         $memberId = (int) ($order['member_id'] ?? 0);
+        if ($memberId <= 0) {
+            $memberId = isset($metadata['member_id']) ? (int) $metadata['member_id'] : 0;
+        }
         $periodId = (int) ($order['membership_period_id'] ?? 0);
         if ($periodId <= 0) {
             $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
