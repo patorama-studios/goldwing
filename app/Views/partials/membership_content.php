@@ -37,7 +37,7 @@
           </ul>
         </div>
         <div class="membership-intro__image">
-          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdE0csgyVfFdqFSwxRvdyUwYfPc5cx7CgYt-ldfJapZNjvba8ZZCezjVid3aDuHmzdV_fVfqE2lW8s_swpu2xxJt8maR93nYmzNR2TXnjpeHyeqhHERIQva8j9t6_Uw2OOwcZNfaN0SpSZTjcRry69FJdfjyES43SkMXGFZh3MZJ28uugx2Ja19nkhWA8uJ72AUTERI2GUwpXlmt6m6ax0b7LDAAipd0lqO9w7BhL9jmeb5m_hcCBqAZ6YZjWydH5KCCgxFJznnqI" alt="Motorcycle community gathering">
+          <img src="/assets/img/membership-second.png" alt="Motorcycle community gathering">
         </div>
       </div>
     </div>
@@ -66,7 +66,7 @@
           </div>
           <div class="membership-plan__row">
             <div>
-              <p class="membership-plan__label">Full - PDF</p>
+              <p class="membership-plan__label">Full - PDF magazine</p>
               <p class="membership-plan__sub">Includes digital magazine</p>
             </div>
             <span class="membership-plan__price"><?= e($formatMembershipPrice($getMembershipPrice($pricingMatrix, 'PDF', 'FULL', 'THREE_YEARS'), $pricingCurrency)) ?></span>
@@ -97,7 +97,7 @@
           </div>
           <div class="membership-plan__row">
             <div>
-              <p class="membership-plan__label">Full - PDF</p>
+              <p class="membership-plan__label">Full - PDF magazine</p>
               <p class="membership-plan__sub">Includes digital magazine</p>
             </div>
             <span class="membership-plan__price"><?= e($formatMembershipPrice($getMembershipPrice($pricingMatrix, 'PDF', 'FULL', 'ONE_YEAR'), $pricingCurrency)) ?></span>
@@ -133,7 +133,7 @@
                 <td><?= e($formatMembershipPrice($getMembershipPrice($pricingMatrix, 'PRINTED', 'FULL', 'ONE_THIRD'), $pricingCurrency)) ?></td>
               </tr>
               <tr>
-                <td>Full - PDF</td>
+                <td>Full - PDF magazine</td>
                 <td><?= e($formatMembershipPrice($getMembershipPrice($pricingMatrix, 'PDF', 'FULL', 'TWO_THIRDS'), $pricingCurrency)) ?></td>
                 <td><?= e($formatMembershipPrice($getMembershipPrice($pricingMatrix, 'PDF', 'FULL', 'ONE_THIRD'), $pricingCurrency)) ?></td>
               </tr>

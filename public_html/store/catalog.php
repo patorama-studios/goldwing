@@ -20,8 +20,9 @@ if ($tagId) {
     $params['tag_id'] = $tagId;
 }
 if ($search !== '') {
-    $conditions[] = '(p.title LIKE :search OR p.description LIKE :search)';
-    $params['search'] = '%' . $search . '%';
+    $conditions[] = '(p.title LIKE :search_title OR p.description LIKE :search_desc)';
+    $params['search_title'] = '%' . $search . '%';
+    $params['search_desc'] = '%' . $search . '%';
 }
 
 $sql = 'SELECT DISTINCT p.*, (SELECT image_url FROM store_product_images i WHERE i.product_id = p.id ORDER BY i.sort_order ASC, i.id ASC LIMIT 1) as image_url FROM store_products p' . $joins;
@@ -38,7 +39,7 @@ $pageTitle = $settings['store_name'] ?? 'Store';
 $heroLead = 'Members-only store for official Australian Goldwing Association gear, apparel, and accessories.';
 ?>
 <div class="store-shell">
-  <form class="store-filters" method="get">
+  <form class="store-filters" method="get" action="/store">
     <div class="store-filter search">
       <label class="sr-only" for="store-search">Search</label>
       <input id="store-search" name="q" value="<?= e($search) ?>" placeholder="Search products">

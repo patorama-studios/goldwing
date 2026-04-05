@@ -1506,8 +1506,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-sm text-gray-500">Latest issue</p>
                   <p class="text-lg font-semibold text-gray-900"><?= e($wingsLatest['title']) ?></p>
                   <div class="mt-3 flex flex-wrap gap-2">
-                    <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                      href="<?= e($wingsLatest['pdf_url']) ?>" target="_blank" rel="noopener">Read Now</a>
+                      <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
+                        href="/member/download_wings.php?id=<?= e((string) $wingsLatest['id']) ?>" target="_blank" rel="noopener">Read Now</a>
                     <a class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
                       href="/member/index.php?page=wings">Archive</a>
                   </div>
@@ -2588,7 +2588,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <p class="text-xs text-gray-500"><?= e($publishedLabel) ?></p>
                       <?php endif; ?>
                       <a class="inline-flex items-center text-sm font-semibold text-secondary"
-                        href="/member/download_wings.php?id=<?= $issue['id'] ?>">
+                        href="/member/download_wings.php?id=<?= $issue['id'] ?>" target="_blank">
                         Read issue
                         <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
                       </a>
@@ -3430,6 +3430,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <input type="file" id="upload-file-input" class="hidden" accept="image/*">
           </div>
           <div id="upload-preview" class="hidden rounded-xl border border-gray-100 bg-white p-3 text-sm"></div>
+          <div id="upload-crop-container" class="hidden rounded-xl border border-gray-100 bg-gray-100 w-full h-64 overflow-hidden relative">
+            <img id="upload-crop-image" src="" alt="Crop" class="max-w-full block">
+          </div>
           <div class="flex items-center justify-end gap-3">
             <button type="button"
               class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700"
@@ -3443,12 +3446,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     </div>
   </main>
 </div>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
   (() => {
     const modal = document.getElementById('upload-modal');
     const dropzone = document.getElementById('upload-dropzone');
     const fileInput = document.getElementById('upload-file-input');
     const preview = document.getElementById('upload-preview');
+    const cropContainer = document.getElementById('upload-crop-container');
+    const cropImage = document.getElementById('upload-crop-image');
     const saveBtn = document.querySelector('[data-upload-save]');
     const cancelBtn = document.querySelector('[data-upload-cancel]');
     const closeBtn = document.querySelector('[data-upload-close]');
@@ -3457,13 +3464,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     let activeTargetPreview = null;
     let activeContext = 'members';
     let selectedFile = null;
+    let cropper = null;
 
     const resetModal = () => {
       selectedFile = null;
       saveBtn.disabled = true;
       preview.innerHTML = '';
       preview.classList.add('hidden');
+      if (cropContainer) cropContainer.classList.add('hidden');
+      if (dropzone) dropzone.classList.remove('hidden');
       fileInput.value = '';
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
     };
 
     const closeModal = () => {
@@ -3487,17 +3501,50 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     });
 
     const setPreview = (file) => {
-      preview.classList.remove('hidden');
       preview.innerHTML = '';
+      dropzone.classList.add('hidden');
+      
       if (file.type === 'application/pdf') {
+        preview.classList.remove('hidden');
+        if (cropContainer) cropContainer.classList.add('hidden');
         preview.innerHTML = `<div class="flex items-center gap-2 text-gray-600"><span class="material-icons-outlined text-base">picture_as_pdf</span>${file.name}</div>`;
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        preview.innerHTML = `<img src="${event.target.result}" alt="Preview" class="w-full h-48 object-cover rounded-lg">`;
-      };
-      reader.readAsDataURL(file);
+      
+      if (cropContainer && cropImage) {
+        preview.classList.add('hidden');
+        cropContainer.classList.remove('hidden');
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          cropImage.src = event.target.result;
+          
+          if (cropper) {
+            cropper.destroy();
+          }
+          
+          let aspectRatio = NaN;
+          if (activeContext === 'avatars') {
+            aspectRatio = 1;
+          } else if (activeContext === 'bikes') {
+            aspectRatio = 4 / 3;
+          }
+          
+          cropper = new Cropper(cropImage, {
+            aspectRatio: aspectRatio,
+            viewMode: 1,
+            autoCropArea: 1,
+          });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.classList.remove('hidden');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          preview.innerHTML = `<img src="${event.target.result}" alt="Preview" class="w-full h-48 object-cover rounded-lg">`;
+        };
+        reader.readAsDataURL(file);
+      }
     };
 
     const handleFile = (file) => {
@@ -3549,21 +3596,34 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           return;
         }
         saveBtn.disabled = true;
-        const result = await uploadFile(selectedFile, activeContext);
-        if (!result || result.error) {
-          alert(result.error || 'Upload failed.');
-          saveBtn.disabled = false;
-          return;
-        }
-        activeTargetInput.value = result.url || '';
-        if (activeTargetPreview) {
-          if (result.type === 'pdf') {
-            activeTargetPreview.innerHTML = '<span class="material-icons-outlined text-gray-400">picture_as_pdf</span>';
-          } else {
-            activeTargetPreview.innerHTML = `<img src="${result.url}" alt="Uploaded" class="h-full w-full object-cover">`;
+
+        const performUpload = async (fileToUpload) => {
+          const result = await uploadFile(fileToUpload, activeContext);
+          if (!result || result.error) {
+            alert(result.error || 'Upload failed.');
+            saveBtn.disabled = false;
+            return;
           }
+          activeTargetInput.value = result.url || '';
+          if (activeTargetPreview) {
+            if (result.type === 'pdf') {
+              activeTargetPreview.innerHTML = '<span class="material-icons-outlined text-gray-400">picture_as_pdf</span>';
+            } else {
+              activeTargetPreview.innerHTML = `<img src="${result.url}" alt="Uploaded" class="h-full w-full object-cover">`;
+            }
+          }
+          closeModal();
+        };
+
+        if (cropper && selectedFile.type !== 'application/pdf') {
+          const canvas = cropper.getCroppedCanvas();
+          canvas.toBlob(async (blob) => {
+            const croppedFile = new File([blob], selectedFile.name, { type: selectedFile.type });
+            await performUpload(croppedFile);
+          }, selectedFile.type);
+        } else {
+          await performUpload(selectedFile);
         }
-        closeModal();
       });
     }
 

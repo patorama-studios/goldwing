@@ -1553,12 +1553,23 @@ textarea:focus {
   padding: 6rem 0 5.5rem;
   text-align: center;
   color: #ffffff;
+  overflow: hidden;
+}
+
+.membership-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background:
-    linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
-    url('https://images.unsplash.com/photo-1558981403-c5f91cbba527?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+    radial-gradient(700px 420px at 80% 20%, rgba(158, 145, 64, 0.35), transparent 60%),
+    linear-gradient(120deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.4) 70%),
+    url('/assets/img/Membership-hero.png') center/cover no-repeat;
+  z-index: 0;
 }
 
 .membership-hero__inner {
+  position: relative;
+  z-index: 1;
   max-width: 820px;
   margin: 0 auto;
 }
@@ -1586,7 +1597,7 @@ textarea:focus {
 }
 
 .membership-intro {
-  margin-top: -3.5rem;
+  padding-top: 3rem;
   padding-bottom: 4rem;
 }
 
