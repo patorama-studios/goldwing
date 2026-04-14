@@ -19,6 +19,7 @@ $items = [
   ],
   ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
   ['key' => 'member-of-the-year', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
+  ['key' => 'dealers', 'label' => 'Honda Dealers', 'icon' => 'two_wheeler', 'href' => '/member/index.php?page=dealers'],
   ['key' => 'profile', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
   ['key' => 'settings', 'label' => 'Settings', 'icon' => 'tune', 'href' => '/member/index.php?page=settings'],
   ['key' => 'billing', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],

@@ -3066,6 +3066,69 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           </div>
         </section>
+      <?php elseif ($page === 'dealers'): ?>
+        <?php
+        $stmt = $pdo->query("SELECT * FROM honda_dealers ORDER BY state ASC, name ASC");
+        $allDealers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $dealersByState = [];
+        foreach ($allDealers as $d) {
+            $dealersByState[$d['state']][] = $d;
+        }
+        ?>
+        <section class="space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Honda Dealers</h2>
+              <p class="text-sm text-gray-500">Find authorised Honda dealers across Australia.</p>
+            </div>
+          </div>
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="space-y-8">
+              <?php foreach ($dealersByState as $state => $dealers): ?>
+                <div>
+                  <h3 class="font-display text-xl font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2"><?= e($state) ?> Dealers</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <?php foreach ($dealers as $dealer): ?>
+                      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 transition-shadow hover:shadow-md">
+                        <div class="flex items-start justify-between gap-2">
+                          <h4 class="font-bold text-gray-900 text-lg leading-tight mb-2"><?= e($dealer['name']) ?></h4>
+                        </div>
+                        <div class="space-y-2 mt-3">
+                          <?php if (!empty($dealer['address'])): ?>
+                            <p class="text-sm text-gray-600 flex items-start gap-2">
+                              <span class="material-icons-outlined text-[16px] text-gray-400 mt-0.5">place</span>
+                              <span><?= e($dealer['address']) ?></span>
+                            </p>
+                          <?php endif; ?>
+                          <?php if (!empty($dealer['phone'])): ?>
+                            <p class="text-sm text-gray-600 flex items-center gap-2">
+                              <span class="material-icons-outlined text-[16px] text-gray-400">phone</span>
+                              <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $dealer['phone'])) ?>" class="hover:text-primary transition-colors"><?= e($dealer['phone']) ?></a>
+                            </p>
+                          <?php endif; ?>
+                          <?php if (!empty($dealer['website'])): ?>
+                            <p class="text-sm text-gray-600 flex items-center gap-2">
+                              <span class="material-icons-outlined text-[16px] text-primary">language</span>
+                              <a href="<?= e($dealer['website']) ?>" target="_blank" rel="noopener" class="text-primary font-medium hover:text-primary-dark transition-colors truncate">Visit Website</a>
+                            </p>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+              <?php if (empty($dealersByState)): ?>
+                <div class="text-center py-8">
+                  <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-400 mb-3">
+                    <span class="material-icons-outlined">two_wheeler</span>
+                  </div>
+                  <p class="text-sm text-gray-500">No dealers have been added yet.</p>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </section>
       <?php elseif ($page === 'store'): ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <h2 class="font-display text-2xl font-bold text-gray-900 mb-2">Store</h2>

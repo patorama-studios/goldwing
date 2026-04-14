@@ -532,3 +532,15 @@ CREATE TABLE renewal_reminders (
   FOREIGN KEY (member_id) REFERENCES members(id),
   FOREIGN KEY (period_id) REFERENCES membership_periods(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE honda_dealers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    state VARCHAR(50) NOT NULL,
+    address TEXT,
+    phone VARCHAR(100),
+    website VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
