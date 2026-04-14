@@ -124,6 +124,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       </section>
     <?php endif; ?>
   <?php endif; ?>
+  <?php if ($pageSlug === 'home'): ?>
+    <?php require __DIR__ . '/../app/Views/partials/sponsors.php'; ?>
+  <?php endif; ?>
 </main>
 <?php if ($templateFooter !== ''): ?>
   <div class="page-builder-template page-builder-template--footer">
