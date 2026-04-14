@@ -274,7 +274,7 @@ $html = <<<HTML
                 <div class="chapter-details">
                     <div class="rep-name">Kevin Lindley</div>
                     <div class="rep-actions">
-                        <a href="tel:0267722706" class="rep-btn call-btn">📞 02 6772 2706</a>
+                        <a href="tel:0428622777" class="rep-btn call-btn">📞 0428 622 777</a>
                         <a href="mailto:ar.riverina@goldwing.org.au" class="rep-btn email-btn">✉️ Email</a>
                     </div>
                 </div>

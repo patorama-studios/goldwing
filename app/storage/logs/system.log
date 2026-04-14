@@ -68,3 +68,38 @@ Stack trace:
 #0 Command line code(1): PDO->prepare('SELECT u.roles,...')
 #1 {main}
   thrown in Command line code on line 1
+[30-Mar-2026 21:17:12 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/store/catalog.php:34
+Stack trace:
+#0 /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/store/catalog.php(34): PDOStatement->execute(Array)
+#1 /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/store/index.php(60): require('/Users/patorama...')
+#2 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/public_html/store/catalog.php on line 34
+[05-Apr-2026 17:56:30 Australia/Sydney] PHP Fatal error:  Uncaught Error: Class "App\Services\DatabaseService" not found in /Users/patorama/vibe_coding_projects/Goldwing Website/tmp_list_pages.php:4
+Stack trace:
+#0 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/tmp_list_pages.php on line 4
+[05-Apr-2026 17:57:18 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'content' in 'field list' in /Users/patorama/vibe_coding_projects/Goldwing Website/tmp_get_page.php:4
+Stack trace:
+#0 /Users/patorama/vibe_coding_projects/Goldwing Website/tmp_get_page.php(4): PDO->prepare('SELECT title, c...')
+#1 {main}
+  thrown in /Users/patorama/vibe_coding_projects/Goldwing Website/tmp_get_page.php on line 4
+[14-Apr-2026 08:26:05 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'success' doesn't have a default value in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/LoginRateLimiter.php:84
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/LoginRateLimiter.php(84): PDOStatement->execute(Array)
+#1 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/LoginRateLimiter.php(41): App\Services\LoginRateLimiter::applyAttempt('admin@goldwing....', NULL, '::1', 5, 15, 30, true)
+#2 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/AuthService.php(23): App\Services\LoginRateLimiter::recordFailure('admin@goldwing....', NULL, '::1')
+#3 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/login.php(23): App\Services\AuthService::attemptLogin('admin@goldwing....', 'admin123')
+#4 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/LoginRateLimiter.php on line 84
+[14-Apr-2026 09:32:35 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/EmailOtpService.php:47
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/EmailOtpService.php(47): PDOStatement->execute(Array)
+#1 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/AuthService.php(51): App\Services\EmailOtpService::issueCode(1, 'admin@goldwing....', 'Admin User')
+#2 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/login.php(23): App\Services\AuthService::attemptLogin('admin@goldwing....', 'Admin123!')
+#3 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/EmailOtpService.php on line 47
+[14-Apr-2026 09:44:25 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'downloads' in 'field list' in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php:24
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php(24): PDO->prepare('UPDATE wings_is...')
+#1 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php on line 24
