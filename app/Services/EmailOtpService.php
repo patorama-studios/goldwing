@@ -43,13 +43,17 @@ class EmailOtpService
         $expiresAt = date('Y-m-d H:i:s', $now + (self::EXPIRY_MINUTES * 60));
         $resendCount++;
 
-        $stmt = $pdo->prepare('INSERT INTO email_otp_codes (user_id, code_hash, attempts, last_sent_at, expires_at, resend_count, resend_window_started_at, created_at, updated_at) VALUES (:user_id, :hash, 0, NOW(), :expires_at, :resend_count, FROM_UNIXTIME(:window_start), NOW(), NOW()) ON DUPLICATE KEY UPDATE code_hash = :hash, attempts = 0, last_sent_at = NOW(), expires_at = :expires_at, resend_count = :resend_count, resend_window_started_at = FROM_UNIXTIME(:window_start), updated_at = NOW()');
+        $stmt = $pdo->prepare('INSERT INTO email_otp_codes (user_id, code_hash, attempts, last_sent_at, expires_at, resend_count, resend_window_started_at, created_at, updated_at) VALUES (:user_id, :hash, 0, NOW(), :expires_at, :resend_count, FROM_UNIXTIME(:window_start), NOW(), NOW()) ON DUPLICATE KEY UPDATE code_hash = :hash_update, attempts = 0, last_sent_at = NOW(), expires_at = :expires_at_update, resend_count = :resend_count_update, resend_window_started_at = FROM_UNIXTIME(:window_start_update), updated_at = NOW()');
         $stmt->execute([
             'user_id' => $userId,
             'hash' => $hash,
             'expires_at' => $expiresAt,
             'resend_count' => $resendCount,
             'window_start' => $windowStart,
+            'hash_update' => $hash,
+            'expires_at_update' => $expiresAt,
+            'resend_count_update' => $resendCount,
+            'window_start_update' => $windowStart,
         ]);
 
         $memberId = self::memberIdForUser($userId);

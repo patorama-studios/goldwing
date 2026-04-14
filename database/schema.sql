@@ -345,6 +345,7 @@ CREATE TABLE wings_issues (
   title VARCHAR(150) NOT NULL,
   pdf_url VARCHAR(255) NOT NULL,
   cover_image_url VARCHAR(255) NULL,
+  downloads INT NOT NULL DEFAULT 0,
   is_latest TINYINT(1) NOT NULL DEFAULT 0,
   published_at DATE NOT NULL,
   created_by INT NULL,

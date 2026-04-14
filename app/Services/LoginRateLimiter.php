@@ -80,7 +80,7 @@ class LoginRateLimiter
                 'id' => $row['id'],
             ]);
         } else {
-            $stmt = $pdo->prepare('INSERT INTO login_attempts (email, user_id, ip_address, attempts_count, first_attempt_at, last_attempt_at, locked_until, updated_at) VALUES (:email, :user_id, :ip, :attempts, :first_attempt_at, NOW(), :locked_until, NOW())');
+            $stmt = $pdo->prepare('INSERT INTO login_attempts (email, user_id, ip_address, success, attempted_at, attempts_count, first_attempt_at, last_attempt_at, locked_until, updated_at) VALUES (:email, :user_id, :ip, 0, NOW(), :attempts, :first_attempt_at, NOW(), :locked_until, NOW())');
             $stmt->execute([
                 'email' => $email,
                 'user_id' => $userId,
