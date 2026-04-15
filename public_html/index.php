@@ -85,7 +85,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
   <?php if ($isMembershipPage && $page && $canView && !$hasEditableBody): ?>
     <?php require __DIR__ . '/../app/Views/partials/membership_content.php'; ?>
   <?php else: ?>
-    <?php if ($page && $canView && $hasEditableBody): ?>
+    <?php if ($page && $canView && $hasEditableBody && $pageSlug !== 'home'): ?>
       <?= render_media_shortcodes($liveHtml) ?>
     <?php else: ?>
       <section class="<?= e($heroClass) ?>">

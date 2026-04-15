@@ -443,3 +443,9 @@ $stmt = $pdo->prepare("UPDATE pages SET live_html = :html WHERE slug = 'chapters
 $stmt->execute(['html' => $html]);
 
 echo "Successfully updated chapters-representatives page!\n";
+
+// Fix home page content - remove page-builder wrapper so PHP hero renders
+$homeHtml = '<p>Australian Goldwing Association is the national home for riders, chapters, and the open road.</p>';
+$stmt = $pdo->prepare("UPDATE pages SET live_html = :html, html_content = :html2, draft_html = :html3 WHERE slug = 'home'");
+$stmt->execute(['html' => $homeHtml, 'html2' => $homeHtml, 'html3' => $homeHtml]);
+echo "Updated home page content.\n";
