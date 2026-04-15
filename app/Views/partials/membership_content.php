@@ -32,7 +32,7 @@
               <span class="membership-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
               </span>
-              <span>Participation in organized rides and national rallies.</span>
+              <span>Participation in organised rides and national rallies.</span>
             </li>
           </ul>
         </div>
@@ -48,7 +48,7 @@
   <div class="container">
     <div class="membership-pricing__intro">
       <h2>Membership Options</h2>
-      <p>Select the duration and type that best fits your needs. All memberships expire on the 31st of July. Pricing includes a one-off $15.00 joining fee.</p>
+      <p>Select the duration and type that best fits your needs. All memberships expire on the <span style="white-space: nowrap;">31st of July</span>. Pricing includes a one-off $15.00 joining fee.</p>
     </div>
     <div class="membership-pricing__grid">
       <article class="membership-plan">
