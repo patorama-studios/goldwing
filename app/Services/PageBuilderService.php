@@ -130,7 +130,8 @@ class PageBuilderService
             return '<div id="gw-content-root" class="page-body" data-gw-body="true">' . $content . '</div>';
         }
         $pageTitle = $page['title'] ?? 'Australian Goldwing Association';
-        $plainContent = trim(strip_tags($draftHtml));
+        $strippedDraft = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $draftHtml);
+        $plainContent = trim(strip_tags($strippedDraft));
         $heroLead = $plainContent !== '' ? $plainContent : 'Rides, events, and member services for Goldwing riders across Australia.';
         if (strlen($heroLead) > 200) {
             $heroLead = substr($heroLead, 0, 200) . '...';

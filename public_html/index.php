@@ -42,7 +42,9 @@ $heroLead = 'Australian Goldwing Association is the national home for riders, ch
 if ($page && $canView) {
     if ($pageSlug !== 'home') {
         $heroTitle = $page['title'];
-        $plainContent = trim(strip_tags(PageService::liveHtml($page)));
+        $rawHtml = PageService::liveHtml($page);
+        $rawHtml = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $rawHtml);
+        $plainContent = trim(strip_tags($rawHtml));
         if ($plainContent !== '') {
             $heroLead = $plainContent;
         }
