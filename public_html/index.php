@@ -38,7 +38,7 @@ if ($page) {
 }
 
 $heroTitle = 'Welcome to the Australian Goldwing Association';
-$heroLead = 'Rides, events, and member services for Goldwing riders across Australia.';
+$heroLead = 'Australian Goldwing Association is the national home for riders, chapters, and the open road.';
 if ($page && $canView) {
     if ($pageSlug !== 'home') {
         $heroTitle = $page['title'];
@@ -91,7 +91,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       <section class="<?= e($heroClass) ?>">
         <div class="container hero__inner">
           <span class="hero__eyebrow">Australian Goldwing Association</span>
-          <h1><?= e($heroTitle) ?></h1>
+          <?php if ($pageSlug === 'home'): ?>
+            <h1>Welcome to the<br><span style="font-size: 0.6em; letter-spacing: 0.02em;">Australian Goldwing Association</span></h1>
+          <?php else: ?>
+            <h1><?= e($heroTitle) ?></h1>
+          <?php endif; ?>
           <p class="hero__lead"><?= e($heroLead) ?></p>
           <?php if ($pageSlug === 'home'): ?>
             <div class="hero__actions">
@@ -102,6 +106,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         </div>
       </section>
 
+      <?php if ($pageSlug !== 'home'): ?>
       <section class="page-section">
         <div class="container">
           <div class="page-card reveal">
@@ -122,6 +127,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           </div>
         </div>
       </section>
+      <?php endif; ?>
     <?php endif; ?>
   <?php endif; ?>
   <?php if ($pageSlug === 'home'): ?>

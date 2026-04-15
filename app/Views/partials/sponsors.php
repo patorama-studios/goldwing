@@ -2,7 +2,7 @@
 $sponsors = [
     [
         'name' => 'Honda Motorcycles Australia',
-        'url' => 'https://motorcycles.honda.com.au/Touring',
+        'url' => 'https://frasermotorcycles.com.au/',
         'image' => '/assets/img/sponsors/honda.png',
         'alt' => 'Honda Logo'
     ],
@@ -20,7 +20,7 @@ $sponsors = [
     ]
 ];
 ?>
-<section class="sponsors-section" style="background: linear-gradient(180deg, #121212 0%, #0a0a0a 100%); padding: 8rem 1rem 4rem 1rem; margin-top: -6rem; position: relative; z-index: 1;">
+<section class="sponsors-section" style="background: linear-gradient(180deg, #121212 0%, #0a0a0a 100%); padding: 4rem 1rem; position: relative; z-index: 1;">
     <div class="container" style="text-align: center;">
         <h2 style="color: #d4af37; font-size: 2rem; margin-bottom: 0.5rem; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">Our Valued Sponsors</h2>
         <p style="color: #aaa; margin-bottom: 3rem; font-size: 1.1rem;">Supporting the Australian Goldwing Association and our members.</p>

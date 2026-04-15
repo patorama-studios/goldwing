@@ -389,7 +389,7 @@ $html = <<<HTML
             <details class="chapter-accordion">
                 <summary>Tasmania</summary>
                 <div class="chapter-details">
-                    <div class="rep-name">Dennis Davis (Contact)</div>
+                    <div class="rep-name">Dennis Davis</div>
                     <div class="rep-actions">
                         <a href="tel:0429351615" class="rep-btn call-btn">📞 0429 351 615</a>
                         <a href="mailto:ar.tasmania@goldwing.org.au" class="rep-btn email-btn">✉️ Email</a>
