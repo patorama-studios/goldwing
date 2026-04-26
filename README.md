@@ -33,6 +33,15 @@
 - Create products (physical or ticket), add options/variants, then assign categories/tags.
 - Ticket products generate codes on paid orders and email them to customers.
 
+### Bulk catalogue import
+- Source spec: `scripts/data/store_catalogue_2026_04.json` (committed; original xlsx kept alongside).
+- Dry-run (no DB writes): `php scripts/import_store_catalogue.php`
+- Apply: `php scripts/import_store_catalogue.php --apply`
+- Also push the catalogue's `shipping.flat_rate` into `store_settings`: add `--update-shipping`.
+- Idempotent: matches products by SKU. Existing products with a matching SKU are updated in place; new ones are inserted; products not in the JSON are left alone. For variant products the script replaces all options/variants on each run (carts/orders keep their snapshots via `ON DELETE SET NULL`).
+- Images are not imported — upload via the admin UI after import.
+- To bring in a new catalogue version, drop a fresh JSON next to the existing one and pass its path: `php scripts/import_store_catalogue.php --apply scripts/data/store_catalogue_2026_07.json`.
+
 ## Members admin portal
 - Run the migration `database/members_module.sql` to add membership lookups, directory preferences (A–F), the member vehicles table, refunds/log tables, and the activity logging stack.
 - Visit `/admin/members` for the new member list, filters, stats, and export; detail pages include overview, profile, vehicles, orders, refunds, and activity tabs with RBAC and logging.

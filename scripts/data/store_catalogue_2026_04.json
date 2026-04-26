@@ -1,0 +1,241 @@
+{
+  "version": "2026-04",
+  "source": "Current Stock List April 2026.xlsx",
+  "shipping": {
+    "flat_rate": 15.00,
+    "note": "All orders subject to a postage fee of $15.00."
+  },
+  "categories": ["Apparel", "Accessories"],
+  "products": [
+    {
+      "sku": "AGA-POLO-MENS",
+      "title": "AGA Polo Shirt (Mens)",
+      "description": "Official Australian Goldwing Association men's short-sleeve polo shirt.",
+      "type": "physical",
+      "base_price": 56.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "S" }, "stock": 2 },
+        { "options": { "Size": "M" }, "stock": 4 },
+        { "options": { "Size": "L" }, "stock": 5 },
+        { "options": { "Size": "XL" }, "stock": 5 },
+        { "options": { "Size": "2XL" }, "stock": 2 },
+        { "options": { "Size": "3XL" }, "stock": 3 },
+        { "options": { "Size": "4XL" }, "stock": 3 },
+        { "options": { "Size": "5XL" }, "stock": 2 }
+      ]
+    },
+    {
+      "sku": "AGA-POLO-LADIES",
+      "title": "AGA Polo Shirt (Ladies)",
+      "description": "Official Australian Goldwing Association ladies' short-sleeve polo shirt.",
+      "type": "physical",
+      "base_price": 56.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["8", "10", "12", "14", "16", "18", "20", "22", "24"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "8" },  "stock": 2 },
+        { "options": { "Size": "10" }, "stock": 3 },
+        { "options": { "Size": "12" }, "stock": 3 },
+        { "options": { "Size": "14" }, "stock": 3 },
+        { "options": { "Size": "16" }, "stock": 1 },
+        { "options": { "Size": "18" }, "stock": 4 },
+        { "options": { "Size": "20" }, "stock": 1 },
+        { "options": { "Size": "22" }, "stock": 4 },
+        { "options": { "Size": "24" }, "stock": 5 }
+      ]
+    },
+    {
+      "sku": "AGA-POLO-LS",
+      "title": "AGA Polo Shirt (Long Sleeve)",
+      "description": "Official Australian Goldwing Association long-sleeve polo shirt.",
+      "type": "physical",
+      "base_price": 64.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "S" },   "stock": 2 },
+        { "options": { "Size": "M" },   "stock": 1 },
+        { "options": { "Size": "L" },   "stock": 2 },
+        { "options": { "Size": "XL" },  "stock": 2 },
+        { "options": { "Size": "2XL" }, "stock": 3 },
+        { "options": { "Size": "3XL" }, "stock": 2 },
+        { "options": { "Size": "4XL" }, "stock": 7 },
+        { "options": { "Size": "5XL" }, "stock": 2 }
+      ]
+    },
+    {
+      "sku": "AGA-RUGBY",
+      "title": "AGA Rugby Top",
+      "description": "Official Australian Goldwing Association rugby top.",
+      "type": "physical",
+      "base_price": 80.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "M" },   "stock": 2 },
+        { "options": { "Size": "L" },   "stock": 2 },
+        { "options": { "Size": "XL" },  "stock": 2 },
+        { "options": { "Size": "2XL" }, "stock": 2 },
+        { "options": { "Size": "3XL" }, "stock": 5 },
+        { "options": { "Size": "4XL" }, "stock": 3 },
+        { "options": { "Size": "5XL" }, "stock": 4 }
+      ]
+    },
+    {
+      "sku": "AGA-FLEECE",
+      "title": "AGA Polar Fleece",
+      "description": "Official Australian Goldwing Association polar fleece jumper.",
+      "type": "physical",
+      "base_price": 107.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "S" },   "stock": 1 },
+        { "options": { "Size": "M" },   "stock": 1 },
+        { "options": { "Size": "L" },   "stock": 1 },
+        { "options": { "Size": "XL" },  "stock": 3 },
+        { "options": { "Size": "2XL" }, "stock": 2 },
+        { "options": { "Size": "3XL" }, "stock": 3 },
+        { "options": { "Size": "4XL" }, "stock": 2 },
+        { "options": { "Size": "5XL" }, "stock": 2 }
+      ]
+    },
+    {
+      "sku": "AGA-FLEECE-VEST",
+      "title": "AGA Polar Fleece Vest",
+      "description": "Official Australian Goldwing Association polar fleece vest.",
+      "type": "physical",
+      "base_price": 93.00,
+      "track_inventory": true,
+      "categories": ["Apparel"],
+      "options": [
+        {
+          "name": "Size",
+          "values": ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+        }
+      ],
+      "variants": [
+        { "options": { "Size": "XS" },  "stock": 1 },
+        { "options": { "Size": "S" },   "stock": 1 },
+        { "options": { "Size": "M" },   "stock": 4 },
+        { "options": { "Size": "L" },   "stock": 3 },
+        { "options": { "Size": "XL" },  "stock": 3 },
+        { "options": { "Size": "2XL" }, "stock": 5 },
+        { "options": { "Size": "3XL" }, "stock": 4 },
+        { "options": { "Size": "4XL" }, "stock": 3 },
+        { "options": { "Size": "5XL" }, "stock": 0 }
+      ]
+    },
+    {
+      "sku": "AGA-BUCKET-HAT",
+      "title": "AGA Bucket Hat",
+      "description": "Official Australian Goldwing Association bucket hat.",
+      "type": "physical",
+      "base_price": 30.00,
+      "track_inventory": true,
+      "stock": 20,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-BASEBALL-CAP",
+      "title": "AGA Baseball Cap",
+      "description": "Official Australian Goldwing Association baseball cap.",
+      "type": "physical",
+      "base_price": 30.00,
+      "track_inventory": true,
+      "stock": 13,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-FACE-MASK",
+      "title": "AGA Face Mask",
+      "description": "Official Australian Goldwing Association branded face mask.",
+      "type": "physical",
+      "base_price": 10.00,
+      "track_inventory": true,
+      "stock": 54,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-FLAG",
+      "title": "AGA Flag",
+      "description": "Official Australian Goldwing Association flag.",
+      "type": "physical",
+      "base_price": 25.00,
+      "track_inventory": true,
+      "stock": 25,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-DECAL",
+      "title": "AGA Decal",
+      "description": "Official Australian Goldwing Association decal.",
+      "type": "physical",
+      "base_price": 10.00,
+      "track_inventory": true,
+      "stock": 13,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-PATCH",
+      "title": "AGA Patch",
+      "description": "Official Australian Goldwing Association cloth patch.",
+      "type": "physical",
+      "base_price": 12.00,
+      "track_inventory": true,
+      "stock": 51,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-ENAMEL-BADGE",
+      "title": "AGA Enamel Badge",
+      "description": "Official Australian Goldwing Association enamel pin badge.",
+      "type": "physical",
+      "base_price": 5.00,
+      "track_inventory": true,
+      "stock": 59,
+      "categories": ["Accessories"]
+    },
+    {
+      "sku": "AGA-NAME-BADGE",
+      "title": "AGA Name Badge",
+      "description": "Official Australian Goldwing Association name badge. Made to order — not held in stock; ordered as a replacement.",
+      "type": "physical",
+      "base_price": 15.00,
+      "track_inventory": false,
+      "categories": ["Accessories"]
+    }
+  ]
+}
