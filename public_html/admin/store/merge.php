@@ -98,11 +98,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // 2. Delete stub products (cascade-friendly; FK checks are off anyway).
+            // 2. With FK checks off, cascades don't fire automatically.
+            //    Manually purge child rows for stub products so renumbering has no collisions.
+            $stubCleanupTables = ['store_product_categories', 'store_product_tags', 'store_product_options', 'store_product_variants'];
+            foreach ($stubCleanupTables as $tbl) {
+                $n = $pdo->exec("DELETE FROM {$tbl} WHERE product_id IN ({$placeholders})");
+                if ($n > 0) {
+                    $log[] = "  Purged {$n} orphaned row(s) from {$tbl}";
+                }
+            }
+
+            // 3. Delete stub products.
             $deleted = $pdo->exec("DELETE FROM store_products WHERE id IN ({$placeholders})");
             $log[] = "Deleted {$deleted} stub products (IDs: {$placeholders})";
 
-            // 3. Renumber surviving products and all child product_id references.
+            // 4. Renumber surviving products and all child product_id references.
             $prodUpd = $pdo->prepare('UPDATE store_products SET id = :new WHERE id = :old');
             $childUpd = [];
             foreach ($childTables as $tbl) {
@@ -118,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            // 4. Reset auto-increment (DDL; MySQL will use max(id)+1, so effectively next insert = 19).
+            // 5. Reset auto-increment (DDL; MySQL will use max(id)+1, so effectively next insert = 19).
             $pdo->exec('ALTER TABLE store_products AUTO_INCREMENT = 1');
             $log[] = 'Reset AUTO_INCREMENT (next insert will use max(id)+1)';
 
