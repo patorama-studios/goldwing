@@ -962,6 +962,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                         <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                         <input type="hidden" name="tab" value="overview">
+                        <input type="hidden" name="action" value="send_welcome_email">
+                        <button
+                          class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-blue-200 shadow-sm text-sm font-medium rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 transition-all">
+                          <span class="material-icons-outlined mr-2 text-[18px]">mark_email_read</span>
+                          Send welcome email
+                        </button>
+                      </form>
+                      <form method="post" action="/admin/members/actions.php">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                        <input type="hidden" name="tab" value="overview">
                         <input type="hidden" name="action" value="send_reset_link">
                         <button
                           class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-gray-200 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all">

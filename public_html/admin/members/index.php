@@ -506,6 +506,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <button type="button" data-bulk-action="assign_chapter" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Assign chapter</button>
               <button type="button" data-bulk-action="change_status" class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700">Change status</button>
               <button type="button" data-bulk-action="enable_2fa" class="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-emerald-700">Require 2FA</button>
+              <button type="button" data-bulk-action="send_welcome_email" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Send welcome email</button>
               <button type="button" data-bulk-action="send_reset_link" class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">Password reset</button>
             </div>
             <button type="button" data-select-all-page class="text-xs font-semibold text-primary">Select all on page</button>

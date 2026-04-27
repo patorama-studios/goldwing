@@ -103,12 +103,16 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
     <?php foreach ($items as $item): ?>
       <?php if (!empty($item['children'])): ?>
         <?php
-          $isDropdownActive = $item['key'] === 'settings' && $isSettingsActive;
-          if (!$isDropdownActive && $currentPath) {
-              foreach ($item['children'] as $child) {
-                  if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
-                      $isDropdownActive = true;
-                      break;
+          if ($item['key'] === 'settings') {
+              $isDropdownActive = $isSettingsActive;
+          } else {
+              $isDropdownActive = false;
+              if ($currentPath) {
+                  foreach ($item['children'] as $child) {
+                      if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                          $isDropdownActive = true;
+                          break;
+                      }
                   }
               }
           }
