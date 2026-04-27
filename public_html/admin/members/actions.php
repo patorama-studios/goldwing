@@ -617,7 +617,7 @@ switch ($action) {
             respondWithJson(['success' => false, 'error' => 'No members selected.'], 400);
         }
         $actionKey = trim((string) ($_POST['bulk_action'] ?? ''));
-        $allowedActions = ['archive', 'delete', 'assign_chapter', 'change_status', 'enable_2fa', 'send_reset_link'];
+        $allowedActions = ['archive', 'delete', 'assign_chapter', 'change_status', 'enable_2fa', 'send_reset_link', 'send_welcome_email'];
         if (!in_array($actionKey, $allowedActions, true)) {
             respondWithJson(['success' => false, 'error' => 'Unknown bulk action.'], 400);
         }
@@ -793,6 +793,34 @@ switch ($action) {
                     'actor_roles' => $actorRoles,
                 ]);
                 $adminResetCount++;
+                $applied++;
+                continue;
+            }
+
+            if ($actionKey === 'send_welcome_email') {
+                $userId = (int) ($member['user_id'] ?? 0);
+                if ($userId <= 0 || empty($member['email'])) {
+                    $skipped[] = ['member_id' => $memberId, 'reason' => 'User account or email missing'];
+                    continue;
+                }
+                $token = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $token);
+                $stmt = $pdo->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at, ip_address) VALUES (:user_id, :token_hash, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW(), :ip)');
+                $stmt->execute([
+                    'user_id' => $userId,
+                    'token_hash' => $tokenHash,
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                ]);
+                $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
+                NotificationService::dispatch('member_set_password', [
+                    'primary_email' => $member['email'],
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'reset_link' => NotificationService::escape($link),
+                ]);
+                ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', [
+                    'user_id' => $userId,
+                    'actor_roles' => $actorRoles,
+                ]);
                 $applied++;
                 continue;
             }
@@ -1655,6 +1683,40 @@ switch ($action) {
         SecurityPolicyService::setTwoFaOverride((int) $member['user_id'], 'REQUIRED');
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'security.2fa_reset', ['user_id' => $member['user_id']]);
         redirectWithFlash($memberId, $tab, '2FA reset. User must re-enroll.');
+        break;
+
+    case 'send_welcome_email':
+        $flashContext = ['flash_context' => 'account_access'];
+        if (!AdminMemberAccess::canResetPassword($user)) {
+            redirectWithFlash($memberId, $tab, 'Password reset links are restricted.', 'error', $flashContext);
+        }
+        $pdo = Database::connection();
+        $userId = $member['user_id'] ?? null;
+        if (!$userId || empty($member['email'])) {
+            redirectWithFlash($memberId, $tab, 'Member is not linked to a user account.', 'error', $flashContext);
+        }
+        $token = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $token);
+        $stmt = $pdo->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at, ip_address) VALUES (:user_id, :token_hash, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW(), :ip)');
+        $stmt->execute([
+            'user_id' => $userId,
+            'token_hash' => $tokenHash,
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+        ]);
+        $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
+        $sent = NotificationService::dispatch('member_set_password', [
+            'primary_email' => $member['email'],
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'reset_link' => NotificationService::escape($link),
+        ]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
+        if (!$sent) {
+            LogViewerService::write('[Admin] Welcome email not sent for member #' . $memberId . '.');
+            error_log('[Admin] Welcome email not sent for member #' . $memberId . '.');
+            redirectWithFlash($memberId, $tab, 'Welcome email could not be sent. Check email settings.', 'error', $flashContext);
+        }
+        LogViewerService::write('[Admin] Welcome email sent for member #' . $memberId . '.');
+        redirectWithFlash($memberId, $tab, 'Welcome email sent.', 'success', $flashContext);
         break;
 
     case 'send_reset_link':
