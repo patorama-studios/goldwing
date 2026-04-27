@@ -34,6 +34,7 @@ $validPages = [
     'order',
     'low-stock',
     'import',
+    'merge',
 ];
 if (!in_array($page, $validPages, true)) {
     $page = 'settings';
@@ -46,7 +47,7 @@ if ($page === 'orders' && $subPage) {
 if (in_array($page, ['orders', 'order'], true)) {
     store_require_permission('store_orders_view');
 }
-if (in_array($page, ['products', 'product', 'low-stock', 'import'], true)) {
+if (in_array($page, ['products', 'product', 'low-stock', 'import', 'merge'], true)) {
     store_require_permission('store_inventory_manage');
 }
 
@@ -61,6 +62,7 @@ $pageTitles = [
     'order' => 'Order Detail',
     'low-stock' => 'Low Stock Alerts',
     'import' => 'Catalogue Import',
+    'merge' => 'Merge Products',
 ];
 $pageTitle = $pageTitles[$page] ?? 'Store';
 $pageSubtitle = '';
@@ -86,6 +88,7 @@ $storeNavItems = [
     ['key' => 'orders', 'label' => 'Orders', 'href' => '/admin/store/orders'],
     ['key' => 'low-stock', 'label' => 'Low Stock', 'href' => '/admin/store/low-stock'],
     ['key' => 'import', 'label' => 'Import', 'href' => '/admin/store/import'],
+    ['key' => 'merge', 'label' => 'Merge', 'href' => '/admin/store/merge'],
 ];
 $activeNavKey = $page === 'order' ? 'orders' : $page;
 
