@@ -479,6 +479,18 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Failed to update profile.', 'error', $redirectExtras);
         }
 
+        if (array_key_exists('email', $payload) && !empty($payload['email']) && $payload['email'] !== ($before['email'] ?? null)) {
+            $syncPdo = Database::connection();
+            $linkedUserId = (int) ($targetMember['user_id'] ?? 0);
+            if ($linkedUserId > 0) {
+                $syncStmt = $syncPdo->prepare('UPDATE users SET email = :email, updated_at = NOW() WHERE id = :id');
+                $syncStmt->execute(['email' => $payload['email'], 'id' => $linkedUserId]);
+            } elseif (!empty($before['email'])) {
+                $syncStmt = $syncPdo->prepare('UPDATE users SET email = :new_email, updated_at = NOW() WHERE email = :old_email');
+                $syncStmt->execute(['new_email' => $payload['email'], 'old_email' => $before['email']]);
+            }
+        }
+
         $changes = [];
         foreach ($payload as $key => $value) {
             $old = $before[$key] ?? null;
@@ -1829,6 +1841,10 @@ switch ($action) {
             $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
             if (!$stmt->execute(['hash' => $hash, 'id' => $targetUserId])) {
                 throw new \RuntimeException('Unable to update user password.');
+            }
+            if (!empty($member['email'])) {
+                $stmt = $pdo->prepare('UPDATE users SET email = :email, updated_at = NOW() WHERE id = :id AND email != :email');
+                $stmt->execute(['email' => $member['email'], 'id' => $targetUserId]);
             }
             $stmt = $pdo->query("SHOW TABLES LIKE 'member_auth'");
             $hasMemberAuth = (bool) $stmt->fetchColumn();
