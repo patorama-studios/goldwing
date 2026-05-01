@@ -2,3 +2,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/goldwing/draft.goldwing.org.au/
+    - /bin/true
