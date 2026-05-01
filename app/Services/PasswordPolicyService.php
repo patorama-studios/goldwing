@@ -15,8 +15,8 @@ class PasswordPolicyService
 
     public static function validate(string $password): array
     {
-        $minLength = (int) SettingsService::getGlobal('security.password_min_length', 12);
-        $minLength = max(12, $minLength);
+        $minLength = (int) SettingsService::getGlobal('security.password_min_length', 8);
+        $minLength = max(8, $minLength);
         $errors = [];
         if (strlen($password) < $minLength) {
             $errors[] = 'Password must be at least ' . $minLength . ' characters.';
