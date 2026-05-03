@@ -190,6 +190,43 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 003 — Beta feedback ticketing table
+// Adds a beta_feedback table so feedback widget submissions persist and can be
+// surfaced + actioned in the notification hub like a simple ticket queue.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_003_beta_feedback';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 003 — Beta feedback table', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS beta_feedback (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NULL,
+            submitter_name VARCHAR(150) NULL,
+            submitter_email VARCHAR(150) NULL,
+            message TEXT NOT NULL,
+            page_url VARCHAR(500) NULL,
+            user_agent VARCHAR(500) NULL,
+            status ENUM('open','in_progress','resolved','wont_fix') NOT NULL DEFAULT 'open',
+            response TEXT NULL,
+            reviewed_by INT NULL,
+            reviewed_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_beta_feedback_status (status),
+            INDEX idx_beta_feedback_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 003 — Beta feedback table', 'status' => 'applied', 'note' => 'beta_feedback table created.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 003 — Beta feedback table', 'status' => 'skipped', 'note' => 'Error: ' . $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
