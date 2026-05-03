@@ -52,6 +52,29 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 002 — Add member role columns (is_area_rep, is_committee, committee_role)
+// Adds three columns to the members table to track area reps and committee roles.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_002_member_roles';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 002 — Member role columns', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $pdo->exec("ALTER TABLE members
+            ADD COLUMN IF NOT EXISTS is_area_rep TINYINT(1) NOT NULL DEFAULT 0 AFTER notes,
+            ADD COLUMN IF NOT EXISTS is_committee TINYINT(1) NOT NULL DEFAULT 0 AFTER is_area_rep,
+            ADD COLUMN IF NOT EXISTS committee_role VARCHAR(150) NULL AFTER is_committee");
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 002 — Member role columns', 'status' => 'applied', 'note' => 'Added is_area_rep, is_committee, committee_role to members table.'];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 002 — Member role columns', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -71,6 +94,7 @@ if ($alreadyRun) {
     .badge { padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
     .applied { background: #dcfce7; color: #166534; }
     .skipped { background: #f1f5f9; color: #64748b; }
+    .error   { background: #fee2e2; color: #991b1b; }
     .label { flex: 1; font-size: 0.875rem; font-weight: 500; }
     .note { font-size: 0.75rem; color: #94a3b8; }
     .back { display: inline-block; margin-top: 1.25rem; font-size: 0.875rem; color: #3b82f6; text-decoration: none; }

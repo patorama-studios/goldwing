@@ -451,6 +451,9 @@ switch ($action) {
                 $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
             }
             $payload['notes'] = trim($_POST['notes'] ?? $targetMember['notes'] ?? '');
+            $payload['is_area_rep'] = isset($_POST['is_area_rep']) ? 1 : 0;
+            $payload['is_committee'] = isset($_POST['is_committee']) ? 1 : 0;
+            $payload['committee_role'] = trim($_POST['committee_role'] ?? '');
         }
         if ($allowFullProfile && $member['member_type'] === 'ASSOCIATE' && !empty($member['full_member_id'])) {
             unset($payload['chapter_id']);
