@@ -221,9 +221,17 @@
       <div class="hidden fixed inset-0 z-50 flex items-center justify-center" data-bulk-modal>
         <div class="absolute inset-0 bg-black/40"></div>
         <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-soft">
-          <div>
+          <div data-modal-confirm-view>
             <h3 class="text-lg font-semibold text-gray-900" data-modal-title></h3>
             <p class="text-sm text-gray-500 mt-1" data-modal-description></p>
+            <div class="hidden mt-3 max-h-40 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 space-y-1" data-modal-member-list></div>
+          </div>
+          <div class="hidden text-center py-4" data-modal-success-view>
+            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+              <svg class="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900" data-modal-success-title>Done</h3>
+            <p class="mt-1 text-sm text-gray-500" data-modal-success-message></p>
           </div>
           <form class="mt-4 space-y-4" data-modal-form>
             <div class="space-y-4" data-modal-fields></div>
@@ -246,15 +254,31 @@
     const modalForm = modal.querySelector('[data-modal-form]');
     const modalCancel = modal.querySelector('[data-modal-cancel]');
     const modalSubmit = modal.querySelector('[data-modal-submit]');
+    const modalMemberList = modal.querySelector('[data-modal-member-list]');
+    const modalConfirmView = modal.querySelector('[data-modal-confirm-view]');
+    const modalSuccessView = modal.querySelector('[data-modal-success-view]');
+    const modalSuccessMessage = modal.querySelector('[data-modal-success-message]');
 
     const closeModal = () => {
       if (!modal) return;
       modal.classList.add('hidden');
+      // Reset back to confirm view for next use
+      modalConfirmView?.classList.remove('hidden');
+      modalSuccessView?.classList.add('hidden');
+      modalForm?.classList.remove('hidden');
     };
 
     const openModal = () => {
       if (!modal) return;
       modal.classList.remove('hidden');
+    };
+
+    const showModalSuccess = (message) => {
+      modalConfirmView?.classList.add('hidden');
+      modalForm?.classList.add('hidden');
+      modalSuccessView?.classList.remove('hidden');
+      if (modalSuccessMessage) modalSuccessMessage.textContent = message;
+      window.setTimeout(() => closeModal(), 3000);
     };
 
     modalCancel?.addEventListener('click', (event) => {
@@ -333,10 +357,17 @@
         description: 'Members will be forced to enroll in 2FA on next login.',
         confirmLabel: 'Require 2FA',
       },
+      send_welcome_email: {
+        title: 'Send welcome email',
+        description: 'Sends the welcome email with a password setup link to the following members:',
+        confirmLabel: 'Send welcome email',
+        listMembers: true,
+      },
       send_reset_link: {
         title: 'Send password reset link',
-        description: 'Respects existing rate limits (max 3 per hour per admin/member).',
+        description: 'Sends a password reset link to the following members (max 3 per hour per admin/member):',
         confirmLabel: 'Send reset links',
+        listMembers: true,
       },
     };
 
@@ -408,6 +439,27 @@
           modalFields.appendChild(renderField(field));
         });
       }
+      // Show member names list for email/comms actions
+      if (modalMemberList) {
+        if (definition.listMembers && selectedMembers.size > 0) {
+          modalMemberList.innerHTML = '';
+          selectedMembers.forEach((id) => {
+            const row = root.querySelector(`[data-member-row][data-member-id="${id}"]`);
+            const name = row?.dataset.memberName || `Member #${id}`;
+            const item = document.createElement('p');
+            item.className = 'text-xs text-gray-700 flex items-center gap-1.5';
+            item.innerHTML = `<span class="material-icons-outlined text-gray-400 text-[14px]">person</span>${name}`;
+            modalMemberList.appendChild(item);
+          });
+          modalMemberList.classList.remove('hidden');
+        } else {
+          modalMemberList.classList.add('hidden');
+        }
+      }
+      // Reset to confirm view
+      modalConfirmView?.classList.remove('hidden');
+      modalSuccessView?.classList.add('hidden');
+      modalForm?.classList.remove('hidden');
       modal.classList.remove('hidden');
     };
 
@@ -502,19 +554,32 @@
       modalSubmit?.setAttribute('disabled', 'disabled');
       try {
         const payload = await executeBulkAction(actionKey, formValues);
-        const tagline = formatBulkSummary(payload);
-        showBulkMessage(tagline, payload.skipped?.length ? 'text-rose-500' : 'text-gray-600');
+        const applied = payload?.applied ?? 0;
+        const skipped = payload?.skipped ?? [];
+        let successMessage = `Email sent to ${applied} member${applied === 1 ? '' : 's'} successfully.`;
+        if (!['send_welcome_email', 'send_reset_link'].includes(actionKey)) {
+          successMessage = `Applied to ${applied} member${applied === 1 ? '' : 's'}.`;
+        }
+        if (skipped.length > 0) {
+          successMessage += ` ${skipped.length} skipped.`;
+        }
         selectedMembers.clear();
         rowCheckboxes.forEach((checkbox) => {
           checkbox.checked = false;
         });
         updateToolbar();
-        closeModal();
+        if (skipped.length > 0) {
+          showBulkMessage(formatBulkSummary(payload), 'text-rose-500');
+          closeModal();
+        } else {
+          showModalSuccess(successMessage);
+        }
         window.setTimeout(() => {
           window.location.reload();
-        }, 800);
+        }, skipped.length > 0 ? 800 : 3200);
       } catch (error) {
         showBulkMessage(error.message || 'Bulk action failed.', 'text-rose-500');
+        closeModal();
       } finally {
         modalSubmit?.removeAttribute('disabled');
       }

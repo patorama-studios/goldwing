@@ -559,7 +559,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $twoFaRequired = $override === 'REQUIRED';
                   $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
                 ?>
-                <tr class="block md:table-row <?= $statusKey === 'pending' ? 'bg-amber-50/60' : '' ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>">
+                <tr class="block md:table-row <?= $statusKey === 'pending' ? 'bg-amber-50/60' : '' ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
                   <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
                     <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Select</span>
                     <div class="mt-1 md:mt-0">

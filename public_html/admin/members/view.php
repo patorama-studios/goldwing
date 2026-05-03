@@ -931,9 +931,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     Quick Actions
                   </h3>
                   <?php if ($flash && $flashContext === 'account_access'): ?>
-                    <div
-                      class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm mb-4 <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
-                      <?= e($flash['message']) ?>
+                    <div class="rounded-lg px-4 py-3 text-sm mb-4 flex items-start gap-2 <?= $flash['type'] === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-green-200 bg-green-50 text-green-700' ?>">
+                      <span class="material-icons-outlined text-[18px] mt-0.5 flex-shrink-0"><?= $flash['type'] === 'error' ? 'error_outline' : 'check_circle' ?></span>
+                      <span><?= e($flash['message']) ?></span>
                     </div>
                   <?php endif; ?>
                   <div class="space-y-3 mb-8">
@@ -958,12 +958,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       </button>
                     <?php endif; ?>
                     <?php if ($canResetPassword): ?>
-                      <form method="post" action="/admin/members/actions.php">
+                      <form method="post" action="/admin/members/actions.php"
+                        data-confirm-email-form
+                        data-member-name="<?= e(trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''))) ?>"
+                        data-member-email="<?= e($member['email'] ?? '') ?>">
                         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                         <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                         <input type="hidden" name="tab" value="overview">
                         <input type="hidden" name="action" value="send_welcome_email">
-                        <button
+                        <button type="button" data-confirm-email-trigger
                           class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-blue-200 shadow-sm text-sm font-medium rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 transition-all">
                           <span class="material-icons-outlined mr-2 text-[18px]">mark_email_read</span>
                           Send welcome email
@@ -2894,4 +2897,76 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   })();
 </script>
 <script defer src="/assets/js/admin-member-links.js"></script>
+
+<!-- Welcome email confirm modal -->
+<div id="welcomeEmailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40" id="welcomeEmailModalBackdrop"></div>
+  <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl mx-4">
+    <div id="welcomeEmailConfirmView">
+      <h3 class="text-lg font-semibold text-gray-900">Send welcome email</h3>
+      <p class="text-sm text-gray-500 mt-1">This will send a welcome email with a password setup link to the following member:</p>
+      <div class="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-2">
+        <span class="material-icons-outlined text-gray-400 text-[18px]">person</span>
+        <div>
+          <p class="text-sm font-semibold text-gray-800" id="welcomeEmailMemberName"></p>
+          <p class="text-xs text-gray-500" id="welcomeEmailMemberEmail"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+        <button type="button" id="welcomeEmailCancel" class="rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+        <button type="button" id="welcomeEmailConfirm" class="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700">Send welcome email</button>
+      </div>
+    </div>
+    <div id="welcomeEmailSuccessView" class="hidden text-center py-4">
+      <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+        <svg class="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      </div>
+      <h3 class="text-base font-semibold text-gray-900">Email sent!</h3>
+      <p class="mt-1 text-sm text-gray-500">The welcome email has been sent successfully.</p>
+    </div>
+  </div>
+</div>
+<script>
+  (() => {
+    const modal = document.getElementById('welcomeEmailModal');
+    const confirmView = document.getElementById('welcomeEmailConfirmView');
+    const successView = document.getElementById('welcomeEmailSuccessView');
+    const cancelBtn = document.getElementById('welcomeEmailCancel');
+    const confirmBtn = document.getElementById('welcomeEmailConfirm');
+    const backdrop = document.getElementById('welcomeEmailModalBackdrop');
+    const nameEl = document.getElementById('welcomeEmailMemberName');
+    const emailEl = document.getElementById('welcomeEmailMemberEmail');
+    let pendingForm = null;
+
+    const closeModal = () => {
+      modal.classList.add('hidden');
+      confirmView.classList.remove('hidden');
+      successView.classList.add('hidden');
+      pendingForm = null;
+    };
+
+    document.querySelectorAll('[data-confirm-email-trigger]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const form = btn.closest('[data-confirm-email-form]');
+        if (!form) return;
+        pendingForm = form;
+        if (nameEl) nameEl.textContent = form.dataset.memberName || 'This member';
+        if (emailEl) emailEl.textContent = form.dataset.memberEmail || '';
+        modal.classList.remove('hidden');
+      });
+    });
+
+    cancelBtn?.addEventListener('click', closeModal);
+    backdrop?.addEventListener('click', closeModal);
+
+    confirmBtn?.addEventListener('click', () => {
+      if (!pendingForm) return;
+      confirmView.classList.add('hidden');
+      successView.classList.remove('hidden');
+      window.setTimeout(() => {
+        pendingForm.submit();
+      }, 1200);
+    });
+  })();
+</script>
 <?php require __DIR__ . '/../../../app/Views/partials/backend_footer.php'; ?>
