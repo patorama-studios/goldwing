@@ -103,6 +103,18 @@ function reqStatusBadge2(string $status): string {
           </div>
         </section>
 
+        <?php
+          $isFeedback = $type === \App\Services\PendingRequestsService::TYPE_FEEDBACK;
+          $approveLabel  = $isFeedback ? 'Mark resolved' : 'Approve';
+          $rejectLabel   = $isFeedback ? "Won't fix"      : 'Deny';
+          $feedbackLabel = $isFeedback ? 'Reply to user'  : 'Send feedback';
+          $approveIcon   = $isFeedback ? 'task_alt'       : 'check_circle';
+          $rejectIcon    = $isFeedback ? 'block'          : 'cancel';
+          $feedbackIcon  = $isFeedback ? 'reply'          : 'forum';
+          $messageLabel  = $isFeedback
+            ? 'Response to submitter (optional for resolve / won\'t fix, required for reply)'
+            : 'Message to submitter (optional for approve, required for deny/feedback)';
+        ?>
         <?php if ($canAction && $item['status'] !== 'approved' && $item['status'] !== 'rejected'): ?>
           <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-6 py-3">
@@ -115,19 +127,19 @@ function reqStatusBadge2(string $status): string {
               <input type="hidden" name="id" value="<?= (int) $id ?>">
 
               <div>
-                <label class="block text-xs uppercase tracking-[0.3em] text-gray-500 mb-1">Message to submitter (optional for approve, required for deny/feedback)</label>
+                <label class="block text-xs uppercase tracking-[0.3em] text-gray-500 mb-1"><?= e($messageLabel) ?></label>
                 <textarea name="message" rows="4" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none" placeholder="Optional context for the submitter..."></textarea>
               </div>
 
               <div class="flex flex-wrap gap-2">
                 <button type="submit" name="action" value="approve" class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                  <span class="material-icons-outlined text-base">check_circle</span> Approve
+                  <span class="material-icons-outlined text-base"><?= e($approveIcon) ?></span> <?= e($approveLabel) ?>
                 </button>
                 <button type="submit" name="action" value="reject" class="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
-                  <span class="material-icons-outlined text-base">cancel</span> Deny
+                  <span class="material-icons-outlined text-base"><?= e($rejectIcon) ?></span> <?= e($rejectLabel) ?>
                 </button>
                 <button type="submit" name="action" value="feedback" class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
-                  <span class="material-icons-outlined text-base">forum</span> Send feedback
+                  <span class="material-icons-outlined text-base"><?= e($feedbackIcon) ?></span> <?= e($feedbackLabel) ?>
                 </button>
               </div>
             </form>

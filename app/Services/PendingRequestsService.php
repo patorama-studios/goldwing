@@ -18,10 +18,12 @@ class PendingRequestsService
     public const TYPE_CHAPTER_CHANGE      = 'chapter_change';
     public const TYPE_STORE_ORDER         = 'store_order';
     public const TYPE_MEMBERSHIP          = 'membership_application';
+    public const TYPE_FEEDBACK            = 'feedback';
 
     public static function types(): array
     {
         return [
+            self::TYPE_FEEDBACK            => ['label' => 'Beta Feedback',          'icon' => 'feedback'],
             self::TYPE_NOTICE              => ['label' => 'Notice',                 'icon' => 'campaign'],
             self::TYPE_EVENT               => ['label' => 'Event',                  'icon' => 'event'],
             self::TYPE_MEMBER_OF_YEAR      => ['label' => 'Member of the Year',     'icon' => 'emoji_events'],
@@ -40,6 +42,7 @@ class PendingRequestsService
     {
         $items = [];
         $methods = [
+            self::TYPE_FEEDBACK       => 'fetchFeedback',
             self::TYPE_NOTICE         => 'fetchNotices',
             self::TYPE_EVENT          => 'fetchEvents',
             self::TYPE_MEMBER_OF_YEAR => 'fetchMemberOfYear',
@@ -249,6 +252,48 @@ class PendingRequestsService
         }, $rows);
     }
 
+    private static function fetchFeedback(string $statusFilter): array
+    {
+        $pdo = Database::connection();
+        // Map hub status filters onto ticket statuses.
+        $where = '';
+        if ($statusFilter === 'pending') {
+            $where = "AND f.status IN ('open','in_progress')";
+        } elseif ($statusFilter === 'approved') {
+            $where = "AND f.status = 'resolved'";
+        } elseif ($statusFilter === 'rejected') {
+            $where = "AND f.status = 'wont_fix'";
+        }
+        $sql = "SELECT f.id, f.user_id, f.submitter_name, f.submitter_email, f.message,
+                       f.page_url, f.user_agent, f.status, f.response, f.reviewed_by,
+                       f.reviewed_at, f.created_at,
+                       u.name AS user_name, u.email AS user_email
+                FROM beta_feedback f
+                LEFT JOIN users u ON u.id = f.user_id
+                WHERE 1=1 $where
+                ORDER BY f.created_at DESC
+                LIMIT 200";
+        $stmt = $pdo->query($sql);
+        $rows = $stmt->fetchAll() ?: [];
+        return array_map(function ($r) {
+            // Display the ticket-style status visually as pending/approved/rejected for the hub.
+            $displayStatus = match ((string) $r['status']) {
+                'resolved' => 'approved',
+                'wont_fix' => 'rejected',
+                default    => 'pending',
+            };
+            $title = 'Ticket #' . $r['id'] . ' — ' . substr(strip_tags((string) $r['message']), 0, 60);
+            $name = $r['submitter_name'] ?: $r['user_name'] ?: 'Anonymous';
+            $email = $r['submitter_email'] ?: $r['user_email'] ?: null;
+            $summary = ($r['page_url'] ? 'Page: ' . $r['page_url'] . ' · ' : '')
+                     . substr((string) $r['message'], 0, 160);
+            // Expose the underlying ticket status alongside the hub-style display status.
+            $r['ticket_status'] = $r['status'];
+            return self::row(self::TYPE_FEEDBACK, $r['id'], $title, $displayStatus, $r['created_at'],
+                $name, $email, $summary, $r);
+        }, $rows);
+    }
+
     private static function fetchMembershipApplications(string $statusFilter): array
     {
         $pdo = Database::connection();
@@ -339,6 +384,7 @@ class PendingRequestsService
             self::TYPE_MEMBERSHIP     => ['table' => 'membership_applications',     'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_MEMBER_OF_YEAR => ['table' => 'member_of_year_nominations',  'pk' => 'id', 'enum' => 'moy'],
             self::TYPE_STORE_ORDER    => ['table' => 'store_orders',                'pk' => 'id', 'enum' => 'store'],
+            self::TYPE_FEEDBACK       => ['table' => 'beta_feedback',               'pk' => 'id', 'enum' => 'feedback'],
         ];
 
         if (!isset($tableMap[$type])) {
@@ -453,11 +499,32 @@ class PendingRequestsService
             }
             return;
         }
+
+        if ($enum === 'feedback') {
+            // approve = mark resolved, reject = wont_fix. Store the message as the response.
+            $ticketStatus = $newStatus === 'approved' ? 'resolved' : 'wont_fix';
+            $sql = "UPDATE $table SET status = :s, response = :msg, reviewed_by = :r, reviewed_at = NOW() WHERE id = :id";
+            $pdo->prepare($sql)->execute([
+                's'   => $ticketStatus,
+                'msg' => $message !== '' ? $message : null,
+                'r'   => $reviewerUserId,
+                'id'  => $id,
+            ]);
+            return;
+        }
     }
 
     private static function updateFeedback(PDO $pdo, array $cfg, int $id, string $message, int $reviewerUserId): void
     {
         $table = $cfg['table'];
+
+        // Beta feedback tickets: store reply in response column, move to in_progress.
+        if ($cfg['enum'] === 'feedback') {
+            $sql = "UPDATE $table SET response = :msg, status = IF(status = 'open','in_progress',status), reviewed_by = :r, reviewed_at = NOW() WHERE id = :id";
+            $pdo->prepare($sql)->execute(['msg' => $message, 'r' => $reviewerUserId, 'id' => $id]);
+            return;
+        }
+
         $sql = "UPDATE $table SET feedback_message = :msg WHERE id = :id";
         // Some tables also have reviewed_by/reviewed_at
         if (in_array($cfg['enum'], ['lower'], true)) {
