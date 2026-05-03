@@ -218,9 +218,11 @@ if ($alreadyRun) {
         }
     };
 
-    $tryAddCol("ALTER TABLE members ADD COLUMN is_area_rep TINYINT(1) NOT NULL DEFAULT 0 AFTER notes", 'is_area_rep');
-    $tryAddCol("ALTER TABLE members ADD COLUMN is_committee TINYINT(1) NOT NULL DEFAULT 0 AFTER is_area_rep", 'is_committee');
-    $tryAddCol("ALTER TABLE members ADD COLUMN committee_role VARCHAR(150) NULL AFTER is_committee", 'committee_role');
+    // No AFTER clause — column order doesn't matter and the referenced
+    // columns may not exist on every environment (e.g. older draft DB).
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_area_rep TINYINT(1) NOT NULL DEFAULT 0", 'is_area_rep');
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_committee TINYINT(1) NOT NULL DEFAULT 0", 'is_committee');
+    $tryAddCol("ALTER TABLE members ADD COLUMN committee_role VARCHAR(150) NULL", 'committee_role');
 
     if ($errors) {
         $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'error', 'note' => implode('; ', $errors)];
