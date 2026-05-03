@@ -92,7 +92,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" name="password" required>
+            <div style="position:relative;">
+              <input type="password" name="password" id="login-password" required style="padding-right:2.5rem;width:100%;box-sizing:border-box;">
+              <button type="button" id="toggle-password" aria-label="Show password" onclick="(function(){var i=document.getElementById('login-password'),b=document.getElementById('toggle-password');if(i.type==='password'){i.type='text';b.textContent='Hide';}else{i.type='password';b.textContent='Show';}})()" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;font-size:0.85rem;padding:0.25rem;">Show</button>
+            </div>
           </div>
           <button class="button primary" type="submit">Login</button>
         </form>
