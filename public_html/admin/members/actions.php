@@ -1704,9 +1704,38 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Password reset links are restricted.', 'error', $flashContext);
         }
         $pdo = Database::connection();
+        if (empty($member['email'])) {
+            redirectWithFlash($memberId, $tab, 'Member has no email address on record.', 'error', $flashContext);
+        }
         $userId = $member['user_id'] ?? null;
-        if (!$userId || empty($member['email'])) {
-            redirectWithFlash($memberId, $tab, 'Member is not linked to a user account.', 'error', $flashContext);
+        // If no user account exists yet (e.g. pre-loaded/imported member), create one now
+        if (!$userId) {
+            $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+            $stmt->execute(['email' => $member['email']]);
+            $existingUser = $stmt->fetch();
+            if ($existingUser) {
+                $userId = (int) $existingUser['id'];
+                $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+                $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
+            } else {
+                $tempPassword = bin2hex(random_bytes(4));
+                $stmt = $pdo->prepare('INSERT INTO users (member_id, name, email, password_hash, is_active, created_at) VALUES (:member_id, :name, :email, :hash, 1, NOW())');
+                $stmt->execute([
+                    'member_id' => $memberId,
+                    'name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                    'email' => $member['email'],
+                    'hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+                ]);
+                $userId = (int) $pdo->lastInsertId();
+                $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+                $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
+                $stmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT :user_id, id FROM roles WHERE name = "member"');
+                $stmt->execute(['user_id' => $userId]);
+                ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.user_account_created', ['user_id' => $userId]);
+            }
+        }
+        if (!$userId) {
+            redirectWithFlash($memberId, $tab, 'Could not create a user account for this member.', 'error', $flashContext);
         }
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);

@@ -931,10 +931,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     Quick Actions
                   </h3>
                   <?php if ($flash && $flashContext === 'account_access'): ?>
-                    <div class="rounded-lg px-4 py-3 text-sm mb-4 flex items-start gap-2 <?= $flash['type'] === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-green-200 bg-green-50 text-green-700' ?>">
+                    <div id="accountAccessFlash" class="rounded-lg px-4 py-3 text-sm mb-4 flex items-start gap-2 <?= $flash['type'] === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-green-200 bg-green-50 text-green-700' ?>">
                       <span class="material-icons-outlined text-[18px] mt-0.5 flex-shrink-0"><?= $flash['type'] === 'error' ? 'error_outline' : 'check_circle' ?></span>
                       <span><?= e($flash['message']) ?></span>
                     </div>
+                    <script>document.getElementById('accountAccessFlash')?.scrollIntoView({behavior:'smooth',block:'center'});</script>
                   <?php endif; ?>
                   <div class="space-y-3 mb-8">
                     <?php if ($canImpersonate && $memberHasUser): ?>
@@ -2961,11 +2962,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
     confirmBtn?.addEventListener('click', () => {
       if (!pendingForm) return;
-      confirmView.classList.add('hidden');
-      successView.classList.remove('hidden');
-      window.setTimeout(() => {
-        pendingForm.submit();
-      }, 1200);
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Sending…';
+      pendingForm.submit();
     });
   })();
 </script>
