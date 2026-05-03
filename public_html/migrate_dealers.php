@@ -1,9 +1,9 @@
 <?php
-require_once __DIR__ . '/app/Services/Env.php';
-\App\Services\Env::load(__DIR__ . '/.env');
-\App\Services\Env::load(__DIR__ . '/.env.local');
+require_once __DIR__ . '/../app/Services/Env.php';
+\App\Services\Env::load(__DIR__ . '/../.env');
+\App\Services\Env::load(__DIR__ . '/../.env.local');
 
-$config = require __DIR__ . '/config/database.php';
+$config = require __DIR__ . '/../config/database.php';
 $port = $config['port'] ?? 3306;
 $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $config['host'], $port, $config['database'], $config['charset']);
 
