@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           exit;
         }
         $user = current_user();
-        $adminRoles = ['admin', 'committee', 'treasurer', 'chapter_leader', 'store_manager'];
+        $adminRoles = ['admin', 'chapter_leader', 'store_manager'];
         $isAdmin = false;
         if ($user) {
           foreach ($adminRoles as $role) {
