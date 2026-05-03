@@ -103,7 +103,3 @@ Stack trace:
 #0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php(24): PDO->prepare('UPDATE wings_is...')
 #1 {main}
   thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php on line 24
-[14-Apr-2026 21:56:52 Australia/Sydney] PHP Fatal error:  Uncaught Error: Call to undefined method App\Services\Database::getInstance() in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/tmp_create_dealers.php:3
-Stack trace:
-#0 {main}
-  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/tmp_create_dealers.php on line 3
