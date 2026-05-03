@@ -259,6 +259,8 @@ class MemberRepository
             'membership_type_id' => 'membership_type_id',
             'full_member_id' => 'full_member_id',
             'status' => 'status',
+            'wings_preference' => 'wings_preference',
+            'privacy_level' => 'privacy_level',
         ];
 
         $columnValues = [];

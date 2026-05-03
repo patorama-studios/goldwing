@@ -347,55 +347,61 @@ if ($user && $user['member_id']) {
 
         if (!$canAddBike) {
           $profileError = 'You do not have permission to add bikes for this profile.';
-        } elseif ($make && $model) {
-          $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
-          $hasRego = in_array('rego', $bikeColumns, true);
-          $hasImage = in_array('image_url', $bikeColumns, true);
-          $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
-          $hasPrimary = in_array('is_primary', $bikeColumns, true);
+        } elseif ($make === '' || $model === '') {
+          $profileError = 'Make and model are required.';
+        } else {
+          try {
+            $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+            $hasRego = in_array('rego', $bikeColumns, true);
+            $hasImage = in_array('image_url', $bikeColumns, true);
+            $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
+            $hasPrimary = in_array('is_primary', $bikeColumns, true);
 
-          $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
-          $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
-          $params = [
-            'member_id' => $targetBikeMemberId,
-            'make' => $make,
-            'model' => $model,
-            'year' => $year ?: null,
-          ];
-          if ($hasRego) {
-            $columns[] = 'rego';
-            $placeholders[] = ':rego';
-            $params['rego'] = $rego !== '' ? $rego : null;
-          }
-          if ($hasImage) {
-            $columns[] = 'image_url';
-            $placeholders[] = ':image_url';
-            $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
-          }
-          if ($hasColor && $color !== '') {
-            if (in_array('color', $bikeColumns, true)) {
-              $columns[] = 'color';
-              $placeholders[] = ':color';
-              $params['color'] = $color;
-            } elseif (in_array('colour', $bikeColumns, true)) {
-              $columns[] = 'colour';
-              $placeholders[] = ':colour';
-              $params['colour'] = $color;
+            $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
+            $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
+            $params = [
+              'member_id' => $targetBikeMemberId,
+              'make' => $make,
+              'model' => $model,
+              'year' => $year ?: null,
+            ];
+            if ($hasRego) {
+              $columns[] = 'rego';
+              $placeholders[] = ':rego';
+              $params['rego'] = $rego !== '' ? $rego : null;
             }
-          }
-          if ($hasPrimary) {
-            $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
-            $primaryStmt->execute(['member_id' => $targetBikeMemberId]);
-            $primaryExists = (bool) $primaryStmt->fetchColumn();
-            if (!$primaryExists) {
-              $columns[] = 'is_primary';
-              $placeholders[] = ':is_primary';
-              $params['is_primary'] = 1;
+            if ($hasImage) {
+              $columns[] = 'image_url';
+              $placeholders[] = ':image_url';
+              $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
             }
+            if ($hasColor && $color !== '') {
+              if (in_array('color', $bikeColumns, true)) {
+                $columns[] = 'color';
+                $placeholders[] = ':color';
+                $params['color'] = $color;
+              } elseif (in_array('colour', $bikeColumns, true)) {
+                $columns[] = 'colour';
+                $placeholders[] = ':colour';
+                $params['colour'] = $color;
+              }
+            }
+            if ($hasPrimary) {
+              $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+              $primaryStmt->execute(['member_id' => $targetBikeMemberId]);
+              $primaryExists = (bool) $primaryStmt->fetchColumn();
+              if (!$primaryExists) {
+                $columns[] = 'is_primary';
+                $placeholders[] = ':is_primary';
+                $params['is_primary'] = 1;
+              }
+            }
+            $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+            $stmt->execute($params);
+            $profileMessage = 'Bike added.';
+          } catch (Throwable $e) {
+            $profileError = 'Unable to save bike. Please try again.';
           }
-          $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
-          $stmt->execute($params);
-          $profileMessage = 'Bike added.';
         }
       } elseif ($_POST['action'] === 'update_bike') {
         $bikeId = (int) ($_POST['bike_id'] ?? 0);
@@ -428,49 +434,56 @@ if ($user && $user['member_id']) {
         } elseif ($make === '' || $model === '') {
           $profileError = 'Make and model are required.';
         } else {
-          $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
-          $hasRego = in_array('rego', $bikeColumns, true);
-          $hasImage = in_array('image_url', $bikeColumns, true);
-          $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
-          $hasPrimary = in_array('is_primary', $bikeColumns, true);
+          try {
+            $bikeColumns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+            $hasRego = in_array('rego', $bikeColumns, true);
+            $hasImage = in_array('image_url', $bikeColumns, true);
+            $hasColor = in_array('color', $bikeColumns, true) || in_array('colour', $bikeColumns, true);
+            $hasPrimary = in_array('is_primary', $bikeColumns, true);
 
-          $fields = ['make = :make', 'model = :model', 'year = :year'];
-          $params = [
-            'make' => $make,
-            'model' => $model,
-            'year' => $year ?: null,
-            'id' => $bikeId,
-            'member_id' => $targetBikeMemberId,
-          ];
-          if ($hasRego) {
-            $fields[] = 'rego = :rego';
-            $params['rego'] = $rego !== '' ? $rego : null;
-          }
-          if ($hasImage) {
-            $fields[] = 'image_url = :image_url';
-            $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
-          }
-          if ($hasColor) {
-            if (in_array('color', $bikeColumns, true)) {
-              $fields[] = 'color = :color';
-              $params['color'] = $color !== '' ? $color : null;
-            } elseif (in_array('colour', $bikeColumns, true)) {
-              $fields[] = 'colour = :colour';
-              $params['colour'] = $color !== '' ? $color : null;
+            $fields = ['make = :make', 'model = :model', 'year = :year'];
+            $params = [
+              'make' => $make,
+              'model' => $model,
+              'year' => $year ?: null,
+              'id' => $bikeId,
+              'member_id' => $targetBikeMemberId,
+            ];
+            if ($hasRego) {
+              $fields[] = 'rego = :rego';
+              $params['rego'] = $rego !== '' ? $rego : null;
             }
+            if ($hasImage) {
+              $fields[] = 'image_url = :image_url';
+              $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
+            }
+            if ($hasColor) {
+              if (in_array('color', $bikeColumns, true)) {
+                $fields[] = 'color = :color';
+                $params['color'] = $color !== '' ? $color : null;
+              } elseif (in_array('colour', $bikeColumns, true)) {
+                $fields[] = 'colour = :colour';
+                $params['colour'] = $color !== '' ? $color : null;
+              }
+            }
+            $setPrimary = $hasPrimary && isset($_POST['is_primary']) && $_POST['is_primary'] === '1';
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
+            $stmt->execute($params);
+            if ($setPrimary) {
+              $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 0 WHERE member_id = :member_id');
+              $stmt->execute(['member_id' => $targetBikeMemberId]);
+              $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 1 WHERE id = :id AND member_id = :member_id');
+              $stmt->execute(['id' => $bikeId, 'member_id' => $targetBikeMemberId]);
+            }
+            $pdo->commit();
+            $profileMessage = 'Bike updated.';
+          } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+              $pdo->rollBack();
+            }
+            $profileError = 'Unable to save bike changes. Please try again.';
           }
-          $setPrimary = $hasPrimary && isset($_POST['is_primary']) && $_POST['is_primary'] === '1';
-          $pdo->beginTransaction();
-          $stmt = $pdo->prepare('UPDATE member_bikes SET ' . implode(', ', $fields) . ' WHERE id = :id AND member_id = :member_id');
-          $stmt->execute($params);
-          if ($setPrimary) {
-            $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 0 WHERE member_id = :member_id');
-            $stmt->execute(['member_id' => $targetBikeMemberId]);
-            $stmt = $pdo->prepare('UPDATE member_bikes SET is_primary = 1 WHERE id = :id AND member_id = :member_id');
-            $stmt->execute(['id' => $bikeId, 'member_id' => $targetBikeMemberId]);
-          }
-          $pdo->commit();
-          $profileMessage = 'Bike updated.';
         }
       } elseif ($_POST['action'] === 'delete_bike') {
         $bikeId = (int) ($_POST['bike_id'] ?? 0);
