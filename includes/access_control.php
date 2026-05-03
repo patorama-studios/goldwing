@@ -24,6 +24,7 @@ function access_control_roles(): array
         'committee',
         'treasurer',
         'store_manager',
+        'webmaster',
         'admin',
     ];
 }
@@ -37,6 +38,7 @@ function access_control_role_labels(): array
         'committee' => 'Committee Member',
         'treasurer' => 'Treasurer',
         'store_manager' => 'Store Manager',
+        'webmaster' => 'Webmaster',
         'admin' => 'Admin',
     ];
 }
@@ -80,6 +82,7 @@ function get_current_role(): string
     $roles = get_current_roles();
     $priority = [
         'admin',
+        'webmaster',
         'store_manager',
         'treasurer',
         'committee',
@@ -289,7 +292,15 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/index.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader'],
+            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader', 'webmaster'],
+        ],
+        [
+            'page_key' => 'admin_requests',
+            'label' => 'Notification Hub',
+            'path_pattern' => '/admin/requests/*',
+            'match_type' => 'prefix',
+            'nav_group' => 'Admin',
+            'roles' => ['admin', 'webmaster'],
         ],
         [
             'page_key' => 'admin_members',

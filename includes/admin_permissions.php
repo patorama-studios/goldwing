@@ -47,6 +47,10 @@ function admin_permission_registry(): array
             ['key' => 'admin.member_of_year.manage', 'label' => 'Manage Member of the Year submissions'],
             ['key' => 'admin.forms.export', 'label' => 'Export form submissions'],
         ],
+        'Notification Hub' => [
+            ['key' => 'admin.requests.view', 'label' => 'View pending requests'],
+            ['key' => 'admin.requests.action', 'label' => 'Approve / deny / send feedback on requests'],
+        ],
         'Builders / Tools' => [
             ['key' => 'admin.ai_page_builder.access', 'label' => 'Access AI page builder'],
             ['key' => 'admin.ai_page_builder.edit', 'label' => 'Edit AI page builder content'],
@@ -160,6 +164,22 @@ function admin_default_role_permissions(): array
             'admin.orders.view',
             'admin.orders.fulfil',
             'admin.order_fulfilment.manage',
+        ],
+        'webmaster' => [
+            'admin.dashboard.view',
+            'admin.requests.view',
+            'admin.requests.action',
+            'admin.members.view',
+            'admin.member_of_year.view',
+            'admin.member_of_year.manage',
+            'admin.events.manage',
+            'admin.calendar.view',
+            'admin.calendar.manage',
+            'admin.pages.view',
+            'admin.pages.edit',
+            'admin.orders.view',
+            'admin.payments.view',
+            'admin.logs.view',
         ],
     ];
 }

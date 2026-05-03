@@ -20,8 +20,18 @@ $settingsChildren = [
     ['key' => 'reports', 'label' => 'Reports', 'href' => '/admin/index.php?page=reports', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
     ['key' => 'audit', 'label' => 'Audit', 'href' => '/admin/index.php?page=audit', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
 ];
+$pendingRequestsCount = 0;
+try {
+    if (class_exists(\App\Services\PendingRequestsService::class)) {
+        $pendingRequestsCount = (int) (\App\Services\PendingRequestsService::counts()['__total'] ?? 0);
+    }
+} catch (Throwable $e) {
+    $pendingRequestsCount = 0;
+}
+
 $items = [
     ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
+    ['key' => 'requests', 'label' => 'Notification Hub', 'icon' => 'notifications_active', 'href' => '/admin/requests/', 'permission' => 'admin.requests.view', 'badge' => $pendingRequestsCount],
     [
         'key' => 'settings',
         'label' => 'Settings',
@@ -171,10 +181,13 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
           </div>
         </details>
       <?php else: ?>
-        <?php $isActive = $activePage === $item['key']; ?>
+        <?php $isActive = $activePage === $item['key']; $badge = (int) ($item['badge'] ?? 0); ?>
         <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
           <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-          <?= e($item['label']) ?>
+          <span class="flex-1"><?= e($item['label']) ?></span>
+          <?php if ($badge > 0): ?>
+            <span class="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold"><?= $badge ?></span>
+          <?php endif; ?>
         </a>
       <?php endif; ?>
     <?php endforeach; ?>

@@ -52,6 +52,144 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 002 — Notification Hub schema
+// Adds approval workflow to notices + calendar_events, adds feedback_message
+// to existing approval tables, seeds the webmaster role.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_002_notification_hub';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 002 — Notification hub schema', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $applied = [];
+    $errors = [];
+
+    $tryExec = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (Throwable $e) {
+            // Ignore "duplicate column" / "duplicate key" errors so the migration is idempotent
+            $msg = $e->getMessage();
+            if (stripos($msg, 'duplicate') !== false || stripos($msg, 'exists') !== false) {
+                $applied[] = $label . ' (already present)';
+            } else {
+                $errors[] = $label . ': ' . $msg;
+            }
+        }
+    };
+
+    // notices: approval columns
+    $tryExec(
+        "ALTER TABLE notices ADD COLUMN status ENUM('draft','pending','approved','rejected') NOT NULL DEFAULT 'approved' AFTER is_pinned",
+        'notices.status'
+    );
+    $tryExec(
+        "ALTER TABLE notices ADD COLUMN feedback_message TEXT NULL AFTER status",
+        'notices.feedback_message'
+    );
+    $tryExec(
+        "ALTER TABLE notices ADD COLUMN reviewed_by INT NULL AFTER feedback_message",
+        'notices.reviewed_by'
+    );
+    $tryExec(
+        "ALTER TABLE notices ADD COLUMN reviewed_at DATETIME NULL AFTER reviewed_by",
+        'notices.reviewed_at'
+    );
+    $tryExec(
+        "ALTER TABLE notices ADD INDEX idx_notices_status (status)",
+        'notices status index'
+    );
+
+    // calendar_events: extend status + add review columns
+    $tryExec(
+        "ALTER TABLE calendar_events MODIFY COLUMN status ENUM('draft','pending','approved','rejected','published','cancelled') NOT NULL DEFAULT 'pending'",
+        'calendar_events.status enum'
+    );
+    $tryExec(
+        "ALTER TABLE calendar_events ADD COLUMN feedback_message TEXT NULL",
+        'calendar_events.feedback_message'
+    );
+    $tryExec(
+        "ALTER TABLE calendar_events ADD COLUMN reviewed_by INT NULL",
+        'calendar_events.reviewed_by'
+    );
+    $tryExec(
+        "ALTER TABLE calendar_events ADD COLUMN reviewed_at DATETIME NULL",
+        'calendar_events.reviewed_at'
+    );
+    // Note: existing 'published' rows are intentionally left alone.
+    // Calendar render code filters WHERE status = 'published', so the
+    // notification hub treats 'published' as the approved/live state.
+
+    // existing approval tables: add feedback_message
+    $tryExec("ALTER TABLE fallen_wings ADD COLUMN feedback_message TEXT NULL", 'fallen_wings.feedback_message');
+    $tryExec("ALTER TABLE chapter_change_requests ADD COLUMN feedback_message TEXT NULL", 'chapter_change_requests.feedback_message');
+    $tryExec("ALTER TABLE member_of_year_nominations ADD COLUMN feedback_message TEXT NULL", 'member_of_year_nominations.feedback_message');
+
+    // webmaster role
+    try {
+        $stmt = $pdo->prepare("INSERT INTO roles (name, slug, description, is_system, is_active, created_at, updated_at)
+            SELECT 'webmaster', 'webmaster', 'Webmaster (reviews and approves member submissions)', 1, 1, NOW(), NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM roles WHERE slug = 'webmaster')");
+        $stmt->execute();
+        $applied[] = 'webmaster role seeded';
+    } catch (Throwable $e) {
+        $errors[] = 'webmaster role: ' . $e->getMessage();
+    }
+
+    // Seed role_permissions for new request hub permissions.
+    // admin gets both, webmaster gets both, content_admin/committee get view only.
+    $permissionSeeds = [
+        'admin'         => ['admin.requests.view', 'admin.requests.action'],
+        'webmaster'     => [
+            'admin.dashboard.view',
+            'admin.requests.view',
+            'admin.requests.action',
+            'admin.members.view',
+            'admin.member_of_year.view',
+            'admin.member_of_year.manage',
+            'admin.events.manage',
+            'admin.calendar.view',
+            'admin.calendar.manage',
+            'admin.pages.view',
+            'admin.pages.edit',
+            'admin.orders.view',
+            'admin.payments.view',
+            'admin.logs.view',
+        ],
+        'committee'     => ['admin.requests.view'],
+        'content_admin' => ['admin.requests.view'],
+    ];
+    try {
+        $permStmt = $pdo->prepare(
+            'INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+             SELECT r.id, :permission_key, 1, NOW(), NOW() FROM roles r WHERE r.name = :role_name
+             ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
+        );
+        $seededCount = 0;
+        foreach ($permissionSeeds as $roleName => $keys) {
+            foreach ($keys as $permKey) {
+                $permStmt->execute(['permission_key' => $permKey, 'role_name' => $roleName]);
+                $seededCount++;
+            }
+        }
+        $applied[] = $seededCount . ' role-permission rows seeded';
+    } catch (Throwable $e) {
+        $errors[] = 'role permission seeds: ' . $e->getMessage();
+    }
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 002 — Notification hub schema', 'status' => 'skipped', 'note' => 'Errors: ' . implode('; ', $errors)];
+    } else {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 002 — Notification hub schema', 'status' => 'applied', 'note' => count($applied) . ' steps: ' . implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

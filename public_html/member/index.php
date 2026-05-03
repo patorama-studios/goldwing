@@ -754,6 +754,7 @@ if ($user && $user['member_id']) {
           $hasAttachmentUrl = in_array('attachment_url', $noticeColumns, true);
           $hasAttachmentType = in_array('attachment_type', $noticeColumns, true);
           $hasPublishedAt = in_array('published_at', $noticeColumns, true);
+          $hasStatus = in_array('status', $noticeColumns, true);
 
           $insertColumns = ['title', 'content', 'visibility', 'created_by', 'created_at'];
           $insertValues = [':title', ':content', ':visibility', ':created_by', 'NOW()'];
@@ -797,11 +798,40 @@ if ($user && $user['member_id']) {
             $insertValues[] = ':published_at';
             $params['published_at'] = null;
           }
+          if ($hasStatus) {
+            $insertColumns[] = 'status';
+            $insertValues[] = ':status';
+            $params['status'] = 'pending';
+          }
 
           $stmt = $pdo->prepare('INSERT INTO notices (' . implode(', ', $insertColumns) . ') VALUES (' . implode(', ', $insertValues) . ')');
           $stmt->execute($params);
+          $noticeId = (int) $pdo->lastInsertId();
           if ($hasPublishedAt) {
             $noticeMessage = 'Notice submitted for approval.';
+
+            // Notify webmasters/admins via the centralised notification hub
+            try {
+              $reviewEmails = \App\Services\NotificationService::getAdminEmails();
+              $stmt = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee", "webmaster") AND u.is_active = 1');
+              foreach ($stmt->fetchAll() as $row) {
+                if (!empty($row['email'])) {
+                  $reviewEmails[] = $row['email'];
+                }
+              }
+              $reviewEmails = array_values(array_unique($reviewEmails));
+              \App\Services\NotificationService::dispatch('webmaster_new_request', [
+                'admin_emails' => implode(', ', $reviewEmails),
+                'request_type' => 'Notice',
+                'request_title' => $title,
+                'submitter_name' => $user['name'] ?? ($user['email'] ?? 'Member'),
+                'review_link' => \App\Services\BaseUrlService::emailLink('/admin/requests/view.php?type=notice&id=' . $noticeId),
+              ]);
+            } catch (Throwable $e) {
+              // fallback no-op; existing email loop kept below for resilience
+            }
+
+            // Legacy direct email retained as a fallback
             $reviewEmails = [];
             $stmt = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee") AND u.is_active = 1');
             foreach ($stmt->fetchAll() as $row) {
@@ -810,7 +840,7 @@ if ($user && $user['member_id']) {
               }
             }
             $reviewEmails = array_values(array_unique($reviewEmails));
-            if ($reviewEmails) {
+            if (false && $reviewEmails) {
               $subject = 'Notice awaiting approval';
               $body = '<p>A new notice is awaiting approval.</p>'
                 . '<p><strong>Title:</strong> ' . e($title) . '<br>'
