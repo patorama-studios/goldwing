@@ -828,6 +828,7 @@ switch ($action) {
                     'primary_email' => $member['email'],
                     'admin_emails' => NotificationService::getAdminEmails(),
                     'reset_link' => NotificationService::escape($link),
+                    'first_name' => NotificationService::escape(trim((string) ($member['first_name'] ?? ''))),
                 ]);
                 ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', [
                     'user_id' => $userId,
@@ -1720,6 +1721,7 @@ switch ($action) {
             'primary_email' => $member['email'],
             'admin_emails' => NotificationService::getAdminEmails(),
             'reset_link' => NotificationService::escape($link),
+            'first_name' => NotificationService::escape(trim((string) ($member['first_name'] ?? ''))),
         ]);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
         if (!$sent) {

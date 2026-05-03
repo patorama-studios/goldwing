@@ -300,6 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               'primary_email' => $memberRow['email'],
               'admin_emails' => NotificationService::getAdminEmails(),
               'reset_link' => NotificationService::escape($resetLink),
+              'first_name' => NotificationService::escape(trim((string) ($memberRow['first_name'] ?? ''))),
             ]);
           }
         }
