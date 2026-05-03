@@ -1317,6 +1317,8 @@ $pageTitles = [
   'history' => 'Membership History',
   'store' => 'Store',
   'settings' => 'Personal Settings',
+  'directory' => 'Members Directory',
+  'committee' => 'Committee & Leadership',
 ];
 $pageTitle = $pageTitles[$page] ?? 'Member Portal';
 $activePage = in_array($page, ['notices-view', 'notices-create'], true) ? 'notices' : $page;
@@ -3510,6 +3512,401 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           <?php else: ?>
             <p class="text-sm text-gray-500">No membership history yet.</p>
+          <?php endif; ?>
+        </section>
+      <?php elseif ($page === 'directory'): ?>
+        <?php
+        $dirStmt = $pdo->query("
+            SELECT
+                m.id,
+                m.first_name,
+                m.last_name,
+                m.member_type,
+                m.phone,
+                m.email,
+                m.member_number_base,
+                m.member_number_suffix,
+                m.member_number,
+                m.directory_pref_b_accept_calls,
+                m.directory_pref_a_collect_motorcycle,
+                m.directory_pref_c_bed_or_tent,
+                m.directory_pref_d_tools_or_workshop,
+                m.is_area_rep,
+                m.is_committee,
+                m.committee_role,
+                m.full_member_id,
+                c.name AS chapter_name,
+                c.state AS chapter_state,
+                CONCAT(fm.first_name, ' ', fm.last_name) AS full_member_name,
+                fm.member_number_base AS full_member_number_base,
+                fm.member_number_suffix AS full_member_number_suffix,
+                su.setting_value AS avatar_url
+            FROM members m
+            LEFT JOIN chapters c ON c.id = m.chapter_id
+            LEFT JOIN members fm ON fm.id = m.full_member_id
+            LEFT JOIN users u ON u.member_id = m.id
+            LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+            WHERE m.status = 'active'
+              AND (m.directory_pref_f_exclude_electronic_directory = 0 OR m.directory_pref_f_exclude_electronic_directory IS NULL)
+            ORDER BY m.last_name ASC, m.first_name ASC
+        ");
+        $directoryMembers = $dirStmt->fetchAll();
+        $dirChapters = [];
+        foreach ($directoryMembers as $dm) {
+          if (!empty($dm['chapter_name'])) {
+            $chLabel = $dm['chapter_name'] . (!empty($dm['chapter_state']) ? ' (' . $dm['chapter_state'] . ')' : '');
+            $dirChapters[$chLabel] = true;
+          }
+        }
+        ksort($dirChapters);
+        $dirTotal = count($directoryMembers);
+        ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 class="font-display text-2xl font-bold text-gray-900">Members Directory</h2>
+              <p class="text-sm text-gray-500 mt-1">
+                <span id="dir-count"><?= $dirTotal ?></span> of <?= $dirTotal ?> member<?= $dirTotal !== 1 ? 's' : '' ?>
+              </p>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="flex flex-col sm:flex-row gap-3 mb-5">
+            <div class="relative flex-1">
+              <span class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <span class="material-icons-outlined text-gray-400 text-lg">search</span>
+              </span>
+              <input type="text" id="dir-search" placeholder="Search by name or member number…"
+                class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            </div>
+            <select id="dir-chapter" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[180px]">
+              <option value="">All Chapters</option>
+              <?php foreach ($dirChapters as $chLabel => $_): ?>
+                <option value="<?= e(strtolower($chLabel)) ?>"><?= e($chLabel) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <select id="dir-type" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[140px]">
+              <option value="">All Types</option>
+              <option value="full">Full</option>
+              <option value="associate">Associate</option>
+              <option value="life">Life</option>
+            </select>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto -mx-2">
+            <table class="w-full text-sm min-w-[700px]" id="dir-table">
+              <thead class="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                <tr>
+                  <th class="py-2 px-2 w-10"></th>
+                  <th class="py-2 px-2">Name</th>
+                  <th class="py-2 px-2 whitespace-nowrap">Member #</th>
+                  <th class="py-2 px-2">Type</th>
+                  <th class="py-2 px-2">Chapter</th>
+                  <th class="py-2 px-2">Phone</th>
+                  <th class="py-2 px-2">Email</th>
+                  <th class="py-2 px-2">Capabilities</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100" id="dir-tbody">
+                <?php foreach ($directoryMembers as $dm):
+                  $dmNumber = '';
+                  if (!empty($dm['member_number_base'])) {
+                    $dmNumber = MembershipService::displayMembershipNumber((int) $dm['member_number_base'], (int) ($dm['member_number_suffix'] ?? 0));
+                  } elseif (!empty($dm['member_number'])) {
+                    $dmNumber = $dm['member_number'];
+                  }
+                  $dmChapterLabel = '';
+                  if (!empty($dm['chapter_name'])) {
+                    $dmChapterLabel = $dm['chapter_name'] . (!empty($dm['chapter_state']) ? ' (' . $dm['chapter_state'] . ')' : '');
+                  }
+                  $dmType = strtolower((string) ($dm['member_type'] ?? ''));
+                  $dmFullName = trim($dm['first_name'] . ' ' . $dm['last_name']);
+                  $dmSearchStr = strtolower($dmFullName . ' ' . $dmNumber);
+                  $dmCanContact = !empty($dm['directory_pref_b_accept_calls']);
+
+                  $dmFullMemberName = '';
+                  if ($dmType === 'associate' && !empty($dm['full_member_name'])) {
+                    $dmFullMemberName = trim($dm['full_member_name']);
+                    if (!empty($dm['full_member_number_base'])) {
+                      $fmNum = MembershipService::displayMembershipNumber((int) $dm['full_member_number_base'], (int) ($dm['full_member_number_suffix'] ?? 0));
+                      $dmFullMemberName .= ' #' . $fmNum;
+                    }
+                  }
+
+                  $typeLabels = ['full' => 'Full', 'associate' => 'Associate', 'life' => 'Life'];
+                  $typeColors = [
+                    'full' => 'bg-blue-100 text-blue-800',
+                    'associate' => 'bg-purple-100 text-purple-800',
+                    'life' => 'bg-amber-100 text-amber-800',
+                  ];
+                  $typeLabel = $typeLabels[$dmType] ?? ucfirst($dmType);
+                  $typeColor = $typeColors[$dmType] ?? 'bg-gray-100 text-gray-700';
+
+                  $caps = [];
+                  if (!empty($dm['directory_pref_a_collect_motorcycle'])) {
+                    $caps[] = ['Motorcycle', 'bg-green-100 text-green-800'];
+                  }
+                  if (!empty($dm['directory_pref_c_bed_or_tent'])) {
+                    $caps[] = ['Bed/Tent', 'bg-teal-100 text-teal-800'];
+                  }
+                  if (!empty($dm['directory_pref_d_tools_or_workshop'])) {
+                    $caps[] = ['Tools', 'bg-orange-100 text-orange-800'];
+                  }
+                ?>
+                  <tr class="hover:bg-gray-50 transition-colors"
+                    data-search="<?= e($dmSearchStr) ?>"
+                    data-chapter="<?= e(strtolower($dmChapterLabel)) ?>"
+                    data-type="<?= e($dmType) ?>">
+                    <td class="py-3 px-2">
+                      <?php if (!empty($dm['avatar_url'])): ?>
+                        <img src="<?= e($dm['avatar_url']) ?>" alt="<?= e($dmFullName) ?>"
+                          class="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0">
+                      <?php else: ?>
+                        <div class="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                          <span class="material-icons-outlined text-gray-400 text-xl">person</span>
+                        </div>
+                      <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2">
+                      <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                        <p class="font-medium text-gray-900"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
+                        <?php if (!empty($dm['is_committee'])): ?>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700">
+                            <?= e(!empty($dm['committee_role']) ? $dm['committee_role'] : 'Committee') ?>
+                          </span>
+                        <?php endif; ?>
+                        <?php if (!empty($dm['is_area_rep'])): ?>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-indigo-100 text-indigo-700">Area Rep</span>
+                        <?php endif; ?>
+                      </div>
+                      <?php if ($dmType === 'associate' && $dmFullMemberName): ?>
+                        <p class="text-xs text-gray-400">Associated: <?= e($dmFullMemberName) ?></p>
+                      <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2 text-gray-600 font-mono whitespace-nowrap"><?= e($dmNumber ?: '—') ?></td>
+                    <td class="py-3 px-2">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium <?= $typeColor ?>">
+                        <?= e($typeLabel) ?>
+                      </span>
+                    </td>
+                    <td class="py-3 px-2 text-gray-600 whitespace-nowrap"><?= e($dmChapterLabel ?: '—') ?></td>
+                    <td class="py-3 px-2 whitespace-nowrap">
+                      <?php if ($dmCanContact && !empty($dm['phone'])): ?>
+                        <a href="tel:<?= e($dm['phone']) ?>" class="text-primary hover:underline"><?= e($dm['phone']) ?></a>
+                      <?php else: ?>
+                        <span class="text-gray-300">—</span>
+                      <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2">
+                      <?php if ($dmCanContact && !empty($dm['email'])): ?>
+                        <a href="mailto:<?= e($dm['email']) ?>" class="text-primary hover:underline block truncate max-w-[200px]"><?= e($dm['email']) ?></a>
+                      <?php else: ?>
+                        <span class="text-gray-300">—</span>
+                      <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2">
+                      <?php if ($caps): ?>
+                        <div class="flex flex-wrap gap-1">
+                          <?php foreach ($caps as [$capLabel, $capColor]): ?>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium <?= $capColor ?>">
+                              <?= e($capLabel) ?>
+                            </span>
+                          <?php endforeach; ?>
+                        </div>
+                      <?php else: ?>
+                        <span class="text-gray-300 text-xs">—</span>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <p id="dir-empty" class="hidden text-center text-sm text-gray-400 py-10">No members match your search.</p>
+        </section>
+        <script>
+        (function () {
+          const search = document.getElementById('dir-search');
+          const chapterSel = document.getElementById('dir-chapter');
+          const typeSel = document.getElementById('dir-type');
+          const rows = Array.from(document.querySelectorAll('#dir-tbody tr'));
+          const emptyMsg = document.getElementById('dir-empty');
+          const countEl = document.getElementById('dir-count');
+
+          function applyFilters() {
+            const q = search.value.trim().toLowerCase();
+            const ch = chapterSel.value.toLowerCase();
+            const tp = typeSel.value.toLowerCase();
+            let visible = 0;
+            rows.forEach(function (row) {
+              const ok = (!q || row.dataset.search.includes(q))
+                && (!ch || row.dataset.chapter.includes(ch))
+                && (!tp || row.dataset.type === tp);
+              row.classList.toggle('hidden', !ok);
+              if (ok) visible++;
+            });
+            emptyMsg.classList.toggle('hidden', visible > 0);
+            if (countEl) countEl.textContent = visible;
+          }
+
+          search.addEventListener('input', applyFilters);
+          chapterSel.addEventListener('change', applyFilters);
+          typeSel.addEventListener('change', applyFilters);
+        })();
+        </script>
+      <?php elseif ($page === 'committee'): ?>
+        <?php
+        $cmtStmt = $pdo->query("
+            SELECT
+                m.id,
+                m.first_name,
+                m.last_name,
+                m.member_number_base,
+                m.member_number_suffix,
+                m.member_number,
+                m.is_committee,
+                m.is_area_rep,
+                m.committee_role,
+                m.phone,
+                m.email,
+                m.directory_pref_b_accept_calls,
+                m.directory_pref_f_exclude_electronic_directory,
+                c.name AS chapter_name,
+                c.state AS chapter_state,
+                su.setting_value AS avatar_url
+            FROM members m
+            LEFT JOIN chapters c ON c.id = m.chapter_id
+            LEFT JOIN users u ON u.member_id = m.id
+            LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+            WHERE m.status = 'active'
+              AND (m.is_committee = 1 OR m.is_area_rep = 1)
+            ORDER BY m.is_committee DESC, m.committee_role ASC, m.last_name ASC, m.first_name ASC
+        ");
+        $cmtAll = $cmtStmt->fetchAll();
+        $cmtCommittee = array_filter($cmtAll, fn($r) => !empty($r['is_committee']));
+        $cmtAreaReps  = array_filter($cmtAll, fn($r) => !empty($r['is_area_rep']) && empty($r['is_committee']));
+        ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="mb-8">
+            <h2 class="font-display text-2xl font-bold text-gray-900">Committee &amp; Leadership</h2>
+            <p class="text-sm text-gray-500 mt-1">Your chapter committee members and area representatives.</p>
+          </div>
+
+          <?php if ($cmtCommittee): ?>
+            <div class="mb-8">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="p-1.5 rounded-lg bg-red-100">
+                  <span class="material-icons-outlined text-red-600 text-base">star</span>
+                </div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Committee Members</h3>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <?php foreach ($cmtCommittee as $cm):
+                  $cmNumber = '';
+                  if (!empty($cm['member_number_base'])) {
+                    $cmNumber = MembershipService::displayMembershipNumber((int) $cm['member_number_base'], (int) ($cm['member_number_suffix'] ?? 0));
+                  } elseif (!empty($cm['member_number'])) {
+                    $cmNumber = $cm['member_number'];
+                  }
+                  $cmChapter = !empty($cm['chapter_name'])
+                    ? $cm['chapter_name'] . (!empty($cm['chapter_state']) ? ' (' . $cm['chapter_state'] . ')' : '')
+                    : '';
+                  $cmCanContact = !empty($cm['directory_pref_b_accept_calls']) && empty($cm['directory_pref_f_exclude_electronic_directory']);
+                ?>
+                  <div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <?php if (!empty($cm['avatar_url'])): ?>
+                      <img src="<?= e($cm['avatar_url']) ?>" alt="<?= e($cm['first_name'] . ' ' . $cm['last_name']) ?>"
+                        class="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0">
+                    <?php else: ?>
+                      <div class="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                        <span class="material-icons-outlined text-red-400 text-2xl">person</span>
+                      </div>
+                    <?php endif; ?>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-semibold text-gray-900 truncate"><?= e($cm['first_name'] . ' ' . $cm['last_name']) ?></p>
+                      <?php if (!empty($cm['committee_role'])): ?>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700 mb-1">
+                          <?= e($cm['committee_role']) ?>
+                        </span>
+                      <?php endif; ?>
+                      <?php if ($cmChapter): ?>
+                        <p class="text-xs text-gray-500 truncate"><?= e($cmChapter) ?></p>
+                      <?php endif; ?>
+                      <?php if ($cmNumber): ?>
+                        <p class="text-xs text-gray-400 font-mono">#<?= e($cmNumber) ?></p>
+                      <?php endif; ?>
+                      <?php if ($cmCanContact && !empty($cm['phone'])): ?>
+                        <a href="tel:<?= e($cm['phone']) ?>" class="mt-1 text-xs text-primary hover:underline block"><?= e($cm['phone']) ?></a>
+                      <?php endif; ?>
+                      <?php if ($cmCanContact && !empty($cm['email'])): ?>
+                        <a href="mailto:<?= e($cm['email']) ?>" class="text-xs text-primary hover:underline block truncate"><?= e($cm['email']) ?></a>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php endif; ?>
+
+          <?php if ($cmtAreaReps): ?>
+            <div>
+              <div class="flex items-center gap-2 mb-4">
+                <div class="p-1.5 rounded-lg bg-indigo-100">
+                  <span class="material-icons-outlined text-indigo-600 text-base">place</span>
+                </div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Area Representatives</h3>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <?php foreach ($cmtAreaReps as $ar):
+                  $arNumber = '';
+                  if (!empty($ar['member_number_base'])) {
+                    $arNumber = MembershipService::displayMembershipNumber((int) $ar['member_number_base'], (int) ($ar['member_number_suffix'] ?? 0));
+                  } elseif (!empty($ar['member_number'])) {
+                    $arNumber = $ar['member_number'];
+                  }
+                  $arChapter = !empty($ar['chapter_name'])
+                    ? $ar['chapter_name'] . (!empty($ar['chapter_state']) ? ' (' . $ar['chapter_state'] . ')' : '')
+                    : '';
+                  $arCanContact = !empty($ar['directory_pref_b_accept_calls']) && empty($ar['directory_pref_f_exclude_electronic_directory']);
+                ?>
+                  <div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <?php if (!empty($ar['avatar_url'])): ?>
+                      <img src="<?= e($ar['avatar_url']) ?>" alt="<?= e($ar['first_name'] . ' ' . $ar['last_name']) ?>"
+                        class="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0">
+                    <?php else: ?>
+                      <div class="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                        <span class="material-icons-outlined text-indigo-400 text-2xl">person</span>
+                      </div>
+                    <?php endif; ?>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-semibold text-gray-900 truncate"><?= e($ar['first_name'] . ' ' . $ar['last_name']) ?></p>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-indigo-100 text-indigo-700 mb-1">Area Rep</span>
+                      <?php if ($arChapter): ?>
+                        <p class="text-xs text-gray-500 truncate"><?= e($arChapter) ?></p>
+                      <?php endif; ?>
+                      <?php if ($arNumber): ?>
+                        <p class="text-xs text-gray-400 font-mono">#<?= e($arNumber) ?></p>
+                      <?php endif; ?>
+                      <?php if ($arCanContact && !empty($ar['phone'])): ?>
+                        <a href="tel:<?= e($ar['phone']) ?>" class="mt-1 text-xs text-primary hover:underline block"><?= e($ar['phone']) ?></a>
+                      <?php endif; ?>
+                      <?php if ($arCanContact && !empty($ar['email'])): ?>
+                        <a href="mailto:<?= e($ar['email']) ?>" class="text-xs text-primary hover:underline block truncate"><?= e($ar['email']) ?></a>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php endif; ?>
+
+          <?php if (!$cmtCommittee && !$cmtAreaReps): ?>
+            <div class="py-16 text-center">
+              <span class="material-icons-outlined text-5xl text-gray-200 mb-3 block">groups</span>
+              <p class="text-gray-400 text-sm">No committee members or area representatives have been assigned yet.</p>
+            </div>
           <?php endif; ?>
         </section>
       <?php else: ?>

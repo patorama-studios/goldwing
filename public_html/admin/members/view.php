@@ -2045,6 +2045,40 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <textarea name="notes" rows="3"
                           class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"><?= e($member['notes'] ?? '') ?></textarea>
                       </div>
+                      <div class="md:col-span-2">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Member roles</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" name="is_area_rep" value="1"
+                              <?= !empty($member['is_area_rep']) ? 'checked' : '' ?>
+                              class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                            <span>Area Representative</span>
+                          </label>
+                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" name="is_committee" value="1" id="admin-is-committee"
+                              <?= !empty($member['is_committee']) ? 'checked' : '' ?>
+                              class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                            <span>Committee Member</span>
+                          </label>
+                        </div>
+                        <div id="admin-committee-role-wrap" <?= empty($member['is_committee']) ? 'style="display:none"' : '' ?>>
+                          <label class="text-sm font-medium text-gray-700">Committee role</label>
+                          <input type="text" name="committee_role" value="<?= e($member['committee_role'] ?? '') ?>"
+                            placeholder="e.g. President, Secretary, Treasurer…"
+                            class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <script>
+                          (function () {
+                            var cb = document.getElementById('admin-is-committee');
+                            var wrap = document.getElementById('admin-committee-role-wrap');
+                            if (cb && wrap) {
+                              cb.addEventListener('change', function () {
+                                wrap.style.display = cb.checked ? '' : 'none';
+                              });
+                            }
+                          })();
+                        </script>
+                      </div>
                     <?php endif; ?>
                   </div>
                   <?php if ($canEditFullProfile): ?>
