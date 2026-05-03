@@ -199,16 +199,34 @@ $alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false)
 if ($alreadyRun) {
     $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'skipped', 'note' => 'Already applied.'];
 } else {
-    try {
-        $pdo = db();
-        $pdo->exec("ALTER TABLE members
-            ADD COLUMN IF NOT EXISTS is_area_rep TINYINT(1) NOT NULL DEFAULT 0 AFTER notes,
-            ADD COLUMN IF NOT EXISTS is_committee TINYINT(1) NOT NULL DEFAULT 0 AFTER is_area_rep,
-            ADD COLUMN IF NOT EXISTS committee_role VARCHAR(150) NULL AFTER is_committee");
+    // ADD COLUMN IF NOT EXISTS requires MySQL 8.0.29+. The live server is older,
+    // so we run each ALTER separately and ignore "duplicate column" errors instead.
+    $pdo = db();
+    $applied = [];
+    $errors = [];
+    $tryAddCol = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'duplicate') !== false) {
+                $applied[] = $label . ' (already present)';
+            } else {
+                $errors[] = $label . ': ' . $msg;
+            }
+        }
+    };
+
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_area_rep TINYINT(1) NOT NULL DEFAULT 0 AFTER notes", 'is_area_rep');
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_committee TINYINT(1) NOT NULL DEFAULT 0 AFTER is_area_rep", 'is_committee');
+    $tryAddCol("ALTER TABLE members ADD COLUMN committee_role VARCHAR(150) NULL AFTER is_committee", 'committee_role');
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'error', 'note' => implode('; ', $errors)];
+    } else {
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
-        $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'applied', 'note' => 'Added is_area_rep, is_committee, committee_role to members table.'];
-    } catch (\Throwable $e) {
-        $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'error', 'note' => $e->getMessage()];
+        $results[] = ['label' => 'Migration 003 — Member role columns', 'status' => 'applied', 'note' => implode(', ', $applied)];
     }
 }
 
