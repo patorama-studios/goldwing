@@ -3516,41 +3516,71 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </section>
       <?php elseif ($page === 'directory'): ?>
         <?php
-        $dirStmt = $pdo->query("
-            SELECT
-                m.id,
-                m.first_name,
-                m.last_name,
-                m.member_type,
-                m.phone,
-                m.email,
-                m.member_number_base,
-                m.member_number_suffix,
-                m.member_number,
-                m.directory_pref_b_accept_calls,
-                m.directory_pref_a_collect_motorcycle,
-                m.directory_pref_c_bed_or_tent,
-                m.directory_pref_d_tools_or_workshop,
-                m.is_area_rep,
-                m.is_committee,
-                m.committee_role,
-                m.full_member_id,
-                c.name AS chapter_name,
-                c.state AS chapter_state,
-                CONCAT(fm.first_name, ' ', fm.last_name) AS full_member_name,
-                fm.member_number_base AS full_member_number_base,
-                fm.member_number_suffix AS full_member_number_suffix,
-                su.setting_value AS avatar_url
-            FROM members m
-            LEFT JOIN chapters c ON c.id = m.chapter_id
-            LEFT JOIN members fm ON fm.id = m.full_member_id
-            LEFT JOIN users u ON u.member_id = m.id
-            LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
-            WHERE m.status = 'active'
-              AND (m.directory_pref_f_exclude_electronic_directory = 0 OR m.directory_pref_f_exclude_electronic_directory IS NULL)
-            ORDER BY m.last_name ASC, m.first_name ASC
-        ");
-        $directoryMembers = $dirStmt->fetchAll();
+        // Resolve which directory pref columns actually exist on this server.
+        $dirPrefs   = \App\Services\MemberRepository::directoryPreferences();
+        $dirPrefCols = [];
+        foreach ($dirPrefs as $letter => $info) {
+            $dirPrefCols[$letter] = $info['column'];
+        }
+        $colAcceptCalls  = $dirPrefCols['B'] ?? null;
+        $colCollectMoto  = $dirPrefCols['A'] ?? null;
+        $colBedOrTent    = $dirPrefCols['C'] ?? null;
+        $colTools        = $dirPrefCols['D'] ?? null;
+        $colExcludeElec  = $dirPrefCols['F'] ?? null;
+
+        // Build optional selects for new role columns (added by Migration 003/005).
+        $tryCol = static function (string $col) use ($pdo): bool {
+            try {
+                $s = $pdo->query("SHOW COLUMNS FROM members LIKE '$col'");
+                return $s && $s->fetch() !== false;
+            } catch (\Throwable $e) {
+                return false;
+            }
+        };
+        $hasAreaRep    = $tryCol('is_area_rep');
+        $hasCommittee  = $tryCol('is_committee');
+        $hasCommRole   = $tryCol('committee_role');
+
+        $roleSelects = '';
+        if ($hasAreaRep)   $roleSelects .= ', m.is_area_rep';
+        if ($hasCommittee) $roleSelects .= ', m.is_committee';
+        if ($hasCommRole)  $roleSelects .= ', m.committee_role';
+
+        $excludeClause = $colExcludeElec
+            ? "AND (m.$colExcludeElec = 0 OR m.$colExcludeElec IS NULL)"
+            : '';
+
+        $selectCols = implode(",\n                ", array_filter([
+            'm.id', 'm.first_name', 'm.last_name', 'm.member_type',
+            'm.phone', 'm.email', 'm.member_number_base', 'm.member_number_suffix', 'm.member_number',
+            $colAcceptCalls ? "m.$colAcceptCalls" : null,
+            $colCollectMoto ? "m.$colCollectMoto" : null,
+            $colBedOrTent   ? "m.$colBedOrTent"   : null,
+            $colTools       ? "m.$colTools"        : null,
+            'm.full_member_id',
+            'c.name AS chapter_name', 'c.state AS chapter_state',
+            'CONCAT(fm.first_name, \' \', fm.last_name) AS full_member_name',
+            'fm.member_number_base AS full_member_number_base',
+            'fm.member_number_suffix AS full_member_number_suffix',
+            'su.setting_value AS avatar_url',
+        ]));
+
+        try {
+            $dirStmt = $pdo->query("
+                SELECT $selectCols $roleSelects
+                FROM members m
+                LEFT JOIN chapters c ON c.id = m.chapter_id
+                LEFT JOIN members fm ON fm.id = m.full_member_id
+                LEFT JOIN users u ON u.member_id = m.id
+                LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+                WHERE m.status = 'active'
+                $excludeClause
+                ORDER BY m.last_name ASC, m.first_name ASC
+            ");
+            $directoryMembers = $dirStmt ? $dirStmt->fetchAll() : [];
+        } catch (\Throwable $e) {
+            $directoryMembers = [];
+        }
         $dirChapters = [];
         foreach ($directoryMembers as $dm) {
           if (!empty($dm['chapter_name'])) {
@@ -3624,7 +3654,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $dmType = strtolower((string) ($dm['member_type'] ?? ''));
                   $dmFullName = trim($dm['first_name'] . ' ' . $dm['last_name']);
                   $dmSearchStr = strtolower($dmFullName . ' ' . $dmNumber);
-                  $dmCanContact = !empty($dm['directory_pref_b_accept_calls']);
+                  $dmCanContact = $colAcceptCalls && !empty($dm[$colAcceptCalls]);
 
                   $dmFullMemberName = '';
                   if ($dmType === 'associate' && !empty($dm['full_member_name'])) {
@@ -3645,13 +3675,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $typeColor = $typeColors[$dmType] ?? 'bg-gray-100 text-gray-700';
 
                   $caps = [];
-                  if (!empty($dm['directory_pref_a_collect_motorcycle'])) {
+                  if ($colCollectMoto && !empty($dm[$colCollectMoto])) {
                     $caps[] = ['Motorcycle', 'bg-green-100 text-green-800'];
                   }
-                  if (!empty($dm['directory_pref_c_bed_or_tent'])) {
+                  if ($colBedOrTent && !empty($dm[$colBedOrTent])) {
                     $caps[] = ['Bed/Tent', 'bg-teal-100 text-teal-800'];
                   }
-                  if (!empty($dm['directory_pref_d_tools_or_workshop'])) {
+                  if ($colTools && !empty($dm[$colTools])) {
                     $caps[] = ['Tools', 'bg-orange-100 text-orange-800'];
                   }
                 ?>
@@ -3758,33 +3788,65 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </script>
       <?php elseif ($page === 'committee'): ?>
         <?php
-        $cmtStmt = $pdo->query("
-            SELECT
-                m.id,
-                m.first_name,
-                m.last_name,
-                m.member_number_base,
-                m.member_number_suffix,
-                m.member_number,
-                m.is_committee,
-                m.is_area_rep,
-                m.committee_role,
-                m.phone,
-                m.email,
-                m.directory_pref_b_accept_calls,
-                m.directory_pref_f_exclude_electronic_directory,
-                c.name AS chapter_name,
-                c.state AS chapter_state,
-                su.setting_value AS avatar_url
-            FROM members m
-            LEFT JOIN chapters c ON c.id = m.chapter_id
-            LEFT JOIN users u ON u.member_id = m.id
-            LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
-            WHERE m.status = 'active'
-              AND (m.is_committee = 1 OR m.is_area_rep = 1)
-            ORDER BY m.is_committee DESC, m.committee_role ASC, m.last_name ASC, m.first_name ASC
-        ");
-        $cmtAll = $cmtStmt->fetchAll();
+        // Resolve directory pref columns for committee page (reuse vars if directory ran first)
+        if (!isset($dirPrefs)) {
+            $dirPrefs   = \App\Services\MemberRepository::directoryPreferences();
+            $dirPrefCols = [];
+            foreach ($dirPrefs as $letter => $info) {
+                $dirPrefCols[$letter] = $info['column'];
+            }
+            $colAcceptCalls = $dirPrefCols['B'] ?? null;
+            $colExcludeElec = $dirPrefCols['F'] ?? null;
+            $tryCol = static function (string $col) use ($pdo): bool {
+                try {
+                    $s = $pdo->query("SHOW COLUMNS FROM members LIKE '$col'");
+                    return $s && $s->fetch() !== false;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            };
+            $hasAreaRep   = $tryCol('is_area_rep');
+            $hasCommittee = $tryCol('is_committee');
+            $hasCommRole  = $tryCol('committee_role');
+        }
+
+        $cmtRoleSelects = '';
+        if ($hasAreaRep)   $cmtRoleSelects .= ', m.is_area_rep';
+        if ($hasCommittee) $cmtRoleSelects .= ', m.is_committee';
+        if ($hasCommRole)  $cmtRoleSelects .= ', m.committee_role';
+
+        $cmtAcceptCol   = $colAcceptCalls ? "m.$colAcceptCalls," : '';
+        $cmtExcludeCol  = $colExcludeElec ? "m.$colExcludeElec," : '';
+
+        if ($hasCommittee || $hasAreaRep) {
+            $cmtWhere = $hasCommittee && $hasAreaRep
+                ? 'AND (m.is_committee = 1 OR m.is_area_rep = 1)'
+                : ($hasCommittee ? 'AND m.is_committee = 1' : 'AND m.is_area_rep = 1');
+            try {
+                $cmtStmt = $pdo->query("
+                    SELECT
+                        m.id, m.first_name, m.last_name,
+                        m.member_number_base, m.member_number_suffix, m.member_number,
+                        m.phone, m.email,
+                        $cmtAcceptCol $cmtExcludeCol
+                        c.name AS chapter_name, c.state AS chapter_state,
+                        su.setting_value AS avatar_url
+                        $cmtRoleSelects
+                    FROM members m
+                    LEFT JOIN chapters c ON c.id = m.chapter_id
+                    LEFT JOIN users u ON u.member_id = m.id
+                    LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+                    WHERE m.status = 'active'
+                    $cmtWhere
+                    ORDER BY m.last_name ASC, m.first_name ASC
+                ");
+                $cmtAll = $cmtStmt ? $cmtStmt->fetchAll() : [];
+            } catch (\Throwable $e) {
+                $cmtAll = [];
+            }
+        } else {
+            $cmtAll = [];
+        }
         $cmtCommittee = array_filter($cmtAll, fn($r) => !empty($r['is_committee']));
         $cmtAreaReps  = array_filter($cmtAll, fn($r) => !empty($r['is_area_rep']) && empty($r['is_committee']));
         ?>
@@ -3813,7 +3875,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $cmChapter = !empty($cm['chapter_name'])
                     ? $cm['chapter_name'] . (!empty($cm['chapter_state']) ? ' (' . $cm['chapter_state'] . ')' : '')
                     : '';
-                  $cmCanContact = !empty($cm['directory_pref_b_accept_calls']) && empty($cm['directory_pref_f_exclude_electronic_directory']);
+                  $cmCanContact = ($colAcceptCalls && !empty($cm[$colAcceptCalls])) && !($colExcludeElec && !empty($cm[$colExcludeElec]));
                 ?>
                   <div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                     <?php if (!empty($cm['avatar_url'])): ?>
@@ -3869,7 +3931,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $arChapter = !empty($ar['chapter_name'])
                     ? $ar['chapter_name'] . (!empty($ar['chapter_state']) ? ' (' . $ar['chapter_state'] . ')' : '')
                     : '';
-                  $arCanContact = !empty($ar['directory_pref_b_accept_calls']) && empty($ar['directory_pref_f_exclude_electronic_directory']);
+                  $arCanContact = ($colAcceptCalls && !empty($ar[$colAcceptCalls])) && !($colExcludeElec && !empty($ar[$colExcludeElec]));
                 ?>
                   <div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                     <?php if (!empty($ar['avatar_url'])): ?>

@@ -270,6 +270,47 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 005 — Ensure member role columns exist (is_area_rep, is_committee, committee_role)
+// Migration 003 used the same settings key as the earlier roles-simplification
+// migration on some servers, so these columns may have been skipped. This
+// migration uses a distinct key and is idempotent — safe to run multiple times.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_005_member_role_columns';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 005 — Member role columns (ensure)', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $applied = [];
+    $errors  = [];
+    $tryAddCol = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'duplicate') !== false) {
+                $applied[] = $label . ' (already present)';
+            } else {
+                $errors[] = $label . ': ' . $msg;
+            }
+        }
+    };
+
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_area_rep TINYINT(1) NOT NULL DEFAULT 0", 'is_area_rep');
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_committee TINYINT(1) NOT NULL DEFAULT 0", 'is_committee');
+    $tryAddCol("ALTER TABLE members ADD COLUMN committee_role VARCHAR(150) NULL", 'committee_role');
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 005 — Member role columns (ensure)', 'status' => 'error', 'note' => implode('; ', $errors)];
+    } else {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 005 — Member role columns (ensure)', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
