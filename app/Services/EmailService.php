@@ -124,29 +124,54 @@ class EmailService
         }
         $logoUrl = self::normalizeAssetUrl($logoUrl);
         $safeSiteName = htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8');
-        $safeSubject = htmlspecialchars($subject, ENT_QUOTES, 'UTF-8');
 
         $logoHtml = $logoUrl !== ''
-            ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $safeSiteName . ' logo" style="max-height:72px; width:auto; display:block;">'
-            : '<div style="font-size:20px; font-weight:bold; letter-spacing:0.02em;">' . $safeSiteName . '</div>';
+            ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $safeSiteName . '" width="120" style="display:block;margin:0 auto 16px;height:auto;">'
+            : '<div style="font-size:20px;font-weight:bold;letter-spacing:0.02em;color:#9e9140;">' . $safeSiteName . '</div>';
 
         $supportEmail = 'webmaster@goldwing.org.au';
-        $safeSupportEmail = htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8');
+        $safeSupport  = htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8');
 
-        return '<div data-email-template="goldwing" style="font-family: Arial, sans-serif; background:#f5f6f2; padding:32px 0;">'
-            . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">'
-            . '<tr><td align="center">'
-            . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="640" style="width:640px; max-width:640px; background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:28px;">'
-            . '<tr><td style="text-align:center; padding-bottom:14px;">' . $logoHtml . '</td></tr>'
-            . '<tr><td style="font-size:22px; font-weight:bold; color:#111827; padding:0 0 12px 0;">' . $safeSubject . '</td></tr>'
-            . '<tr><td style="font-size:14px; line-height:1.6; color:#374151;">' . $bodyHtml . '</td></tr>'
-            . '</table>'
-            . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="640" style="width:640px; max-width:640px; padding-top:10px;">'
-            . '<tr><td style="text-align:center; font-size:12px; color:#9ca3af;">'
-            . $safeSiteName . ' &bull; <a href="mailto:' . $safeSupportEmail . '" style="color:#9ca3af; text-decoration:none;">' . $safeSupportEmail . '</a>'
-            . '</td></tr>'
-            . '</table>'
-            . '</td></tr></table></div>';
+        // ── Outer page ────────────────────────────────────────────────────────
+        $html  = '<div data-email-template="goldwing" style="margin:0;padding:40px 20px;background:#e8e3d7;font-family:Arial,Helvetica,sans-serif;">';
+        $html .= '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;">';
+
+        // Gold top bar
+        $html .= '<tr><td style="background:#9e9140;height:6px;border-radius:8px 8px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>';
+
+        // Main white card
+        $html .= '<tr><td style="background:#ffffff;border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">';
+        $html .= '<table width="100%" cellpadding="0" cellspacing="0" border="0">';
+
+        // Logo header (cream)
+        $html .= '<tr><td style="background:#f4f1e8;padding:32px 40px;text-align:center;border-bottom:1px solid #e8e3d7;">';
+        $html .= $logoHtml;
+        $html .= '<p style="margin:0;font-size:13px;color:#9e9140;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Member Portal</p>';
+        $html .= '</td></tr>';
+
+        // Body content
+        $html .= '<tr><td style="padding:40px;font-size:15px;line-height:1.6;color:#374151;">';
+        $html .= $bodyHtml;
+        $html .= '</td></tr>';
+
+        // Footer (cream)
+        $html .= '<tr><td style="background:#f4f1e8;border-top:1px solid #e8e3d7;padding:20px 40px;text-align:center;">';
+        $html .= '<p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#9e9140;">' . $safeSiteName . '</p>';
+        $html .= '<p style="margin:0;font-size:12px;color:#9a9a94;">';
+        $html .= '<a href="mailto:' . $safeSupport . '" style="color:#9a9a94;text-decoration:none;">' . $safeSupport . '</a>';
+        $html .= ' &nbsp;&middot;&nbsp; ';
+        $html .= '<a href="https://goldwing.org.au" style="color:#9a9a94;text-decoration:none;">goldwing.org.au</a>';
+        $html .= '</p></td></tr>';
+
+        $html .= '</table>';
+        $html .= '</td></tr>';
+
+        // Bottom spacing
+        $html .= '<tr><td style="height:32px;"></td></tr>';
+        $html .= '</table>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     private static function normalizeAssetUrl(string $url): string

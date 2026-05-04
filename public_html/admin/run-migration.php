@@ -352,7 +352,6 @@ if ($alreadyRun) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // MIGRATION 007 — Ticket messages + archived status
 // Adds ticket_messages conversation table and extends status ENUMs/values
 // to support the 'archived' state on all request types.
@@ -392,6 +391,54 @@ if ($alreadyRun) {
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 007 — Ticket messages', 'status' => 'error', 'note' => $e->getMessage()];
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 008 — Branded welcome email body (AGA design)
+// Updates the member_set_password template in notifications.catalog to use the
+// new AGA-branded inner body content (gold button, feature grid, 48-hour link).
+// The EmailService wrapper (gold bar, logo header, footer) is now in PHP code;
+// this migration only updates the inner body stored in the DB.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_008_branded_welcome_email';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 008 — Branded welcome email body', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $catalog = SettingsService::getGlobal('notifications.catalog', []);
+    if (!is_array($catalog)) {
+        $catalog = [];
+    }
+
+    $brandedBody = '<p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1c1a17;line-height:1.3;">G\'day {{first_name}},</p>'
+        . '<p style="margin:0 0 24px;font-size:16px;color:#5a5a55;line-height:1.6;">Welcome to the Australian Goldwing Association\'s member portal \xe2\x80\x94 we\'re thrilled to have you on board with us!</p>'
+        . '<hr style="border:none;border-top:1px solid #e8e3d7;margin:0 0 24px;">'
+        . '<p style="margin:0 0 8px;font-size:15px;font-weight:600;color:#1c1a17;">One quick step before you can log in:</p>'
+        . '<p style="margin:0 0 28px;font-size:15px;color:#5a5a55;line-height:1.6;">You\'ll need to create your password. Press the button below to get started \xe2\x80\x94 it only takes a moment.</p>'
+        . '<table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;"><tr><td style="background:#9e9140;border-radius:8px;"><a href="{{reset_link}}" style="display:inline-block;padding:14px 36px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:0.02em;">Set Your Password &rarr;</a></td></tr></table>'
+        . '<p style="margin:0 0 24px;font-size:13px;color:#9a9a94;line-height:1.5;">This link is valid for 48 hours. If you have any trouble, reply to this email or contact us at <a href="mailto:webmaster@goldwing.org.au" style="color:#9e9140;text-decoration:none;">webmaster@goldwing.org.au</a></p>'
+        . '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f1e8;border-radius:10px;overflow:hidden;">'
+        . '<tr><td style="padding:20px 24px 8px;"><p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#9e9140;text-transform:uppercase;letter-spacing:0.1em;">Once you\'re in, you can</p></td></tr>'
+        . '<tr><td style="padding:0 24px 20px;">'
+        . '<table width="100%" cellpadding="0" cellspacing="0" border="0">'
+        . '<tr><td width="50%" style="padding:4px 8px 4px 0;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x8f\x8d\xef\xb8\x8f Manage your bikes</td><td width="50%" style="padding:4px 0 4px 8px;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x93\x96 Read Wings Magazine</td></tr>'
+        . '<tr><td width="50%" style="padding:4px 8px 4px 0;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x92\xb3 Manage your membership</td><td width="50%" style="padding:4px 0 4px 8px;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x9b\x92 Shop the members store</td></tr>'
+        . '<tr><td width="50%" style="padding:4px 8px 4px 0;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x93\x85 Browse upcoming events</td><td width="50%" style="padding:4px 0 4px 8px;font-size:13px;color:#5a5a55;vertical-align:top;">\xf0\x9f\x93\xa2 Post on the notice board</td></tr>'
+        . '</table></td></tr></table>';
+
+    $catalog['member_set_password'] = array_merge(
+        $catalog['member_set_password'] ?? [],
+        [
+            'subject' => "Welcome to the Australian Goldwing Association \xe2\x80\x94 let\xe2\x80\x99s get you set up!",
+            'body'    => $brandedBody,
+        ]
+    );
+
+    SettingsService::setGlobal((int) $user['id'], 'notifications.catalog', $catalog);
+    SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+
+    $results[] = ['label' => 'Migration 008 — Branded welcome email body', 'status' => 'applied', 'note' => 'member_set_password body updated to AGA-branded design.'];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
