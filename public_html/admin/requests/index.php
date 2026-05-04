@@ -32,8 +32,8 @@ $pageTitle  = 'Notification Hub';
 $activePage = 'requests';
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
-function reqStatusBadge(string $status): string {
-    $s = strtolower($status);
+function reqStatusBadge(?string $status): string {
+    $s = strtolower($status ?? '');
     return match ($s) {
         'approved' => 'bg-emerald-100 text-emerald-800',
         'rejected' => 'bg-rose-100 text-rose-800',
@@ -98,7 +98,7 @@ function reqStatusBadge(string $status): string {
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-xs font-semibold uppercase tracking-wider text-gray-500"><?= e($item['type_label']) ?></span>
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold <?= reqStatusBadge($item['status']) ?>"><?= e(strtoupper($item['status'])) ?></span>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold <?= reqStatusBadge($item['status'] ?? '') ?>"><?= e(strtoupper($item['status'] ?? '')) ?></span>
                       </div>
                       <p class="font-semibold text-gray-900 truncate mt-0.5"><?= e($item['title']) ?></p>
                       <?php if (!empty($item['summary'])): ?>
