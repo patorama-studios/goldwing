@@ -8,6 +8,9 @@ require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\SettingsService;
 
+// Clear OPcache so freshly-deployed service files are picked up immediately.
+if (function_exists('opcache_reset')) { opcache_reset(); }
+
 // Require admin login
 $user = current_user();
 if (!$user || empty($user['id'])) {

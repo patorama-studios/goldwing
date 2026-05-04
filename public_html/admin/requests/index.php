@@ -28,6 +28,11 @@ if ($typeFilter !== '' && !in_array($typeFilter, $validTypes, true)) {
 $items  = PendingRequestsService::all($typeFilter ?: null, $statusFilter);
 $counts = PendingRequestsService::counts();
 
+// Temporary debug: dump first item so we can read raw structure from browser.
+// Safe: only visible in source, never rendered in UI.
+$_dbgItem = !empty($items) ? $items[0] : null;
+$_dbgDump = base64_encode(json_encode(array_diff_key($_dbgItem ?? [], ['raw' => 1])));
+
 $pageTitle  = 'Notification Hub';
 $activePage = 'requests';
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
@@ -42,6 +47,7 @@ function reqStatusBadge(?string $status): string {
     };
 }
 ?>
+<!-- DEBUG_ITEM:<?= $_dbgDump ?? '' ?> -->
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../../app/Views/partials/backend_admin_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
