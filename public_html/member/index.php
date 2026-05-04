@@ -3573,7 +3573,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 LEFT JOIN members fm ON fm.id = m.full_member_id
                 LEFT JOIN users u ON u.member_id = m.id
                 LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
-                WHERE m.status = 'active'
+                WHERE LOWER(m.status) = 'active'
                 $excludeClause
                 ORDER BY m.last_name ASC, m.first_name ASC
             ");
@@ -3836,7 +3836,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     LEFT JOIN chapters c ON c.id = m.chapter_id
                     LEFT JOIN users u ON u.member_id = m.id
                     LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
-                    WHERE m.status = 'active'
+                    WHERE LOWER(m.status) = 'active'
                     $cmtWhere
                     ORDER BY m.last_name ASC, m.first_name ASC
                 ");
