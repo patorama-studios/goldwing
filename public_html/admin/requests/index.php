@@ -3,6 +3,14 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\PendingRequestsService;
 
+// Temporary: capture PHP fatal errors so we can diagnose the items-list crash.
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        echo '<!-- PHP_FATAL:' . base64_encode(json_encode($err)) . ' -->';
+    }
+});
+
 require_permission('admin.requests.view');
 
 $user = current_user();
