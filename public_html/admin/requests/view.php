@@ -78,30 +78,61 @@ function reqStatusBadge2(?string $status): string {
           </div>
 
           <div class="p-6 space-y-4">
-            <?php if (!empty($item['summary'])): ?>
-              <p class="text-sm text-gray-700"><?= e($item['summary']) ?></p>
-            <?php endif; ?>
 
-            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-2">Submission details</p>
-              <dl class="grid gap-3 sm:grid-cols-2 text-sm">
-                <?php foreach ($item['raw'] as $k => $v):
-                  if (in_array($k, ['feedback_message', 'reviewed_by', 'reviewed_at', 'submitter_name', 'submitter_email', 'admin_notes', 'rejection_reason'], true)) continue;
-                  if (is_array($v) || is_object($v)) continue;
-                  if ($v === null || $v === '') continue;
-                ?>
-                  <div>
-                    <dt class="text-xs uppercase tracking-wider text-gray-500"><?= e(str_replace('_', ' ', $k)) ?></dt>
-                    <dd class="text-gray-900 break-words"><?= e((string) $v) ?></dd>
-                  </div>
-                <?php endforeach; ?>
-              </dl>
-            </div>
+            <?php
+              // Rich-text / long-form fields rendered with preserved HTML so they're readable.
+              $richFields  = ['message', 'content', 'description', 'tribute', 'nomination_details'];
+              // Fields to omit from the compact metadata grid (shown elsewhere or internal noise).
+              $skipMeta    = array_merge($richFields, [
+                  'id', 'status', 'created_at', 'created_by', 'submitted_at',
+                  'user_id', 'user_name', 'user_email', 'ticket_status',
+                  'feedback_message', 'reviewed_by', 'reviewed_at', 'response',
+                  'submitter_name', 'submitter_email', 'admin_notes', 'rejection_reason',
+              ]);
+            ?>
+
+            <?php foreach ($richFields as $rf): ?>
+              <?php $rfVal = (string) ($item['raw'][$rf] ?? ''); if ($rfVal === '') continue; ?>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-2"><?= e(ucwords(str_replace('_', ' ', $rf))) ?></p>
+                <div class="text-sm text-gray-800 leading-relaxed prose prose-sm max-w-none">
+                  <?= strip_tags($rfVal, '<p><br><strong><b><em><i><ul><ol><li><h2><h3><h4><a><blockquote><pre><code>') ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
+
+            <?php
+              $metaFields = array_filter($item['raw'], function ($v, $k) use ($skipMeta) {
+                  if (in_array($k, $skipMeta, true)) return false;
+                  if (is_array($v) || is_object($v)) return false;
+                  return $v !== null && $v !== '';
+              }, ARRAY_FILTER_USE_BOTH);
+            ?>
+            <?php if (!empty($metaFields)): ?>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-2">Submission details</p>
+                <dl class="grid gap-3 sm:grid-cols-2 text-sm">
+                  <?php foreach ($metaFields as $k => $v): ?>
+                    <div>
+                      <dt class="text-xs uppercase tracking-wider text-gray-500"><?= e(str_replace('_', ' ', $k)) ?></dt>
+                      <dd class="text-gray-900 break-words"><?= e((string) $v) ?></dd>
+                    </div>
+                  <?php endforeach; ?>
+                </dl>
+              </div>
+            <?php endif; ?>
 
             <?php if (!empty($item['raw']['feedback_message'])): ?>
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p class="text-xs uppercase tracking-[0.3em] text-amber-700 mb-1">Existing feedback</p>
                 <p class="text-sm text-amber-900 whitespace-pre-wrap"><?= e((string) $item['raw']['feedback_message']) ?></p>
+              </div>
+            <?php endif; ?>
+
+            <?php if (!empty($item['raw']['response'])): ?>
+              <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p class="text-xs uppercase tracking-[0.3em] text-blue-700 mb-1">Admin response on record</p>
+                <p class="text-sm text-blue-900 whitespace-pre-wrap"><?= e((string) $item['raw']['response']) ?></p>
               </div>
             <?php endif; ?>
           </div>
