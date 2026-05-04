@@ -22,14 +22,18 @@ unset($_SESSION['requests_flash']);
 
 $canAction = current_admin_can('admin.requests.action');
 
+// Load conversation thread
+$threadMessages = $item ? PendingRequestsService::getMessages($type, $id) : [];
+
 $pageTitle  = 'Request Detail';
 $activePage = 'requests';
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
-function reqStatusBadge2(string $status): string {
-    return match (strtolower($status)) {
+function reqStatusBadge2(?string $status): string {
+    return match (strtolower($status ?? '')) {
         'approved' => 'bg-emerald-100 text-emerald-800',
         'rejected' => 'bg-rose-100 text-rose-800',
+        'archived' => 'bg-gray-200 text-gray-600',
         'pending', 'new' => 'bg-amber-100 text-amber-800',
         default => 'bg-gray-100 text-gray-700',
     };
@@ -104,18 +108,51 @@ function reqStatusBadge2(string $status): string {
         </section>
 
         <?php
-          $isFeedback = $type === \App\Services\PendingRequestsService::TYPE_FEEDBACK;
+          $isFeedback   = $type === \App\Services\PendingRequestsService::TYPE_FEEDBACK;
           $approveLabel  = $isFeedback ? 'Mark resolved' : 'Approve';
-          $rejectLabel   = $isFeedback ? "Won't fix"      : 'Deny';
-          $feedbackLabel = $isFeedback ? 'Reply to user'  : 'Send feedback';
-          $approveIcon   = $isFeedback ? 'task_alt'       : 'check_circle';
-          $rejectIcon    = $isFeedback ? 'block'          : 'cancel';
-          $feedbackIcon  = $isFeedback ? 'reply'          : 'forum';
+          $rejectLabel   = $isFeedback ? "Won't fix"     : 'Deny';
+          $feedbackLabel = $isFeedback ? 'Reply to user' : 'Send feedback';
+          $approveIcon   = $isFeedback ? 'task_alt'      : 'check_circle';
+          $rejectIcon    = $isFeedback ? 'block'         : 'cancel';
+          $feedbackIcon  = $isFeedback ? 'reply'         : 'forum';
           $messageLabel  = $isFeedback
             ? 'Response to submitter (optional for resolve / won\'t fix, required for reply)'
             : 'Message to submitter (optional for approve, required for deny/feedback)';
+          $itemStatus    = $item['status'] ?? '';
+          $isPending     = !in_array($itemStatus, ['approved', 'rejected', 'archived'], true);
+          $isActioned    = in_array($itemStatus, ['approved', 'rejected'], true);
+          $isArchived    = ($itemStatus === 'archived');
         ?>
-        <?php if ($canAction && $item['status'] !== 'approved' && $item['status'] !== 'rejected'): ?>
+
+        <?php if (!empty($threadMessages)): ?>
+          <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-100 px-6 py-3 flex items-center gap-2">
+              <span class="material-icons-outlined text-base text-gray-400">forum</span>
+              <h2 class="font-semibold text-gray-900">Conversation</h2>
+            </div>
+            <div class="divide-y divide-gray-100">
+              <?php foreach ($threadMessages as $tmsg): ?>
+                <div class="px-6 py-4 flex gap-3 <?= $tmsg['sender_type'] === 'admin' ? 'bg-blue-50/50' : 'bg-white' ?>">
+                  <span class="material-icons-outlined text-2xl mt-0.5 <?= $tmsg['sender_type'] === 'admin' ? 'text-blue-400' : 'text-gray-400' ?>">
+                    <?= $tmsg['sender_type'] === 'admin' ? 'support_agent' : 'person' ?>
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                      <span class="font-semibold text-sm text-gray-900"><?= e($tmsg['sender_name']) ?></span>
+                      <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold <?= $tmsg['sender_type'] === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600' ?>">
+                        <?= $tmsg['sender_type'] === 'admin' ? 'Admin' : 'Member' ?>
+                      </span>
+                      <span class="text-xs text-gray-400"><?= e($tmsg['created_at']) ?></span>
+                    </div>
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap"><?= e($tmsg['message']) ?></p>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </section>
+        <?php endif; ?>
+
+        <?php if ($canAction && $isPending): ?>
           <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-6 py-3">
               <h2 class="font-semibold text-gray-900">Take action</h2>
@@ -144,13 +181,33 @@ function reqStatusBadge2(string $status): string {
               </div>
             </form>
           </section>
-        <?php elseif ($canAction): ?>
+
+        <?php elseif ($canAction && $isActioned): ?>
           <section class="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
-            <p class="text-sm text-gray-600">This request has been <?= e($item['status']) ?>.
-              <?php if (!empty($item['raw']['reviewed_at'])): ?>
-                Reviewed <?= e((string) $item['raw']['reviewed_at']) ?>.
-              <?php endif; ?>
-            </p>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <p class="text-sm text-gray-600">This request has been <strong><?= e($itemStatus) ?></strong>.
+                <?php if (!empty($item['raw']['reviewed_at'])): ?>
+                  Reviewed <?= e((string) $item['raw']['reviewed_at']) ?>.
+                <?php endif; ?>
+              </p>
+              <form method="post" action="/admin/requests/actions.php" class="shrink-0">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="type" value="<?= e($type) ?>">
+                <input type="hidden" name="id" value="<?= (int) $id ?>">
+                <button type="submit" name="action" value="archive"
+                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  <span class="material-icons-outlined text-base">archive</span> Archive
+                </button>
+              </form>
+            </div>
+          </section>
+
+        <?php elseif ($canAction && $isArchived): ?>
+          <section class="rounded-2xl border border-gray-100 bg-gray-50 shadow-sm p-6">
+            <div class="flex items-center gap-2 text-gray-500">
+              <span class="material-icons-outlined">inventory_2</span>
+              <p class="text-sm">This request has been archived and is closed.</p>
+            </div>
           </section>
         <?php endif; ?>
       <?php endif; ?>

@@ -1,5 +1,4 @@
 <?php
-// v2 — updated to force OPcache refresh
 namespace App\Services;
 
 use PDO;
@@ -39,6 +38,12 @@ class PendingRequestsService
      * Return a unified list of all pending requests across all types.
      * Each row: [type, id, title, submitted_by, submitted_at, status, detail_url, summary]
      */
+    /** Valid status filters accepted by the hub */
+    public static function validStatuses(): array
+    {
+        return ['pending', 'approved', 'rejected', 'archived', 'all'];
+    }
+
     public static function all(?string $typeFilter = null, string $statusFilter = 'pending'): array
     {
         $items = [];
@@ -102,6 +107,182 @@ class PendingRequestsService
             }
         }
         return null;
+    }
+
+    /**
+     * Return all requests submitted by a specific user (for the member notification hub).
+     * Keyed the same as all() so the same templates can render them.
+     */
+    public static function allForUser(int $userId, int $memberId): array
+    {
+        $pdo = Database::connection();
+        $items = [];
+
+        // beta_feedback — linked by user_id
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT f.id, f.user_id, f.submitter_name, f.submitter_email, f.message,
+                        f.page_url, f.user_agent, f.status, f.response, f.reviewed_by,
+                        f.reviewed_at, f.created_at,
+                        u.name AS user_name, u.email AS user_email
+                 FROM beta_feedback f
+                 LEFT JOIN users u ON u.id = f.user_id
+                 WHERE f.user_id = :uid
+                 ORDER BY f.created_at DESC LIMIT 100"
+            );
+            $stmt->execute(['uid' => $userId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $displayStatus = match ((string) $r['status']) {
+                    'resolved'  => 'approved',
+                    'wont_fix'  => 'rejected',
+                    'archived'  => 'archived',
+                    default     => 'pending',
+                };
+                $r['ticket_status'] = $r['status'];
+                $items[] = self::row(self::TYPE_FEEDBACK, $r['id'],
+                    'Ticket #' . $r['id'] . ' — ' . substr(strip_tags((string) $r['message']), 0, 60),
+                    $displayStatus, $r['created_at'],
+                    $r['submitter_name'] ?: $r['user_name'] ?: 'You',
+                    $r['submitter_email'] ?: $r['user_email'] ?: null,
+                    ($r['page_url'] ? 'Page: ' . $r['page_url'] . ' · ' : '') . substr((string) $r['message'], 0, 160),
+                    $r);
+            }
+        } catch (Throwable $e) {}
+
+        // notices — linked by created_by (user_id)
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT n.id, n.title, n.content, n.status, n.created_at, n.feedback_message
+                 FROM notices n WHERE n.created_by = :uid ORDER BY n.created_at DESC LIMIT 50"
+            );
+            $stmt->execute(['uid' => $userId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $items[] = self::row(self::TYPE_NOTICE, $r['id'], $r['title'], $r['status'], $r['created_at'],
+                    null, null, substr(strip_tags((string) $r['content']), 0, 160), $r);
+            }
+        } catch (Throwable $e) {}
+
+        // calendar_events — linked by created_by
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT e.id, e.title, e.description, e.status, e.created_at, e.start_at, e.feedback_message
+                 FROM calendar_events e WHERE e.created_by = :uid ORDER BY e.created_at DESC LIMIT 50"
+            );
+            $stmt->execute(['uid' => $userId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $st = strtolower((string) $r['status']) === 'published' ? 'approved' : strtolower((string) $r['status']);
+                $items[] = self::row(self::TYPE_EVENT, $r['id'], $r['title'], $st, $r['created_at'],
+                    null, null,
+                    ($r['start_at'] ? 'Starts ' . $r['start_at'] . ' · ' : '') . substr(strip_tags((string) $r['description']), 0, 140),
+                    $r);
+            }
+        } catch (Throwable $e) {}
+
+        // fallen_wings — linked by submitted_by (user_id)
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT fw.id, fw.full_name, fw.year_of_passing, fw.tribute, fw.status, fw.created_at, fw.feedback_message
+                 FROM fallen_wings fw WHERE fw.submitted_by = :uid ORDER BY fw.created_at DESC LIMIT 50"
+            );
+            $stmt->execute(['uid' => $userId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $items[] = self::row(self::TYPE_FALLEN_WINGS, $r['id'], $r['full_name'],
+                    strtolower((string) $r['status']), $r['created_at'], null, null,
+                    'Year of passing: ' . $r['year_of_passing'], $r);
+            }
+        } catch (Throwable $e) {}
+
+        // chapter_change_requests — linked by member_id
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT ccr.id, ccr.status, ccr.requested_at, ccr.feedback_message,
+                        c.name AS chapter_name
+                 FROM chapter_change_requests ccr
+                 LEFT JOIN chapters c ON c.id = ccr.requested_chapter_id
+                 WHERE ccr.member_id = :mid ORDER BY ccr.requested_at DESC LIMIT 20"
+            );
+            $stmt->execute(['mid' => $memberId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $items[] = self::row(self::TYPE_CHAPTER_CHANGE, $r['id'],
+                    'Chapter change → ' . ($r['chapter_name'] ?? 'Chapter'),
+                    strtolower((string) $r['status']), $r['requested_at'], null, null,
+                    'Requested chapter: ' . ($r['chapter_name'] ?? 'n/a'), $r);
+            }
+        } catch (Throwable $e) {}
+
+        // membership_applications — linked by member_id
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT a.id, a.member_type, a.status, a.created_at
+                 FROM membership_applications a WHERE a.member_id = :mid ORDER BY a.created_at DESC LIMIT 20"
+            );
+            $stmt->execute(['mid' => $memberId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $items[] = self::row(self::TYPE_MEMBERSHIP, $r['id'], 'Membership application',
+                    strtolower((string) $r['status']), $r['created_at'], null, null,
+                    'Type: ' . $r['member_type'], $r);
+            }
+        } catch (Throwable $e) {}
+
+        usort($items, fn($a, $b) => strcmp((string)($b['submitted_at'] ?? ''), (string)($a['submitted_at'] ?? '')));
+        return $items;
+    }
+
+    // ─── ticket message thread ─────────────────────────────────────────────
+
+    /** Fetch conversation messages for a specific request. */
+    public static function getMessages(string $type, int $id): array
+    {
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare(
+                'SELECT * FROM ticket_messages WHERE request_type = :t AND request_id = :id ORDER BY created_at ASC'
+            );
+            $stmt->execute(['t' => $type, 'id' => $id]);
+            return $stmt->fetchAll() ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /** Add a message to the conversation thread. */
+    public static function addMessage(string $type, int $id, string $senderType, ?int $userId, string $senderName, string $message): void
+    {
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare(
+                'INSERT INTO ticket_messages (request_type, request_id, sender_type, user_id, sender_name, message, created_at)
+                 VALUES (:t, :id, :st, :uid, :name, :msg, NOW())'
+            );
+            $stmt->execute([
+                't'    => $type,
+                'id'   => $id,
+                'st'   => $senderType,
+                'uid'  => $userId,
+                'name' => $senderName,
+                'msg'  => $message,
+            ]);
+        } catch (Throwable $e) {}
+    }
+
+    /** Reopen a request back to pending when a member replies. */
+    public static function reopen(string $type, int $id): void
+    {
+        try {
+            $pdo = Database::connection();
+            $tableMap = [
+                self::TYPE_FEEDBACK       => ['table' => 'beta_feedback',           'status_open' => 'open',    'enum' => 'lower'],
+                self::TYPE_NOTICE         => ['table' => 'notices',                  'status_open' => 'pending', 'enum' => 'lower'],
+                self::TYPE_EVENT          => ['table' => 'calendar_events',          'status_open' => 'pending', 'enum' => 'lower'],
+                self::TYPE_FALLEN_WINGS   => ['table' => 'fallen_wings',             'status_open' => 'PENDING', 'enum' => 'upper'],
+                self::TYPE_CHAPTER_CHANGE => ['table' => 'chapter_change_requests',  'status_open' => 'PENDING', 'enum' => 'upper'],
+                self::TYPE_MEMBERSHIP     => ['table' => 'membership_applications',  'status_open' => 'PENDING', 'enum' => 'upper'],
+            ];
+            if (!isset($tableMap[$type])) return;
+            $cfg = $tableMap[$type];
+            $pdo->prepare("UPDATE {$cfg['table']} SET status = :s WHERE id = :id")
+                ->execute(['s' => $cfg['status_open'], 'id' => $id]);
+        } catch (Throwable $e) {}
     }
 
     // ─── per-type fetchers ─────────────────────────────────────────────
@@ -257,14 +438,13 @@ class PendingRequestsService
     {
         $pdo = Database::connection();
         // Map hub status filters onto ticket statuses.
-        $where = '';
-        if ($statusFilter === 'pending') {
-            $where = "AND f.status IN ('open','in_progress')";
-        } elseif ($statusFilter === 'approved') {
-            $where = "AND f.status = 'resolved'";
-        } elseif ($statusFilter === 'rejected') {
-            $where = "AND f.status = 'wont_fix'";
-        }
+        $where = match ($statusFilter) {
+            'pending'  => "AND f.status IN ('open','in_progress')",
+            'approved' => "AND f.status = 'resolved'",
+            'rejected' => "AND f.status = 'wont_fix'",
+            'archived' => "AND f.status = 'archived'",
+            default    => '',
+        };
         $sql = "SELECT f.id, f.user_id, f.submitter_name, f.submitter_email, f.message,
                        f.page_url, f.user_agent, f.status, f.response, f.reviewed_by,
                        f.reviewed_at, f.created_at,
@@ -281,6 +461,7 @@ class PendingRequestsService
             $displayStatus = match ((string) $r['status']) {
                 'resolved' => 'approved',
                 'wont_fix' => 'rejected',
+                'archived' => 'archived',
                 default    => 'pending',
             };
             $title = 'Ticket #' . $r['id'] . ' — ' . substr(strip_tags((string) $r['message']), 0, 60);
@@ -320,30 +501,24 @@ class PendingRequestsService
 
     private static function statusWhere(string $statusFilter, string $col = 'n.status'): string
     {
-        if ($statusFilter === 'pending') {
-            return "AND $col = 'pending'";
-        }
-        if ($statusFilter === 'approved') {
-            return "AND $col = 'approved'";
-        }
-        if ($statusFilter === 'rejected') {
-            return "AND $col = 'rejected'";
-        }
-        return '';
+        return match ($statusFilter) {
+            'pending'  => "AND $col = 'pending'",
+            'approved' => "AND $col = 'approved'",
+            'rejected' => "AND $col = 'rejected'",
+            'archived' => "AND $col = 'archived'",
+            default    => '',
+        };
     }
 
     private static function statusWhereUpper(string $statusFilter, string $col): string
     {
-        if ($statusFilter === 'pending') {
-            return "AND $col = 'PENDING'";
-        }
-        if ($statusFilter === 'approved') {
-            return "AND $col = 'APPROVED'";
-        }
-        if ($statusFilter === 'rejected') {
-            return "AND $col = 'REJECTED'";
-        }
-        return '';
+        return match ($statusFilter) {
+            'pending'  => "AND $col = 'PENDING'",
+            'approved' => "AND $col = 'APPROVED'",
+            'rejected' => "AND $col = 'REJECTED'",
+            'archived' => "AND $col = 'ARCHIVED'",
+            default    => '',
+        };
     }
 
     private static function row(string $type, $id, ?string $title, ?string $status, ?string $submittedAt,
@@ -403,6 +578,8 @@ class PendingRequestsService
                 self::updateStatus($pdo, $cfg, $id, 'approved', $message, $reviewerUserId);
             } elseif ($action === 'reject') {
                 self::updateStatus($pdo, $cfg, $id, 'rejected', $message, $reviewerUserId);
+            } elseif ($action === 'archive') {
+                self::updateStatus($pdo, $cfg, $id, 'archived', $message, $reviewerUserId);
             } elseif ($action === 'feedback') {
                 self::updateFeedback($pdo, $cfg, $id, $message, $reviewerUserId);
             } else {
@@ -502,8 +679,13 @@ class PendingRequestsService
         }
 
         if ($enum === 'feedback') {
-            // approve = mark resolved, reject = wont_fix. Store the message as the response.
-            $ticketStatus = $newStatus === 'approved' ? 'resolved' : 'wont_fix';
+            // approve = resolved, reject = wont_fix, archive = archived
+            $ticketStatus = match ($newStatus) {
+                'approved' => 'resolved',
+                'rejected' => 'wont_fix',
+                'archived' => 'archived',
+                default    => $newStatus,
+            };
             $sql = "UPDATE $table SET status = :s, response = :msg, reviewed_by = :r, reviewed_at = NOW() WHERE id = :id";
             $pdo->prepare($sql)->execute([
                 's'   => $ticketStatus,

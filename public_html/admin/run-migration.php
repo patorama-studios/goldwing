@@ -353,6 +353,48 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 007 — Ticket messages + archived status
+// Adds ticket_messages conversation table and extends status ENUMs/values
+// to support the 'archived' state on all request types.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_007_ticket_messages';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 007 — Ticket messages', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // Create ticket_messages table (conversation threads for any request type)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS ticket_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            request_type VARCHAR(50) NOT NULL,
+            request_id INT NOT NULL,
+            sender_type ENUM('member','admin') NOT NULL,
+            user_id INT NULL,
+            sender_name VARCHAR(150) NULL,
+            message TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_tm_request (request_type, request_id),
+            INDEX idx_tm_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Extend beta_feedback status ENUM to include 'archived'
+        try {
+            $pdo->exec("ALTER TABLE beta_feedback MODIFY COLUMN status
+                ENUM('open','in_progress','resolved','wont_fix','archived') NOT NULL DEFAULT 'open'");
+        } catch (Throwable $e2) { /* already extended */ }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 007 — Ticket messages', 'status' => 'applied',
+            'note' => 'ticket_messages table created; beta_feedback status ENUM extended with archived.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 007 — Ticket messages', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

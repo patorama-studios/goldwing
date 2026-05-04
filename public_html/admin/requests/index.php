@@ -17,7 +17,7 @@ $user = current_user();
 
 $typeFilter   = trim((string) ($_GET['type'] ?? ''));
 $statusFilter = trim((string) ($_GET['status'] ?? 'pending'));
-if (!in_array($statusFilter, ['pending', 'approved', 'rejected', 'all'], true)) {
+if (!in_array($statusFilter, ['pending', 'approved', 'rejected', 'archived', 'all'], true)) {
     $statusFilter = 'pending';
 }
 $validTypes = array_keys(PendingRequestsService::types());
@@ -76,7 +76,7 @@ function reqStatusBadge(?string $status): string {
         </div>
         <div class="border-b border-gray-100 px-4 py-3 flex flex-wrap items-center gap-2">
           <span class="text-xs uppercase tracking-[0.3em] text-gray-500 mr-2">Status:</span>
-          <?php foreach (['pending', 'approved', 'rejected', 'all'] as $s): ?>
+          <?php foreach (['pending', 'approved', 'rejected', 'archived', 'all'] as $s): ?>
             <a class="rounded-full px-3 py-1 text-xs font-semibold <?= $statusFilter === $s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
                href="?<?= $typeFilter !== '' ? 'type=' . e($typeFilter) . '&' : '' ?>status=<?= e($s) ?>">
               <?= e(ucfirst($s)) ?>
