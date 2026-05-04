@@ -287,8 +287,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/index.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-<<<<<<< Updated upstream
-            'roles' => ['admin', 'committee', 'treasurer', 'chapter_leader', 'webmaster'],
+            'roles' => ['admin', 'chapter_leader'],
         ],
         [
             'page_key' => 'admin_requests',
@@ -296,10 +295,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/requests/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'webmaster'],
-=======
-            'roles' => ['admin', 'chapter_leader'],
->>>>>>> Stashed changes
+            'roles' => ['admin'],
         ],
         [
             'page_key' => 'admin_members',
