@@ -1350,7 +1350,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600">
-                <span class="material-symbols-outlined text-[20px]">group</span>
+                <span class="material-icons-outlined text-[20px]">group</span>
               </span>
               <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+2%</span>
             </div>
@@ -1364,7 +1364,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-400">
-                <span class="material-symbols-outlined text-[20px]">person_off</span>
+                <span class="material-icons-outlined text-[20px]">person_off</span>
               </span>
               <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Stable</span>
             </div>
@@ -1378,7 +1378,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3 <?= $pendingCount > 0 ? 'ring-1 ring-amber-300' : '' ?>">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 text-amber-500">
-                <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+                <span class="material-icons-outlined text-[20px]">pending_actions</span>
               </span>
               <?php if ($pendingCount > 0): ?>
                 <a href="/admin/index.php?page=applications" class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wide hover:bg-amber-100">Action Req.</a>
@@ -1394,7 +1394,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-500">
-                <span class="material-symbols-outlined text-[20px]">calendar_clock</span>
+                <span class="material-icons-outlined text-[20px]">alarm</span>
               </span>
             </div>
             <div>
@@ -1407,7 +1407,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-violet-50 text-violet-500">
-                <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+                <span class="material-icons-outlined text-[20px]">manage_accounts</span>
               </span>
             </div>
             <div>
@@ -1424,7 +1424,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <?php /* Recent Logins */ ?>
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center gap-2 mb-5">
-              <span class="material-symbols-outlined text-gray-400 text-[20px]">login</span>
+              <span class="material-icons-outlined text-gray-400 text-[20px]">login</span>
               <h2 class="font-display text-lg font-bold text-gray-900">Recent Logins</h2>
             </div>
             <ul class="space-y-3 flex-1">
@@ -1451,7 +1451,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center justify-between mb-5">
               <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-400 text-[20px]">receipt_long</span>
+                <span class="material-icons-outlined text-gray-400 text-[20px]">receipt_long</span>
                 <h2 class="font-display text-lg font-bold text-gray-900">Recent Payments</h2>
               </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
@@ -1460,7 +1460,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
             <?php if (empty($recentPayments)): ?>
               <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-6">
-                <span class="material-symbols-outlined text-[36px] text-gray-200">credit_card_off</span>
+                <span class="material-icons-outlined text-[36px] text-gray-200">credit_card_off</span>
                 <p class="text-sm">No recent transactions to display</p>
               </div>
             <?php else: ?>
@@ -1479,7 +1479,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center justify-between mb-5">
               <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-400 text-[20px]">event</span>
+                <span class="material-icons-outlined text-gray-400 text-[20px]">event</span>
                 <h2 class="font-display text-lg font-bold text-gray-900">Upcoming Events</h2>
               </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
@@ -1488,7 +1488,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
             <?php if (empty($events)): ?>
               <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-6">
-                <span class="material-symbols-outlined text-[36px] text-gray-200">event_busy</span>
+                <span class="material-icons-outlined text-[36px] text-gray-200">event_busy</span>
                 <p class="text-sm">No upcoming events.</p>
               </div>
             <?php else: ?>
@@ -1508,9 +1508,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </div>
                       <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-gray-900 truncate"><?= e($ev['title']) ?></p>
-                        <?php if ($evTimeLabel): ?><p class="text-xs text-gray-500 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">schedule</span><?= e($evTimeLabel) ?></p><?php endif; ?>
+                        <?php if ($evTimeLabel): ?><p class="text-xs text-gray-500 flex items-center gap-1"><span class="material-icons-outlined text-[13px]">schedule</span><?= e($evTimeLabel) ?></p><?php endif; ?>
                       </div>
-                      <span class="material-symbols-outlined text-gray-400 group-hover:text-amber-600 text-[18px] shrink-0">chevron_right</span>
+                      <span class="material-icons-outlined text-gray-400 group-hover:text-amber-600 text-[18px] shrink-0">chevron_right</span>
                     </a>
                   </li>
                 <?php endforeach; ?>
@@ -1528,7 +1528,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-400 text-[20px]">campaign</span>
+                <span class="material-icons-outlined text-gray-400 text-[20px]">campaign</span>
                 <h2 class="font-display text-lg font-bold text-gray-900">Notices</h2>
               </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
@@ -1541,7 +1541,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <ul class="space-y-2 flex-1">
                 <?php foreach ($notices as $notice): ?>
                   <li class="flex items-center gap-2 text-sm text-gray-700">
-                    <span class="material-symbols-outlined text-gray-300 text-[16px] shrink-0">info</span>
+                    <span class="material-icons-outlined text-gray-300 text-[16px] shrink-0">info</span>
                     <span class="truncate"><?= e($notice['title']) ?></span>
                   </li>
                 <?php endforeach; ?>
@@ -1553,7 +1553,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-400 text-[20px]">notifications_active</span>
+                <span class="material-icons-outlined text-gray-400 text-[20px]">notifications_active</span>
                 <h2 class="font-display text-lg font-bold text-gray-900">Pending Actions</h2>
               </div>
               <?php if ($pendingHubTotal > 0): ?>
@@ -1562,7 +1562,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
             <?php if (empty($pendingHubItems)): ?>
               <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-4">
-                <span class="material-symbols-outlined text-[32px] text-gray-200">check_circle</span>
+                <span class="material-icons-outlined text-[32px] text-gray-200">check_circle</span>
                 <p class="text-sm">All clear — nothing pending.</p>
               </div>
             <?php else: ?>
@@ -1589,13 +1589,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <li>
                     <a href="<?= e($detailUrl) ?>" class="flex items-start gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition group">
                       <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-500 shrink-0">
-                        <span class="material-symbols-outlined text-[16px]"><?= e($icon) ?></span>
+                        <span class="material-icons-outlined text-[16px]"><?= e($icon) ?></span>
                       </span>
                       <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide"><?= e($label) ?></p>
                         <p class="text-sm font-medium text-gray-800 truncate"><?= e($item['title'] ?? '—') ?></p>
                       </div>
-                      <span class="material-symbols-outlined text-gray-300 group-hover:text-amber-500 text-[16px] shrink-0 mt-1">chevron_right</span>
+                      <span class="material-icons-outlined text-gray-300 group-hover:text-amber-500 text-[16px] shrink-0 mt-1">chevron_right</span>
                     </a>
                   </li>
                 <?php endforeach; ?>
@@ -1611,7 +1611,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <?php /* Security */ ?>
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center gap-2 mb-4">
-              <span class="material-symbols-outlined text-gray-400 text-[20px]">security</span>
+              <span class="material-icons-outlined text-gray-400 text-[20px]">security</span>
               <h2 class="font-display text-lg font-bold text-gray-900">Security</h2>
             </div>
             <dl class="space-y-3 flex-1">
@@ -1635,12 +1635,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <?php /* ── Recent Security Events ───────────────────────────────────── */ ?>
         <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div class="flex items-center gap-2 mb-4">
-            <span class="material-symbols-outlined text-gray-400 text-[20px]">history</span>
+            <span class="material-icons-outlined text-gray-400 text-[20px]">history</span>
             <h2 class="font-display text-lg font-bold text-gray-900">Recent Security Events</h2>
           </div>
           <?php if (empty($recentSecurityEvents)): ?>
             <div class="flex flex-col items-center justify-center gap-2 py-8 text-gray-400">
-              <span class="material-symbols-outlined text-[40px] text-gray-200">verified_user</span>
+              <span class="material-icons-outlined text-[40px] text-gray-200">verified_user</span>
               <p class="text-sm">No recent security events flagged by the system.</p>
             </div>
           <?php else: ?>
@@ -2261,7 +2261,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
               <div class="flex items-center gap-3 mb-6">
                 <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                  <span class="material-icons-outlined">edit_square</span>
+                  <span class="material-icons-outlined">edit</span>
                 </div>
                 <div>
                   <h2 class="font-display text-xl font-bold text-gray-900">Create Notice</h2>
