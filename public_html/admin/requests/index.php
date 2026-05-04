@@ -166,26 +166,26 @@ function reqActionButtons(array $item): string {
         </div>
       </div>
 
-      <!-- Type Tab Nav -->
-      <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div class="flex items-center border-b border-gray-200 min-w-max">
-          <a href="?status=<?= e($statusFilter) ?>"
-             class="px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap <?= $typeFilter === '' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300' ?>">
-            All Notifications
+      <!-- Type Filter Blocks -->
+      <div class="flex flex-wrap gap-2">
+        <a href="?status=<?= e($statusFilter) ?>"
+           class="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors <?= $typeFilter === '' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' ?>">
+          <span class="material-icons-outlined text-[18px]">inbox</span>
+          All Notifications
+        </a>
+        <?php foreach (PendingRequestsService::types() as $type => $meta): ?>
+          <?php $cnt = (int) ($hubCounts[$type] ?? 0); ?>
+          <a href="?type=<?= e($type) ?>&status=<?= e($statusFilter) ?>"
+             class="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors <?= $typeFilter === $type ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' ?>">
+            <span class="material-icons-outlined text-[18px]"><?= e($meta['icon']) ?></span>
+            <?= e($meta['label']) ?>
+            <?php if ($cnt > 0): ?>
+              <span class="inline-flex items-center justify-center rounded-full h-5 min-w-[20px] px-1.5 text-[11px] font-bold <?= $typeFilter === $type ? 'bg-primary/20 text-primary' : 'bg-gray-100 text-gray-600' ?>">
+                <?= $cnt ?>
+              </span>
+            <?php endif; ?>
           </a>
-          <?php foreach (PendingRequestsService::types() as $type => $meta): ?>
-            <?php $cnt = (int) ($hubCounts[$type] ?? 0); ?>
-            <a href="?type=<?= e($type) ?>&status=<?= e($statusFilter) ?>"
-               class="flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap <?= $typeFilter === $type ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300' ?>">
-              <?= e($meta['label']) ?>
-              <?php if ($cnt > 0): ?>
-                <span class="inline-flex items-center justify-center rounded-full h-5 min-w-[20px] px-1.5 text-[11px] font-bold <?= $typeFilter === $type ? 'bg-primary/15 text-primary' : 'bg-gray-100 text-gray-600' ?>">
-                  <?= $cnt ?>
-                </span>
-              <?php endif; ?>
-            </a>
-          <?php endforeach; ?>
-        </div>
+        <?php endforeach; ?>
       </div>
 
       <!-- Status Pills (secondary filter) -->
