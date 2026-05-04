@@ -1338,122 +1338,321 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $newAdminDevices24h = (int) ($pdo->query("SELECT COUNT(*) FROM activity_log WHERE action = 'security.admin_new_device' AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)")->fetchColumn() ?? 0);
         $recentSecurityEvents = $pdo->query("SELECT action, created_at FROM activity_log WHERE action IN ('refund.processed','member.export','security.role_escalation') ORDER BY created_at DESC LIMIT 5")->fetchAll();
         $fimRow = $pdo->query("SELECT approved_at, last_scan_at, last_scan_status FROM file_integrity_baseline WHERE id = 1 LIMIT 1")->fetch();
-        $settings = $pdo->query("SELECT setting_key, setting_value FROM system_settings")->fetchAll();
-        $settingMap = [];
-        foreach ($settings as $setting) {
-          $settingMap[$setting['setting_key']] = $setting['setting_value'];
-        }
-        $uploadDir = __DIR__ . '/../uploads';
-        $mediaBytes = directory_size_bytes($uploadDir);
-        $mediaUsageMb = round($mediaBytes / 1024 / 1024, 2);
+        $pendingHubItems = \App\Services\PendingRequestsService::all(null, 'pending');
+        $pendingHubCounts = \App\Services\PendingRequestsService::counts();
+        $pendingHubTotal = (int) ($pendingHubCounts['__total'] ?? 0);
         ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h1 class="font-display text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-gray-500">Active Members</p>
-              <p class="text-2xl font-semibold text-gray-900"><?= e((string) $activeCount) ?></p>
+
+        <?php /* ── Stat cards ─────────────────────────────────────────────── */ ?>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+
+          <?php /* Active Members */ ?>
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div class="flex items-start justify-between">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600">
+                <span class="material-symbols-outlined text-[20px]">group</span>
+              </span>
+              <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+2%</span>
             </div>
-            <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-gray-500">Lapsed Members</p>
-              <p class="text-2xl font-semibold text-gray-900"><?= e((string) $lapsedCount) ?></p>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-gray-500">Pending Approvals</p>
-              <p class="text-2xl font-semibold text-gray-900"><?= e((string) $pendingCount) ?></p>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-gray-500">Members Due Soon</p>
-              <p class="text-2xl font-semibold text-gray-900"><?= e((string) $dueSoon) ?></p>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-gray-500">Total Users</p>
-              <p class="text-2xl font-semibold text-gray-900"><?= e((string) $totalUsers) ?></p>
+            <div>
+              <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Active Members</p>
+              <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $activeCount) ?></p>
             </div>
           </div>
-        </section>
+
+          <?php /* Lapsed Members */ ?>
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div class="flex items-start justify-between">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-400">
+                <span class="material-symbols-outlined text-[20px]">person_off</span>
+              </span>
+              <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Stable</span>
+            </div>
+            <div>
+              <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Lapsed Members</p>
+              <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $lapsedCount) ?></p>
+            </div>
+          </div>
+
+          <?php /* Pending Approvals */ ?>
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3 <?= $pendingCount > 0 ? 'ring-1 ring-amber-300' : '' ?>">
+            <div class="flex items-start justify-between">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 text-amber-500">
+                <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+              </span>
+              <?php if ($pendingCount > 0): ?>
+                <a href="/admin/index.php?page=applications" class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wide hover:bg-amber-100">Action Req.</a>
+              <?php endif; ?>
+            </div>
+            <div>
+              <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Pending Approvals</p>
+              <p class="text-3xl font-bold <?= $pendingCount > 0 ? 'text-amber-600' : 'text-gray-900' ?> mt-0.5"><?= e((string) $pendingCount) ?></p>
+            </div>
+          </div>
+
+          <?php /* Due Soon */ ?>
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div class="flex items-start justify-between">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-500">
+                <span class="material-symbols-outlined text-[20px]">calendar_clock</span>
+              </span>
+            </div>
+            <div>
+              <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Due Soon</p>
+              <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $dueSoon) ?></p>
+            </div>
+          </div>
+
+          <?php /* Total Users */ ?>
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div class="flex items-start justify-between">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-violet-50 text-violet-500">
+                <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+              </span>
+            </div>
+            <div>
+              <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Total Users</p>
+              <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $totalUsers) ?></p>
+            </div>
+          </div>
+
+        </div>
+
+        <?php /* ── Middle row: Logins / Payments / Events ───────────────────── */ ?>
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="font-display text-xl font-bold text-gray-900">Recent Payments</h2>
+
+          <?php /* Recent Logins */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center gap-2 mb-5">
+              <span class="material-symbols-outlined text-gray-400 text-[20px]">login</span>
+              <h2 class="font-display text-lg font-bold text-gray-900">Recent Logins</h2>
+            </div>
+            <ul class="space-y-3 flex-1">
+              <?php foreach ($recentLogins as $login):
+                $initials = implode('', array_map(fn($w) => strtoupper($w[0]), array_filter(explode(' ', $login['name']))));
+                $initials = substr($initials, 0, 2);
+              ?>
+                <li class="flex items-center gap-3">
+                  <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-gray-600 text-xs font-bold shrink-0"><?= e($initials) ?></span>
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-800 truncate"><?= e($login['name']) ?></p>
+                    <p class="text-xs text-gray-400"><?= e($login['created_at']) ?></p>
+                  </div>
+                </li>
+              <?php endforeach; ?>
+              <?php if (empty($recentLogins)): ?>
+                <li class="text-sm text-gray-400">No recent logins.</li>
+              <?php endif; ?>
+            </ul>
+            <a href="/admin/security/activity_log.php" class="mt-5 text-xs text-center text-blue-600 hover:underline">View Login Audit Log</a>
+          </div>
+
+          <?php /* Recent Payments */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-400 text-[20px]">receipt_long</span>
+                <h2 class="font-display text-lg font-bold text-gray-900">Recent Payments</h2>
+              </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
-                <a class="text-xs text-blue-600" href="/admin/settings/index.php?section=payments">Stripe settings</a>
+                <a class="text-xs text-blue-600 hover:underline" href="/admin/settings/index.php?section=payments">Stripe settings</a>
               <?php endif; ?>
             </div>
-            <ul class="space-y-2 text-sm text-gray-600">
-              <?php foreach ($recentPayments as $payment): ?>
-                <li><?= e($payment['description']) ?> - $<?= e($payment['amount']) ?></li>
-              <?php endforeach; ?>
-            </ul>
+            <?php if (empty($recentPayments)): ?>
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-6">
+                <span class="material-symbols-outlined text-[36px] text-gray-200">credit_card_off</span>
+                <p class="text-sm">No recent transactions to display</p>
+              </div>
+            <?php else: ?>
+              <ul class="space-y-3 flex-1">
+                <?php foreach ($recentPayments as $payment): ?>
+                  <li class="flex items-center justify-between text-sm">
+                    <span class="text-gray-700 truncate mr-2"><?= e($payment['description']) ?></span>
+                    <span class="font-semibold text-gray-900 shrink-0">$<?= e($payment['amount']) ?></span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 class="font-display text-xl font-bold text-gray-900 mb-4">Recent Logins</h2>
-            <ul class="space-y-2 text-sm text-gray-600">
-              <?php foreach ($recentLogins as $login): ?>
-                <li><?= e($login['name']) ?> - <?= e($login['created_at']) ?></li>
-              <?php endforeach; ?>
-            </ul>
-          </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="font-display text-xl font-bold text-gray-900">Upcoming Events</h2>
+
+          <?php /* Upcoming Events */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-400 text-[20px]">event</span>
+                <h2 class="font-display text-lg font-bold text-gray-900">Upcoming Events</h2>
+              </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
-                <a class="text-xs text-blue-600" href="/admin/settings/index.php?section=events">Event settings</a>
+                <a class="text-xs text-blue-600 hover:underline" href="/admin/settings/index.php?section=events">Event settings</a>
               <?php endif; ?>
             </div>
-            <ul class="space-y-2 text-sm text-gray-600">
-              <?php foreach ($events as $event): ?>
-                <li><?= e($event['title']) ?> - <?= e($event['event_date']) ?></li>
-              <?php endforeach; ?>
-            </ul>
+            <?php if (empty($events)): ?>
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-6">
+                <span class="material-symbols-outlined text-[36px] text-gray-200">event_busy</span>
+                <p class="text-sm">No upcoming events.</p>
+              </div>
+            <?php else: ?>
+              <ul class="space-y-3 flex-1">
+                <?php foreach ($events as $ev):
+                  $evDate = new DateTime($ev['event_date']);
+                  $evMonth = strtoupper($evDate->format('M'));
+                  $evDay = $evDate->format('j');
+                  $evTime = (strlen($ev['event_date']) > 10) ? substr($ev['event_date'], 11, 5) : '';
+                  $evTimeLabel = ($evTime && $evTime !== '00:00') ? $evTime . ' Departure' : '';
+                ?>
+                  <li>
+                    <a href="/admin/index.php?page=events" class="flex items-center gap-3 p-3 rounded-xl bg-amber-50 hover:bg-amber-100 transition group">
+                      <div class="shrink-0 w-12 h-12 rounded-xl bg-amber-400 flex flex-col items-center justify-center text-white leading-none">
+                        <span class="text-[10px] font-bold uppercase tracking-wide"><?= e($evMonth) ?></span>
+                        <span class="text-xl font-bold"><?= e($evDay) ?></span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-gray-900 truncate"><?= e($ev['title']) ?></p>
+                        <?php if ($evTimeLabel): ?><p class="text-xs text-gray-500 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">schedule</span><?= e($evTimeLabel) ?></p><?php endif; ?>
+                      </div>
+                      <span class="material-symbols-outlined text-gray-400 group-hover:text-amber-600 text-[18px] shrink-0">chevron_right</span>
+                    </a>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+            <a href="/admin/index.php?page=events" class="mt-4 text-xs text-center text-blue-600 hover:underline">View all events</a>
           </div>
+
         </section>
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+
+        <?php /* ── Bottom row: Notices / Pending Notifications / Security ───── */ ?>
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <?php /* Notices */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="font-display text-xl font-bold text-gray-900">Notice Board</h2>
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-400 text-[20px]">campaign</span>
+                <h2 class="font-display text-lg font-bold text-gray-900">Notices</h2>
+              </div>
               <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
-                <a class="text-xs text-blue-600" href="/admin/settings/index.php?section=notifications">Notification
-                  settings</a>
+                <a class="text-xs text-blue-600 hover:underline" href="/admin/settings/index.php?section=notifications">Settings</a>
               <?php endif; ?>
             </div>
-            <ul class="space-y-2 text-sm text-gray-600">
-              <?php foreach ($notices as $notice): ?>
-                <li><?= e($notice['title']) ?></li>
-              <?php endforeach; ?>
-            </ul>
+            <?php if (empty($notices)): ?>
+              <p class="text-sm text-gray-400">No notices.</p>
+            <?php else: ?>
+              <ul class="space-y-2 flex-1">
+                <?php foreach ($notices as $notice): ?>
+                  <li class="flex items-center gap-2 text-sm text-gray-700">
+                    <span class="material-symbols-outlined text-gray-300 text-[16px] shrink-0">info</span>
+                    <span class="truncate"><?= e($notice['title']) ?></span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 class="font-display text-xl font-bold text-gray-900 mb-4">System Health</h2>
-            <p class="text-sm text-gray-600">Last renewal reminder:
-              <?= e($settingMap['last_renewal_reminder_run'] ?? 'N/A') ?>
-            </p>
-            <p class="text-sm text-gray-600">Last expiry job: <?= e($settingMap['last_expire_run'] ?? 'N/A') ?></p>
-            <p class="text-sm text-gray-600">Last daily summary: <?= e($settingMap['last_daily_summary_run'] ?? 'N/A') ?>
-            </p>
-            <p class="text-sm text-gray-600">Media storage: <?= e((string) $mediaUsageMb) ?> MB</p>
+
+          <?php /* Pending Notifications */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-400 text-[20px]">notifications_active</span>
+                <h2 class="font-display text-lg font-bold text-gray-900">Pending Actions</h2>
+              </div>
+              <?php if ($pendingHubTotal > 0): ?>
+                <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold"><?= $pendingHubTotal ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if (empty($pendingHubItems)): ?>
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400 py-4">
+                <span class="material-symbols-outlined text-[32px] text-gray-200">check_circle</span>
+                <p class="text-sm">All clear — nothing pending.</p>
+              </div>
+            <?php else: ?>
+              <?php
+                $typeIcons = [
+                  'notice'                 => 'campaign',
+                  'event'                  => 'event',
+                  'member_of_year'         => 'emoji_events',
+                  'fallen_wings'           => 'military_tech',
+                  'chapter_change'         => 'swap_horiz',
+                  'store_order'            => 'storefront',
+                  'membership_application' => 'how_to_reg',
+                  'feedback'               => 'feedback',
+                ];
+                $typeLabels = \App\Services\PendingRequestsService::types();
+                $shownItems = array_slice($pendingHubItems, 0, 5);
+              ?>
+              <ul class="space-y-2 flex-1">
+                <?php foreach ($shownItems as $item):
+                  $icon = $typeIcons[$item['type']] ?? 'notifications';
+                  $label = $typeLabels[$item['type']]['label'] ?? ucfirst(str_replace('_', ' ', $item['type']));
+                  $detailUrl = $item['detail_url'] ?? '/admin/requests/index.php';
+                ?>
+                  <li>
+                    <a href="<?= e($detailUrl) ?>" class="flex items-start gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition group">
+                      <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-500 shrink-0">
+                        <span class="material-symbols-outlined text-[16px]"><?= e($icon) ?></span>
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide"><?= e($label) ?></p>
+                        <p class="text-sm font-medium text-gray-800 truncate"><?= e($item['title'] ?? '—') ?></p>
+                      </div>
+                      <span class="material-symbols-outlined text-gray-300 group-hover:text-amber-500 text-[16px] shrink-0 mt-1">chevron_right</span>
+                    </a>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+              <?php if ($pendingHubTotal > 5): ?>
+                <a href="/admin/requests/index.php" class="mt-3 text-xs text-center text-blue-600 hover:underline">+<?= $pendingHubTotal - 5 ?> more — view all</a>
+              <?php else: ?>
+                <a href="/admin/requests/index.php" class="mt-3 text-xs text-center text-blue-600 hover:underline">View notification hub</a>
+              <?php endif; ?>
+            <?php endif; ?>
           </div>
+
+          <?php /* Security */ ?>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="material-symbols-outlined text-gray-400 text-[20px]">security</span>
+              <h2 class="font-display text-lg font-bold text-gray-900">Security</h2>
+            </div>
+            <dl class="space-y-3 flex-1">
+              <div class="flex items-center justify-between">
+                <dt class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Fail Logins (24h)</dt>
+                <dd class="text-lg font-bold <?= $failedLogins24h > 0 ? 'text-rose-600' : 'text-gray-900' ?>"><?= e((string) $failedLogins24h) ?></dd>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="text-xs text-gray-500 uppercase tracking-wide font-semibold">New Devices</dt>
+                <dd class="text-lg font-bold <?= $newAdminDevices24h > 0 ? 'text-amber-600' : 'text-gray-900' ?>"><?= e((string) $newAdminDevices24h) ?></dd>
+              </div>
+              <div class="pt-2 border-t border-gray-100">
+                <p class="text-xs text-gray-400">Baseline: <span class="font-medium text-gray-600"><?= e($fimRow['approved_at'] ?? 'Never') ?></span></p>
+                <p class="text-xs text-gray-400 mt-1">Last scan: <span class="font-medium text-gray-600"><?= e($fimRow['last_scan_at'] ?? 'Never') ?></span></p>
+              </div>
+            </dl>
+          </div>
+
         </section>
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 class="font-display text-xl font-bold text-gray-900 mb-4">Security Snapshot</h2>
-            <p class="text-sm text-gray-600">Failed login attempts (24h): <?= e((string) $failedLogins24h) ?></p>
-            <p class="text-sm text-gray-600">New admin devices (24h): <?= e((string) $newAdminDevices24h) ?></p>
-            <p class="text-sm text-gray-600">Last baseline approval: <?= e($fimRow['approved_at'] ?? 'Never') ?></p>
-            <p class="text-sm text-gray-600">Last integrity scan: <?= e($fimRow['last_scan_at'] ?? 'Never') ?>
-              (<?= e($fimRow['last_scan_status'] ?? 'N/A') ?>)</p>
+
+        <?php /* ── Recent Security Events ───────────────────────────────────── */ ?>
+        <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="material-symbols-outlined text-gray-400 text-[20px]">history</span>
+            <h2 class="font-display text-lg font-bold text-gray-900">Recent Security Events</h2>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h2 class="font-display text-xl font-bold text-gray-900 mb-4">Recent Security Events</h2>
-            <ul class="space-y-2 text-sm text-gray-600">
+          <?php if (empty($recentSecurityEvents)): ?>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-gray-400">
+              <span class="material-symbols-outlined text-[40px] text-gray-200">verified_user</span>
+              <p class="text-sm">No recent security events flagged by the system.</p>
+            </div>
+          <?php else: ?>
+            <ul class="divide-y divide-gray-100">
               <?php foreach ($recentSecurityEvents as $event): ?>
-                <li><?= e($event['action']) ?> - <?= e($event['created_at']) ?></li>
+                <li class="flex items-center justify-between py-2.5 text-sm">
+                  <span class="font-medium text-gray-700"><?= e($event['action']) ?></span>
+                  <span class="text-xs text-gray-400"><?= e($event['created_at']) ?></span>
+                </li>
               <?php endforeach; ?>
-              <?php if (empty($recentSecurityEvents)): ?>
-                <li>No recent security events.</li>
-              <?php endif; ?>
             </ul>
-          </div>
+          <?php endif; ?>
         </section>
       <?php elseif ($page === 'members'): ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm text-sm">
