@@ -160,7 +160,6 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-<<<<<<< HEAD
 // MIGRATION 003 — Add member role columns (is_area_rep, is_committee, committee_role)
 // Adds three columns to the members table to track area reps and committee roles.
 // ─────────────────────────────────────────────────────────────────────────────
