@@ -25,13 +25,10 @@ if ($typeFilter !== '' && !in_array($typeFilter, $validTypes, true)) {
     $typeFilter = '';
 }
 
-$items  = PendingRequestsService::all($typeFilter ?: null, $statusFilter);
-$counts = PendingRequestsService::counts();
-
-// Temporary debug: dump first item so we can read raw structure from browser.
-// Safe: only visible in source, never rendered in UI.
-$_dbgItem = !empty($items) ? $items[0] : null;
-$_dbgDump = base64_encode(json_encode(array_diff_key($_dbgItem ?? [], ['raw' => 1])));
+// Use $hubItems / $hubCounts to avoid being overwritten by backend_admin_sidebar.php
+// which defines its own $items array for the nav menu.
+$hubItems  = PendingRequestsService::all($typeFilter ?: null, $statusFilter);
+$hubCounts = PendingRequestsService::counts();
 
 $pageTitle  = 'Notification Hub';
 $activePage = 'requests';
@@ -47,7 +44,6 @@ function reqStatusBadge(?string $status): string {
     };
 }
 ?>
-<!-- DEBUG_ITEM:<?= $_dbgDump ?? '' ?> -->
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../../app/Views/partials/backend_admin_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
@@ -60,7 +56,7 @@ function reqStatusBadge(?string $status): string {
         </div>
         <div class="flex items-center gap-2 text-sm">
           <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800">
-            <?= (int) ($counts['__total'] ?? 0) ?> pending
+            <?= (int) ($hubCounts['__total'] ?? 0) ?> pending
           </span>
         </div>
       </header>
@@ -69,12 +65,12 @@ function reqStatusBadge(?string $status): string {
         <div class="border-b border-gray-100 px-4 py-3 flex flex-wrap items-center gap-2">
           <span class="text-xs uppercase tracking-[0.3em] text-gray-500 mr-2">Type:</span>
           <a class="rounded-full px-3 py-1 text-xs font-semibold <?= $typeFilter === '' ? 'bg-primary text-gray-900' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
-             href="?status=<?= e($statusFilter) ?>">All (<?= (int) ($counts['__total'] ?? 0) ?>)</a>
+             href="?status=<?= e($statusFilter) ?>">All (<?= (int) ($hubCounts['__total'] ?? 0) ?>)</a>
           <?php foreach (PendingRequestsService::types() as $type => $meta): ?>
             <a class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold <?= $typeFilter === $type ? 'bg-primary text-gray-900' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
                href="?type=<?= e($type) ?>&status=<?= e($statusFilter) ?>">
               <span class="material-icons-outlined text-sm"><?= e($meta['icon']) ?></span>
-              <?= e($meta['label']) ?> (<?= (int) ($counts[$type] ?? 0) ?>)
+              <?= e($meta['label']) ?> (<?= (int) ($hubCounts[$type] ?? 0) ?>)
             </a>
           <?php endforeach; ?>
         </div>
@@ -88,7 +84,7 @@ function reqStatusBadge(?string $status): string {
           <?php endforeach; ?>
         </div>
 
-        <?php if (empty($items)): ?>
+        <?php if (empty($hubItems)): ?>
           <div class="px-6 py-16 text-center">
             <span class="material-icons-outlined text-5xl text-gray-300">inbox</span>
             <h2 class="mt-3 text-lg font-semibold text-gray-700">Nothing to review</h2>
@@ -96,7 +92,7 @@ function reqStatusBadge(?string $status): string {
           </div>
         <?php else: ?>
           <div class="divide-y divide-gray-100">
-            <?php foreach ($items as $item): ?>
+            <?php foreach ($hubItems as $item): ?>
               <a class="block px-6 py-4 hover:bg-gray-50 transition-colors" href="<?= e($item['detail_url']) ?>">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div class="flex items-start gap-3 min-w-0">
