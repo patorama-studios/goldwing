@@ -129,39 +129,9 @@ if ($alreadyRun) {
     $tryExec("ALTER TABLE chapter_change_requests ADD COLUMN feedback_message TEXT NULL", 'chapter_change_requests.feedback_message');
     $tryExec("ALTER TABLE member_of_year_nominations ADD COLUMN feedback_message TEXT NULL", 'member_of_year_nominations.feedback_message');
 
-    // webmaster role
-    try {
-        $stmt = $pdo->prepare("INSERT INTO roles (name, slug, description, is_system, is_active, created_at, updated_at)
-            SELECT 'webmaster', 'webmaster', 'Webmaster (reviews and approves member submissions)', 1, 1, NOW(), NOW()
-            WHERE NOT EXISTS (SELECT 1 FROM roles WHERE slug = 'webmaster')");
-        $stmt->execute();
-        $applied[] = 'webmaster role seeded';
-    } catch (Throwable $e) {
-        $errors[] = 'webmaster role: ' . $e->getMessage();
-    }
-
-    // Seed role_permissions for new request hub permissions.
-    // admin gets both, webmaster gets both, content_admin/committee get view only.
+    // Seed request hub permissions for admin (webmaster role removed by migration 003)
     $permissionSeeds = [
-        'admin'         => ['admin.requests.view', 'admin.requests.action'],
-        'webmaster'     => [
-            'admin.dashboard.view',
-            'admin.requests.view',
-            'admin.requests.action',
-            'admin.members.view',
-            'admin.member_of_year.view',
-            'admin.member_of_year.manage',
-            'admin.events.manage',
-            'admin.calendar.view',
-            'admin.calendar.manage',
-            'admin.pages.view',
-            'admin.pages.edit',
-            'admin.orders.view',
-            'admin.payments.view',
-            'admin.logs.view',
-        ],
-        'committee'     => ['admin.requests.view'],
-        'content_admin' => ['admin.requests.view'],
+        'admin' => ['admin.requests.view', 'admin.requests.action'],
     ];
     try {
         $permStmt = $pdo->prepare(
@@ -190,6 +160,7 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 // MIGRATION 003 — Add member role columns (is_area_rep, is_committee, committee_role)
 // Adds three columns to the members table to track area reps and committee roles.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,6 +278,75 @@ if ($alreadyRun) {
     } else {
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
         $results[] = ['label' => 'Migration 005 — Member role columns (ensure)', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 006 — Simplify roles to Webmaster / Quartermaster / Area Rep / Member
+// Removes committee, treasurer, membership_admin, store_admin, content_admin,
+// super_admin, and the separate webmaster role (admin = Webmaster going forward).
+// Updates descriptions for renamed roles. Re-seeds permissions for remaining
+// admin roles. Safe to run multiple times.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_006_simplify_roles';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 006 — Simplify roles', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // Update descriptions for the renamed roles
+        $pdo->exec("UPDATE roles SET description = 'Webmaster - full system access', updated_at = NOW() WHERE name = 'admin'");
+        $pdo->exec("UPDATE roles SET description = 'Quartermaster - store and order management', updated_at = NOW() WHERE name = 'store_manager'");
+        $pdo->exec("UPDATE roles SET description = 'Area Representative', updated_at = NOW() WHERE name = 'chapter_leader'");
+
+        // Remove deprecated roles — ON DELETE CASCADE handles user_roles and role_permissions
+        $pdo->exec("DELETE FROM roles WHERE name IN ('committee', 'treasurer', 'membership_admin', 'store_admin', 'content_admin', 'webmaster', 'super_admin')");
+
+        // Clean up stale page_role_access rows for removed roles
+        $pdo->exec("DELETE FROM page_role_access WHERE role IN ('committee', 'treasurer', 'membership_admin', 'store_admin', 'content_admin', 'webmaster', 'super_admin')");
+
+        // Re-seed Quartermaster (store_manager) — full store access, no member access
+        $pdo->exec(
+            "DELETE rp FROM role_permissions rp
+             JOIN roles r ON r.id = rp.role_id
+             WHERE r.name = 'store_manager'
+               AND rp.permission_key NOT IN (
+                 'admin.store.view','admin.products.manage','admin.orders.view',
+                 'admin.orders.fulfil','admin.orders.refund_cancel','admin.order_fulfilment.manage'
+               )"
+        );
+        $qmStmt = $pdo->prepare(
+            'INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+             SELECT r.id, :perm, 1, NOW(), NOW() FROM roles r WHERE r.name = :role
+             ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
+        );
+        foreach (['admin.store.view','admin.products.manage','admin.orders.view','admin.orders.fulfil','admin.orders.refund_cancel','admin.order_fulfilment.manage'] as $perm) {
+            $qmStmt->execute(['perm' => $perm, 'role' => 'store_manager']);
+        }
+
+        // Re-seed Area Rep (chapter_leader)
+        $pdo->exec(
+            "DELETE rp FROM role_permissions rp
+             JOIN roles r ON r.id = rp.role_id
+             WHERE r.name = 'chapter_leader'
+               AND rp.permission_key NOT IN ('admin.dashboard.view','admin.members.view','admin.members.edit')"
+        );
+        $arStmt = $pdo->prepare(
+            'INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+             SELECT r.id, :perm, 1, NOW(), NOW() FROM roles r WHERE r.name = :role
+             ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
+        );
+        foreach (['admin.dashboard.view','admin.members.view','admin.members.edit'] as $perm) {
+            $arStmt->execute(['perm' => $perm, 'role' => 'chapter_leader']);
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 006 — Simplify roles', 'status' => 'applied', 'note' => 'Roles simplified to: Webmaster (admin) / Quartermaster / Area Rep / Member. Deprecated roles removed.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 006 — Simplify roles', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 

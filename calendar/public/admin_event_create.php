@@ -5,7 +5,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/csrf.php';
 require_once __DIR__ . '/../lib/mailer.php';
 
-calendar_require_role(['ADMIN', 'CHAPTER_LEADER', 'COMMITTEE', 'TREASURER']);
+calendar_require_role(['ADMIN', 'CHAPTER_LEADER']);
 $user = calendar_current_user();
 $pdo = calendar_db();
 calendar_require_tables($pdo, ['calendar_events']);
