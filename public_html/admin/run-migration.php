@@ -442,6 +442,100 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 009 — Add is_historic column to members table
+// Tracks whether a member's motorcycle qualifies as a historic vehicle (25+ years).
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_009_member_historic_flag';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 009 — Member historic flag', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $applied = [];
+    $errors  = [];
+    $tryAddCol = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'duplicate') !== false) {
+                $applied[] = $label . ' (already present)';
+            } else {
+                $errors[] = $label . ': ' . $msg;
+            }
+        }
+    };
+
+    $tryAddCol("ALTER TABLE members ADD COLUMN is_historic TINYINT(1) NOT NULL DEFAULT 0", 'is_historic');
+    $tryAddCol("ALTER TABLE members ADD INDEX idx_members_historic (is_historic)", 'idx_members_historic');
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 009 — Member historic flag', 'status' => 'error', 'note' => implode('; ', $errors)];
+    } else {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 009 — Member historic flag', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 010 — Add missing chapters
+// Inserts Holiday Coast, South Coast NSW, Southern Districts, and NFC chapters
+// that appear in the import CSV but weren't seeded in the initial schema.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_010_add_missing_chapters';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 010 — Add missing chapters', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->prepare(
+            "INSERT INTO chapters (name, state, created_at, updated_at)
+             VALUES (:name, :state, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE updated_at = NOW()"
+        );
+        $chapters = [
+            ['name' => 'Holiday Coast',      'state' => 'NSW'],
+            ['name' => 'South Coast NSW',    'state' => 'NSW'],
+            ['name' => 'Southern Districts', 'state' => 'NSW'],
+            ['name' => 'NFC',                'state' => 'NSW'],
+        ];
+        $inserted = 0;
+        foreach ($chapters as $ch) {
+            $stmt->execute($ch);
+            $inserted++;
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 010 — Add missing chapters', 'status' => 'applied', 'note' => $inserted . ' chapters upserted.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 010 — Add missing chapters', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 011 — Rename chapter_leader role to area_rep
+// Updates the role name and display label to match the application code.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_011_rename_chapter_leader_to_area_rep';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 011 — Rename chapter_leader → area_rep', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $pdo->exec("UPDATE roles SET name = 'area_rep', description = 'Area Representative', updated_at = NOW() WHERE name = 'chapter_leader'");
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 011 — Rename chapter_leader → area_rep', 'status' => 'applied', 'note' => 'Role renamed from chapter_leader to area_rep.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 011 — Rename chapter_leader → area_rep', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
