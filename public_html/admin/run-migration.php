@@ -484,7 +484,7 @@ if ($alreadyRun) {
 // Inserts Holiday Coast, South Coast NSW, Southern Districts, and NFC chapters
 // that appear in the import CSV but weren't seeded in the initial schema.
 // ─────────────────────────────────────────────────────────────────────────────
-$migrationKey = 'migration_010_add_missing_chapters';
+$migrationKey = 'migration_010b_add_missing_chapters';
 $alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
 
 if ($alreadyRun) {
@@ -492,11 +492,19 @@ if ($alreadyRun) {
 } else {
     try {
         $pdo = db();
-        $stmt = $pdo->prepare(
-            "INSERT INTO chapters (name, state, created_at, updated_at)
-             VALUES (:name, :state, NOW(), NOW())
-             ON DUPLICATE KEY UPDATE updated_at = NOW()"
-        );
+        // Discover which columns the chapters table actually has
+        $cols = [];
+        foreach ($pdo->query("SHOW COLUMNS FROM chapters") as $row) {
+            $cols[] = $row['Field'];
+        }
+        $hasState = in_array('state', $cols, true);
+        $hasTimes = in_array('created_at', $cols, true);
+
+        $sql = 'INSERT INTO chapters (name' . ($hasState ? ', state' : '') . ($hasTimes ? ', created_at, updated_at' : '') . ')'
+             . ' VALUES (:name' . ($hasState ? ', :state' : '') . ($hasTimes ? ', NOW(), NOW()' : '') . ')'
+             . ' ON DUPLICATE KEY UPDATE name = name';
+        $stmt = $pdo->prepare($sql);
+
         $chapters = [
             ['name' => 'Holiday Coast',      'state' => 'NSW'],
             ['name' => 'South Coast NSW',    'state' => 'NSW'],
@@ -505,7 +513,9 @@ if ($alreadyRun) {
         ];
         $inserted = 0;
         foreach ($chapters as $ch) {
-            $stmt->execute($ch);
+            $params = ['name' => $ch['name']];
+            if ($hasState) { $params['state'] = $ch['state']; }
+            $stmt->execute($params);
             $inserted++;
         }
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
