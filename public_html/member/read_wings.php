@@ -165,7 +165,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       padding: 16px 70px;
     }
 
-    /* ── Arrow buttons ── */
+    /* ── Arrow buttons (desktop side arrows) ── */
     .nav-arrow {
       position: absolute;
       top: 50%;
@@ -195,6 +195,32 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     .nav-arrow .material-icons-outlined { font-size: 30px; }
     #btn-prev { left: 12px; }
     #btn-next { right: 12px; }
+
+    /* ── Mobile bottom nav arrows ── */
+    .mobile-nav-arrow {
+      display: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(242,201,76,0.13);
+      border: 1.5px solid rgba(242,201,76,0.3);
+      color: #F2C94C;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, opacity 0.2s;
+      flex-shrink: 0;
+    }
+    .mobile-nav-arrow:hover:not(:disabled) { background: rgba(242,201,76,0.28); }
+    .mobile-nav-arrow:disabled { opacity: 0.22; cursor: default; }
+    .mobile-nav-arrow .material-icons-outlined { font-size: 24px; }
+
+    /* ── Mobile overrides ── */
+    @media (max-width: 767px) {
+      #btn-prev, #btn-next { display: none; }
+      .mobile-nav-arrow { display: inline-flex; }
+      #reader-area { padding: 8px 6px; }
+    }
 
     /* ── Flipbook container ── */
     #flip-book-wrap {
@@ -365,7 +391,13 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 
 <!-- Bottom Bar -->
 <div id="bottom-bar">
+  <button id="mobile-prev" class="mobile-nav-arrow" aria-label="Previous page" disabled>
+    <span class="material-icons-outlined">chevron_left</span>
+  </button>
   <div id="page-dots"></div>
+  <button id="mobile-next" class="mobile-nav-arrow" aria-label="Next page" disabled>
+    <span class="material-icons-outlined">chevron_right</span>
+  </button>
   <a id="download-btn" href="/member/download_wings.php?id=<?= $id ?>" download>
     <span class="material-icons-outlined">download</span>
     Download PDF
@@ -388,6 +420,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   const pageCounter  = document.getElementById('page-counter');
   const btnPrev      = document.getElementById('btn-prev');
   const btnNext      = document.getElementById('btn-next');
+  const mobilePrev   = document.getElementById('mobile-prev');
+  const mobileNext   = document.getElementById('mobile-next');
   const dotsWrap     = document.getElementById('page-dots');
   const flipWrap     = document.getElementById('flip-book-wrap');
   const flipContainer= document.getElementById('flip-book');
@@ -405,25 +439,30 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   function getBookDimensions() {
     const topBar    = document.getElementById('top-bar').offsetHeight;
     const bottomBar = document.getElementById('bottom-bar').offsetHeight;
-    const vPad      = 48;
-    const arrowGap  = isMobile ? 90 : 150;
-
-    const availH = window.innerHeight - topBar - bottomBar - vPad;
-    const availW = window.innerWidth  - arrowGap;
 
     // A4 portrait ratio (1 : 1.414)
     const aspect = 1 / 1.414;
 
     let w, h;
     if (isMobile) {
-      // Single page — use nearly full width
-      w = Math.floor(availW * 0.95);
+      // No side arrows — fill the full width and as much height as possible
+      const vPad  = 12;   // small vertical breathing room
+      const hPad  = 10;   // minimal horizontal padding
+      const availH = window.innerHeight - topBar - bottomBar - vPad;
+      const availW = window.innerWidth  - hPad;
+
+      w = Math.floor(availW * 0.98);
       h = Math.floor(w / aspect);
-      if (h > availH) { h = Math.floor(availH * 0.95); w = Math.floor(h * aspect); }
-      w = Math.max(160, Math.min(w, 480));
-      h = Math.max(226, Math.min(h, 680));
+      if (h > availH) { h = Math.floor(availH * 0.98); w = Math.floor(h * aspect); }
+      w = Math.max(160, Math.min(w, 560));
+      h = Math.max(226, Math.min(h, 800));
     } else {
-      // Two-page spread — each page = half the available width
+      // Two-page spread — side arrows take ~150px total
+      const vPad    = 48;
+      const arrowGap = 150;
+      const availH  = window.innerHeight - topBar - bottomBar - vPad;
+      const availW  = window.innerWidth  - arrowGap;
+
       w = Math.floor((availW * 0.88) / 2);
       h = Math.floor(w / aspect);
       if (h > availH) { h = Math.floor(availH * 0.94); w = Math.floor(h * aspect); }
@@ -473,8 +512,10 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     const spread = Math.ceil(currentPage / 2);
     const totalSpreads = Math.ceil(total / 2);
     pageCounter.textContent = `Page ${currentPage} of ${total}`;
-    btnPrev.disabled = currentPage <= 1;
-    btnNext.disabled = currentPage >= total;
+    btnPrev.disabled    = currentPage <= 1;
+    btnNext.disabled    = currentPage >= total;
+    mobilePrev.disabled = currentPage <= 1;
+    mobileNext.disabled = currentPage >= total;
 
     // Update dots
     if (dotsWrap.children.length > 0) {
@@ -549,8 +590,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       size:                'stretch',
       minWidth:            160,
       minHeight:           226,
-      maxWidth:            isMobile ? 500 : 650,
-      maxHeight:           isMobile ? 710 : 900,
+      maxWidth:            isMobile ? 600 : 650,
+      maxHeight:           isMobile ? 850 : 900,
       maxShadowOpacity:    0.5,
       showCover:           true,
       mobileScrollSupport: true,
@@ -578,14 +619,18 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     pageFlip.on('init', () => {
       overlay.style.display = 'none';
       flipWrap.classList.add('ready');
-      btnPrev.disabled = false;
-      btnNext.disabled = false;
+      btnPrev.disabled    = false;
+      btnNext.disabled    = false;
+      mobilePrev.disabled = false;
+      mobileNext.disabled = false;
       updateUI(pageFlip.getCurrentPageIndex() + 1, totalPages);
     });
 
-    // Arrow buttons
+    // Arrow buttons (desktop side + mobile bottom)
     btnPrev.addEventListener('click', () => pageFlip.flipPrev());
     btnNext.addEventListener('click', () => pageFlip.flipNext());
+    mobilePrev.addEventListener('click', () => pageFlip.flipPrev());
+    mobileNext.addEventListener('click', () => pageFlip.flipNext());
 
     // Keyboard arrows
     document.addEventListener('keydown', (e) => {
