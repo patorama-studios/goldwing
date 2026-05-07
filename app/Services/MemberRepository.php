@@ -261,6 +261,7 @@ class MemberRepository
             'status' => 'status',
             'wings_preference' => 'wings_preference',
             'privacy_level' => 'privacy_level',
+            'is_historic' => 'is_historic',
         ];
 
         $columnValues = [];

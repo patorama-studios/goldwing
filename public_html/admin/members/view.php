@@ -628,8 +628,29 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div class="border-b border-gray-100 px-8 py-6">
+      <?php if ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
+        <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="material-icons-outlined text-indigo-500 text-xl">account_tree</span>
+            <div>
+              <p class="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-0.5">Household Member</p>
+              <p class="text-sm text-indigo-900">This is an associate member. Their household account is managed by
+                <strong><?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?></strong>
+                (#<?= e(\App\Services\MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>).
+              </p>
+            </div>
+          </div>
+          <a href="/admin/members/view.php?id=<?= e((int) $fullMember['id']) ?>"
+            class="shrink-0 inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-white px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors">
+            <span class="material-icons-outlined text-[16px]">person</span>
+            View full member
+          </a>
+        </div>
+      <?php endif; ?>
+
+      <?php $isAdminViewLifeMember = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE'; ?>
+      <section class="rounded-2xl border <?= $isAdminViewLifeMember ? 'border-yellow-300' : 'border-gray-200' ?> bg-white shadow-sm">
+        <div class="border-b <?= $isAdminViewLifeMember ? 'border-yellow-200 bg-yellow-50' : 'border-gray-100' ?> px-8 py-6">
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div>
               <a class="text-xs font-bold tracking-widest text-gray-400 uppercase inline-flex items-center gap-2 mb-3 hover:text-gray-500 transition-colors"
@@ -638,20 +659,31 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 Member Profile
               </a>
               <div class="flex items-center gap-4">
-                <div class="h-14 w-14 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
+                <div class="h-14 w-14 rounded-full <?= $isAdminViewLifeMember ? 'border-2 border-yellow-300 bg-yellow-200' : 'border border-gray-200 bg-gray-50' ?> overflow-hidden flex items-center justify-center">
                   <?php if ($avatarUrl): ?>
                     <img src="<?= e($avatarUrl) ?>"
                       alt="Avatar of <?= e($member['first_name'] . ' ' . $member['last_name']) ?>"
                       class="h-full w-full object-cover">
+                  <?php elseif ($isAdminViewLifeMember): ?>
+                    <span class="material-icons-outlined text-yellow-600 text-2xl">star</span>
                   <?php else: ?>
                     <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
                       <?= e(substr($member['first_name'] ?? '', 0, 1) . substr($member['last_name'] ?? '', 0, 1)) ?>
                     </span>
                   <?php endif; ?>
                 </div>
-                <h1 class="text-4xl font-bold text-gray-900 font-display">
-                  <?= e($member['first_name'] . ' ' . $member['last_name']) ?>
-                </h1>
+                <div>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-4xl font-bold <?= $isAdminViewLifeMember ? 'text-yellow-900' : 'text-gray-900' ?> font-display">
+                      <?= e($member['first_name'] . ' ' . $member['last_name']) ?>
+                    </h1>
+                    <?php if ($isAdminViewLifeMember): ?>
+                      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-200 text-yellow-800 text-xs font-bold uppercase tracking-wide">
+                        <span class="material-icons-outlined text-[12px]">star</span>Life Member
+                      </span>
+                    <?php endif; ?>
+                  </div>
+                </div>
               </div>
               <div class="flex flex-wrap items-center gap-3 mt-6">
                 <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
@@ -688,6 +720,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       class="text-sm font-bold text-gray-900 leading-tight"><?= e(formatDate($member['created_at'])) ?></span>
                   </div>
                 </div>
+                <?php if (!empty($member['is_historic'])): ?>
+                  <div class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 border border-stone-300 shadow-sm">
+                    <span class="material-icons-outlined text-stone-600 text-[18px]">history</span>
+                    <div class="flex flex-col">
+                      <span class="text-[10px] font-bold text-stone-500 uppercase tracking-wider leading-none mb-0.5">Flag</span>
+                      <span class="text-sm font-bold text-stone-800 leading-tight">Historic Vehicle</span>
+                    </div>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
             <div class="flex flex-col items-end">
