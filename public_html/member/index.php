@@ -39,6 +39,7 @@ $notificationCategories = NotificationPreferenceService::categories();
 $masterNotificationsEnabled = !empty($notificationPrefs['master_enabled']);
 $unsubscribeAll = !empty($notificationPrefs['unsubscribe_all_non_essential']);
 $avatarUrl = SettingsService::getUser((int) ($user['id'] ?? 0), 'avatar_url', '');
+$associateAvatarUrl = SettingsService::getUser((int) ($user['id'] ?? 0), 'associate_avatar_url', '');
 $globalWeeklyDigestEnabled = SettingsService::getGlobal('notifications.weekly_digest_enabled', false);
 $globalEventRemindersEnabled = SettingsService::getGlobal('notifications.event_reminders_enabled', true);
 $customerPortalEnabled = SettingsService::getGlobal('payments.stripe.customer_portal_enabled', false);
@@ -525,12 +526,15 @@ if ($user && $user['member_id']) {
           'categories' => $categories,
         ];
         $avatarInput = trim($_POST['avatar_url'] ?? '');
+        $assocAvatarInput = trim($_POST['associate_avatar_url'] ?? '');
         SettingsService::setUser((int) $user['id'], 'timezone', $timezone !== '' ? $timezone : SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
         NotificationPreferenceService::save((int) $user['id'], $prefs);
         SettingsService::setUser((int) $user['id'], 'avatar_url', $avatarInput);
+        SettingsService::setUser((int) $user['id'], 'associate_avatar_url', $assocAvatarInput);
         $userTimezone = SettingsService::getUser((int) $user['id'], 'timezone', SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
         $notificationPrefs = NotificationPreferenceService::load((int) $user['id']);
         $avatarUrl = SettingsService::getUser((int) $user['id'], 'avatar_url', '');
+        $associateAvatarUrl = SettingsService::getUser((int) $user['id'], 'associate_avatar_url', '');
         ActivityLogger::log('member', (int) $user['id'], (int) ($member['id'] ?? 0), 'notification.preferences_updated', [
           'visibility' => 'member',
         ]);
@@ -1744,85 +1748,151 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         if ($profileMemberId !== $member['id']) {
           $profileActionUrl .= '&member_id=' . urlencode((string) $profileMemberId);
         }
+        // Household header
+        $householdMain = null;
+        $householdAssoc = null;
+        if (in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
+          $householdMain = $member;
+          $householdAssoc = !empty($associates) ? $associates[0] : null;
+        } elseif ($member['member_type'] === 'ASSOCIATE' && $fullMember) {
+          $householdMain = $fullMember;
+          $householdAssoc = $member;
+        }
+        $isHousehold = $householdMain !== null && $householdAssoc !== null;
+        $memberNumberForPanel = static function(array $m): string {
+          if (!empty($m['member_number_base'])) {
+            return MembershipService::displayMembershipNumber((int) $m['member_number_base'], (int) ($m['member_number_suffix'] ?? 0));
+          }
+          return (string) ($m['member_number'] ?? '—');
+        };
+        $typeLabelsPanel = ['FULL' => 'Full Member', 'ASSOCIATE' => 'Associate', 'LIFE' => 'Life Member'];
         ?>
         <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div class="border-b border-gray-100 px-8 py-6">
-            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-              <div>
-                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2 mb-3">
-                  <span class="material-icons-outlined text-[16px]">arrow_back</span>
-                  Member Profile
-                  <?php if ($profileMemberId !== $member['id']): ?>
-                    <span
-                      class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold"><?= e($profileContextLabel) ?></span>
+            <div class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2 mb-5">
+              <span class="material-icons-outlined text-[16px]">groups</span>
+              Household Profile
+              <?php if ($profileMemberId !== $member['id']): ?>
+                <span class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold"><?= e($profileContextLabel) ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if ($isHousehold): ?>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <?php foreach ([$householdMain, $householdAssoc] as $panelMember):
+                  $panelIsActive = (int) $panelMember['id'] === $profileMemberId;
+                  $panelType = strtoupper((string) ($panelMember['member_type'] ?? 'FULL'));
+                  $panelIsLife = $panelType === 'LIFE';
+                  $panelIsAssoc = $panelType === 'ASSOCIATE';
+                  $panelAvatar = (!$panelIsAssoc) ? $avatarUrl : $associateAvatarUrl;
+                  $panelName = trim(($panelMember['first_name'] ?? '') . ' ' . ($panelMember['last_name'] ?? ''));
+                  $panelNumber = $memberNumberForPanel($panelMember);
+                  $panelTypeLabel = $typeLabelsPanel[$panelType] ?? ucfirst(strtolower($panelType));
+                  $panelPhone = $panelMember['phone'] ?? '';
+                  $panelHistoric = !empty($panelMember['is_historic']);
+                  $panelEditUrl = '/member/index.php?page=profile&member_id=' . urlencode((string) $panelMember['id']);
+                ?>
+                <div class="rounded-xl border-2 <?= $panelIsActive ? 'border-primary' : 'border-gray-200' ?> <?= $panelIsLife ? 'bg-yellow-50' : 'bg-white' ?> overflow-hidden flex flex-col">
+                  <div class="p-5 flex items-start gap-4 flex-1">
+                    <div class="shrink-0">
+                      <div class="h-20 w-20 rounded-full <?= $panelIsLife ? 'border-2 border-yellow-300 bg-yellow-200' : 'border border-gray-200 bg-gray-50' ?> overflow-hidden flex items-center justify-center">
+                        <?php if (!empty($panelAvatar)): ?>
+                          <img src="<?= e($panelAvatar) ?>" alt="<?= e($panelName) ?>" class="h-full w-full object-cover">
+                        <?php elseif ($panelIsLife): ?>
+                          <span class="material-icons-outlined text-yellow-600 text-3xl">star</span>
+                        <?php else: ?>
+                          <span class="text-gray-400 font-semibold text-xl"><?= e(mb_substr($panelMember['first_name'] ?? '', 0, 1) . mb_substr($panelMember['last_name'] ?? '', 0, 1)) ?></span>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <h2 class="text-lg font-bold <?= $panelIsLife ? 'text-yellow-900' : 'text-gray-900' ?> leading-tight"><?= e($panelName) ?></h2>
+                        <?php if ($panelIsLife): ?>
+                          <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-200 text-yellow-800 shrink-0">
+                            <span class="material-icons-outlined text-[10px] leading-none">star</span>Life
+                          </span>
+                        <?php endif; ?>
+                      </div>
+                      <p class="text-xs text-gray-500 mb-2">#<?= e($panelNumber) ?> &middot; <?= e($panelTypeLabel) ?></p>
+                      <?php if ($panelPhone !== ''): ?>
+                        <p class="text-sm text-gray-700 flex items-center gap-1 mb-1">
+                          <span class="material-icons-outlined text-[14px] text-gray-400">phone</span><?= e($panelPhone) ?>
+                        </p>
+                      <?php endif; ?>
+                      <?php if ($panelHistoric): ?>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-stone-100 text-stone-700 border border-stone-200">
+                          <span class="material-icons-outlined text-[10px] leading-none">history</span>Historic Vehicle
+                        </span>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                  <?php if ($panelIsActive): ?>
+                    <div class="border-t border-primary/20 bg-primary/5 px-5 py-2.5 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                      <span class="material-icons-outlined text-[14px]">edit</span>Editing this profile below
+                    </div>
+                  <?php else: ?>
+                    <a href="<?= e($panelEditUrl) ?>" class="border-t border-gray-100 px-5 py-2.5 flex items-center justify-between text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
+                      Edit profile
+                      <span class="material-icons-outlined text-[14px]">chevron_right</span>
+                    </a>
                   <?php endif; ?>
                 </div>
-                <div class="flex items-center gap-4">
-                  <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
-                    <?php if (!empty($avatarUrl)): ?>
-                      <img src="<?= e($avatarUrl) ?>"
-                        alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>"
-                        class="h-full w-full object-cover">
-                    <?php else: ?>
-                      <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
-                        <?= e(substr($profileMember['first_name'] ?? '', 0, 1) . substr($profileMember['last_name'] ?? '', 0, 1)) ?>
-                      </span>
-                    <?php endif; ?>
-                  </div>
-                  <div>
-                    <h1 class="text-4xl font-bold text-gray-900 font-display">
-                      <?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>
-                    </h1>
-                    <p class="text-sm text-gray-500">
-                      <?= e($profileContextNote !== '' ? $profileContextNote : 'Manage your personal profile information.') ?>
-                    </p>
-                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <div class="flex items-center gap-4 mb-6">
+                <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
+                  <?php if (!empty($avatarUrl)): ?>
+                    <img src="<?= e($avatarUrl) ?>" alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>" class="h-full w-full object-cover">
+                  <?php else: ?>
+                    <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
+                      <?= e(substr($profileMember['first_name'] ?? '', 0, 1) . substr($profileMember['last_name'] ?? '', 0, 1)) ?>
+                    </span>
+                  <?php endif; ?>
                 </div>
-                <div class="flex flex-wrap items-center gap-3 mt-6">
-                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                    <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                      <span class="material-icons-outlined text-[18px]">tag</span>
-                    </div>
-                    <div class="flex flex-col">
-                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Member ID</span>
-                      <span class="text-sm font-bold text-gray-900"><?= e($profileMemberNumber) ?></span>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                    <div class="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <span class="material-icons-outlined text-[18px]">diversity_3</span>
-                    </div>
-                    <div class="flex flex-col">
-                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Chapter</span>
-                      <span class="text-sm font-bold text-gray-900"><?= e($profileChapterName) ?></span>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
-                    <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <span class="material-icons-outlined text-[18px]">calendar_month</span>
-                    </div>
-                    <div class="flex flex-col">
-                      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Joined</span>
-                      <span class="text-sm font-bold text-gray-900"><?= e($joinedLabel) ?></span>
-                    </div>
-                  </div>
+                <div>
+                  <h1 class="text-3xl font-bold text-gray-900 font-display"><?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?></h1>
+                  <p class="text-sm text-gray-500"><?= e($profileContextNote !== '' ? $profileContextNote : 'Manage your personal profile information.') ?></p>
                 </div>
               </div>
-              <div class="flex flex-col items-start gap-3">
-                <span class="text-xs font-medium text-gray-500">Current Status</span>
-                <div
-                  class="inline-flex items-center gap-2 rounded-lg bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-700 border border-yellow-200 uppercase tracking-wider">
-                  <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                  <?= e($currentStatusLabel) ?>
+            <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                  <span class="material-icons-outlined text-[18px]">tag</span>
                 </div>
-                <?php if ($profileMemberId !== $member['id']): ?>
-                  <a href="/member/index.php?page=profile"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                    <span class="material-icons-outlined text-[16px]">arrow_back</span>
-                    Back to my profile
-                  </a>
-                <?php endif; ?>
+                <div class="flex flex-col">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Member ID</span>
+                  <span class="text-sm font-bold text-gray-900"><?= e($profileMemberNumber) ?></span>
+                </div>
               </div>
+              <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                <div class="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <span class="material-icons-outlined text-[18px]">diversity_3</span>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Chapter</span>
+                  <span class="text-sm font-bold text-gray-900"><?= e($profileChapterName) ?></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-sm">
+                <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <span class="material-icons-outlined text-[18px]">calendar_month</span>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Joined</span>
+                  <span class="text-sm font-bold text-gray-900"><?= e($joinedLabel) ?></span>
+                </div>
+              </div>
+              <div class="inline-flex items-center gap-2 rounded-lg bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-700 border border-yellow-200 uppercase tracking-wider">
+                <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                <?= e($currentStatusLabel) ?>
+              </div>
+              <?php if ($profileMemberId !== $member['id'] && !$isHousehold): ?>
+                <a href="/member/index.php?page=profile" class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                  <span class="material-icons-outlined text-[16px]">arrow_back</span>Back to my profile
+                </a>
+              <?php endif; ?>
             </div>
           </div>
           <div class="p-5 space-y-6">
@@ -1954,6 +2024,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                             </label>
                           <?php endforeach; ?>
                         </div>
+                      </div>
+                      <div class="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4">
+                        <p class="text-sm font-medium text-gray-700 mb-1">Historic vehicle registration</p>
+                        <p class="text-xs text-gray-500 mb-3">Tick if this member's motorcycle qualifies as a historic vehicle (25+ years old). AGA club membership proof may be required for state-based historic registration concessions.</p>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                          <input type="checkbox" name="is_historic" value="1"
+                            <?= !empty($profileMember['is_historic']) ? 'checked' : '' ?>
+                            class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                          <span class="font-medium">Historic vehicle member</span>
+                        </label>
                       </div>
                       <?php if ($canEditProfile): ?>
                         <div class="flex justify-end">
@@ -2410,6 +2490,28 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </div>
                   </div>
                 </div>
+                <?php if (!empty($associates) || ($member && $member['member_type'] === 'ASSOCIATE')): ?>
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Associate member photo</p>
+                  <p class="text-xs text-gray-500 mt-0.5 mb-2">Photo for the linked associate member on this household account.</p>
+                  <div class="flex items-center gap-3">
+                    <div id="assoc-avatar-preview"
+                      class="h-14 w-14 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center overflow-hidden">
+                      <?php if (!empty($associateAvatarUrl)): ?>
+                        <img src="<?= e($associateAvatarUrl) ?>" alt="Associate"
+                          class="h-full w-full object-cover">
+                      <?php else: ?>
+                        <span class="material-icons-outlined text-base">person</span>
+                      <?php endif; ?>
+                    </div>
+                    <input type="hidden" name="associate_avatar_url" id="assoc-avatar-url-input" value="<?= e($associateAvatarUrl) ?>">
+                    <button type="button"
+                      class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
+                      data-upload-trigger data-upload-target="assoc-avatar-url-input" data-upload-preview="assoc-avatar-preview"
+                      data-upload-context="avatars">Upload image</button>
+                  </div>
+                </div>
+                <?php endif; ?>
                 <div>
                   <p class="text-sm font-medium text-gray-700 mb-2">Account Notifications</p>
                   <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
@@ -3666,11 +3768,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     }
                   }
 
-                  $typeLabels = ['full' => 'Full', 'associate' => 'Associate', 'life' => 'Life'];
+                  $typeLabels = ['full' => 'Full', 'associate' => 'Associate', 'life' => 'Life Member'];
                   $typeColors = [
                     'full' => 'bg-blue-100 text-blue-800',
                     'associate' => 'bg-purple-100 text-purple-800',
-                    'life' => 'bg-amber-100 text-amber-800',
+                    'life' => 'bg-yellow-200 text-yellow-800',
                   ];
                   $typeLabel = $typeLabels[$dmType] ?? ucfirst($dmType);
                   $typeColor = $typeColors[$dmType] ?? 'bg-gray-100 text-gray-700';
@@ -3686,23 +3788,32 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     $caps[] = ['Tools', 'bg-orange-100 text-orange-800'];
                   }
                 ?>
-                  <tr class="hover:bg-gray-50 transition-colors"
+                  <tr class="<?= $dmType === 'life' ? 'bg-yellow-50/60' : 'hover:bg-gray-50' ?> transition-colors"
                     data-search="<?= e($dmSearchStr) ?>"
                     data-chapter="<?= e(strtolower($dmChapterLabel)) ?>"
                     data-type="<?= e($dmType) ?>">
                     <td class="py-3 px-2">
                       <?php if (!empty($dm['avatar_url'])): ?>
                         <img src="<?= e($dm['avatar_url']) ?>" alt="<?= e($dmFullName) ?>"
-                          class="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0">
+                          class="w-9 h-9 rounded-full object-cover border <?= $dmType === 'life' ? 'border-yellow-300' : 'border-gray-200' ?> shrink-0">
                       <?php else: ?>
-                        <div class="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                          <span class="material-icons-outlined text-gray-400 text-xl">person</span>
+                        <div class="w-9 h-9 rounded-full <?= $dmType === 'life' ? 'bg-yellow-200 border-yellow-300' : 'bg-gray-100 border-gray-200' ?> border flex items-center justify-center shrink-0">
+                          <?php if ($dmType === 'life'): ?>
+                            <span class="material-icons-outlined text-yellow-600 text-xl">star</span>
+                          <?php else: ?>
+                            <span class="material-icons-outlined text-gray-400 text-xl">person</span>
+                          <?php endif; ?>
                         </div>
                       <?php endif; ?>
                     </td>
                     <td class="py-3 px-2">
                       <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                        <p class="font-medium text-gray-900"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
+                        <p class="font-medium <?= $dmType === 'life' ? 'text-yellow-900' : 'text-gray-900' ?>"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
+                        <?php if ($dmType === 'life'): ?>
+                          <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-yellow-200 text-yellow-800">
+                            <span class="material-icons-outlined text-[10px] leading-none">star</span>Life
+                          </span>
+                        <?php endif; ?>
                         <?php if (!empty($dm['is_committee'])): ?>
                           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700">
                             <?= e(!empty($dm['committee_role']) ? $dm['committee_role'] : 'Committee') ?>

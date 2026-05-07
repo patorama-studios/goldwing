@@ -558,8 +558,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $statusLabelText = statusLabel($member['status']);
                   $twoFaRequired = $override === 'REQUIRED';
                   $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
+                  $isLifeMember = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE';
                 ?>
-                <tr class="block md:table-row <?= $statusKey === 'pending' ? 'bg-amber-50/60' : '' ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
+                <tr class="block md:table-row <?= $isLifeMember ? 'bg-yellow-50' : ($statusKey === 'pending' ? 'bg-amber-50/60' : '') ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
                   <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
                     <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Select</span>
                     <div class="mt-1 md:mt-0">
@@ -569,18 +570,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
                     <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member</span>
                     <div class="mt-1 flex items-center gap-3 md:mt-0">
-                      <div class="h-10 w-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-sm font-semibold">
-                        <?= e($initials) ?>
+                      <div class="h-10 w-10 rounded-full <?= $isLifeMember ? 'bg-yellow-200 text-yellow-800' : 'bg-slate-100 text-slate-700' ?> flex items-center justify-center text-sm font-semibold">
+                        <?php if ($isLifeMember): ?>
+                          <span class="material-icons-outlined text-lg">star</span>
+                        <?php else: ?>
+                          <?= e($initials) ?>
+                        <?php endif; ?>
                       </div>
                       <div>
-                        <a class="text-sm font-semibold text-gray-900 hover:text-primary" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
+                        <a class="text-sm font-semibold <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : 'text-gray-900 hover:text-primary' ?>" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
                           <?= e($fullName !== '' ? $fullName : 'Member') ?>
                         </a>
-                        <?php if ($statusKey === 'pending'): ?>
-                          <div class="mt-1">
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          <?php if ($isLifeMember): ?>
+                            <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-200 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800">
+                              <span class="material-icons-outlined text-[10px] leading-none">star</span>Life Member
+                            </span>
+                          <?php endif; ?>
+                          <?php if ($statusKey === 'pending'): ?>
                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">Pending</span>
-                          </div>
-                        <?php endif; ?>
+                          <?php endif; ?>
+                        </div>
                       </div>
                     </div>
                   </td>
