@@ -115,6 +115,42 @@ $statusOptions = ['pending', 'active', 'expired', 'cancelled', 'suspended'];
 $flash = $_SESSION['members_flash'] ?? null;
 unset($_SESSION['members_flash']);
 
+// Batch fetch avatar URLs for all members on this page
+$userIds = array_values(array_filter(array_column($members, 'user_id')));
+$avatarsByUserId = [];
+if ($userIds) {
+    $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+    try {
+        $avatarStmt = $pdo->prepare("SELECT user_id, value_json FROM settings_user WHERE user_id IN ($placeholders) AND key_name = 'avatar_url'");
+        $avatarStmt->execute($userIds);
+        foreach ($avatarStmt->fetchAll(PDO::FETCH_ASSOC) as $avatarRow) {
+            $decoded = json_decode($avatarRow['value_json'], true);
+            if ($decoded) {
+                $avatarsByUserId[(int) $avatarRow['user_id']] = $decoded;
+            }
+        }
+    } catch (Throwable $e) {
+        // avatar fetch is best-effort
+    }
+}
+
+// Group members by chapter for accordion view
+$membersByChapter = [];
+foreach ($members as $member) {
+    $chapterId = (int) ($member['chapter_id'] ?? 0);
+    $key = $chapterId ?: 'unassigned';
+    if (!isset($membersByChapter[$key])) {
+        $membersByChapter[$key] = [
+            'name' => $member['chapter_name'] ?? 'Unassigned',
+            'state' => $member['chapter_state'] ?? '',
+            'id' => $chapterId,
+            'members' => [],
+        ];
+    }
+    $membersByChapter[$key]['members'][] = $member;
+}
+uasort($membersByChapter, static fn($a, $b) => strcmp($a['name'], $b['name']));
+
 function buildQuery(array $overrides = []): string
 {
     $params = $_GET;
@@ -493,12 +529,31 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       </section>
 
       <section class="rounded-2xl border border-gray-200 bg-white shadow-sm" data-members-list>
-        <div data-bulk-toolbar class="hidden border-b border-gray-100 px-5 py-4 bg-slate-50">
+        <!-- Section header with view toggle -->
+        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
+          <p class="text-xs text-gray-500"><?= e((string) $totalMembers) ?> result<?= $totalMembers !== 1 ? 's' : '' ?></p>
+          <div class="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-0.5" data-view-toggle>
+            <button type="button" data-view-btn="list" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" title="Compact list">
+              <span class="material-icons-outlined text-sm">view_list</span>
+              List
+            </button>
+            <button type="button" data-view-btn="chapter" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" title="By chapter">
+              <span class="material-icons-outlined text-sm">account_tree</span>
+              Chapter
+            </button>
+            <button type="button" data-view-btn="grid" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" title="Card grid">
+              <span class="material-icons-outlined text-sm">grid_view</span>
+              Grid
+            </button>
+          </div>
+        </div>
+
+        <!-- Bulk action toolbar -->
+        <div data-bulk-toolbar class="hidden border-b border-gray-100 px-5 py-3 bg-slate-50">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-baseline gap-2 text-sm text-gray-800">
               <span class="font-semibold" data-selected-count>0</span>
               <span class="text-gray-500">selected</span>
-              <span class="text-xs text-gray-400">Actions apply to highlighted rows.</span>
             </div>
             <div class="flex flex-wrap gap-2">
               <button type="button" data-bulk-action="archive" class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Archive</button>
@@ -506,206 +561,364 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <button type="button" data-bulk-action="assign_chapter" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Assign chapter</button>
               <button type="button" data-bulk-action="change_status" class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700">Change status</button>
               <button type="button" data-bulk-action="enable_2fa" class="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-emerald-700">Require 2FA</button>
-              <button type="button" data-bulk-action="send_welcome_email" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Send welcome email</button>
-              <button type="button" data-bulk-action="send_reset_link" class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">Password reset</button>
+              <button type="button" data-bulk-action="send_welcome_email" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Send welcome</button>
+              <button type="button" data-bulk-action="send_reset_link" class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">Reset password</button>
             </div>
             <button type="button" data-select-all-page class="text-xs font-semibold text-primary">Select all on page</button>
           </div>
         </div>
-        <div data-bulk-message class="hidden px-5 py-3 text-sm text-gray-600"></div>
+        <div data-bulk-message class="hidden px-5 py-2 text-sm text-gray-600"></div>
         <div data-members-config="<?= $membersListConfigJson ?>" class="hidden"></div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm block md:table" data-members-table>
-            <thead class="hidden md:table-header-group text-left text-xs uppercase text-gray-500 border-b">
-              <tr>
-                <th class="py-3 px-4 w-10">
-                  <label class="sr-only">Select all</label>
-                  <input type="checkbox" data-select-all>
-                </th>
-                <th class="py-3 px-4">Member</th>
-                <th class="py-3 px-4">ID</th>
-                <th class="py-3 px-4">Membership #</th>
-                <th class="py-3 px-4">Contact info</th>
-                <th class="py-3 px-4">Chapter</th>
-                <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4">2FA</th>
-                <th class="py-3 px-4">Created</th>
-                <th class="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="block divide-y md:table-row-group">
+
+        <!-- ══════════════════════════════════════════════════ -->
+        <!-- VIEW 1: COMPACT LIST TABLE -->
+        <!-- ══════════════════════════════════════════════════ -->
+        <div data-view="list">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-members-table>
+              <thead class="text-left text-xs uppercase tracking-wide text-gray-400 bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="py-2.5 pl-4 pr-2 w-8">
+                    <input type="checkbox" data-select-all class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                  </th>
+                  <th class="py-2.5 px-3">Member</th>
+                  <th class="py-2.5 px-3">Chapter</th>
+                  <th class="py-2.5 px-3">Type</th>
+                  <th class="py-2.5 px-3">Email</th>
+                  <th class="py-2.5 px-3">Status</th>
+                  <th class="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <?php foreach ($members as $member): ?>
+                  <?php
+                    $fullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+                    $initials = memberInitials($member['first_name'] ?? 'M', $member['last_name'] ?? 'M');
+                    $chapterLabel = $member['chapter_name'] ?? 'Unassigned';
+                    $chapterState = $member['chapter_state'] ?? '';
+                    $statusLabelText = statusLabel($member['status']);
+                    $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
+                    $memberType = strtoupper((string) ($member['member_type'] ?? 'FULL'));
+                    $isLifeMember = $memberType === 'LIFE';
+                    $isAssociate = $memberType === 'ASSOCIATE';
+                    $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
+                    $userId = (int) ($member['user_id'] ?? 0);
+                    $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                  ?>
+                  <tr class="group hover:bg-gray-50/70 transition-colors <?= $isLifeMember ? 'bg-yellow-50/50' : ($statusKey === 'pending' ? 'bg-amber-50/40' : '') ?>"
+                      data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
+
+                    <!-- Checkbox -->
+                    <td class="pl-4 pr-2 py-2.5 w-8">
+                      <input type="checkbox" data-member-checkbox value="<?= e((int) $member['id']) ?>" class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                    </td>
+
+                    <!-- Member -->
+                    <td class="px-3 py-2.5">
+                      <div class="flex items-center gap-2.5">
+                        <!-- Avatar -->
+                        <?php if ($avatarUrl): ?>
+                          <img src="<?= e($avatarUrl) ?>" alt="<?= e($initials) ?>" class="h-8 w-8 rounded-full object-cover flex-shrink-0">
+                        <?php else: ?>
+                          <div class="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
+                            <?= $isLifeMember ? 'bg-yellow-200 text-yellow-800' : ($isAssociate ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700') ?>">
+                            <?= $isLifeMember ? '<span class="material-icons-outlined text-sm">star</span>' : e($initials) ?>
+                          </div>
+                        <?php endif; ?>
+                        <!-- Name + number -->
+                        <div class="min-w-0">
+                          <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                             class="text-sm font-semibold truncate <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : 'text-gray-900 hover:text-primary' ?>">
+                            <?= e($fullName !== '' ? $fullName : 'Member') ?>
+                          </a>
+                          <p class="text-[11px] text-gray-400 leading-tight">#<?= e($member['member_number_display'] ?? '—') ?></p>
+                        </div>
+                      </div>
+                    </td>
+
+                    <!-- Chapter -->
+                    <td class="px-3 py-2.5">
+                      <?php if ($canInlineEdit): ?>
+                        <div class="flex items-center gap-1 group/inline" data-inline-field data-field="chapter" data-member-id="<?= e((int) $member['id']) ?>">
+                          <div data-inline-display>
+                            <p class="text-sm text-gray-800 font-medium" data-inline-value><?= e($chapterLabel) ?></p>
+                            <?php if ($chapterState): ?>
+                              <p class="text-[11px] text-gray-400"><?= e($chapterState) ?></p>
+                            <?php endif; ?>
+                          </div>
+                          <button type="button" data-inline-trigger
+                            class="opacity-0 group-hover/inline:opacity-100 transition-opacity ml-1 rounded p-0.5 text-gray-400 hover:text-primary hover:bg-primary/10"
+                            title="Edit chapter">
+                            <span class="material-icons-outlined text-sm">edit</span>
+                          </button>
+                          <div class="hidden" data-inline-editor>
+                            <select class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary/30" data-inline-input>
+                              <option value="">Unassigned</option>
+                              <?php foreach ($availableChapters as $chapter): ?>
+                                <?php $chapterState2 = $chapter['state'] ?? ''; ?>
+                                <option value="<?= e($chapter['id']) ?>" <?= (int) ($member['chapter_id'] ?? 0) === (int) $chapter['id'] ? 'selected' : '' ?>>
+                                  <?= e($chapter['name'] . ($chapterState2 ? ' (' . $chapterState2 . ')' : '')) ?>
+                                </option>
+                              <?php endforeach; ?>
+                            </select>
+                            <p class="text-[11px] text-gray-400 mt-0.5" data-inline-feedback></p>
+                          </div>
+                        </div>
+                      <?php else: ?>
+                        <p class="text-sm text-gray-700"><?= e($chapterLabel) ?></p>
+                        <?php if ($chapterState): ?>
+                          <p class="text-[11px] text-gray-400"><?= e($chapterState) ?></p>
+                        <?php endif; ?>
+                      <?php endif; ?>
+                    </td>
+
+                    <!-- Type / Associate -->
+                    <td class="px-3 py-2.5">
+                      <?php if ($isLifeMember): ?>
+                        <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800">
+                          <span class="material-icons-outlined text-[10px]">star</span>Life
+                        </span>
+                      <?php elseif ($isAssociate): ?>
+                        <span class="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700">Assoc.</span>
+                        <?php if ($primaryMemberName !== ''): ?>
+                          <p class="text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px]" title="Associate of <?= e($primaryMemberName) ?>">of <?= e($primaryMemberName) ?></p>
+                        <?php endif; ?>
+                      <?php else: ?>
+                        <span class="text-xs text-gray-400">Full</span>
+                      <?php endif; ?>
+                    </td>
+
+                    <!-- Email -->
+                    <td class="px-3 py-2.5">
+                      <p class="text-sm text-gray-700 truncate max-w-[200px]" title="<?= e($member['email']) ?>"><?= e($member['email']) ?></p>
+                    </td>
+
+                    <!-- Status -->
+                    <td class="px-3 py-2.5">
+                      <?php if ($canInlineEdit): ?>
+                        <div class="flex items-center gap-1 group/status" data-inline-field data-field="status" data-member-id="<?= e((int) $member['id']) ?>">
+                          <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold <?= statusBadgeClasses($member['status']) ?>" data-inline-value data-inline-badge><?= e($statusLabelText) ?></span>
+                          <button type="button" data-inline-trigger
+                            class="opacity-0 group-hover/status:opacity-100 transition-opacity rounded p-0.5 text-gray-400 hover:text-primary hover:bg-primary/10"
+                            title="Edit status">
+                            <span class="material-icons-outlined text-sm">edit</span>
+                          </button>
+                          <div class="hidden" data-inline-editor>
+                            <select class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary/30" data-inline-input>
+                              <?php foreach ($statusOptions as $statusOption): ?>
+                                <option value="<?= e($statusOption) ?>" <?= $statusOption === $statusKey ? 'selected' : '' ?>>
+                                  <?= e($statusOption === 'cancelled' ? 'Archived' : ucfirst($statusOption)) ?>
+                                </option>
+                              <?php endforeach; ?>
+                            </select>
+                            <p class="text-[11px] text-gray-400 mt-0.5" data-inline-feedback></p>
+                          </div>
+                        </div>
+                      <?php else: ?>
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
+                      <?php endif; ?>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="px-3 py-2.5 text-right">
+                      <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                         class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors">
+                        View
+                        <span class="material-icons-outlined text-xs">chevron_right</span>
+                      </a>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                <?php if (empty($members)): ?>
+                  <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No members found.</td>
+                  </tr>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════ -->
+        <!-- VIEW 2: CHAPTER ACCORDION -->
+        <!-- ══════════════════════════════════════════════════ -->
+        <div data-view="chapter" class="hidden divide-y divide-gray-100">
+          <?php if (empty($membersByChapter)): ?>
+            <p class="px-5 py-8 text-center text-sm text-gray-400">No members found.</p>
+          <?php else: ?>
+            <?php foreach ($membersByChapter as $chapterData): ?>
+              <?php
+                $chapterMembers = $chapterData['members'];
+                $chapterMemberCount = count($chapterMembers);
+                $activeCount = count(array_filter($chapterMembers, fn($m) => normalizeMemberStatus((string) ($m['status'] ?? '')) === 'active'));
+                $pendingCount = count(array_filter($chapterMembers, fn($m) => normalizeMemberStatus((string) ($m['status'] ?? '')) === 'pending'));
+              ?>
+              <details class="group/chapter" open>
+                <summary class="flex cursor-pointer select-none items-center justify-between gap-4 px-5 py-3 hover:bg-gray-50 transition-colors list-none">
+                  <div class="flex items-center gap-3">
+                    <span class="material-icons-outlined text-base text-gray-400 transition-transform group-open/chapter:rotate-90">chevron_right</span>
+                    <div>
+                      <span class="font-semibold text-gray-900"><?= e($chapterData['name']) ?></span>
+                      <?php if ($chapterData['state']): ?>
+                        <span class="ml-1.5 text-xs text-gray-400"><?= e($chapterData['state']) ?></span>
+                      <?php endif; ?>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600"><?= $chapterMemberCount ?> member<?= $chapterMemberCount !== 1 ? 's' : '' ?></span>
+                    <?php if ($activeCount): ?><span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700"><?= $activeCount ?> active</span><?php endif; ?>
+                    <?php if ($pendingCount): ?><span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700"><?= $pendingCount ?> pending</span><?php endif; ?>
+                  </div>
+                </summary>
+                <div class="border-t border-gray-100 bg-gray-50/40">
+                  <table class="w-full text-sm">
+                    <tbody class="divide-y divide-gray-100">
+                      <?php foreach ($chapterMembers as $member): ?>
+                        <?php
+                          $fullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+                          $initials = memberInitials($member['first_name'] ?? 'M', $member['last_name'] ?? 'M');
+                          $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
+                          $statusLabelText = statusLabel($member['status']);
+                          $memberType = strtoupper((string) ($member['member_type'] ?? 'FULL'));
+                          $isLifeMember = $memberType === 'LIFE';
+                          $isAssociate = $memberType === 'ASSOCIATE';
+                          $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
+                          $userId = (int) ($member['user_id'] ?? 0);
+                          $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                        ?>
+                        <tr class="hover:bg-white/80 transition-colors <?= $isLifeMember ? 'bg-yellow-50/30' : '' ?>"
+                            data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
+                          <td class="pl-10 pr-3 py-2.5 w-8">
+                            <input type="checkbox" data-member-checkbox value="<?= e((int) $member['id']) ?>" class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                          </td>
+                          <td class="px-3 py-2.5">
+                            <div class="flex items-center gap-2.5">
+                              <?php if ($avatarUrl): ?>
+                                <img src="<?= e($avatarUrl) ?>" alt="<?= e($initials) ?>" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
+                              <?php else: ?>
+                                <div class="h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold
+                                  <?= $isLifeMember ? 'bg-yellow-200 text-yellow-800' : ($isAssociate ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700') ?>">
+                                  <?= $isLifeMember ? '<span class="material-icons-outlined text-xs">star</span>' : e($initials) ?>
+                                </div>
+                              <?php endif; ?>
+                              <div>
+                                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                                   class="text-sm font-medium text-gray-900 hover:text-primary">
+                                  <?= e($fullName !== '' ? $fullName : 'Member') ?>
+                                </a>
+                                <?php if ($isAssociate && $primaryMemberName !== ''): ?>
+                                  <p class="text-[11px] text-gray-400">of <?= e($primaryMemberName) ?></p>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="px-3 py-2.5">
+                            <p class="text-xs text-gray-500">#<?= e($member['member_number_display'] ?? '—') ?></p>
+                          </td>
+                          <td class="px-3 py-2.5">
+                            <?php if ($isLifeMember): ?>
+                              <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-yellow-800">
+                                <span class="material-icons-outlined text-[10px]">star</span>Life
+                              </span>
+                            <?php elseif ($isAssociate): ?>
+                              <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-purple-700">Assoc.</span>
+                            <?php else: ?>
+                              <span class="text-xs text-gray-400">Full</span>
+                            <?php endif; ?>
+                          </td>
+                          <td class="px-3 py-2.5">
+                            <p class="text-sm text-gray-600 truncate max-w-[200px]"><?= e($member['email']) ?></p>
+                          </td>
+                          <td class="px-3 py-2.5">
+                            <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
+                          </td>
+                          <td class="px-3 py-2.5 text-right pr-5">
+                            <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                               class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:border-gray-300 transition-colors">
+                              View <span class="material-icons-outlined text-xs">chevron_right</span>
+                            </a>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════ -->
+        <!-- VIEW 3: CARD GRID -->
+        <!-- ══════════════════════════════════════════════════ -->
+        <div data-view="grid" class="hidden p-5">
+          <?php if (empty($members)): ?>
+            <p class="py-8 text-center text-sm text-gray-400">No members found.</p>
+          <?php else: ?>
+            <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               <?php foreach ($members as $member): ?>
                 <?php
-                  $memberRoles = [];
-                  if (!empty($member['user_roles_csv'])) {
-                      $memberRoles = array_filter(array_map('trim', explode(',', $member['user_roles_csv'])));
-                  }
-                  $requirement = SecurityPolicyService::computeTwoFaRequirement([
-                      'id' => (int) ($member['user_id'] ?? 0),
-                      'roles' => $memberRoles,
-                  ]);
-                  $override = $member['twofa_override'] ?? 'DEFAULT';
-                  if ($override === 'EXEMPT') {
-                      $enforcement = 'Exempt';
-                  } elseif ($requirement === 'DISABLED') {
-                      $enforcement = 'Disabled';
-                  } else {
-                      $enforcement = $requirement === 'REQUIRED' ? 'Required' : 'Optional';
-                  }
                   $fullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
                   $initials = memberInitials($member['first_name'] ?? 'M', $member['last_name'] ?? 'M');
                   $chapterLabel = $member['chapter_name'] ?? 'Unassigned';
-                  $statusLabelText = statusLabel($member['status']);
-                  $twoFaRequired = $override === 'REQUIRED';
+                  $chapterState = $member['chapter_state'] ?? '';
                   $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
-                  $isLifeMember = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE';
+                  $statusLabelText = statusLabel($member['status']);
+                  $memberType = strtoupper((string) ($member['member_type'] ?? 'FULL'));
+                  $isLifeMember = $memberType === 'LIFE';
+                  $isAssociate = $memberType === 'ASSOCIATE';
+                  $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
+                  $userId = (int) ($member['user_id'] ?? 0);
+                  $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                  // Generate a deterministic colour for initials avatars
+                  $colorPalette = ['bg-slate-200 text-slate-700','bg-blue-100 text-blue-700','bg-teal-100 text-teal-700','bg-violet-100 text-violet-700','bg-rose-100 text-rose-700','bg-orange-100 text-orange-700','bg-cyan-100 text-cyan-700'];
+                  $colorClass = $isLifeMember ? 'bg-yellow-200 text-yellow-800' : ($isAssociate ? 'bg-purple-100 text-purple-700' : $colorPalette[crc32($fullName) % count($colorPalette)]);
                 ?>
-                <tr class="block md:table-row <?= $isLifeMember ? 'bg-yellow-50' : ($statusKey === 'pending' ? 'bg-amber-50/60' : '') ?>" data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
-                  <td class="block px-4 py-3 md:table-cell md:w-10 md:px-4 md:py-3">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Select</span>
-                    <div class="mt-1 md:mt-0">
-                      <input type="checkbox" data-member-checkbox value="<?= e((int) $member['id']) ?>" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member</span>
-                    <div class="mt-1 flex items-center gap-3 md:mt-0">
-                      <div class="h-10 w-10 rounded-full <?= $isLifeMember ? 'bg-yellow-200 text-yellow-800' : 'bg-slate-100 text-slate-700' ?> flex items-center justify-center text-sm font-semibold">
-                        <?php if ($isLifeMember): ?>
-                          <span class="material-icons-outlined text-lg">star</span>
-                        <?php else: ?>
-                          <?= e($initials) ?>
-                        <?php endif; ?>
-                      </div>
-                      <div>
-                        <a class="text-sm font-semibold <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : 'text-gray-900 hover:text-primary' ?>" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
-                          <?= e($fullName !== '' ? $fullName : 'Member') ?>
-                        </a>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          <?php if ($isLifeMember): ?>
-                            <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-200 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800">
-                              <span class="material-icons-outlined text-[10px] leading-none">star</span>Life Member
-                            </span>
-                          <?php endif; ?>
-                          <?php if ($statusKey === 'pending'): ?>
-                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">Pending</span>
-                          <?php endif; ?>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">ID</span>
-                    <div class="mt-1 text-sm text-gray-700 md:mt-0"><?= e((string) ($member['id'] ?? '—')) ?></div>
-                  </td>
-                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Member #</span>
-                    <div class="mt-1 text-sm text-gray-700 md:mt-0"><?= e($member['member_number_display'] ?? '—') ?></div>
-                  </td>
-                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Contact</span>
-                    <div class="mt-1 md:mt-0">
-                      <p class="text-sm"><?= e($member['email']) ?></p>
-                      <p class="text-xs text-gray-500"><?= e($member['phone'] ?? '—') ?></p>
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Chapter</span>
-                    <div class="mt-1 md:mt-0">
-                    <?php if ($canInlineEdit): ?>
-                      <div class="space-y-2" data-inline-field data-field="chapter" data-member-id="<?= e((int) $member['id']) ?>">
-                        <button type="button" class="flex items-center justify-between w-full rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm" data-inline-trigger>
-                          <span class="text-left" data-inline-value><?= e($chapterLabel) ?></span>
-                          <span class="material-icons-outlined text-sm">edit</span>
-                        </button>
-                        <div class="hidden space-y-2" data-inline-editor>
-                          <select class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/30" data-inline-input>
-                            <option value="">Unassigned</option>
-                            <?php foreach ($availableChapters as $chapter): ?>
-                              <?php $chapterState = $chapter['state'] ?? ''; ?>
-                              <option value="<?= e($chapter['id']) ?>" <?= (int) ($member['chapter_id'] ?? 0) === (int) $chapter['id'] ? 'selected' : '' ?>>
-                                <?= e($chapter['name'] . ($chapterState ? ' (' . $chapterState . ')' : '')) ?>
-                              </option>
-                            <?php endforeach; ?>
-                          </select>
-                          <p class="text-xs text-gray-500" data-inline-feedback></p>
-                        </div>
-                      </div>
+                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                   class="group flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm hover:border-primary/30 hover:shadow-md transition-all">
+                  <!-- Avatar -->
+                  <div class="relative mb-3">
+                    <?php if ($avatarUrl): ?>
+                      <img src="<?= e($avatarUrl) ?>" alt="<?= e($initials) ?>"
+                           class="h-16 w-16 rounded-full object-cover ring-2 ring-white shadow">
                     <?php else: ?>
-                      <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                        <?= e($chapterLabel) ?>
+                      <div class="h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold ring-2 ring-white shadow <?= $colorClass ?>">
+                        <?= $isLifeMember ? '<span class="material-icons-outlined text-2xl">star</span>' : e($initials) ?>
+                      </div>
+                    <?php endif; ?>
+                    <!-- Status dot -->
+                    <span class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white
+                      <?= match($statusKey) { 'active' => 'bg-green-400', 'pending' => 'bg-amber-400', 'expired' => 'bg-red-400', 'suspended' => 'bg-indigo-400', default => 'bg-gray-300' } ?>">
+                    </span>
+                  </div>
+                  <!-- Name -->
+                  <p class="text-sm font-semibold text-gray-900 group-hover:text-primary leading-tight truncate w-full">
+                    <?= e($fullName !== '' ? $fullName : 'Member') ?>
+                  </p>
+                  <!-- Member # -->
+                  <p class="text-[11px] text-gray-400 mt-0.5">#<?= e($member['member_number_display'] ?? '—') ?></p>
+                  <!-- Chapter -->
+                  <p class="text-xs text-gray-500 mt-2 truncate w-full" title="<?= e($chapterLabel) ?>">
+                    <?= e($chapterLabel) ?><?= $chapterState ? ' · ' . e($chapterState) : '' ?>
+                  </p>
+                  <!-- Type badges -->
+                  <div class="mt-2 flex flex-wrap justify-center gap-1">
+                    <?php if ($isLifeMember): ?>
+                      <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-yellow-800">
+                        <span class="material-icons-outlined text-[9px]">star</span>Life
                       </span>
+                    <?php elseif ($isAssociate): ?>
+                      <span class="inline-flex rounded-full bg-purple-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-purple-700">Assoc.</span>
                     <?php endif; ?>
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Status</span>
-                    <div class="mt-1 md:mt-0">
-                    <?php if ($canInlineEdit): ?>
-                      <div class="space-y-2" data-inline-field data-field="status" data-member-id="<?= e((int) $member['id']) ?>">
-                        <button type="button" class="flex items-center justify-between w-full rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm" data-inline-trigger>
-                          <span class="text-left inline-flex items-center gap-2" data-inline-value>
-                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($member['status']) ?>" data-inline-badge><?= e($statusLabelText) ?></span>
-                          </span>
-                          <span class="material-icons-outlined text-sm">edit</span>
-                        </button>
-                        <div class="hidden space-y-2" data-inline-editor>
-                          <select class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/30" data-inline-input>
-                            <?php foreach ($statusOptions as $statusOption): ?>
-                              <option value="<?= e($statusOption) ?>" <?= $statusOption === $statusKey ? 'selected' : '' ?>>
-                                <?= e($statusOption === 'cancelled' ? 'Archived' : ucfirst($statusOption)) ?>
-                              </option>
-                            <?php endforeach; ?>
-                          </select>
-                          <p class="text-xs text-gray-500" data-inline-feedback></p>
-                        </div>
-                      </div>
-                    <?php else: ?>
-                      <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
-                    <?php endif; ?>
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 text-xs md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">2FA</span>
-                    <div class="mt-1 md:mt-0">
-                    <div class="space-y-1" data-inline-field data-field="twofa" data-member-id="<?= e((int) $member['id']) ?>" data-twofa-required="<?= $twoFaRequired ? '1' : '0' ?>">
-                      <div class="flex items-center justify-between gap-2">
-                        <p class="text-sm font-semibold <?= $member['twofa_enabled_at'] ? 'text-emerald-700' : 'text-gray-500' ?>" data-inline-value>
-                          <?= $twoFaRequired ? 'Required' : 'Optional' ?>
-                        </p>
-                        <?php if ($canInlineEdit): ?>
-                          <button type="button" class="rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary shadow-sm" data-inline-toggle data-state="<?= $twoFaRequired ? '1' : '0' ?>" aria-pressed="<?= $twoFaRequired ? 'true' : 'false' ?>">
-                            <?= $twoFaRequired ? 'Set optional' : 'Require 2FA' ?>
-                          </button>
-                        <?php endif; ?>
-                      </div>
-                      <p class="text-xs <?= $enforcement === 'Disabled' ? 'text-rose-500' : 'text-gray-500' ?>"><?= e($enforcement) ?></p>
-                      <p class="text-xs text-gray-500 hidden" data-inline-feedback></p>
-                    </div>
-                    </div>
-                  </td>
-                  <td class="block px-4 py-3 text-gray-600 md:table-cell md:px-4 md:py-4">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Created</span>
-                    <div class="mt-1 md:mt-0"><?= formatDate($member['created_at']) ?></div>
-                  </td>
-                  <td class="block px-4 py-3 md:table-cell md:px-4 md:py-4 md:text-right">
-                    <span class="text-[11px] uppercase tracking-wide text-gray-400 md:hidden">Actions</span>
-                    <div class="mt-1 md:mt-0">
-                      <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>">
-                        View
-                        <span class="material-icons-outlined text-sm">chevron_right</span>
-                      </a>
-                    </div>
-                  </td>
-                </tr>
+                    <span class="inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
+                  </div>
+                  <?php if ($isAssociate && $primaryMemberName !== ''): ?>
+                    <p class="text-[10px] text-gray-400 mt-1 truncate w-full" title="Associate of <?= e($primaryMemberName) ?>">of <?= e($primaryMemberName) ?></p>
+                  <?php endif; ?>
+                </a>
               <?php endforeach; ?>
-              <?php if (empty($members)): ?>
-                <tr class="block md:table-row">
-                  <td colspan="10" class="block px-4 py-6 text-center text-gray-500 md:table-cell">No members found.</td>
-                </tr>
-              <?php endif; ?>
-            </tbody>
-          </table>
+            </div>
+          <?php endif; ?>
         </div>
       </section>
 

@@ -5,6 +5,35 @@
       return;
     }
 
+    // ─── VIEW TOGGLE ───────────────────────────────────────
+    const STORAGE_KEY = 'admin_members_view';
+    const viewBtns = root.querySelectorAll('[data-view-btn]');
+    const viewPanels = root.querySelectorAll('[data-view]');
+
+    const switchView = (view) => {
+      viewPanels.forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.view !== view);
+      });
+      viewBtns.forEach((btn) => {
+        const active = btn.dataset.viewBtn === view;
+        btn.classList.toggle('bg-white', active);
+        btn.classList.toggle('shadow-sm', active);
+        btn.classList.toggle('text-gray-900', active);
+        btn.classList.toggle('text-gray-500', !active);
+      });
+      try { localStorage.setItem(STORAGE_KEY, view); } catch (_) {}
+    };
+
+    viewBtns.forEach((btn) => {
+      btn.addEventListener('click', () => switchView(btn.dataset.viewBtn));
+    });
+
+    // Restore saved view or default to 'list'
+    let savedView = 'list';
+    try { savedView = localStorage.getItem(STORAGE_KEY) || 'list'; } catch (_) {}
+    switchView(savedView);
+    // ────────────────────────────────────────────────────────
+
     const configEl = root.querySelector('[data-members-config]');
     let csrfToken = '';
     let chapters = [];
@@ -149,14 +178,17 @@
 
     const toggleEditorVisibility = (container, visible) => {
       const trigger = container.querySelector('[data-inline-trigger]');
+      const display = container.querySelector('[data-inline-display]');
       const editor = container.querySelector('[data-inline-editor]');
       if (visible) {
         trigger?.classList.add('hidden');
+        display?.classList.add('hidden');
         editor?.classList.remove('hidden');
         const select = container.querySelector('[data-inline-input]');
         select?.focus();
       } else {
         trigger?.classList.remove('hidden');
+        display?.classList.remove('hidden');
         editor?.classList.add('hidden');
       }
     };
@@ -183,8 +215,10 @@
             valueEl.textContent = payload.label;
           }
           if (field === 'status' && badge) {
+            const statusClass = statusBadgeClasses[select.value] || 'bg-slate-100 text-slate-800';
+            // compact badge (list/chapter views use smaller classes)
             badge.textContent = payload.label;
-            badge.className = `inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClasses[select.value] || 'bg-slate-100 text-slate-800'}`;
+            badge.className = badge.className.replace(/bg-\S+ text-\S+/, '').trim() + ` ${statusClass}`;
           }
           showInlineFeedback(container, 'Saved', 'success');
         } catch (error) {
