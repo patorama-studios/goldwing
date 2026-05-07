@@ -6,7 +6,7 @@ use PDO;
 
 class AdminMemberAccess
 {
-    private const CHAPTER_ROLE = 'chapter_leader';
+    private const CHAPTER_ROLE = 'area_rep';
 
     public static function getChapterRestrictionId(?array $user): ?int
     {
@@ -16,7 +16,7 @@ class AdminMemberAccess
         if (self::isFullAccess($user) || self::isTreasurer($user)) {
             return null;
         }
-        if (!self::isChapterLeader($user)) {
+        if (!self::isAreaRep($user)) {
             return null;
         }
         $memberId = $user['member_id'] ?? null;
@@ -42,7 +42,7 @@ class AdminMemberAccess
         return function_exists('current_admin_can') && current_admin_can('admin.payments.view', $user);
     }
 
-    public static function isChapterLeader(array $user): bool
+    public static function isAreaRep(array $user): bool
     {
         return self::hasRole($user, self::CHAPTER_ROLE);
     }

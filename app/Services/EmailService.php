@@ -45,6 +45,15 @@ class EmailService
                 'helo' => SettingsService::getGlobal('site.base_url', ''),
             ];
             $sent = SmtpMailer::send($smtpConfig, $from, $fromName, $to, $subject, $message, $replyTo);
+            if (!$sent) {
+                ActivityLogger::log('system', null, null, 'email.smtp_failed', [
+                    'recipient' => $to,
+                    'subject' => $subject,
+                    'smtp_host' => $smtpConfig['host'],
+                    'smtp_port' => $smtpConfig['port'],
+                    'smtp_user' => $smtpConfig['username'],
+                ]);
+            }
         } elseif ($provider === 'resend') {
             $apiKey = SettingsService::getGlobal('integrations.resend_api_key', '');
             if ($apiKey !== '') {
@@ -57,7 +66,7 @@ class EmailService
                 if ($replyTo !== '') {
                     $payload['reply_to'] = $replyTo;
                 }
-                
+
                 $ch = curl_init('https://api.resend.com/emails');
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
@@ -65,39 +74,42 @@ class EmailService
                     CURLOPT_POSTFIELDS => json_encode($payload),
                     CURLOPT_HTTPHEADER => [
                         'Authorization: Bearer ' . $apiKey,
-                        'Content-Type: application/json'
+                        'Content-Type: application/json',
                     ],
                     CURLOPT_TIMEOUT => 15,
                 ]);
                 $response = curl_exec($ch);
                 $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
-                
+
                 if ($statusCode >= 200 && $statusCode < 300) {
                     $sent = true;
                 } else {
                     ActivityLogger::log('system', null, null, 'email.resend_error', [
                         'recipient' => $to,
                         'status' => $statusCode,
-                        'response' => $response
+                        'response' => $response,
                     ]);
                 }
             } else {
-                 ActivityLogger::log('system', null, null, 'email.resend_missing_key', [
-                     'recipient' => $to,
-                 ]);
+                ActivityLogger::log('system', null, null, 'email.resend_missing_key', [
+                    'recipient' => $to,
+                ]);
             }
-        }
-        if (!$sent) {
+        } else {
+            // php_mail provider (default) — no fallback from other providers
             $headers = 'From: ' . $fromName . ' <' . $from . ">\r\n";
             if (!empty($replyTo)) {
                 $headers .= 'Reply-To: ' . $replyTo . "\r\n";
             }
-            if (!empty($provider)) {
-                $headers .= 'X-Email-Provider: ' . $provider . "\r\n";
-            }
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            $sent = @mail($to, $subject, $message, $headers);
+            $sent = mail($to, $subject, $message, $headers);
+            if (!$sent) {
+                ActivityLogger::log('system', null, null, 'email.php_mail_failed', [
+                    'recipient' => $to,
+                    'subject' => $subject,
+                ]);
+            }
         }
         self::log($to, $subject, $message, $sent, $metadata, [
             'from_name' => $fromName,

@@ -104,7 +104,7 @@ function admin_default_role_permissions(): array
 
     return [
         'admin' => $admin,
-        'chapter_leader' => [
+        'area_rep' => [
             'admin.dashboard.view',
             'admin.members.view',
             'admin.members.edit',

@@ -3,7 +3,7 @@ INSERT INTO roles (name) VALUES
 ('store_manager'),
 ('committee'),
 ('treasurer'),
-('chapter_leader'),
+('area_rep'),
 ('member');
 
 INSERT INTO chapters (name, region) VALUES

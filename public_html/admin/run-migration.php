@@ -302,7 +302,7 @@ if ($alreadyRun) {
         // Update descriptions for the renamed roles
         $pdo->exec("UPDATE roles SET description = 'Webmaster - full system access', updated_at = NOW() WHERE name = 'admin'");
         $pdo->exec("UPDATE roles SET description = 'Quartermaster - store and order management', updated_at = NOW() WHERE name = 'store_manager'");
-        $pdo->exec("UPDATE roles SET description = 'Area Representative', updated_at = NOW() WHERE name = 'chapter_leader'");
+        $pdo->exec("UPDATE roles SET description = 'Area Representative', updated_at = NOW() WHERE name = 'area_rep'");
 
         // Remove deprecated roles — ON DELETE CASCADE handles user_roles and role_permissions
         $pdo->exec("DELETE FROM roles WHERE name IN ('committee', 'treasurer', 'membership_admin', 'store_admin', 'content_admin', 'webmaster', 'super_admin')");
@@ -329,11 +329,11 @@ if ($alreadyRun) {
             $qmStmt->execute(['perm' => $perm, 'role' => 'store_manager']);
         }
 
-        // Re-seed Area Rep (chapter_leader)
+        // Re-seed Area Rep
         $pdo->exec(
             "DELETE rp FROM role_permissions rp
              JOIN roles r ON r.id = rp.role_id
-             WHERE r.name = 'chapter_leader'
+             WHERE r.name = 'area_rep'
                AND rp.permission_key NOT IN ('admin.dashboard.view','admin.members.view','admin.members.edit')"
         );
         $arStmt = $pdo->prepare(
@@ -342,7 +342,7 @@ if ($alreadyRun) {
              ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
         );
         foreach (['admin.dashboard.view','admin.members.view','admin.members.edit'] as $perm) {
-            $arStmt->execute(['perm' => $perm, 'role' => 'chapter_leader']);
+            $arStmt->execute(['perm' => $perm, 'role' => 'area_rep']);
         }
 
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);

@@ -202,10 +202,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subject = 'New event submitted for review: ' . $title;
             $body = '<p>A member has submitted a new event for review.</p><p><strong>' . calendar_e($title) . '</strong></p><p>Please log in to the admin area to approve or deny this event.</p>';
             if ($scope === 'CHAPTER') {
-                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin") OR (r.name = "chapter_leader" AND u.chapter_id = :chapter_id)');
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin") OR (r.name = "area_rep" AND u.chapter_id = :chapter_id)');
                 $stmt->execute(['chapter_id' => $chapterId]);
             } else {
-                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "chapter_leader")');
+                $stmt = $pdo->prepare('SELECT DISTINCT u.id, u.email FROM users u INNER JOIN user_roles ur ON ur.user_id = u.id INNER JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "area_rep")');
                 $stmt->execute();
             }
             $admins = $stmt->fetchAll();

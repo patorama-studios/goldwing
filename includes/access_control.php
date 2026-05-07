@@ -4,8 +4,8 @@ use App\Services\ActivityLogger;
 function access_control_role_aliases(): array
 {
     return [
-        'chapter_rep' => 'chapter_leader',
-        'area_rep' => 'chapter_leader',
+        'chapter_leader' => 'area_rep',
+        'chapter_rep' => 'area_rep',
         'web_admin' => 'admin',
         'web admin' => 'admin',
         'web-admin' => 'admin',
@@ -26,7 +26,7 @@ function access_control_roles(): array
     return [
         'public',
         'member',
-        'chapter_leader',
+        'area_rep',
         'store_manager',
         'admin',
     ];
@@ -37,7 +37,7 @@ function access_control_role_labels(): array
     return [
         'public' => 'Public',
         'member' => 'Member',
-        'chapter_leader' => 'Area Rep',
+        'area_rep' => 'Area Rep',
         'store_manager' => 'Quartermaster',
         'admin' => 'Webmaster',
     ];
@@ -83,7 +83,7 @@ function get_current_role(): string
     $priority = [
         'admin',
         'store_manager',
-        'chapter_leader',
+        'area_rep',
         'member',
         'public',
     ];
@@ -115,7 +115,7 @@ function access_control_default_registry(): array
 {
     $memberRoles = [
         'member',
-        'chapter_leader',
+        'area_rep',
         'store_manager',
         'admin',
     ];
@@ -287,7 +287,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/index.php',
             'match_type' => 'exact',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'chapter_leader'],
+            'roles' => ['admin', 'area_rep'],
         ],
         [
             'page_key' => 'admin_requests',
@@ -303,7 +303,7 @@ function access_control_default_registry(): array
             'path_pattern' => '/admin/members/*',
             'match_type' => 'prefix',
             'nav_group' => 'Admin',
-            'roles' => ['admin', 'chapter_leader'],
+            'roles' => ['admin', 'area_rep'],
         ],
         [
             'page_key' => 'admin_member_of_year',

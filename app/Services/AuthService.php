@@ -135,12 +135,12 @@ class AuthService
         ];
         self::recordLogin((int) $user['id']);
         $roleList = $user['roles'] ?? [];
-        $actorType = array_intersect($roleList, ['admin', 'chapter_leader', 'store_manager']) ? 'admin' : 'member';
+        $actorType = array_intersect($roleList, ['admin', 'area_rep', 'store_manager']) ? 'admin' : 'member';
         ActivityLogger::log($actorType, (int) $user['id'], null, 'security.login_success', ['email' => $user['email']]);
 
         $fingerprint = TrustedDeviceService::fingerprint();
         $isNewDevice = TrustedDeviceService::record((int) $user['id'], $fingerprint);
-        $adminRoles = ['admin', 'chapter_leader', 'store_manager'];
+        $adminRoles = ['admin', 'area_rep', 'store_manager'];
         if ($isNewDevice && count(array_intersect($roleList, $adminRoles)) > 0) {
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
             $safeEmail = htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8');
@@ -208,6 +208,19 @@ class AuthService
         if (!$member) {
             return null;
         }
+        // Resolve associate member numbers to the household user account.
+        // Associates share the main member's login — if this member has no user
+        // account of their own, walk up to the full member and use theirs.
+        $resolveMemberId = (int) $member['id'];
+        if (empty($member['user_id']) && !empty($member['full_member_id'])) {
+            $stmt = $pdo->prepare('SELECT id, user_id FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $member['full_member_id']]);
+            $fullMember = $stmt->fetch();
+            if ($fullMember) {
+                $resolveMemberId = (int) $fullMember['id'];
+                $member = $fullMember;
+            }
+        }
         if (!empty($member['user_id'])) {
             $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
             $stmt->execute(['id' => (int) $member['user_id']]);
@@ -217,7 +230,7 @@ class AuthService
             }
         }
         $stmt = $pdo->prepare('SELECT * FROM users WHERE member_id = :member_id LIMIT 1');
-        $stmt->execute(['member_id' => (int) $member['id']]);
+        $stmt->execute(['member_id' => $resolveMemberId]);
         $user = $stmt->fetch();
         return $user ?: null;
     }

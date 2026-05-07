@@ -1755,12 +1755,12 @@ switch ($action) {
             'reset_link' => NotificationService::escape($link),
             'first_name' => NotificationService::escape(trim((string) ($member['first_name'] ?? ''))),
         ]);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
         if (!$sent) {
             LogViewerService::write('[Admin] Welcome email not sent for member #' . $memberId . '.');
             error_log('[Admin] Welcome email not sent for member #' . $memberId . '.');
             redirectWithFlash($memberId, $tab, 'Welcome email could not be sent. Check email settings.', 'error', $flashContext);
         }
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
         LogViewerService::write('[Admin] Welcome email sent for member #' . $memberId . '.');
         redirectWithFlash($memberId, $tab, 'Welcome email sent.', 'success', $flashContext);
         break;
