@@ -131,6 +131,8 @@ $headerLookup = [
     'note' => 'notes',
     'full_member_number' => 'full_member_number',
     'full_member_id' => 'full_member_number',
+    'is_historic' => 'is_historic',
+    'historic' => 'is_historic',
 ];
 
 $headerKeys = [];
@@ -191,6 +193,7 @@ $candidateColumns = [
     'notes',
     'member_number',
     'created_at',
+    'is_historic',
 ];
 
 $insertColumns = [];
@@ -237,8 +240,15 @@ while (($row = fgetcsv($handle)) !== false) {
     $email = trim($data['email'] ?? '');
     $memberIdRaw = trim($data['member_id'] ?? '');
 
-    if (!Validator::required($firstName) || !Validator::required($lastName) || !Validator::email($email) || !Validator::required($memberIdRaw)) {
+    $memberTypeForValidation = strtoupper(trim($data['member_type'] ?? 'FULL'));
+    $emailRequired = $memberTypeForValidation !== 'ASSOCIATE';
+    if (!Validator::required($firstName) || !Validator::required($lastName) || !Validator::required($memberIdRaw) || ($emailRequired && !Validator::email($email))) {
         $errors[] = 'Row ' . $rowNumber . ': Missing required fields (first_name, last_name, email, member_id).';
+        $skippedCount++;
+        continue;
+    }
+    if (!$emailRequired && $email !== '' && !Validator::email($email)) {
+        $errors[] = 'Row ' . $rowNumber . ': Invalid email address for associate member.';
         $skippedCount++;
         continue;
     }
