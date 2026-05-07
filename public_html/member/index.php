@@ -264,6 +264,7 @@ if ($user && $user['member_id']) {
               'country' => trim($_POST['country'] ?? ''),
               'wings_preference' => $_POST['wings_preference'] ?? $targetMember['wings_preference'],
               'privacy_level' => $_POST['privacy_level'] ?? $targetMember['privacy_level'],
+              'is_historic' => isset($_POST['is_historic']) ? 1 : 0,
             ];
             foreach (MemberRepository::directoryPreferences() as $letter => $info) {
               $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
@@ -297,7 +298,7 @@ if ($user && $user['member_id']) {
             $memberNumber = $memberNumberObj ?: 'Unknown';
             
             $adminEmails = [];
-            $stmtEmails = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee", "chapter_leader") AND u.is_active = 1');
+            $stmtEmails = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee", "area_rep") AND u.is_active = 1');
             foreach ($stmtEmails->fetchAll() as $row) {
               if (!empty($row['email'])) {
                 $adminEmails[] = $row['email'];
