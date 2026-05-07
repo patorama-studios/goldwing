@@ -20,9 +20,12 @@ if (!$issue) {
     exit;
 }
 
-// Increment download counter
-$update = $pdo->prepare('UPDATE wings_issues SET downloads = downloads + 1 WHERE id = :id');
-$update->execute(['id' => $id]);
+// Only count as a download when not just viewing in the flipbook reader
+$viewOnly = !empty($_GET['view']);
+if (!$viewOnly) {
+    $update = $pdo->prepare('UPDATE wings_issues SET downloads = downloads + 1 WHERE id = :id');
+    $update->execute(['id' => $id]);
+}
 
 // Redirect to actual file
 if (empty($issue['pdf_url'])) {

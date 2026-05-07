@@ -1557,7 +1557,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-lg font-semibold text-gray-900"><?= e($wingsLatest['title']) ?></p>
                   <div class="mt-3 flex flex-wrap gap-2">
                       <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                        href="/member/download_wings.php?id=<?= e((string) $wingsLatest['id']) ?>" target="_blank" rel="noopener">Read Now</a>
+                        href="/member/read_wings.php?id=<?= e((string) $wingsLatest['id']) ?>">Read Now</a>
                     <a class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
                       href="/member/index.php?page=wings">Archive</a>
                   </div>
@@ -2660,7 +2660,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </div>
                   <div class="flex flex-wrap gap-3">
                     <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                      href="/member/download_wings.php?id=<?= $latestIssue['id'] ?>" target="_blank" rel="noopener">
+                      href="/member/read_wings.php?id=<?= $latestIssue['id'] ?>">
                       <span class="material-icons-outlined text-base">menu_book</span>
                       <span class="ml-2">Read Online</span>
                     </a>
@@ -2736,7 +2736,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <p class="text-xs text-gray-500"><?= e($publishedLabel) ?></p>
                       <?php endif; ?>
                       <a class="inline-flex items-center text-sm font-semibold text-secondary"
-                        href="/member/download_wings.php?id=<?= $issue['id'] ?>" target="_blank">
+                        href="/member/read_wings.php?id=<?= $issue['id'] ?>">
                         Read issue
                         <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
                       </a>

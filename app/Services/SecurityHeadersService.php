@@ -16,12 +16,12 @@ class SecurityHeadersService
             : "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com";
         $googleScriptSources = 'https://maps.googleapis.com https://maps.gstatic.com';
         $stripeScriptSources = 'https://js.stripe.com https://m.stripe.network';
-        $scriptSrc = $allowFraming
-            ? "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net {$googleScriptSources} {$stripeScriptSources}"
-            : "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com {$googleScriptSources} {$stripeScriptSources}";
+        $cdnSources = 'https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com';
+        $scriptSrc = "script-src 'self' 'unsafe-inline' {$cdnSources} {$googleScriptSources} {$stripeScriptSources}";
         $frameSrc = "frame-src 'self' https://js.stripe.com https://m.stripe.network";
-        $connectSrc = "connect-src 'self' https://api.stripe.com https://m.stripe.network https://maps.googleapis.com https://maps.gstatic.com";
-        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; {$frameSrc}; font-src 'self' data: https://fonts.gstatic.com; {$connectSrc}; {$frameAncestors}";
+        $connectSrc = "connect-src 'self' https://api.stripe.com https://m.stripe.network https://maps.googleapis.com https://maps.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net";
+        $workerSrc = "worker-src blob: https://cdnjs.cloudflare.com";
+        $csp = "default-src 'self'; img-src 'self' data: https:; {$styleSrc}; {$scriptSrc}; {$frameSrc}; font-src 'self' data: https://fonts.gstatic.com; {$connectSrc}; {$workerSrc}; {$frameAncestors}";
         header('Content-Security-Policy: ' . $csp);
         header('X-Frame-Options: ' . ($allowFraming ? 'SAMEORIGIN' : 'DENY'));
         header('X-Content-Type-Options: nosniff');
