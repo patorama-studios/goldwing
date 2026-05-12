@@ -132,6 +132,27 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     #fullscreen-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
     #fullscreen-btn .material-icons-outlined { font-size: 16px; }
 
+    /* Pinch zoom hint (mobile only) */
+    #zoom-hint {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: rgba(0,0,0,0.65);
+      color: rgba(255,255,255,0.75);
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s;
+      z-index: 50;
+      white-space: nowrap;
+      display: none;
+    }
+    #zoom-hint.show { opacity: 1; }
+    @media (max-width: 767px) { #zoom-hint { display: block; } }
+
     /* Escape hint toast */
     #esc-hint {
       position: fixed;
@@ -229,6 +250,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       justify-content: center;
       width: 100%;
       height: 100%;
+      transform-origin: center center;
+      /* transform: scale() set by zoom JS */
     }
 
     #flip-book {
@@ -373,6 +396,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   </div>
 </div>
 <div id="esc-hint">Press <kbd style="background:rgba(255,255,255,0.15);padding:1px 6px;border-radius:4px;font-family:monospace">Esc</kbd> to exit full screen</div>
+<div id="zoom-hint">Pinch to zoom · Double-tap to reset</div>
 
 <!-- Reader Area -->
 <div id="reader-area">
@@ -624,6 +648,12 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       mobilePrev.disabled = false;
       mobileNext.disabled = false;
       updateUI(pageFlip.getCurrentPageIndex() + 1, totalPages);
+      // Show pinch-to-zoom hint on mobile briefly
+      if (isMobile) {
+        const zh = document.getElementById('zoom-hint');
+        setTimeout(() => { zh.classList.add('show'); }, 600);
+        setTimeout(() => { zh.classList.remove('show'); }, 4000);
+      }
     });
 
     // Arrow buttons (desktop side + mobile bottom)
@@ -637,6 +667,59 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   pageFlip.flipPrev();
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  pageFlip.flipNext();
     });
+
+    // ── Zoom (pinch on mobile, scroll wheel on desktop) ──────
+    let zoomScale    = 1;
+    let pinchStartDist  = 0;
+    let pinchStartScale = 1;
+    let isPinching   = false;
+    let lastTapTime  = 0;
+    const readerEl   = document.getElementById('reader-area');
+
+    function applyZoom(scale, animate) {
+      zoomScale = Math.min(4, Math.max(0.75, scale));
+      flipWrap.style.transition = animate ? 'transform 0.18s ease' : 'none';
+      flipWrap.style.transform  = `scale(${zoomScale})`;
+    }
+
+    // Mobile — pinch to zoom
+    readerEl.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        isPinching = true;
+        pinchStartDist  = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        pinchStartScale = zoomScale;
+      }
+    }, { passive: true });
+
+    readerEl.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && isPinching) {
+        e.preventDefault();                        // block browser default zoom
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        applyZoom(pinchStartScale * (dist / pinchStartDist), false);
+      }
+    }, { passive: false });
+
+    readerEl.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) isPinching = false;
+      // Double-tap to reset zoom
+      if (e.touches.length === 0 && e.changedTouches.length === 1) {
+        const now = Date.now();
+        if (now - lastTapTime < 300) applyZoom(1, true);
+        lastTapTime = now;
+      }
+    });
+
+    // Desktop — scroll wheel to zoom
+    readerEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      applyZoom(zoomScale * (e.deltaY < 0 ? 1.12 : 0.89), true);
+    }, { passive: false });
 
     // Responsive resize
     let resizeTimer;
