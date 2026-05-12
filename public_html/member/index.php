@@ -3670,7 +3670,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             'CONCAT(fm.first_name, \' \', fm.last_name) AS full_member_name',
             'fm.member_number_base AS full_member_number_base',
             'fm.member_number_suffix AS full_member_number_suffix',
-            'su.setting_value AS avatar_url',
+            'JSON_UNQUOTE(su.value_json) AS avatar_url',
         ]));
 
         try {
@@ -3680,7 +3680,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 LEFT JOIN chapters c ON c.id = m.chapter_id
                 LEFT JOIN members fm ON fm.id = m.full_member_id
                 LEFT JOIN users u ON u.id = m.user_id
-                LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+                LEFT JOIN settings_user su ON su.user_id = u.id AND su.key_name = 'avatar_url'
                 WHERE LOWER(m.status) = 'active'
                 $excludeClause
                 ORDER BY COALESCE(fm.last_name, m.last_name) ASC, COALESCE(fm.first_name, m.first_name) ASC, CASE WHEN m.full_member_id IS NULL THEN 0 ELSE 1 END ASC, m.last_name ASC, m.first_name ASC
@@ -3954,12 +3954,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         m.phone, m.email,
                         $cmtAcceptCol $cmtExcludeCol
                         c.name AS chapter_name, c.state AS chapter_state,
-                        su.setting_value AS avatar_url
+                        JSON_UNQUOTE(su.value_json) AS avatar_url
                         $cmtRoleSelects
                     FROM members m
                     LEFT JOIN chapters c ON c.id = m.chapter_id
                     LEFT JOIN users u ON u.id = m.user_id
-                    LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
+                    LEFT JOIN settings_user su ON su.user_id = u.id AND su.key_name = 'avatar_url'
                     WHERE LOWER(m.status) = 'active'
                     $cmtWhere
                     ORDER BY m.last_name ASC, m.first_name ASC
