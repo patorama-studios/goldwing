@@ -4404,24 +4404,44 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
       }
     };
 
+    const noticeSubmitBtn = noticeForm ? noticeForm.querySelector('button[type="submit"]') : null;
+
     const handleNoticeFile = async (file) => {
       if (!file || !noticeAttachmentUrl || !noticeAttachmentType) {
         return;
       }
-      const result = await uploadFile(file, 'notices');
+      if (noticeAttachmentPreview) {
+        noticeAttachmentPreview.classList.remove('hidden');
+        noticeAttachmentPreview.innerHTML = '<span class="text-xs text-gray-500">Uploading…</span>';
+      }
+      if (noticeSubmitBtn) noticeSubmitBtn.disabled = true;
+      let result;
+      try {
+        result = await uploadFile(file, 'notices');
+      } catch (e) {
+        if (noticeAttachmentPreview) {
+          noticeAttachmentPreview.innerHTML = '<span class="text-xs text-red-600">Upload failed. Please try again.</span>';
+        }
+        if (noticeSubmitBtn) noticeSubmitBtn.disabled = false;
+        return;
+      }
       if (!result || result.error) {
-        alert(result.error || 'Upload failed.');
+        if (noticeAttachmentPreview) {
+          noticeAttachmentPreview.innerHTML = `<span class="text-xs text-red-600">${result?.error || 'Upload failed. Please try again.'}</span>`;
+        }
+        if (noticeSubmitBtn) noticeSubmitBtn.disabled = false;
         return;
       }
       noticeAttachmentUrl.value = result.url || '';
       noticeAttachmentType.value = result.type || '';
       setNoticeAttachmentPreview(file, result);
+      if (noticeSubmitBtn) noticeSubmitBtn.disabled = false;
     };
 
     if (noticeUploadInput) {
       noticeUploadInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
-        handleNoticeFile(file);
+        if (file) handleNoticeFile(file);
       });
     }
     if (noticeUploadZone) {
@@ -4436,7 +4456,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         event.preventDefault();
         noticeUploadZone.classList.remove('border-primary');
         const file = event.dataTransfer.files[0];
-        handleNoticeFile(file);
+        if (file) handleNoticeFile(file);
       });
     }
 
