@@ -3643,6 +3643,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $hasAreaRep    = $tryCol('is_area_rep');
         $hasCommittee  = $tryCol('is_committee');
         $hasCommRole   = $tryCol('committee_role');
+        $hasMemberNumber = $tryCol('member_number');
 
         $roleSelects = '';
         if ($hasAreaRep)   $roleSelects .= ', m.is_area_rep';
@@ -3653,9 +3654,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             ? "AND (m.$colExcludeElec = 0 OR m.$colExcludeElec IS NULL)"
             : '';
 
+        $memberNumberExpr = $hasMemberNumber
+            ? 'COALESCE(m.member_number, CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END)) AS member_number'
+            : 'CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END) AS member_number';
+
         $selectCols = implode(",\n                ", array_filter([
             'm.id', 'm.first_name', 'm.last_name', 'm.member_type',
-            'm.phone', 'm.email', 'm.member_number_base', 'm.member_number_suffix', 'm.member_number',
+            'm.phone', 'm.email', 'm.member_number_base', 'm.member_number_suffix', $memberNumberExpr,
             $colAcceptCalls ? "m.$colAcceptCalls" : null,
             $colCollectMoto ? "m.$colCollectMoto" : null,
             $colBedOrTent   ? "m.$colBedOrTent"   : null,
