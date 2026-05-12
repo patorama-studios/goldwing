@@ -1383,7 +1383,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <div>
                 <p class="text-sm text-gray-500 mb-1">Expiry Date</p>
                 <p class="text-lg font-semibold text-gray-900">
-                  <?= ($member && $member['member_type'] === 'LIFE') ? 'No expiry' : e($membershipPeriod['end_date'] ?? 'N/A') ?>
+                  <?= ($member && $member['member_type'] === 'LIFE') ? 'No expiry' : e($membershipPeriod ? format_date_au($membershipPeriod['end_date'] ?? null) ?: 'N/A' : 'N/A') ?>
                 </p>
               </div>
             </div>
@@ -3605,8 +3605,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php foreach ($history as $period): ?>
                     <tr>
                       <td class="py-2 pr-3 text-gray-900"><?= e($period['term']) ?></td>
-                      <td class="py-2 pr-3 text-gray-600"><?= e($period['start_date']) ?></td>
-                      <td class="py-2 pr-3 text-gray-600"><?= e($period['end_date'] ?? 'No expiry') ?></td>
+                      <td class="py-2 pr-3 text-gray-600"><?= e(format_date_au($period['start_date'])) ?></td>
+                      <td class="py-2 pr-3 text-gray-600"><?= e($period['end_date'] ? format_date_au($period['end_date']) : 'No expiry') ?></td>
                       <td class="py-2 text-gray-600"><?= e($period['status']) ?></td>
                     </tr>
                   <?php endforeach; ?>
@@ -3678,7 +3678,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
                 WHERE LOWER(m.status) = 'active'
                 $excludeClause
-                ORDER BY m.last_name ASC, m.first_name ASC
+                ORDER BY COALESCE(fm.last_name, m.last_name) ASC, COALESCE(fm.first_name, m.first_name) ASC, CASE WHEN m.full_member_id IS NULL THEN 0 ELSE 1 END ASC, m.last_name ASC, m.first_name ASC
             ");
             $directoryMembers = $dirStmt ? $dirStmt->fetchAll() : [];
         } catch (\Throwable $e) {
@@ -3788,27 +3788,34 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     $caps[] = ['Tools', 'bg-orange-100 text-orange-800'];
                   }
                 ?>
-                  <tr class="<?= $dmType === 'life' ? 'bg-yellow-50/60' : 'hover:bg-gray-50' ?> transition-colors"
+                  <tr class="<?= $dmType === 'life' ? 'bg-yellow-50/60' : ($dmType === 'associate' ? 'bg-purple-50/30 hover:bg-purple-50/60' : 'hover:bg-gray-50') ?> transition-colors"
                     data-search="<?= e($dmSearchStr) ?>"
                     data-chapter="<?= e(strtolower($dmChapterLabel)) ?>"
                     data-type="<?= e($dmType) ?>">
-                    <td class="py-3 px-2">
+                    <td class="py-3 px-2 <?= $dmType === 'associate' ? 'pl-6' : '' ?>">
+                      <?php if ($dmType === 'associate'): ?>
+                        <div class="flex items-center gap-1">
+                          <span class="text-purple-300 text-base leading-none">↳</span>
+                      <?php endif; ?>
                       <?php if (!empty($dm['avatar_url'])): ?>
                         <img src="<?= e($dm['avatar_url']) ?>" alt="<?= e($dmFullName) ?>"
-                          class="w-9 h-9 rounded-full object-cover border <?= $dmType === 'life' ? 'border-yellow-300' : 'border-gray-200' ?> shrink-0">
+                          class="w-9 h-9 rounded-full object-cover border <?= $dmType === 'life' ? 'border-yellow-300' : ($dmType === 'associate' ? 'border-purple-200' : 'border-gray-200') ?> shrink-0">
                       <?php else: ?>
-                        <div class="w-9 h-9 rounded-full <?= $dmType === 'life' ? 'bg-yellow-200 border-yellow-300' : 'bg-gray-100 border-gray-200' ?> border flex items-center justify-center shrink-0">
+                        <div class="w-9 h-9 rounded-full <?= $dmType === 'life' ? 'bg-yellow-200 border-yellow-300' : ($dmType === 'associate' ? 'bg-purple-100 border-purple-200' : 'bg-gray-100 border-gray-200') ?> border flex items-center justify-center shrink-0">
                           <?php if ($dmType === 'life'): ?>
                             <span class="material-icons-outlined text-yellow-600 text-xl">star</span>
                           <?php else: ?>
-                            <span class="material-icons-outlined text-gray-400 text-xl">person</span>
+                            <span class="material-icons-outlined <?= $dmType === 'associate' ? 'text-purple-400' : 'text-gray-400' ?> text-xl">person</span>
                           <?php endif; ?>
+                        </div>
+                      <?php endif; ?>
+                      <?php if ($dmType === 'associate'): ?>
                         </div>
                       <?php endif; ?>
                     </td>
                     <td class="py-3 px-2">
                       <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                        <p class="font-medium <?= $dmType === 'life' ? 'text-yellow-900' : 'text-gray-900' ?>"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
+                        <p class="font-medium <?= $dmType === 'life' ? 'text-yellow-900' : ($dmType === 'associate' ? 'text-purple-900' : 'text-gray-900') ?>"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
                         <?php if ($dmType === 'life'): ?>
                           <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-yellow-200 text-yellow-800">
                             <span class="material-icons-outlined text-[10px] leading-none">star</span>Life

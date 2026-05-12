@@ -1529,11 +1529,11 @@ switch ($action) {
 
     case 'member_settings_update':
         if (!AdminMemberAccess::isFullAccess($user)) {
-            redirectWithFlash($memberId, 'settings', 'Settings updates are restricted.', 'error');
+            redirectWithFlash($memberId, $tab, 'Settings updates are restricted.', 'error');
         }
         $userId = $member['user_id'] ?? null;
         if (!$userId) {
-            redirectWithFlash($memberId, 'settings', 'Member does not have a linked user account.', 'error');
+            redirectWithFlash($memberId, $tab, 'Member does not have a linked user account.', 'error');
         }
         $timezone = trim($_POST['user_timezone'] ?? '');
         $avatarUrl = trim($_POST['avatar_url'] ?? '');
@@ -1571,7 +1571,7 @@ switch ($action) {
                 'actor_roles' => $user['roles'] ?? [],
             ]);
         }
-        redirectWithFlash($memberId, 'settings', 'Member settings saved.');
+        redirectWithFlash($memberId, $tab, 'Member settings saved.');
         break;
 
     case 'twofa_toggle':

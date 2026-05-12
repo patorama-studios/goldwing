@@ -1,0 +1,5 @@
+# Ignore all uploaded media files but keep this .gitignore and .gitkeep placeholders
+*
+!.gitignore
+!.gitkeep
+!*/

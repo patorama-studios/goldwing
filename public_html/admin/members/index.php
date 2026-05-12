@@ -605,7 +605,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     $userId = (int) ($member['user_id'] ?? 0);
                     $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
                   ?>
-                  <tr class="group hover:bg-gray-50/70 transition-colors <?= $isLifeMember ? 'bg-yellow-50/50' : ($statusKey === 'pending' ? 'bg-amber-50/40' : '') ?>"
+                  <tr class="group hover:bg-gray-50/70 transition-colors <?= $isLifeMember ? 'bg-yellow-50/50' : ($isAssociate ? 'bg-purple-50/20 hover:bg-purple-50/40' : ($statusKey === 'pending' ? 'bg-amber-50/40' : '')) ?>"
                       data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
 
                     <!-- Checkbox -->
@@ -614,8 +614,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </td>
 
                     <!-- Member -->
-                    <td class="px-3 py-2.5">
+                    <td class="px-3 py-2.5 <?= $isAssociate ? 'pl-7' : '' ?>">
                       <div class="flex items-center gap-2.5">
+                        <?php if ($isAssociate): ?>
+                          <span class="text-purple-300 text-sm leading-none flex-shrink-0">↳</span>
+                        <?php endif; ?>
                         <!-- Avatar -->
                         <?php if ($avatarUrl): ?>
                           <img src="<?= e($avatarUrl) ?>" alt="<?= e($initials) ?>" class="h-8 w-8 rounded-full object-cover flex-shrink-0">
@@ -628,7 +631,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <!-- Name + number -->
                         <div class="min-w-0">
                           <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
-                             class="text-sm font-semibold truncate <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : 'text-gray-900 hover:text-primary' ?>">
+                             class="text-sm font-semibold truncate <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : ($isAssociate ? 'text-purple-900 hover:text-purple-700' : 'text-gray-900 hover:text-primary') ?>">
                             <?= e($fullName !== '' ? $fullName : 'Member') ?>
                           </a>
                           <p class="text-[11px] text-gray-400 leading-tight">#<?= e($member['member_number_display'] ?? '—') ?></p>

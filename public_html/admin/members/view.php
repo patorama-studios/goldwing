@@ -1408,6 +1408,56 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   </form>
                 </div>
                 <div class="space-y-6">
+                  <?php if ($canEditSettings && $userId > 0): ?>
+                  <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex items-center gap-3 mb-4">
+                      <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
+                        <span class="material-icons-outlined">account_circle</span>
+                      </div>
+                      <div>
+                        <h2 class="font-display text-lg font-bold text-gray-900">Profile Image</h2>
+                        <p class="text-sm text-gray-500">Upload a photo for this member.</p>
+                      </div>
+                    </div>
+                    <form method="post" action="/admin/members/actions.php" class="space-y-3">
+                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                      <input type="hidden" name="tab" value="profile">
+                      <input type="hidden" name="action" value="member_settings_update">
+                      <input type="hidden" name="user_timezone" value="<?= e($userTimezone) ?>">
+                      <div class="flex items-center gap-3">
+                        <div id="profile-avatar-preview"
+                          class="h-16 w-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <?php if ($avatarUrl): ?>
+                            <img src="<?= e($avatarUrl) ?>" alt="<?= e($member['first_name'] . ' ' . $member['last_name']) ?>"
+                              class="h-full w-full object-cover">
+                          <?php else: ?>
+                            <span class="material-icons-outlined text-gray-400 text-2xl">person</span>
+                          <?php endif; ?>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                          <input type="hidden" name="avatar_url" id="profile-avatar-url-input" value="<?= e($avatarUrl) ?>">
+                          <button type="button"
+                            class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            data-upload-trigger
+                            data-upload-target="profile-avatar-url-input"
+                            data-upload-preview="profile-avatar-preview"
+                            data-upload-context="avatars">
+                            <span class="material-icons-outlined text-sm">upload</span>
+                            Upload photo
+                          </button>
+                          <?php if ($avatarUrl): ?>
+                            <p class="text-xs text-gray-400 truncate max-w-[160px]" title="<?= e($avatarUrl) ?>">Current: <?= e(basename($avatarUrl)) ?></p>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                      <button type="submit"
+                        class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold">
+                        Save photo
+                      </button>
+                    </form>
+                  </div>
+                  <?php endif; ?>
                   <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
                     <div class="flex items-start justify-between gap-3 mb-4">
                       <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -1534,7 +1584,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <div class="flex items-center justify-between gap-3">
                               <div>
                                 <p class="font-semibold text-gray-900"><?= e($request['name']) ?></p>
-                                <p class="text-xs text-gray-500">Requested: <?= e($request['requested_at']) ?></p>
+                                <p class="text-xs text-gray-500">Requested: <?= e(formatDateTime($request['requested_at'])) ?></p>
                               </div>
                               <span
                                 class="text-[11px] font-bold uppercase tracking-widest text-gray-500"><?= e($request['status']) ?></span>

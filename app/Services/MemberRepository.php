@@ -102,7 +102,8 @@ class MemberRepository
             . $memberAuthJoin
             . 'LEFT JOIN users u ON u.id = m.user_id '
             . 'LEFT JOIN user_2fa u2 ON u2.user_id = u.id '
-            . 'LEFT JOIN user_security_overrides uo ON uo.user_id = u.id';
+            . 'LEFT JOIN user_security_overrides uo ON uo.user_id = u.id '
+            . 'LEFT JOIN members fm ON fm.id = m.full_member_id';
 
         if ($whereClause !== '') {
             $base .= ' WHERE ' . $whereClause;
@@ -677,8 +678,16 @@ class MemberRepository
             ?: (self::hasMemberNumberColumn($pdo) ? 'm.member_number' : 'm.id');
         $memberNumberSuffix = self::hasMemberColumn($pdo, 'member_number_suffix') ? 'm.member_number_suffix' : null;
 
+        if ($sortBy === 'member') {
+            return 'COALESCE(fm.last_name, m.last_name) ' . $direction
+                . ', COALESCE(fm.first_name, m.first_name) ' . $direction
+                . ', CASE WHEN m.full_member_id IS NULL THEN 0 ELSE 1 END ASC'
+                . ', m.last_name ' . $direction
+                . ', m.first_name ' . $direction
+                . ', m.id DESC';
+        }
+
         $map = [
-            'member' => ['m.last_name', 'm.first_name'],
             'chapter' => ['c.name', 'm.last_name', 'm.first_name'],
             'status' => ['LOWER(m.status)', 'm.last_name', 'm.first_name'],
             'created' => ['m.created_at'],

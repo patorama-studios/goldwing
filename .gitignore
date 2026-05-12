@@ -1,7 +1,6 @@
 .env
 .env.local
 scripts/ftp.env
-public_html/uploads/
 public_html/uploads.zip
 
 # macOS metadata
