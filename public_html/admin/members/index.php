@@ -56,12 +56,12 @@ $sortOptions = [
     'chapter' => 'Chapter',
     'status' => 'Status',
 ];
-$sortBy = strtolower(trim((string) ($_GET['sort_by'] ?? 'created')));
+$sortBy = strtolower(trim((string) ($_GET['sort_by'] ?? 'member')));
 if ($sortBy === 'member_id') {
     $sortBy = 'member_number';
 }
 if (!array_key_exists($sortBy, $sortOptions)) {
-    $sortBy = 'created';
+    $sortBy = 'member';
 }
 $sortDirInput = strtolower(trim((string) ($_GET['sort_dir'] ?? '')));
 $sortDir = $sortDirInput !== '' ? $sortDirInput : ($sortBy === 'created' ? 'desc' : 'asc');

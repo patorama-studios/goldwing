@@ -3679,7 +3679,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 FROM members m
                 LEFT JOIN chapters c ON c.id = m.chapter_id
                 LEFT JOIN members fm ON fm.id = m.full_member_id
-                LEFT JOIN users u ON u.member_id = m.id
+                LEFT JOIN users u ON u.id = m.user_id
                 LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
                 WHERE LOWER(m.status) = 'active'
                 $excludeClause
@@ -3958,7 +3958,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         $cmtRoleSelects
                     FROM members m
                     LEFT JOIN chapters c ON c.id = m.chapter_id
-                    LEFT JOIN users u ON u.member_id = m.id
+                    LEFT JOIN users u ON u.id = m.user_id
                     LEFT JOIN settings_user su ON su.user_id = u.id AND su.setting_key = 'avatar_url'
                     WHERE LOWER(m.status) = 'active'
                     $cmtWhere
