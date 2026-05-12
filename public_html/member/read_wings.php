@@ -151,7 +151,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       display: none;
     }
     #zoom-hint.show { opacity: 1; }
-    @media (max-width: 767px) { #zoom-hint { display: block; } }
+    @media (max-width: 1023px) { #zoom-hint { display: block; } }
 
     /* Escape hint toast */
     #esc-hint {
@@ -236,8 +236,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     .mobile-nav-arrow:disabled { opacity: 0.22; cursor: default; }
     .mobile-nav-arrow .material-icons-outlined { font-size: 24px; }
 
-    /* ── Mobile overrides ── */
-    @media (max-width: 767px) {
+    /* ── Mobile overrides (phones + tablets) ── */
+    @media (max-width: 1023px) {
       #btn-prev, #btn-next { display: none; }
       .mobile-nav-arrow { display: inline-flex; }
       #reader-area { padding: 8px 6px; }
@@ -432,8 +432,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 (async function () {
   // ── Config ──────────────────────────────────────────────
   const PDF_URL    = <?= json_encode($pdfUrl) ?>;
-  const RENDER_SCALE = 1.2;   // higher = sharper pages, slower load
-  const PARALLEL   = 4;       // pages rendered simultaneously
+  const RENDER_SCALE = 2.0;   // higher = sharper pages, slower load
+  const PARALLEL   = 6;       // pages rendered simultaneously
   const MAX_DOTS   = 20;      // max navigation dots shown
 
   // ── Elements ─────────────────────────────────────────────
@@ -458,7 +458,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   let pageFlip = null;
   let totalPages = 0;
 
-  const isMobile = window.innerWidth < 768;
+  // Treat anything under 1024px as mobile (catches phones in landscape + small tablets)
+  const isMobile = window.innerWidth < 1024;
 
   function getBookDimensions() {
     const topBar    = document.getElementById('top-bar').offsetHeight;
@@ -478,8 +479,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       w = Math.floor(availW * 0.98);
       h = Math.floor(w / aspect);
       if (h > availH) { h = Math.floor(availH * 0.98); w = Math.floor(h * aspect); }
-      w = Math.max(160, Math.min(w, 560));
-      h = Math.max(226, Math.min(h, 800));
+      w = Math.max(160, Math.min(w, 900));   // allow larger tablets to use full width
+      h = Math.max(226, Math.min(h, 1200));
     } else {
       // Two-page spread — side arrows take ~150px total
       const vPad    = 48;
@@ -587,7 +588,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       canvas.width   = Math.round(viewport.width);
       canvas.height  = Math.round(viewport.height);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      images[pageNum - 1] = canvas.toDataURL('image/jpeg', 0.80);
+      images[pageNum - 1] = canvas.toDataURL('image/jpeg', 0.85);
       rendered++;
       const pct = Math.round((rendered / totalPages) * 100);
       progressBar.style.width = pct + '%';
@@ -614,8 +615,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       size:                'stretch',
       minWidth:            160,
       minHeight:           226,
-      maxWidth:            isMobile ? 600 : 650,
-      maxHeight:           isMobile ? 850 : 900,
+      maxWidth:            isMobile ? 950 : 650,
+      maxHeight:           isMobile ? 1300 : 900,
       maxShadowOpacity:    0.5,
       showCover:           true,
       mobileScrollSupport: true,
