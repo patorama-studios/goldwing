@@ -3732,6 +3732,25 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </select>
           </div>
 
+          <!-- Assistance flags legend -->
+          <?php if ($colCollectMoto || $colAcceptCalls || $colBedOrTent || $colTools): ?>
+            <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span class="font-medium text-gray-600">Assistance flags:</span>
+              <?php if ($colCollectMoto): ?>
+                <span><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">A</span>Collect motorcycle</span>
+              <?php endif; ?>
+              <?php if ($colAcceptCalls): ?>
+                <span><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">B</span>Accept phone calls</span>
+              <?php endif; ?>
+              <?php if ($colBedOrTent): ?>
+                <span><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">C</span>Provide bed or tent</span>
+              <?php endif; ?>
+              <?php if ($colTools): ?>
+                <span><span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">D</span>Provide tools/workshop</span>
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
+
           <!-- Table -->
           <div class="overflow-x-auto -mx-2">
             <table class="w-full text-sm min-w-[700px]" id="dir-table">
@@ -3744,7 +3763,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <th class="py-2 px-2">Chapter</th>
                   <th class="py-2 px-2">Phone</th>
                   <th class="py-2 px-2">Email</th>
-                  <th class="py-2 px-2">Capabilities</th>
+                  <th class="py-2 px-2">Assistance</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100" id="dir-tbody">
@@ -3784,13 +3803,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 
                   $caps = [];
                   if ($colCollectMoto && !empty($dm[$colCollectMoto])) {
-                    $caps[] = ['Motorcycle', 'bg-green-100 text-green-800'];
+                    $caps[] = 'A';
+                  }
+                  if ($colAcceptCalls && !empty($dm[$colAcceptCalls])) {
+                    $caps[] = 'B';
                   }
                   if ($colBedOrTent && !empty($dm[$colBedOrTent])) {
-                    $caps[] = ['Bed/Tent', 'bg-teal-100 text-teal-800'];
+                    $caps[] = 'C';
                   }
                   if ($colTools && !empty($dm[$colTools])) {
-                    $caps[] = ['Tools', 'bg-orange-100 text-orange-800'];
+                    $caps[] = 'D';
                   }
                 ?>
                   <tr class="<?= $dmType === 'life' ? 'bg-yellow-50/60' : ($dmType === 'associate' ? 'bg-purple-50/30 hover:bg-purple-50/60' : 'hover:bg-gray-50') ?> transition-colors"
@@ -3820,7 +3842,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </td>
                     <td class="py-3 px-2">
                       <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                        <p class="font-medium <?= $dmType === 'life' ? 'text-yellow-900' : ($dmType === 'associate' ? 'text-purple-900' : 'text-gray-900') ?>"><?= e($dm['last_name']) ?>, <?= e($dm['first_name']) ?></p>
+                        <p class="font-medium <?= $dmType === 'life' ? 'text-yellow-900' : ($dmType === 'associate' ? 'text-purple-900' : 'text-gray-900') ?>"><?= e($dm['first_name']) ?> <?= e($dm['last_name']) ?></p>
                         <?php if ($dmType === 'life'): ?>
                           <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-yellow-200 text-yellow-800">
                             <span class="material-icons-outlined text-[10px] leading-none">star</span>Life
@@ -3847,14 +3869,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </td>
                     <td class="py-3 px-2 text-gray-600 whitespace-nowrap"><?= e($dmChapterLabel ?: '—') ?></td>
                     <td class="py-3 px-2 whitespace-nowrap">
-                      <?php if ($dmCanContact && !empty($dm['phone'])): ?>
+                      <?php if (!empty($dm['phone'])): ?>
                         <a href="tel:<?= e($dm['phone']) ?>" class="text-primary hover:underline"><?= e($dm['phone']) ?></a>
                       <?php else: ?>
                         <span class="text-gray-300">—</span>
                       <?php endif; ?>
                     </td>
                     <td class="py-3 px-2">
-                      <?php if ($dmCanContact && !empty($dm['email'])): ?>
+                      <?php if (!empty($dm['email'])): ?>
                         <a href="mailto:<?= e($dm['email']) ?>" class="text-primary hover:underline block truncate max-w-[200px]"><?= e($dm['email']) ?></a>
                       <?php else: ?>
                         <span class="text-gray-300">—</span>
@@ -3862,10 +3884,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </td>
                     <td class="py-3 px-2">
                       <?php if ($caps): ?>
-                        <div class="flex flex-wrap gap-1">
-                          <?php foreach ($caps as [$capLabel, $capColor]): ?>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium <?= $capColor ?>">
-                              <?= e($capLabel) ?>
+                        <div class="flex gap-1">
+                          <?php foreach ($caps as $capLetter): ?>
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                              <?= e($capLetter) ?>
                             </span>
                           <?php endforeach; ?>
                         </div>
