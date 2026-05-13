@@ -546,6 +546,42 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 012 — Add missing member_bikes columns (image_url, rego)
+// Older databases were created before these columns were added to schema.sql,
+// so admin-side saves were silently dropping bike photos and rego values.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_012_member_bikes_columns';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 012 — member_bikes image_url + rego', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+        $existing = $pdo->query("SHOW COLUMNS FROM member_bikes")->fetchAll(PDO::FETCH_COLUMN, 0);
+        // Add rego first so image_url's AFTER clause is valid.
+        if (!in_array('rego', $existing, true)) {
+            $pdo->exec("ALTER TABLE member_bikes ADD COLUMN rego VARCHAR(50) NULL AFTER year");
+            $applied[] = 'rego added';
+        } else {
+            $applied[] = 'rego already present';
+        }
+        $existing = $pdo->query("SHOW COLUMNS FROM member_bikes")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('image_url', $existing, true)) {
+            $pdo->exec("ALTER TABLE member_bikes ADD COLUMN image_url VARCHAR(255) NULL AFTER rego");
+            $applied[] = 'image_url added';
+        } else {
+            $applied[] = 'image_url already present';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 012 — member_bikes image_url + rego', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 012 — member_bikes image_url + rego', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
