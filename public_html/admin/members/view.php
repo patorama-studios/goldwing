@@ -622,10 +622,19 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <?php if ($flash && $flashContext !== 'account_access'): ?>
-        <div
-          class="rounded-2xl border border-gray-200 bg-white p-4 text-sm <?= $flash['type'] === 'error' ? 'text-red-700' : 'text-green-700' ?>">
-          <?= e($flash['message']) ?>
+        <div id="memberFlashBanner"
+          class="rounded-2xl border p-4 text-sm flex items-start gap-3 <?= $flash['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800' ?>">
+          <span class="material-icons-outlined text-[20px] mt-0.5 flex-shrink-0"><?= $flash['type'] === 'error' ? 'error_outline' : 'check_circle' ?></span>
+          <span class="font-medium"><?= e($flash['message']) ?></span>
         </div>
+        <script>
+          (function () {
+            var el = document.getElementById('memberFlashBanner');
+            if (el && typeof el.scrollIntoView === 'function') {
+              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          })();
+        </script>
       <?php endif; ?>
 
       <?php if ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
@@ -1266,30 +1275,44 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             </div>
                           </div>
                         <?php endif; ?>
+                        <?php if (!$canEditContact || !$canEditAddress): ?>
+                          <div class="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                            <span class="material-icons-outlined text-[16px] mt-0.5">lock</span>
+                            <span>
+                              <?php if (!$canEditContact && !$canEditAddress): ?>
+                                You don't have permission to edit any of these fields. Contact an administrator if you need to request changes.
+                              <?php elseif (!$canEditContact): ?>
+                                Name, email and phone are read-only for your role. Address fields remain editable.
+                              <?php else: ?>
+                                Address fields are read-only for your role. Name, email and phone remain editable.
+                              <?php endif; ?>
+                            </span>
+                          </div>
+                        <?php endif; ?>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label class="text-sm font-medium text-gray-700">First name</label>
                             <input type="text" name="first_name" value="<?= e($profileMember['first_name']) ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditContact ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditContact ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">Last name</label>
                             <input type="text" name="last_name" value="<?= e($profileMember['last_name']) ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditContact ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditContact ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">Email</label>
                             <input type="email" name="email" value="<?= e($profileMember['email']) ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditContact ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditContact ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">Phone</label>
                             <input type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditContact ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditContact ? '' : 'disabled' ?>>
                           </div>
                           <div class="md:col-span-2">
                             <label class="text-sm font-medium text-gray-700">Address line 1</label>
@@ -1299,43 +1322,43 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               data-google-autocomplete-postal="#admin_address_postcode"
                               data-google-autocomplete-country="#admin_address_country" type="text" name="address_line1"
                               value="<?= e($profileMember['address_line1'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div class="md:col-span-2">
                             <label class="text-sm font-medium text-gray-700">Address line 2</label>
                             <input id="admin_address_line2" type="text" name="address_line2"
                               value="<?= e($profileMember['address_line2'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">City</label>
                             <input id="admin_address_city" type="text" name="suburb"
                               value="<?= e($profileMember['suburb'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">State</label>
                             <input id="admin_address_state" type="text" name="state"
                               value="<?= e($profileMember['state'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">Postal code</label>
                             <input id="admin_address_postcode" type="text" name="postcode"
                               value="<?= e($profileMember['postal_code'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div>
                             <label class="text-sm font-medium text-gray-700">Country</label>
                             <input id="admin_address_country" type="text" name="country"
                               value="<?= e($profileMember['country'] ?? '') ?>"
-                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                              <?= $canEditAddress ? '' : 'readonly' ?>>
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                         </div>
                       </div>
@@ -2995,6 +3018,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       return response.json();
     };
 
+    const flagFormUnsaved = (targetInput) => {
+      if (!targetInput) {
+        return;
+      }
+      const form = targetInput.closest('form');
+      if (!form) {
+        return;
+      }
+      let note = form.querySelector('[data-photo-unsaved-note]');
+      if (!note) {
+        note = document.createElement('div');
+        note.setAttribute('data-photo-unsaved-note', '');
+        note.className = 'mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800';
+        note.innerHTML = '<span class="material-icons-outlined text-sm">info</span><span>Photo uploaded — click <strong>Save</strong> below to keep it.</span>';
+        const submit = form.querySelector('button[type="submit"]');
+        if (submit && submit.parentNode) {
+          submit.parentNode.insertBefore(note, submit);
+        } else {
+          form.appendChild(note);
+        }
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) {
+        submit.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2');
+      }
+    };
+
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
         if (!selectedFile || !activeTargetInput) {
@@ -3011,6 +3061,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         if (activeTargetPreview) {
           activeTargetPreview.innerHTML = `<img src="${result.url}" alt="Uploaded" class="h-full w-full object-cover">`;
         }
+        flagFormUnsaved(activeTargetInput);
         closeModal();
       });
     }

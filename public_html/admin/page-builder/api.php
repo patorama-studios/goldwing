@@ -317,6 +317,7 @@ $permissionMap = [
     'versions' => 'admin.ai_page_builder.access',
     'settings' => 'admin.ai_page_builder.edit',
     'upload_media' => 'admin.media_library.manage',
+    'list_media' => 'admin.ai_page_builder.edit',
     'save_draft' => 'admin.ai_page_builder.edit',
     'create_page' => 'admin.ai_page_builder.edit',
     'access' => 'admin.ai_page_builder.edit',
@@ -417,6 +418,43 @@ if ($method === 'GET') {
         $stmt->execute(['page_id' => $pageId]);
         $versions = $stmt->fetchAll() ?: [];
         json_response(['versions' => $versions]);
+    }
+
+    if ($action === 'list_media') {
+        $pdo = db();
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $limit = max(1, min(60, (int) ($_GET['limit'] ?? 40)));
+        $where = ["type = 'image'"];
+        $params = [];
+        if ($search !== '') {
+            $where[] = '(title LIKE :search1 OR path LIKE :search2 OR file_name LIKE :search3)';
+            $term = '%' . $search . '%';
+            $params['search1'] = $term;
+            $params['search2'] = $term;
+            $params['search3'] = $term;
+        }
+        $sql = 'SELECT id, title, path, file_name, file_type, source_context, created_at FROM media WHERE '
+            . implode(' AND ', $where)
+            . ' ORDER BY created_at DESC LIMIT ' . $limit;
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            json_response(['error' => 'Could not load media library.'], 500);
+        }
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'title' => (string) ($row['title'] ?? ($row['file_name'] ?? '')),
+                'url' => (string) ($row['path'] ?? ''),
+                'file_type' => (string) ($row['file_type'] ?? ''),
+                'context' => (string) ($row['source_context'] ?? ''),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+            ];
+        }
+        json_response(['items' => $items]);
     }
 
     if ($action === 'settings') {

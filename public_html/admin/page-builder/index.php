@@ -426,6 +426,50 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     max-height: 90vh;
     overflow-y: auto;
   }
+  .builder-modal-card.builder-modal-wide {
+    width: min(960px, 95vw);
+  }
+  .media-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 0.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+  .media-picker-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+    position: relative;
+    aspect-ratio: 1 / 1;
+    transition: border-color 0.15s ease;
+  }
+  .media-picker-item:hover {
+    border-color: #15803d;
+  }
+  .media-picker-item.selected {
+    border-color: #15803d;
+    box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
+  }
+  .media-picker-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .media-picker-empty {
+    grid-column: 1 / -1;
+    padding: 1.5rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+  }
   @media (min-width: 1024px) {
     .topbar-subtitle {
       display: block;
@@ -626,12 +670,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 </div>
 
 <div class="builder-modal" id="image-modal">
-  <div class="builder-modal-card space-y-3">
+  <div class="builder-modal-card builder-modal-wide space-y-3">
     <h3 class="font-display text-lg font-bold text-gray-900">Replace Image</h3>
-    <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Image URL</label>
-    <input id="image-src" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="https://">
-    <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Media ID (optional)</label>
-    <input id="image-media-id" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="123">
+    <div class="rounded-lg border border-gray-200 bg-slate-50 p-3 space-y-2">
+      <div class="flex items-center justify-between gap-2">
+        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Pick from media library</label>
+        <input id="image-library-search" type="search" placeholder="Search title or filename..." class="w-56 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs">
+      </div>
+      <div id="image-library-grid" class="media-picker-grid">
+        <div class="media-picker-empty">Loading media...</div>
+      </div>
+      <p id="image-library-status" class="text-[11px] text-slate-500">&nbsp;</p>
+    </div>
+    <details class="rounded-lg border border-gray-200 bg-white p-3" id="image-manual-details">
+      <summary class="text-xs uppercase tracking-[0.2em] text-slate-500 cursor-pointer">Or paste a URL manually</summary>
+      <div class="mt-3 space-y-2">
+        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Image URL</label>
+        <input id="image-src" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="https://">
+        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Media ID (optional)</label>
+        <input id="image-media-id" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="123">
+      </div>
+    </details>
     <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Alt text</label>
     <input id="image-alt" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Describe the image">
     <div class="flex justify-end gap-2">
@@ -1217,6 +1276,87 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       loadPage(state.currentPage.id);
     });
 
+    const libraryGrid = document.getElementById('image-library-grid');
+    const librarySearch = document.getElementById('image-library-search');
+    const libraryStatus = document.getElementById('image-library-status');
+    const manualDetails = document.getElementById('image-manual-details');
+    let libraryItems = [];
+    let libraryQuery = '';
+    let libraryRequestSeq = 0;
+
+    const renderLibraryGrid = (items) => {
+      if (!libraryGrid) return;
+      libraryGrid.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'media-picker-empty';
+        empty.textContent = libraryQuery ? 'No images match this search.' : 'No images in the library yet. Upload one or paste a URL below.';
+        libraryGrid.appendChild(empty);
+        return;
+      }
+      const currentSrc = imageSrc.value.trim();
+      items.forEach((item) => {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'media-picker-item';
+        tile.title = item.title || item.url;
+        tile.dataset.url = item.url;
+        tile.dataset.id = String(item.id || '');
+        if (currentSrc && item.url === currentSrc) {
+          tile.classList.add('selected');
+        }
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.alt = item.title || '';
+        img.loading = 'lazy';
+        tile.appendChild(img);
+        tile.addEventListener('click', () => {
+          imageSrc.value = item.url;
+          imageMediaId.value = String(item.id || '');
+          if (!imageAlt.value.trim()) {
+            imageAlt.value = item.title || '';
+          }
+          libraryGrid.querySelectorAll('.media-picker-item.selected').forEach((el) => el.classList.remove('selected'));
+          tile.classList.add('selected');
+          if (libraryStatus) {
+            libraryStatus.textContent = 'Selected: ' + (item.title || item.url);
+          }
+        });
+        libraryGrid.appendChild(tile);
+      });
+    };
+
+    const loadMediaLibrary = async (query = '') => {
+      if (!libraryGrid) return;
+      const seq = ++libraryRequestSeq;
+      libraryQuery = query;
+      libraryGrid.innerHTML = '<div class="media-picker-empty">Loading media...</div>';
+      if (libraryStatus) libraryStatus.textContent = ' ';
+      try {
+        const params = new URLSearchParams({ action: 'list_media' });
+        if (query) params.set('q', query);
+        const data = await apiRequest('/admin/page-builder/api.php?' + params.toString());
+        if (seq !== libraryRequestSeq) return;
+        libraryItems = Array.isArray(data.items) ? data.items : [];
+        renderLibraryGrid(libraryItems);
+      } catch (err) {
+        if (seq !== libraryRequestSeq) return;
+        libraryGrid.innerHTML = '';
+        const fail = document.createElement('div');
+        fail.className = 'media-picker-empty';
+        fail.textContent = err.message || 'Could not load media library.';
+        libraryGrid.appendChild(fail);
+      }
+    };
+
+    let librarySearchTimer = null;
+    if (librarySearch) {
+      librarySearch.addEventListener('input', () => {
+        clearTimeout(librarySearchTimer);
+        librarySearchTimer = setTimeout(() => loadMediaLibrary(librarySearch.value.trim()), 200);
+      });
+    }
+
     replaceImageBtn.addEventListener('click', () => {
       if (!state.selected || state.selected.tagName !== 'img') return;
       const parser = new DOMParser();
@@ -1225,7 +1365,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       imageSrc.value = img?.getAttribute('src') || '';
       imageMediaId.value = img?.getAttribute('data-media-id') || '';
       imageAlt.value = img?.getAttribute('alt') || '';
+      if (librarySearch) librarySearch.value = '';
+      if (manualDetails) manualDetails.open = false;
       imageModal.classList.add('active');
+      loadMediaLibrary('');
     });
 
     generateImageBtn.addEventListener('click', async () => {

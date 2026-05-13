@@ -3182,20 +3182,24 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-sm text-gray-500">Requests are reviewed by committee.</p>
                 </div>
               </div>
-              <form method="post" enctype="multipart/form-data" class="space-y-3">
+              <form method="post" enctype="multipart/form-data" class="space-y-3" autocomplete="off">
                 <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                 <input type="hidden" name="action" value="submit_fallen_wings">
                 <input type="text" name="fallen_name" placeholder="Member full name"
                   value="<?= e(empty($fallenMessage) ? ($_POST['fallen_name'] ?? '') : '') ?>"
+                  autocomplete="off"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
                 <input type="date" name="fallen_date"
                   value="<?= e(empty($fallenMessage) ? ($_POST['fallen_date'] ?? '') : '') ?>"
+                  autocomplete="off"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900-01-01"
                   max="<?= e(date('Y-m-d')) ?>" required>
                 <input type="text" name="fallen_member_number" maxlength="120" placeholder="Member number (optional)"
                   value="<?= e(empty($fallenMessage) ? ($_POST['fallen_member_number'] ?? '') : '') ?>"
+                  autocomplete="off" data-1p-ignore data-lpignore="true"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\\-]+">
                 <textarea name="fallen_tribute" rows="4" placeholder="Optional tribute or note"
+                  autocomplete="off"
                   class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(empty($fallenMessage) ? ($_POST['fallen_tribute'] ?? '') : '') ?></textarea>
                 <div>
                   <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Photograph</label>
@@ -4301,6 +4305,33 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
       return response.json();
     };
 
+    const flagFormUnsaved = (targetInput) => {
+      if (!targetInput) {
+        return;
+      }
+      const form = targetInput.closest('form');
+      if (!form) {
+        return;
+      }
+      let note = form.querySelector('[data-photo-unsaved-note]');
+      if (!note) {
+        note = document.createElement('div');
+        note.setAttribute('data-photo-unsaved-note', '');
+        note.className = 'mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800';
+        note.innerHTML = '<span class="material-icons-outlined text-sm">info</span><span>Photo uploaded — click <strong>Save</strong> below to keep it.</span>';
+        const submit = form.querySelector('button[type="submit"]');
+        if (submit && submit.parentNode) {
+          submit.parentNode.insertBefore(note, submit);
+        } else {
+          form.appendChild(note);
+        }
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) {
+        submit.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2');
+      }
+    };
+
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
         if (!selectedFile || !activeTargetInput) {
@@ -4323,6 +4354,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               activeTargetPreview.innerHTML = `<img src="${result.url}" alt="Uploaded" class="h-full w-full object-cover">`;
             }
           }
+          flagFormUnsaved(activeTargetInput);
           closeModal();
         };
 

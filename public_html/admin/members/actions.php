@@ -460,6 +460,9 @@ switch ($action) {
         }
 
         if ($payload === []) {
+            if (!AdminMemberAccess::canEditContact($user) && !AdminMemberAccess::canEditAddress($user) && !$allowFullProfile) {
+                redirectWithFlash($memberId, $tab, "You don't have permission to edit this profile. Contact an administrator if you need to request changes.", 'error', $redirectExtras);
+            }
             redirectWithFlash($memberId, $tab, 'No changes detected.', 'error', $redirectExtras);
         }
         if (array_key_exists('email', $payload) && !MemberRepository::isEmailAvailable($payload['email'], $targetMemberId)) {
