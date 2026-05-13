@@ -441,19 +441,40 @@ switch ($action) {
             $payload['country'] = trim($_POST['country'] ?? $targetMember['country'] ?? '');
         }
         if ($allowFullProfile) {
-            $payload['chapter_id'] = isset($_POST['chapter_id']) && $_POST['chapter_id'] !== '' ? (int) $_POST['chapter_id'] : null;
-            $payload['membership_type_id'] = isset($_POST['membership_type_id']) && $_POST['membership_type_id'] !== '' ? (int) $_POST['membership_type_id'] : null;
-            $status = $_POST['status'] ?? $targetMember['status'];
-            if (in_array($status, ['pending', 'active', 'expired', 'cancelled', 'suspended'], true)) {
-                $payload['status'] = $status;
+            if (array_key_exists('chapter_id', $_POST)) {
+                $payload['chapter_id'] = $_POST['chapter_id'] !== '' ? (int) $_POST['chapter_id'] : null;
             }
+            if (array_key_exists('membership_type_id', $_POST)) {
+                $payload['membership_type_id'] = $_POST['membership_type_id'] !== '' ? (int) $_POST['membership_type_id'] : null;
+            }
+            if (array_key_exists('status', $_POST)) {
+                $status = $_POST['status'];
+                if (in_array($status, ['pending', 'active', 'expired', 'cancelled', 'suspended'], true)) {
+                    $payload['status'] = $status;
+                }
+            }
+            // Directory preferences are checkboxes — only sync when the form section was actually submitted.
+            $directoryFormPresent = false;
             foreach (MemberRepository::directoryPreferences() as $letter => $info) {
-                $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
+                if (array_key_exists('directory_pref_' . $letter, $_POST)) {
+                    $directoryFormPresent = true;
+                    break;
+                }
             }
-            $payload['notes'] = trim($_POST['notes'] ?? $targetMember['notes'] ?? '');
-            $payload['is_area_rep'] = isset($_POST['is_area_rep']) ? 1 : 0;
-            $payload['is_committee'] = isset($_POST['is_committee']) ? 1 : 0;
-            $payload['committee_role'] = trim($_POST['committee_role'] ?? '');
+            $directoryMarkerPresent = !empty($_POST['directory_pref_submitted']);
+            if ($directoryFormPresent || $directoryMarkerPresent) {
+                foreach (MemberRepository::directoryPreferences() as $letter => $info) {
+                    $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
+                }
+            }
+            if (array_key_exists('notes', $_POST)) {
+                $payload['notes'] = trim((string) $_POST['notes']);
+            }
+            if (!empty($_POST['admin_flags_submitted'])) {
+                $payload['is_area_rep'] = isset($_POST['is_area_rep']) ? 1 : 0;
+                $payload['is_committee'] = isset($_POST['is_committee']) ? 1 : 0;
+                $payload['committee_role'] = trim((string) ($_POST['committee_role'] ?? ''));
+            }
         }
         if ($allowFullProfile && $member['member_type'] === 'ASSOCIATE' && !empty($member['full_member_id'])) {
             unset($payload['chapter_id']);

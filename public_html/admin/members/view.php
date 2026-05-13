@@ -1405,6 +1405,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             </label>
                           </div>
                           <div class="mt-5 text-sm font-medium text-gray-700 mb-2">Assistance flags</div>
+                          <input type="hidden" name="directory_pref_submitted" value="1">
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
                             <?php foreach (\App\Services\MemberRepository::directoryPreferences() as $letter => $info): ?>
                               <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
@@ -2114,6 +2115,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="hidden" name="tab" value="orders">
                   <input type="hidden" name="action" value="save_profile">
                   <?php if ($canEditFullProfile): ?>
+                    <input type="hidden" name="admin_flags_submitted" value="1">
                     <?php foreach ($directoryPrefs as $letter => $info): ?>
                       <?php if (!empty($member[$info['column']])): ?>
                         <input type="hidden" name="directory_pref_<?= e($letter) ?>" value="1">
