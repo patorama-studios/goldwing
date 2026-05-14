@@ -1901,8 +1901,8 @@ switch ($action) {
                 throw new \RuntimeException('Unable to update user password.');
             }
             if (!empty($member['email'])) {
-                $stmt = $pdo->prepare('UPDATE users SET email = :email, updated_at = NOW() WHERE id = :id AND email != :email');
-                $stmt->execute(['email' => $member['email'], 'id' => $targetUserId]);
+                $stmt = $pdo->prepare('UPDATE users SET email = :new_email, updated_at = NOW() WHERE id = :id AND email != :current_email');
+                $stmt->execute(['new_email' => $member['email'], 'current_email' => $member['email'], 'id' => $targetUserId]);
             }
             $stmt = $pdo->query("SHOW TABLES LIKE 'member_auth'");
             $hasMemberAuth = (bool) $stmt->fetchColumn();
