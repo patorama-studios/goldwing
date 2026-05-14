@@ -67,18 +67,14 @@ if ($method === 'GET') {
         $stmt->execute(['id' => $conversationId]);
         $messages = $stmt->fetchAll() ?: [];
 
-        $providers = config('ai.providers', []);
-        $providerList = [];
-        foreach ($providers as $key => $provider) {
-            $dbConfigured = AiProviderKeyService::hasKey($key);
-            $envConfigured = !empty($provider['api_key']);
-            $providerList[] = [
-                'key' => $key,
-                'label' => $provider['label'] ?? ucfirst($key),
-                'models' => $provider['models'] ?? [],
-                'configured' => $dbConfigured || $envConfigured,
-            ];
-        }
+        $kieConfig = config('ai.providers.kie', []);
+        $kieConfigured = AiProviderKeyService::hasKey('kie') || !empty($kieConfig['api_key']);
+        $providerList = [[
+            'key' => 'kie',
+            'label' => 'kie.ai',
+            'models' => $kieConfig['models'] ?? ['claude-sonnet-4-6'],
+            'configured' => $kieConfigured,
+        ]];
 
         $revisions = PageAiRevisionService::listByPage($pageId, 50);
         $revisionList = array_map(function ($revision) {
@@ -103,8 +99,8 @@ if ($method === 'GET') {
             'preview_url' => '/?page=' . urlencode($page['slug']) . '&builder_preview=1',
             'has_schema' => !empty($page['schema_json']),
             'providers' => $providerList,
-            'default_provider' => config('ai.default_provider', 'openai'),
-            'default_model' => config('ai.default_model', 'gpt-4o-mini'),
+            'default_provider' => 'kie',
+            'default_model' => config('ai.default_model', 'claude-sonnet-4-6'),
             'conversation_id' => $conversationId,
             'messages' => $messages,
             'revisions' => $revisionList,
@@ -183,14 +179,12 @@ if ($method === 'POST') {
             $message = substr($message, 0, 2000);
         }
 
-        $providers = config('ai.providers', []);
-        $provider = strtolower($data['provider'] ?? config('ai.default_provider', 'openai'));
-        if (!isset($providers[$provider])) {
-            $provider = config('ai.default_provider', 'openai');
-        }
-        $model = $data['model'] ?? ($providers[$provider]['models'][0] ?? config('ai.default_model', 'gpt-4o-mini'));
-        if (!in_array($model, $providers[$provider]['models'] ?? [], true)) {
-            $model = $providers[$provider]['models'][0] ?? config('ai.default_model', 'gpt-4o-mini');
+        $provider = 'kie';
+        $allowedModels = config('ai.providers.kie.models', ['claude-sonnet-4-6']);
+        $defaultModel = config('ai.default_model', 'claude-sonnet-4-6');
+        $model = (string) ($data['model'] ?? $defaultModel);
+        if (!in_array($model, $allowedModels, true)) {
+            $model = $defaultModel;
         }
 
         $selected = $data['selectedElement'] ?? [];

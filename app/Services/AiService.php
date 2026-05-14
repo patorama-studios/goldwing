@@ -1,6 +1,8 @@
 <?php
 namespace App\Services;
 
+use App\Services\AiProviders\AiProviderFactory;
+
 class AiService
 {
     public static function createConversation(int $userId): int
@@ -26,48 +28,37 @@ class AiService
     {
         self::logMessage($conversationId, 'user', $input);
 
-        $apiKey = config('ai.providers.openai.api_key', config('ai.api_key', ''));
-        if ($apiKey === '') {
+        $client = AiProviderFactory::make('kie');
+        if (!$client) {
             $fallback = [
                 'target_type' => 'page',
                 'target_id' => null,
                 'slug' => 'home',
                 'proposed_html' => '<p>AI is not configured.</p>',
-                'change_summary' => 'AI key missing; fallback response.',
+                'change_summary' => 'kie.ai key missing; fallback response.',
             ];
             self::logMessage($conversationId, 'assistant', json_encode($fallback));
             return $fallback;
         }
 
-        $systemPrompt = 'You are an assistant for the Australian Goldwing Association admin. '
-            . 'Return ONLY valid JSON with keys: target_type (page|notice|event), target_id or slug, '
-            . 'proposed_html or proposed_text, change_summary. '
-            . 'Never suggest role/permission changes. Never output PHP or server code. Only content edits.';
-
-        $payload = [
-            'model' => config('ai.model', 'gpt-4o-mini'),
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $input],
-            ],
-            'temperature' => 0.3,
-        ];
-
-        $ch = curl_init('https://api.openai.com/v1/chat/completions');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $apiKey,
-                'Content-Type: application/json',
-            ],
+        $systemPrompt = implode("\n", [
+            'You are an assistant for the Australian Goldwing Association admin page builder.',
+            'SCOPE LOCK: You may ONLY suggest content edits to a single page draft.',
+            'You MUST NOT output PHP, server code, SQL, shell commands, <script>, <iframe>, inline event handlers, or anything outside the page content.',
+            'You MUST NOT suggest role, permission, settings, user, or codebase changes.',
+            'Return ONLY valid JSON with keys: target_type (page|notice|event), target_id or slug, proposed_html or proposed_text, change_summary.',
         ]);
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
 
-        if ($status < 200 || $status >= 300 || !$response) {
+        $result = $client->request([
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $input],
+        ], [
+            'model' => config('ai.model', 'claude-sonnet-4-6'),
+            'temperature' => 0.3,
+            'max_tokens' => 1400,
+        ]);
+
+        if (!$result['ok']) {
             $fallback = [
                 'target_type' => 'page',
                 'target_id' => null,
@@ -79,8 +70,7 @@ class AiService
             return $fallback;
         }
 
-        $data = json_decode($response, true);
-        $content = $data['choices'][0]['message']['content'] ?? '';
+        $content = (string) ($result['content'] ?? '');
         self::logMessage($conversationId, 'assistant', $content);
 
         $decoded = json_decode($content, true);
@@ -106,9 +96,7 @@ class AiService
         }
 
         $html = $result['proposed_html'] ?? $result['proposed_text'] ?? '';
-        if (stripos($html, '<?php') !== false || stripos($html, 'require(') !== false) {
-            $html = '<p>Blocked unsafe content.</p>';
-        }
+        $html = self::stripUnsafe((string) $html);
         if (isset($result['proposed_html'])) {
             $result['proposed_html'] = $html;
         } elseif (isset($result['proposed_text'])) {
@@ -118,5 +106,32 @@ class AiService
         }
 
         return $result;
+    }
+
+    private static function stripUnsafe(string $html): string
+    {
+        if ($html === '') {
+            return $html;
+        }
+        $blockedPhrases = ['<?php', '<?=', '<? ', 'require(', 'require_once', 'include(', 'include_once', 'eval(', 'system(', 'shell_exec'];
+        foreach ($blockedPhrases as $needle) {
+            if (stripos($html, $needle) !== false) {
+                return '<p>Blocked unsafe content.</p>';
+            }
+        }
+        $patterns = [
+            '/<script\b[^>]*>.*?<\/script>/is', '/<script\b[^>]*>/i',
+            '/<iframe\b[^>]*>/i', '/<\/iframe>/i',
+            '/<object\b[^>]*>/i', '/<\/object>/i',
+            '/<embed\b[^>]*>/i',
+            '/\son[a-z]+\s*=\s*"(?:[^"\\\\]|\\\\.)*"/i',
+            "/\\son[a-z]+\\s*=\\s*'(?:[^'\\\\]|\\\\.)*'/i",
+            '/\son[a-z]+\s*=\s*[^\s>]+/i',
+            '/javascript:/i',
+        ];
+        foreach ($patterns as $pat) {
+            $html = preg_replace($pat, '', $html) ?? $html;
+        }
+        return $html;
     }
 }

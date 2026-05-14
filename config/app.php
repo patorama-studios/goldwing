@@ -26,26 +26,16 @@ return [
         ],
     ],
     'ai' => [
-        'default_provider' => getenv('AI_DEFAULT_PROVIDER') ?: 'openai',
-        'default_model' => getenv('AI_DEFAULT_MODEL') ?: 'gpt-4o-mini',
-        'provider' => getenv('AI_DEFAULT_PROVIDER') ?: 'openai',
-        'api_key' => getenv('OPENAI_API_KEY') ?: '',
-        'model' => getenv('AI_DEFAULT_MODEL') ?: 'gpt-4o-mini',
+        'default_provider' => 'kie',
+        'default_model' => getenv('AI_DEFAULT_MODEL') ?: 'claude-sonnet-4-6',
+        'provider' => 'kie',
+        'api_key' => getenv('KIE_API_KEY') ?: '',
+        'model' => getenv('AI_DEFAULT_MODEL') ?: 'claude-sonnet-4-6',
         'providers' => [
-            'openai' => [
-                'label' => 'OpenAI',
-                'api_key' => getenv('OPENAI_API_KEY') ?: '',
-                'models' => ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'],
-            ],
-            'gemini' => [
-                'label' => 'Gemini',
-                'api_key' => getenv('GEMINI_API_KEY') ?: '',
-                'models' => ['gemini-1.5-flash', 'gemini-1.5-pro'],
-            ],
-            'claude' => [
-                'label' => 'Claude',
-                'api_key' => getenv('ANTHROPIC_API_KEY') ?: '',
-                'models' => ['claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022'],
+            'kie' => [
+                'label' => 'kie.ai',
+                'api_key' => getenv('KIE_API_KEY') ?: '',
+                'models' => ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5'],
             ],
         ],
     ],

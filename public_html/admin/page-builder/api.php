@@ -3,12 +3,48 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AiProviderKeyService;
 use App\Services\AiProviders\AiProviderFactory;
+use App\Services\AiProviders\KieAiProvider;
 use App\Services\AuditService;
 use App\Services\Csrf;
 use App\Services\PageBuilderService;
 use App\Services\PageService;
 use App\Services\SettingsService;
 use App\Services\MediaService;
+
+const AI_PROVIDER = 'kie';
+const AI_DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+function ai_scope_lock_prompt(): string
+{
+    return implode("\n", [
+        'SCOPE LOCK (NON-NEGOTIABLE):',
+        '- You may ONLY produce HTML content destined for a single page draft inside the AGA web page builder.',
+        '- You MUST NOT output PHP, server-side code, shell commands, SQL, or any code targeting the codebase, filesystem, environment, or admin tooling.',
+        '- You MUST NOT output <script>, <iframe>, <object>, <embed>, <form action=... posting anywhere>, event handlers (onclick, onload, onerror, etc.), or external resource loaders.',
+        '- You MUST NOT reference or attempt to modify routes, files, settings, users, roles, permissions, the database, server config, the admin UI, or any non-page-content surface.',
+        '- You MUST NOT include javascript: URLs, data: URLs with executable payloads, or CSS expressions/imports loading external scripts.',
+        '- Refuse politely if asked to do anything outside editing the page draft content.',
+    ]);
+}
+
+function ai_sanitize_html(string $html): string
+{
+    $patterns = [
+        '/<\?php\b/i', '/<\?=/i', '/<\?\s/i',
+        '/<script\b[^>]*>.*?<\/script>/is', '/<script\b[^>]*>/i',
+        '/<iframe\b[^>]*>/i', '/<\/iframe>/i',
+        '/<object\b[^>]*>/i', '/<\/object>/i',
+        '/<embed\b[^>]*>/i',
+        '/\son[a-z]+\s*=\s*"(?:[^"\\\\]|\\\\.)*"/i',
+        "/\\son[a-z]+\\s*=\\s*'(?:[^'\\\\]|\\\\.)*'/i",
+        '/\son[a-z]+\s*=\s*[^\s>]+/i',
+        '/javascript:/i',
+    ];
+    foreach ($patterns as $pat) {
+        $html = preg_replace($pat, '', $html) ?? $html;
+    }
+    return $html;
+}
 
 header('Content-Type: application/json');
 
@@ -77,6 +113,8 @@ function fetch_chat_messages(int $pageId): array
 function normalize_ai_response(string $content): array
 {
     $trimmed = trim($content);
+    // Strip markdown fences if model added them despite instructions.
+    $trimmed = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $trimmed) ?? $trimmed;
     $decoded = json_decode($trimmed, true);
     if (!is_array($decoded)) {
         return ['ok' => false, 'error' => 'AI response was not valid JSON.'];
@@ -87,6 +125,7 @@ function normalize_ai_response(string $content): array
     if ($updatedHtml === '') {
         return ['ok' => false, 'error' => 'AI response missing updated_html.'];
     }
+    $updatedHtml = ai_sanitize_html($updatedHtml);
     return [
         'ok' => true,
         'updated_html' => $updatedHtml,
@@ -111,45 +150,14 @@ function default_template_html(string $scope): string
     return '';
 }
 
-function generate_image_openai(string $prompt): array
+function generate_image_kie(string $prompt): array
 {
-    $apiKey = AiProviderKeyService::getKey('openai');
-    if ($apiKey === null || $apiKey === '') {
-        return ['ok' => false, 'error' => 'OpenAI API key not configured.'];
+    $apiKey = AiProviderKeyService::getKey('kie') ?? config('ai.providers.kie.api_key', '');
+    if ($apiKey === '' || $apiKey === null) {
+        return ['ok' => false, 'error' => 'kie.ai API key not configured.'];
     }
-    $payload = [
-        'model' => 'dall-e-3',
-        'prompt' => $prompt,
-        'size' => '1024x1024',
-        'response_format' => 'url',
-    ];
-
-    $ch = curl_init('https://api.openai.com/v1/images/generations');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-        ],
-    ]);
-    $response = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-
-    if ($response === false || $status < 200 || $status >= 300) {
-        return ['ok' => false, 'error' => $error ?: 'Image generation failed.'];
-    }
-
-    $data = json_decode($response, true);
-    $url = $data['data'][0]['url'] ?? '';
-    if ($url === '') {
-        return ['ok' => false, 'error' => 'Image response missing URL.'];
-    }
-
-    return ['ok' => true, 'url' => $url];
+    $provider = new KieAiProvider($apiKey);
+    return $provider->generateImage($prompt);
 }
 
 function normalize_reference_image_url(string $url): ?string
@@ -226,12 +234,8 @@ function usage_record(string $provider, int $usdCents, int $tokens): void
 
 function usage_cost_from_raw(string $provider, array $raw, float $ratePer1k): array
 {
-    $tokens = 0;
-    if ($provider === 'openai') {
-        $tokens = (int) ($raw['usage']['total_tokens'] ?? 0);
-    } elseif ($provider === 'gemini') {
-        $tokens = (int) ($raw['usageMetadata']['totalTokenCount'] ?? 0);
-    }
+    $tokens = (int) ($raw['usage']['total_tokens']
+        ?? (($raw['usage']['prompt_tokens'] ?? 0) + ($raw['usage']['completion_tokens'] ?? 0)));
     $usd = $tokens > 0 ? ($tokens / 1000.0) * $ratePer1k : 0.0;
     return ['tokens' => $tokens, 'usd_cents' => (int) round($usd * 100)];
 }
@@ -262,7 +266,8 @@ function usage_check_cap(string $provider): array
 
 function normalize_page_create_response(string $content): array
 {
-    $decoded = json_decode(trim($content), true);
+    $trimmed = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', trim($content)) ?? trim($content);
+    $decoded = json_decode($trimmed, true);
     if (!is_array($decoded)) {
         return ['ok' => false, 'error' => 'AI response was not valid JSON.'];
     }
@@ -276,6 +281,7 @@ function normalize_page_create_response(string $content): array
     if ($title === '') {
         $title = 'New Page';
     }
+    $html = ai_sanitize_html($html);
     return [
         'ok' => true,
         'title' => $title,
@@ -338,7 +344,7 @@ $user = current_user();
 if ($method === 'GET') {
     if ($action === 'pages') {
         $pages = PageService::listEditablePages();
-        $provider = SettingsService::getGlobal('ai.provider', 'openai');
+        $provider = AI_PROVIDER;
         $usage = usage_fetch($provider);
         $capUsd = (float) SettingsService::getGlobal('ai.monthly_cap_usd', 0);
         $capCents = (int) round($capUsd * 100);
@@ -458,8 +464,8 @@ if ($method === 'GET') {
     }
 
     if ($action === 'settings') {
-        $provider = SettingsService::getGlobal('ai.provider', 'openai');
-        $model = SettingsService::getGlobal('ai.model', '');
+        $provider = AI_PROVIDER;
+        $model = SettingsService::getGlobal('ai.model', AI_DEFAULT_MODEL);
         $imageEnabled = SettingsService::getGlobal('ai.image_generation_enabled', false);
         $capUsd = (float) SettingsService::getGlobal('ai.monthly_cap_usd', 0);
         $capCents = (int) round($capUsd * 100);
@@ -599,7 +605,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'create_page') {
-        $provider = strtolower((string) SettingsService::getGlobal('ai.provider', 'openai'));
+        $provider = AI_PROVIDER;
         $capCheck = usage_check_cap($provider);
         if (!$capCheck['ok']) {
             json_response(['error' => 'Monthly AI usage cap reached.'], 429);
@@ -608,25 +614,26 @@ if ($method === 'POST') {
         if ($prompt === '') {
             json_response(['error' => 'Prompt is required.'], 400);
         }
-        if (!in_array($provider, ['openai', 'gemini'], true)) {
-            $provider = 'openai';
+        $model = (string) SettingsService::getGlobal('ai.model', AI_DEFAULT_MODEL);
+        if ($model === '') {
+            $model = AI_DEFAULT_MODEL;
         }
-        $model = (string) SettingsService::getGlobal('ai.model', '');
         $client = AiProviderFactory::make($provider);
         if (!$client) {
-            json_response(['error' => 'AI provider is not configured.'], 400);
+            json_response(['error' => 'kie.ai is not configured. Add an API key in AI Settings.'], 400);
         }
 
         $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
         $masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
         $systemPrompt = implode("\n", [
-            'You create HTML for a front-facing page on the Australian Goldwing Association site.',
-            'You are an advanced product and website builder and designer.',
+            ai_scope_lock_prompt(),
+            '',
+            'You create HTML for a single front-facing page on the Australian Goldwing Association site.',
             'Return ONLY valid JSON with keys: title, slug, html, summary.',
             'Use existing site styles and structure (sections, headings, buttons).',
-            'Output HTML only (no markdown).',
+            'Output HTML only — no markdown, no code fences.',
             $masterPrompt !== '' ? 'Master prompt: ' . $masterPrompt : '',
-            $guardrails !== '' ? 'Guardrails: ' . $guardrails : '',
+            $guardrails !== '' ? 'Additional guardrails: ' . $guardrails : '',
         ]);
 
         $messages = [
@@ -798,34 +805,36 @@ if ($method === 'POST') {
             json_response(['error' => 'Element selection required.'], 400);
         }
 
-        $provider = strtolower((string) SettingsService::getGlobal('ai.provider', 'openai'));
+        $provider = AI_PROVIDER;
         $capCheck = usage_check_cap($provider);
         if (!$capCheck['ok']) {
             json_response(['error' => 'Monthly AI usage cap reached.'], 429);
         }
-        if (!in_array($provider, ['openai', 'gemini'], true)) {
-            $provider = 'openai';
+        $model = (string) SettingsService::getGlobal('ai.model', AI_DEFAULT_MODEL);
+        if ($model === '') {
+            $model = AI_DEFAULT_MODEL;
         }
-        $model = (string) SettingsService::getGlobal('ai.model', '');
         $client = AiProviderFactory::make($provider);
         if (!$client) {
-            json_response(['error' => 'AI provider is not configured.'], 400);
+            json_response(['error' => 'kie.ai is not configured. Add an API key in AI Settings.'], 400);
         }
         if ($referenceImageUrl !== null && !$client->supportsVision()) {
-            json_response(['error' => 'Selected AI provider does not support vision inputs.'], 400);
+            json_response(['error' => 'Vision input is not available for the selected model.'], 400);
         }
 
         $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
         $masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
         $systemPrompt = implode("\n", [
-            'You are an advanced product and website builder and designer.',
-            'You can fully redesign pages when asked, applying modern UX/UI best practices and clear content hierarchy.',
+            ai_scope_lock_prompt(),
+            '',
+            'You are an advanced website builder/designer working on a single page draft.',
+            'You can redesign sections or whole pages when asked, applying modern UX/UI best practices and clear content hierarchy.',
             'Return ONLY valid JSON with keys: updated_html (string), summary (string), warnings (array).',
             'If mode is element, updated_html MUST be the full HTML for the selected element only.',
             'If mode is page, updated_html MUST be the full HTML for the page content.',
             'Do not include markdown fences.',
             $masterPrompt !== '' ? 'Master prompt: ' . $masterPrompt : '',
-            $guardrails !== '' ? 'Guardrails: ' . $guardrails : '',
+            $guardrails !== '' ? 'Additional guardrails: ' . $guardrails : '',
         ]);
 
         $userPromptParts = [
@@ -937,7 +946,7 @@ if ($method === 'POST') {
     if ($action === 'image_generate') {
         $page = load_page_or_fail($pageId);
         $templateScope = trim((string) ($data['template_scope'] ?? ''));
-        $provider = strtolower((string) SettingsService::getGlobal('ai.provider', 'openai'));
+        $provider = AI_PROVIDER;
         $capCheck = usage_check_cap($provider);
         if (!$capCheck['ok']) {
             json_response(['error' => 'Monthly AI usage cap reached.'], 429);
@@ -950,14 +959,11 @@ if ($method === 'POST') {
         if (!$enabled) {
             json_response(['error' => 'Image generation is disabled.'], 400);
         }
-        if ($provider !== 'openai') {
-            json_response(['error' => 'Image generation only supported with OpenAI.'], 400);
-        }
-        $result = generate_image_openai($prompt);
+        $result = generate_image_kie($prompt);
         if (!$result['ok']) {
             json_response(['error' => $result['error']], 500);
         }
-        $imageCostUsd = (float) SettingsService::getGlobal('ai.image_cost_usd', 0.02);
+        $imageCostUsd = (float) SettingsService::getGlobal('ai.image_cost_usd', 0.04);
         usage_record($provider, (int) round($imageCostUsd * 100), 0);
         AuditService::log((int) ($user['id'] ?? 0), 'ai_edit', 'Page #' . $pageId . ' image generated.');
         json_response([

@@ -21,10 +21,11 @@
   - `email.from` and `email.from_name`
   - `stripe.secret_key` and `stripe.webhook_secret`
   - `stripe.membership_prices` with your Stripe price IDs
-  - `ai.default_provider` and `ai.default_model` to pick the default AI provider/model
-- AI provider keys are read from environment variables (preferred):
-  - `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`
-  - `AI_DEFAULT_PROVIDER`, `AI_DEFAULT_MODEL` (optional overrides)
+  - `ai.default_model` to pick the default model (default: `claude-sonnet-4-6`)
+- The AI page builder is hard-locked to kie.ai. Configure the API key either via:
+  - Admin → AI Settings → kie.ai API Key (stored encrypted in DB), OR
+  - `KIE_API_KEY` environment variable (fallback)
+  - `AI_DEFAULT_MODEL` env var (optional model override)
 
 ## 5) Stripe webhook
 - In Stripe, add a webhook endpoint:

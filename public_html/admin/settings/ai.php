@@ -13,15 +13,16 @@ $user = current_user();
 $message = '';
 $error = '';
 
+$provider = 'kie';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
         $error = 'Invalid CSRF token.';
     } else {
-        $provider = strtolower(trim((string) ($_POST['provider'] ?? 'openai')));
-        if (!in_array($provider, ['openai', 'gemini'], true)) {
-            $provider = 'openai';
-        }
         $model = trim((string) ($_POST['model'] ?? ''));
+        if ($model === '') {
+            $model = 'claude-sonnet-4-6';
+        }
         $apiKey = trim((string) ($_POST['api_key'] ?? ''));
         $imageEnabled = isset($_POST['image_generation_enabled']);
         $monthlyCap = isset($_POST['monthly_cap_usd']) ? (float) $_POST['monthly_cap_usd'] : 0.0;
@@ -41,7 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SettingsService::setGlobal((int) $user['id'], 'ai.image_cost_usd', $imageCost);
             SettingsService::setGlobal((int) $user['id'], 'ai.guardrails', $guardrails);
             SettingsService::setGlobal((int) $user['id'], 'ai.builder_master_prompt', $masterPrompt);
-            AiProviderKeyService::upsertKey($provider, $apiKey, (int) $user['id']);
+            if ($apiKey !== '') {
+                AiProviderKeyService::upsertKey($provider, $apiKey, (int) $user['id']);
+            }
 
             AuditService::log((int) $user['id'], 'settings_change', 'AI settings updated.');
             $message = 'AI settings saved.';
@@ -49,12 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$provider = SettingsService::getGlobal('ai.provider', 'openai');
-$model = SettingsService::getGlobal('ai.model', '');
+SettingsService::setGlobal((int) $user['id'], 'ai.provider', 'kie');
+$model = SettingsService::getGlobal('ai.model', 'claude-sonnet-4-6');
+if (!is_string($model) || trim((string) $model) === '') {
+    $model = 'claude-sonnet-4-6';
+}
 $imageEnabled = SettingsService::getGlobal('ai.image_generation_enabled', false);
 $monthlyCap = (float) SettingsService::getGlobal('ai.monthly_cap_usd', 50);
 $tokenRate = (float) SettingsService::getGlobal('ai.token_cost_usd', 0.01);
-$imageCost = (float) SettingsService::getGlobal('ai.image_cost_usd', 0.02);
+$imageCost = (float) SettingsService::getGlobal('ai.image_cost_usd', 0.04);
 $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
 $masterPrompt = (string) SettingsService::getGlobal('ai.builder_master_prompt', '');
 $meta = AiProviderKeyService::getMeta($provider);
@@ -79,7 +85,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
         <div>
           <h1 class="font-display text-2xl font-bold text-gray-900">AI Settings</h1>
-          <p class="text-sm text-gray-500">Configure the AI provider and model for the page builder.</p>
+          <p class="text-sm text-gray-500">The AI page builder uses <strong>kie.ai</strong> with Claude Sonnet 4.6. It is restricted to creating and editing pages only and cannot modify site code or any other admin area.</p>
         </div>
         <?php if (!$encryptionReady): ?>
           <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">APP_KEY is missing. Set it in `.env` before saving API keys.</div>
@@ -88,18 +94,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Provider</label>
-            <select name="provider" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-              <option value="openai" <?= $provider === 'openai' ? 'selected' : '' ?>>ChatGPT</option>
-              <option value="gemini" <?= $provider === 'gemini' ? 'selected' : '' ?>>Gemini</option>
-            </select>
+            <input type="text" value="kie.ai" readonly class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <p class="text-xs text-gray-500 mt-1">Provider is fixed to kie.ai.</p>
           </div>
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Model</label>
-            <input type="text" name="model" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $model) ?>" placeholder="e.g. gpt-4o-mini">
+            <input type="text" name="model" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $model) ?>" placeholder="claude-sonnet-4-6">
+            <p class="text-xs text-gray-500 mt-1">Default is <code>claude-sonnet-4-6</code> (Claude Sonnet 4.6 via kie.ai).</p>
           </div>
           <div>
-            <label class="text-xs uppercase tracking-[0.2em] text-slate-500">API Key</label>
-            <input type="password" name="api_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $meta['configured'] ? 'Key configured (last 4: ' . e((string) $meta['last4']) . ')' : 'Enter API key' ?>">
+            <label class="text-xs uppercase tracking-[0.2em] text-slate-500">kie.ai API Key</label>
+            <input type="password" name="api_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="<?= $meta['configured'] ? 'Key configured (last 4: ' . e((string) $meta['last4']) . ')' : 'Paste your kie.ai API key' ?>">
+            <p class="text-xs text-gray-500 mt-1">Stored encrypted. Leave blank to keep the existing key.</p>
           </div>
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Monthly Cap (USD)</label>
@@ -114,7 +120,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <input type="number" step="0.01" min="0" name="image_cost_usd" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(number_format($imageCost, 2, '.', '')) ?>">
           </div>
           <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Changing guardrails will affect how the AI builder behaves across all pages.
+            The AI builder is hard-locked to page content only. It cannot touch PHP, server code, the admin/codebase, or anything outside the page draft.
           </div>
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">AI Builder Master Prompt</label>
@@ -122,11 +128,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </div>
           <div>
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">AI Guardrails</label>
-            <textarea name="ai_guardrails" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Rules for the AI to follow."><?= e($guardrails) ?></textarea>
+            <textarea name="ai_guardrails" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Extra rules layered on top of the built-in scope lock."><?= e($guardrails) ?></textarea>
           </div>
           <label class="inline-flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" name="image_generation_enabled" class="rounded border-gray-200" <?= $imageEnabled ? 'checked' : '' ?>>
-            Enable image generation
+            Enable image generation via kie.ai
           </label>
           <div>
             <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold" type="submit">Save Settings</button>
