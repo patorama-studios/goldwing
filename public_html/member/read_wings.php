@@ -152,6 +152,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     }
     #zoom-hint.show { opacity: 1; }
     @media (max-width: 1023px) { #zoom-hint { display: block; } }
+    body.is-mobile #zoom-hint { display: block; }
 
     /* Escape hint toast */
     #esc-hint {
@@ -242,6 +243,10 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       .mobile-nav-arrow { display: inline-flex; }
       #reader-area { padding: 8px 6px; }
     }
+    /* Also apply mobile overrides when ?mobile=1 forces mobile mode (body.is-mobile added by JS) */
+    body.is-mobile #btn-prev, body.is-mobile #btn-next { display: none; }
+    body.is-mobile .mobile-nav-arrow { display: inline-flex; }
+    body.is-mobile #reader-area { padding: 8px 6px; }
 
     /* ── Flipbook container ── */
     #flip-book-wrap {
@@ -432,8 +437,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 (async function () {
   // ── Config ──────────────────────────────────────────────
   const PDF_URL    = <?= json_encode($pdfUrl) ?>;
-  const RENDER_SCALE = 2.0;   // higher = sharper pages, slower load
-  const PARALLEL   = 6;       // pages rendered simultaneously
+  const RENDER_SCALE = 1.5;   // higher = sharper pages, slower load (1.5 balances quality/speed)
+  const PARALLEL   = 4;       // pages rendered simultaneously
   const MAX_DOTS   = 20;      // max navigation dots shown
 
   // ── Elements ─────────────────────────────────────────────
@@ -459,7 +464,9 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   let totalPages = 0;
 
   // Treat anything under 1024px as mobile (catches phones in landscape + small tablets)
-  const isMobile = window.innerWidth < 1024;
+  // ?mobile=1 in URL forces mobile mode (useful for testing on desktop)
+  const isMobile = window.innerWidth < 1024 || new URLSearchParams(location.search).get('mobile') === '1';
+  if (isMobile) document.body.classList.add('is-mobile');
 
   function getBookDimensions() {
     const topBar    = document.getElementById('top-bar').offsetHeight;
