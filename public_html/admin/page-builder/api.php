@@ -234,9 +234,16 @@ function usage_record(string $provider, int $usdCents, int $tokens): void
 
 function usage_cost_from_raw(string $provider, array $raw, float $ratePer1k): array
 {
-    $tokens = (int) ($raw['usage']['total_tokens']
-        ?? (($raw['usage']['prompt_tokens'] ?? 0) + ($raw['usage']['completion_tokens'] ?? 0)));
-    $usd = $tokens > 0 ? ($tokens / 1000.0) * $ratePer1k : 0.0;
+    $usage = $raw['usage'] ?? [];
+    $tokens = (int) ($usage['total_tokens']
+        ?? (($usage['input_tokens'] ?? 0) + ($usage['output_tokens'] ?? 0)
+            ?: ($usage['prompt_tokens'] ?? 0) + ($usage['completion_tokens'] ?? 0)));
+    $usd = 0.0;
+    if (isset($raw['credits_consumed'])) {
+        $usd = (float) $raw['credits_consumed'];
+    } elseif ($tokens > 0) {
+        $usd = ($tokens / 1000.0) * $ratePer1k;
+    }
     return ['tokens' => $tokens, 'usd_cents' => (int) round($usd * 100)];
 }
 

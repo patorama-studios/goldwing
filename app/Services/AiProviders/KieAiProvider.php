@@ -9,7 +9,7 @@ class KieAiProvider implements AiProviderInterface
     public function __construct(string $apiKey)
     {
         $this->apiKey = $apiKey;
-        $this->endpoint = 'https://api.kie.ai/v1/chat/completions';
+        $this->endpoint = 'https://api.kie.ai/claude/v1/messages';
     }
 
     public function supportsVision(): bool
@@ -19,12 +19,20 @@ class KieAiProvider implements AiProviderInterface
 
     public function request(array $messages, array $options = []): array
     {
+        [$systemPrompt, $anthropicMessages] = self::translateMessages($messages);
+
         $payload = [
             'model' => $options['model'] ?? 'claude-sonnet-4-6',
-            'messages' => $messages,
-            'temperature' => $options['temperature'] ?? 0.2,
+            'messages' => $anthropicMessages,
             'max_tokens' => $options['max_tokens'] ?? 1400,
+            'stream' => false,
         ];
+        if ($systemPrompt !== '') {
+            $payload['system'] = $systemPrompt;
+        }
+        if (isset($options['temperature'])) {
+            $payload['temperature'] = (float) $options['temperature'];
+        }
 
         $ch = curl_init($this->endpoint);
         curl_setopt_array($ch, [
@@ -35,6 +43,7 @@ class KieAiProvider implements AiProviderInterface
                 'Authorization: Bearer ' . $this->apiKey,
                 'Content-Type: application/json',
             ],
+            CURLOPT_TIMEOUT => 120,
         ]);
         $response = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -45,73 +54,111 @@ class KieAiProvider implements AiProviderInterface
             $errMessage = $error ?: 'kie.ai request failed.';
             if ($response) {
                 $decoded = json_decode($response, true);
-                if (is_array($decoded) && !empty($decoded['error']['message'])) {
-                    $errMessage = (string) $decoded['error']['message'];
+                if (is_array($decoded)) {
+                    if (!empty($decoded['error']['message'])) {
+                        $errMessage = (string) $decoded['error']['message'];
+                    } elseif (!empty($decoded['message'])) {
+                        $errMessage = (string) $decoded['message'];
+                    } elseif (!empty($decoded['msg'])) {
+                        $errMessage = (string) $decoded['msg'];
+                    }
                 }
             }
             return [
                 'ok' => false,
                 'status' => $status,
-                'error' => $errMessage,
+                'error' => 'kie.ai (' . $status . '): ' . $errMessage,
             ];
         }
 
         $data = json_decode($response, true);
-        $content = $data['choices'][0]['message']['content'] ?? '';
-        if (is_array($content)) {
-            $text = '';
-            foreach ($content as $chunk) {
-                if (is_array($chunk) && isset($chunk['text'])) {
-                    $text .= (string) $chunk['text'];
-                } elseif (is_string($chunk)) {
-                    $text .= $chunk;
+        $content = '';
+        if (is_array($data) && !empty($data['content']) && is_array($data['content'])) {
+            foreach ($data['content'] as $block) {
+                if (is_array($block) && ($block['type'] ?? '') === 'text') {
+                    $content .= (string) ($block['text'] ?? '');
                 }
             }
-            $content = $text;
         }
 
         return [
             'ok' => true,
             'status' => $status,
-            'content' => (string) $content,
+            'content' => $content,
             'raw' => $data,
         ];
     }
 
+    private static function translateMessages(array $messages): array
+    {
+        $systemChunks = [];
+        $out = [];
+        foreach ($messages as $msg) {
+            $role = $msg['role'] ?? '';
+            $content = $msg['content'] ?? '';
+            if ($role === 'system') {
+                if (is_string($content)) {
+                    $systemChunks[] = $content;
+                } elseif (is_array($content)) {
+                    foreach ($content as $part) {
+                        if (is_array($part) && isset($part['text'])) {
+                            $systemChunks[] = (string) $part['text'];
+                        }
+                    }
+                }
+                continue;
+            }
+            if ($role !== 'user' && $role !== 'assistant') {
+                continue;
+            }
+            $out[] = [
+                'role' => $role,
+                'content' => self::translateContent($content),
+            ];
+        }
+        return [implode("\n\n", array_filter($systemChunks)), $out];
+    }
+
+    private static function translateContent($content)
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+        if (!is_array($content)) {
+            return '';
+        }
+        $blocks = [];
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+            if ($type === 'text') {
+                $blocks[] = ['type' => 'text', 'text' => (string) ($part['text'] ?? '')];
+            } elseif ($type === 'image_url') {
+                $url = is_array($part['image_url'] ?? null) ? ($part['image_url']['url'] ?? '') : (string) ($part['image_url'] ?? '');
+                if ($url === '') {
+                    continue;
+                }
+                $blocks[] = [
+                    'type' => 'image',
+                    'source' => [
+                        'type' => 'url',
+                        'url' => $url,
+                    ],
+                ];
+            } elseif ($type === 'image') {
+                $blocks[] = $part;
+            }
+        }
+        return $blocks;
+    }
+
     public function generateImage(string $prompt, array $options = []): array
     {
-        $payload = [
-            'model' => $options['model'] ?? 'dall-e-3',
-            'prompt' => $prompt,
-            'size' => $options['size'] ?? '1024x1024',
-            'n' => 1,
+        return [
+            'ok' => false,
+            'error' => 'Image generation via kie.ai is not wired up in this build. Use the media library or disable image generation in AI Settings.',
         ];
-
-        $ch = curl_init('https://api.kie.ai/v1/images/generations');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->apiKey,
-                'Content-Type: application/json',
-            ],
-        ]);
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($response === false || $status < 200 || $status >= 300) {
-            return ['ok' => false, 'error' => $error ?: 'kie.ai image generation failed.'];
-        }
-
-        $data = json_decode($response, true);
-        $url = $data['data'][0]['url'] ?? ($data['data'][0]['b64_json'] ?? '');
-        if ($url === '') {
-            return ['ok' => false, 'error' => 'Image response missing URL.'];
-        }
-
-        return ['ok' => true, 'url' => $url];
     }
 }
