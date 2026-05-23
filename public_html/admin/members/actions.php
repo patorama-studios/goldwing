@@ -338,7 +338,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -451,6 +451,18 @@ switch ($action) {
                 $status = $_POST['status'];
                 if (in_array($status, ['pending', 'active', 'expired', 'cancelled', 'suspended'], true)) {
                     $payload['status'] = $status;
+                }
+            }
+            if (array_key_exists('wings_preference', $_POST)) {
+                $wp = strtolower(trim((string) $_POST['wings_preference']));
+                if (in_array($wp, ['digital', 'print', 'both'], true)) {
+                    $payload['wings_preference'] = $wp;
+                }
+            }
+            if (array_key_exists('privacy_level', $_POST)) {
+                $pl = strtoupper(trim((string) $_POST['privacy_level']));
+                if (in_array($pl, ['A', 'B', 'C', 'D', 'E', 'F'], true)) {
+                    $payload['privacy_level'] = $pl;
                 }
             }
             // Directory preferences are checkboxes — only sync when the form section was actually submitted.
@@ -1551,6 +1563,48 @@ switch ($action) {
         redirectWithFlash($memberId, 'roles', 'Roles updated.');
         break;
 
+    case 'member_avatar_update':
+        // Avatar-only updater that works whether or not the member has a
+        // linked user account. Avatar is stored on members.avatar_url; the
+        // display layer falls back to settings_user.avatar_url for older
+        // records.
+        if (!AdminMemberAccess::isFullAccess($user)) {
+            redirectWithFlash($memberId, $tab, 'Photo updates are restricted.', 'error');
+        }
+        $avatarUrl = trim($_POST['avatar_url'] ?? '');
+        if ($avatarUrl !== '' && !preg_match('#^(https?:)?/#i', $avatarUrl)) {
+            redirectWithFlash($memberId, $tab, 'Photo URL looks invalid.', 'error');
+        }
+        $pdoAvatar = Database::connection();
+        $hasMemberAvatar = false;
+        try {
+            $hasMemberAvatar = (bool) $pdoAvatar->query("SHOW COLUMNS FROM members LIKE 'avatar_url'")->fetchColumn();
+        } catch (\Throwable $e) {
+            $hasMemberAvatar = false;
+        }
+        $currentMemberAvatar = $hasMemberAvatar ? ($member['avatar_url'] ?? '') : '';
+        $linkedUserId = (int) ($member['user_id'] ?? 0);
+        $currentUserAvatar = $linkedUserId > 0 ? (string) SettingsService::getUser($linkedUserId, 'avatar_url', '') : '';
+        $valueToStore = $avatarUrl === '' ? null : $avatarUrl;
+        if ($hasMemberAvatar) {
+            $stmt = $pdoAvatar->prepare('UPDATE members SET avatar_url = :u, updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['u' => $valueToStore, 'id' => $memberId]);
+        }
+        if ($linkedUserId > 0) {
+            // Keep settings_user in sync so existing display fallbacks see the same value.
+            SettingsService::setUser($linkedUserId, 'avatar_url', $avatarUrl);
+        }
+        $previous = $currentMemberAvatar !== '' ? $currentMemberAvatar : $currentUserAvatar;
+        if ($previous !== $avatarUrl) {
+            ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'settings.avatar_updated', [
+                'before' => $previous,
+                'after' => $avatarUrl,
+                'actor_roles' => $user['roles'] ?? [],
+            ]);
+        }
+        redirectWithFlash($memberId, $tab, 'Profile photo saved.');
+        break;
+
     case 'member_settings_update':
         if (!AdminMemberAccess::isFullAccess($user)) {
             redirectWithFlash($memberId, $tab, 'Settings updates are restricted.', 'error');
@@ -1577,6 +1631,18 @@ switch ($action) {
         $normalizedTimezone = $timezone !== '' ? $timezone : $defaultTimezone;
         SettingsService::setUser($userId, 'timezone', $normalizedTimezone);
         SettingsService::setUser($userId, 'avatar_url', $avatarUrl);
+        // Mirror avatar onto members.avatar_url so it shows for legacy displays
+        // that don't have a user_id to join through. Best-effort — if the
+        // column doesn't exist on this DB yet, just skip.
+        try {
+            $syncPdo = Database::connection();
+            if ($syncPdo->query("SHOW COLUMNS FROM members LIKE 'avatar_url'")->fetchColumn()) {
+                $syncStmt = $syncPdo->prepare('UPDATE members SET avatar_url = :u, updated_at = NOW() WHERE id = :id');
+                $syncStmt->execute(['u' => $avatarUrl === '' ? null : $avatarUrl, 'id' => $memberId]);
+            }
+        } catch (\Throwable $e) {
+            // Silent — avatar still saved to settings_user.
+        }
         NotificationPreferenceService::save($userId, $preferences);
         $newPreferences = NotificationPreferenceService::load($userId);
         $changes = [];

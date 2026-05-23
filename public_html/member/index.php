@@ -3633,7 +3633,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $colCollectMoto  = $dirPrefCols['A'] ?? null;
         $colBedOrTent    = $dirPrefCols['C'] ?? null;
         $colTools        = $dirPrefCols['D'] ?? null;
-        $colExcludeElec  = $dirPrefCols['F'] ?? null;
+        $colExcludeMember = $dirPrefCols['E'] ?? null;  // "Exclude Member Directory" (printed)
+        $colExcludeElec   = $dirPrefCols['F'] ?? null;  // "Exclude Electronic Directory" (online)
 
         // Build optional selects for new role columns (added by Migration 003/005).
         $tryCol = static function (string $col) use ($pdo): bool {
@@ -3648,15 +3649,31 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $hasCommittee  = $tryCol('is_committee');
         $hasCommRole   = $tryCol('committee_role');
         $hasMemberNumber = $tryCol('member_number');
+        $hasPrivacyLevel = $tryCol('privacy_level');
 
         $roleSelects = '';
         if ($hasAreaRep)   $roleSelects .= ', m.is_area_rep';
         if ($hasCommittee) $roleSelects .= ', m.is_committee';
         if ($hasCommRole)  $roleSelects .= ', m.committee_role';
 
-        $excludeClause = $colExcludeElec
-            ? "AND (m.$colExcludeElec = 0 OR m.$colExcludeElec IS NULL)"
-            : '';
+        // Build the directory exclusion clause. A member is hidden from the
+        // online directory if ANY of these are true:
+        //   - privacy_level = 'F'           (dropdown "Exclude from directory")
+        //   - directory_pref E = 1          ("Exclude Member Directory" — printed)
+        //   - directory_pref F = 1          ("Exclude Electronic Directory" — online)
+        // Each branch is only added if the relevant column actually exists, so
+        // older DB layouts degrade gracefully without throwing.
+        $excludeParts = [];
+        if ($hasPrivacyLevel) {
+            $excludeParts[] = "(m.privacy_level IS NULL OR m.privacy_level <> 'F')";
+        }
+        if ($colExcludeMember) {
+            $excludeParts[] = "(m.$colExcludeMember = 0 OR m.$colExcludeMember IS NULL)";
+        }
+        if ($colExcludeElec) {
+            $excludeParts[] = "(m.$colExcludeElec = 0 OR m.$colExcludeElec IS NULL)";
+        }
+        $excludeClause = $excludeParts ? 'AND ' . implode(' AND ', $excludeParts) : '';
 
         $memberNumberExpr = $hasMemberNumber
             ? 'COALESCE(m.member_number, CONCAT(m.member_number_base, CASE WHEN m.member_number_suffix > 0 THEN CONCAT(".", m.member_number_suffix) ELSE "" END)) AS member_number'
@@ -3674,7 +3691,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             'CONCAT(fm.first_name, \' \', fm.last_name) AS full_member_name',
             'fm.member_number_base AS full_member_number_base',
             'fm.member_number_suffix AS full_member_number_suffix',
-            'JSON_UNQUOTE(su.value_json) AS avatar_url',
+            // Prefer members.avatar_url (works for legacy members without a
+            // linked user account), fall back to settings_user for old data.
+            ($tryCol('avatar_url')
+                ? 'COALESCE(NULLIF(m.avatar_url, \'\'), JSON_UNQUOTE(su.value_json)) AS avatar_url'
+                : 'JSON_UNQUOTE(su.value_json) AS avatar_url'),
         ]));
 
         try {
@@ -3967,6 +3988,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 
         $cmtAcceptCol   = $colAcceptCalls ? "m.$colAcceptCalls," : '';
         $cmtExcludeCol  = $colExcludeElec ? "m.$colExcludeElec," : '';
+        $cmtHasMemberAvatar = $tryCol('avatar_url');
+        $cmtAvatarSelect = $cmtHasMemberAvatar
+            ? "COALESCE(NULLIF(m.avatar_url, ''), JSON_UNQUOTE(su.value_json)) AS avatar_url"
+            : "JSON_UNQUOTE(su.value_json) AS avatar_url";
 
         if ($hasCommittee || $hasAreaRep) {
             $cmtWhere = $hasCommittee && $hasAreaRep
@@ -3980,7 +4005,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         m.phone, m.email,
                         $cmtAcceptCol $cmtExcludeCol
                         c.name AS chapter_name, c.state AS chapter_state,
-                        JSON_UNQUOTE(su.value_json) AS avatar_url
+                        $cmtAvatarSelect
                         $cmtRoleSelects
                     FROM members m
                     LEFT JOIN chapters c ON c.id = m.chapter_id

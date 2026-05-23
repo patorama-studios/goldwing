@@ -766,7 +766,7 @@ class MemberRepository
             'C' => ['label' => 'Provide bed or tent space', 'columns' => ['directory_pref_c_bed_or_tent', 'assist_bed']],
             'D' => ['label' => 'Provide tools or workshop', 'columns' => ['directory_pref_d_tools_or_workshop', 'assist_tools']],
             'E' => ['label' => 'Exclude Member Directory', 'columns' => ['directory_pref_e_exclude_member_directory', 'exclude_printed']],
-            'F' => ['label' => 'Exclude Electronic Directory', 'columns' => ['directory_pref_f_exclude_electronic_directory']],
+            'F' => ['label' => 'Exclude Electronic Directory', 'columns' => ['directory_pref_f_exclude_electronic_directory', 'exclude_electronic']],
         ];
     }
 

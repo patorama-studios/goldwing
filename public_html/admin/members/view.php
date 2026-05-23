@@ -251,7 +251,14 @@ $userId = (int) ($member['user_id'] ?? 0);
 $userTimezone = SettingsService::getUser($userId, 'timezone', SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
 $notificationCategories = NotificationPreferenceService::categories();
 $notificationPrefs = NotificationPreferenceService::load($userId);
-$avatarUrl = SettingsService::getUser($userId, 'avatar_url', '');
+// Avatar: prefer members.avatar_url (works for legacy members without a
+// linked user account), fall back to settings_user when empty for older data.
+$avatarUrl = '';
+if (!empty($member['avatar_url'])) {
+    $avatarUrl = (string) $member['avatar_url'];
+} elseif ($userId > 0) {
+    $avatarUrl = (string) SettingsService::getUser($userId, 'avatar_url', '');
+}
 $masterNotificationsEnabled = !empty($notificationPrefs['master_enabled']);
 $unsubscribeAll = !empty($notificationPrefs['unsubscribe_all_non_essential']);
 
@@ -923,16 +930,45 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </div>
                     <div class="mt-8 pt-8 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-12">
                       <div>
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Directory Preferences
-                        </h3>
+                        <div class="flex items-center justify-between mb-3 gap-2">
+                          <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Directory Preferences</h3>
+                          <a href="<?= e(buildTabUrl($memberId, 'profile')) ?>"
+                            class="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1">
+                            <span class="material-icons-outlined text-[14px]">edit</span>
+                            Edit on Profile tab
+                          </a>
+                        </div>
+                        <?php
+                          $privacyLevel = strtoupper(trim((string) ($profileMember['privacy_level'] ?? 'A')));
+                          $privacyLabels = [
+                            'A' => 'Name only',
+                            'B' => 'Name + Address',
+                            'C' => 'Name + Address + Phone',
+                            'D' => 'Name + Address + Email',
+                            'E' => 'Name + Address + Phone + Email',
+                            'F' => 'Excluded from directory',
+                          ];
+                          $privacyExcluded = ($privacyLevel === 'F');
+                          $privacyLabel = $privacyLabels[$privacyLevel] ?? $privacyLevel;
+                        ?>
+                        <div class="mb-3 inline-flex items-center gap-2 rounded-lg border <?= $privacyExcluded ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-white text-gray-700' ?> px-3 py-2 text-xs">
+                          <span class="material-icons-outlined text-[14px]"><?= $privacyExcluded ? 'visibility_off' : 'visibility' ?></span>
+                          <span class="font-semibold uppercase tracking-wide">Privacy <?= e($privacyLevel) ?></span>
+                          <span class="opacity-70">— <?= e($privacyLabel) ?></span>
+                        </div>
                         <div class="flex flex-wrap gap-2">
                           <?php foreach ($directorySummary as $letter => $enabled): ?>
+                            <?php $title = $directoryPrefs[$letter]['label'] ?? ''; ?>
                             <span
-                              class="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                              <span class="font-bold mr-1 opacity-50"><?= e($letter) ?></span>
-                              <?= e($directoryPrefs[$letter]['label']) ?>
+                              title="<?= e($title) ?>"
+                              class="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium border <?= $enabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200 line-through' ?>">
+                              <span class="font-bold mr-1"><?= e($letter) ?></span>
+                              <?= e($title) ?>
                             </span>
                           <?php endforeach; ?>
+                          <?php if (empty($directorySummary)): ?>
+                            <span class="text-xs text-gray-400 italic">No preference columns available on this database.</span>
+                          <?php endif; ?>
                         </div>
                       </div>
                       <div>
@@ -1432,7 +1468,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   </form>
                 </div>
                 <div class="space-y-6">
-                  <?php if ($canEditSettings && $userId > 0): ?>
+                  <?php if ($canEditSettings): ?>
                   <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
                     <div class="flex items-center gap-3 mb-4">
                       <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
@@ -1447,8 +1483,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                       <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                       <input type="hidden" name="tab" value="profile">
-                      <input type="hidden" name="action" value="member_settings_update">
-                      <input type="hidden" name="user_timezone" value="<?= e($userTimezone) ?>">
+                      <input type="hidden" name="action" value="member_avatar_update">
                       <div class="flex items-center gap-3">
                         <div id="profile-avatar-preview"
                           class="h-16 w-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0">

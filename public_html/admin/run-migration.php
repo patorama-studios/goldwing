@@ -582,6 +582,78 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 013 — Add missing fallen_wings attachment columns (image_url, pdf_url)
+// Submission/edit handlers in public_html/member/index.php and
+// public_html/admin/index.php INSERT/UPDATE these columns, but no earlier
+// migration created them, so saving a new Fallen Wings entry threw a PDO
+// error and the page rendered a PHP warning screen.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_013_fallen_wings_attachments';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 013 — fallen_wings image_url + pdf_url', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+        $existing = $pdo->query("SHOW COLUMNS FROM fallen_wings")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('image_url', $existing, true)) {
+            $pdo->exec("ALTER TABLE fallen_wings ADD COLUMN image_url VARCHAR(255) NULL AFTER tribute");
+            $applied[] = 'image_url added';
+        } else {
+            $applied[] = 'image_url already present';
+        }
+        $existing = $pdo->query("SHOW COLUMNS FROM fallen_wings")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('pdf_url', $existing, true)) {
+            $pdo->exec("ALTER TABLE fallen_wings ADD COLUMN pdf_url VARCHAR(255) NULL AFTER image_url");
+            $applied[] = 'pdf_url added';
+        } else {
+            $applied[] = 'pdf_url already present';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 013 — fallen_wings image_url + pdf_url', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 013 — fallen_wings image_url + pdf_url', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 014 — Add members.avatar_url so legacy members without a linked
+// users row can still have a profile photo. Avatars previously lived only
+// in settings_user (keyed by user_id). The display code prefers
+// members.avatar_url first and falls back to settings_user so existing
+// avatars continue to work.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_014_members_avatar_url';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 014 — members.avatar_url', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $existing = $pdo->query("SHOW COLUMNS FROM members")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('avatar_url', $existing, true)) {
+            // notes column may or may not exist; try AFTER notes first, fall
+            // back to a plain ADD if that AFTER target is missing.
+            try {
+                $pdo->exec("ALTER TABLE members ADD COLUMN avatar_url VARCHAR(512) NULL AFTER notes");
+            } catch (Throwable $inner) {
+                $pdo->exec("ALTER TABLE members ADD COLUMN avatar_url VARCHAR(512) NULL");
+            }
+            $note = 'avatar_url added';
+        } else {
+            $note = 'avatar_url already present';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 014 — members.avatar_url', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 014 — members.avatar_url', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

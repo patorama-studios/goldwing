@@ -423,6 +423,7 @@ $content = ob_get_clean();
     <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
+<?php include __DIR__ . '/_back_to_site.php'; ?>
 <?php echo $content; ?>
 </body>
 </html>

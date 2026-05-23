@@ -603,7 +603,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     $isAssociate = $memberType === 'ASSOCIATE';
                     $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
                     $userId = (int) ($member['user_id'] ?? 0);
-                    $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                    $avatarUrl = !empty($member['avatar_url'])
+                        ? (string) $member['avatar_url']
+                        : ($userId ? ($avatarsByUserId[$userId] ?? '') : '');
                   ?>
                   <tr class="group hover:bg-gray-50/70 transition-colors <?= $isLifeMember ? 'bg-yellow-50/50' : ($isAssociate ? 'bg-purple-50/20 hover:bg-purple-50/40' : ($statusKey === 'pending' ? 'bg-amber-50/40' : '')) ?>"
                       data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
@@ -787,7 +789,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           $isAssociate = $memberType === 'ASSOCIATE';
                           $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
                           $userId = (int) ($member['user_id'] ?? 0);
-                          $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                          $avatarUrl = !empty($member['avatar_url'])
+                        ? (string) $member['avatar_url']
+                        : ($userId ? ($avatarsByUserId[$userId] ?? '') : '');
                         ?>
                         <tr class="hover:bg-white/80 transition-colors <?= $isLifeMember ? 'bg-yellow-50/30' : '' ?>"
                             data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
@@ -872,7 +876,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $isAssociate = $memberType === 'ASSOCIATE';
                   $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
                   $userId = (int) ($member['user_id'] ?? 0);
-                  $avatarUrl = $userId ? ($avatarsByUserId[$userId] ?? '') : '';
+                  $avatarUrl = !empty($member['avatar_url'])
+                      ? (string) $member['avatar_url']
+                      : ($userId ? ($avatarsByUserId[$userId] ?? '') : '');
                   // Generate a deterministic colour for initials avatars
                   $colorPalette = ['bg-slate-200 text-slate-700','bg-blue-100 text-blue-700','bg-teal-100 text-teal-700','bg-violet-100 text-violet-700','bg-rose-100 text-rose-700','bg-orange-100 text-orange-700','bg-cyan-100 text-cyan-700'];
                   $colorClass = $isLifeMember ? 'bg-yellow-200 text-yellow-800' : ($isAssociate ? 'bg-purple-100 text-purple-700' : $colorPalette[crc32($fullName) % count($colorPalette)]);

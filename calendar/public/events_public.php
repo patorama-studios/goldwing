@@ -496,6 +496,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
 </head>
 
 <body>
+    <?php include __DIR__ . '/_back_to_site.php'; ?>
     <main class="calendar-shell">
         <form method="get" class="calendar-controls">
             <div class="calendar-controls-top">

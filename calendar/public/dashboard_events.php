@@ -51,6 +51,7 @@ $occurrences = array_slice($occurrences, 0, 15);
     <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
+<?php include __DIR__ . '/_back_to_site.php'; ?>
 <div class="calendar-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <h1 style="margin: 0;">Upcoming Events for You</h1>
