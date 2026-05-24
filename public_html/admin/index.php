@@ -923,6 +923,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $alerts[] = ['type' => 'success', 'message' => 'Notice rejected.'];
       }
     }
+    if ($page === 'notices' && ($_POST['action'] ?? '') === 'update_notice') {
+      $noticeId = (int) ($_POST['notice_id'] ?? 0);
+      $title = trim($_POST['notice_title'] ?? '');
+      $contentRaw = trim($_POST['notice_content'] ?? '');
+      $content = DomSnapshotService::sanitize($contentRaw);
+      $category = strtolower(trim($_POST['notice_category'] ?? 'notice'));
+      $audienceScope = strtolower(trim($_POST['notice_audience_scope'] ?? 'all'));
+      $audienceState = trim($_POST['notice_audience_state'] ?? '');
+      $audienceChapterId = (int) ($_POST['notice_audience_chapter'] ?? 0);
+      $attachmentUrl = trim($_POST['notice_attachment_url'] ?? '');
+      $attachmentType = strtolower(trim($_POST['notice_attachment_type'] ?? ''));
+      $removeAttachment = !empty($_POST['remove_attachment']);
+
+      $allowedCategories = ['notice', 'advert', 'announcement'];
+      if (!in_array($category, $allowedCategories, true)) {
+        $category = 'notice';
+      }
+      $allowedAttachmentTypes = ['image', 'pdf'];
+      if (!in_array($attachmentType, $allowedAttachmentTypes, true) || $attachmentUrl === '') {
+        $attachmentType = '';
+        $attachmentUrl = '';
+      }
+      $allowedScopes = ['all', 'state', 'chapter'];
+      if (!in_array($audienceScope, $allowedScopes, true)) {
+        $audienceScope = 'all';
+      }
+
+      $stateCodes = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
+
+      if ($noticeId <= 0) {
+        $alerts[] = ['type' => 'error', 'message' => 'Invalid notice.'];
+      } elseif ($audienceScope === 'state' && !in_array($audienceState, $stateCodes, true)) {
+        $alerts[] = ['type' => 'error', 'message' => 'Please select a valid state.'];
+      } elseif ($audienceScope === 'chapter' && $audienceChapterId <= 0) {
+        $alerts[] = ['type' => 'error', 'message' => 'Please select a chapter.'];
+      } elseif ($title === '' || $content === '') {
+        $alerts[] = ['type' => 'error', 'message' => 'Please provide a title and description.'];
+      } else {
+        $noticeColumns = [];
+        try {
+          $noticeColumns = $pdo->query('SHOW COLUMNS FROM notices')->fetchAll(PDO::FETCH_COLUMN, 0);
+        } catch (PDOException $e) {
+          $noticeColumns = [];
+        }
+        $hasCategory = in_array('category', $noticeColumns, true);
+        $hasAudience = in_array('audience_scope', $noticeColumns, true);
+        $hasAttachmentUrl = in_array('attachment_url', $noticeColumns, true);
+        $hasAttachmentType = in_array('attachment_type', $noticeColumns, true);
+
+        $sets = ['title = :title', 'content = :content'];
+        $params = ['id' => $noticeId, 'title' => $title, 'content' => $content];
+
+        if ($hasCategory) {
+          $sets[] = 'category = :category';
+          $params['category'] = $category;
+        }
+        if ($hasAudience) {
+          $sets[] = 'audience_scope = :scope';
+          $params['scope'] = $audienceScope;
+          $sets[] = 'audience_state = :state';
+          $params['state'] = $audienceScope === 'state' ? $audienceState : null;
+          $sets[] = 'audience_chapter_id = :chapter';
+          $params['chapter'] = $audienceScope === 'chapter' ? $audienceChapterId : null;
+        }
+        if ($hasAttachmentUrl) {
+          if ($removeAttachment) {
+            $sets[] = 'attachment_url = :attachment_url';
+            $params['attachment_url'] = null;
+          } elseif ($attachmentUrl !== '') {
+            $sets[] = 'attachment_url = :attachment_url';
+            $params['attachment_url'] = $attachmentUrl;
+          }
+        }
+        if ($hasAttachmentType) {
+          if ($removeAttachment) {
+            $sets[] = 'attachment_type = :attachment_type';
+            $params['attachment_type'] = null;
+          } elseif ($attachmentType !== '') {
+            $sets[] = 'attachment_type = :attachment_type';
+            $params['attachment_type'] = $attachmentType;
+          }
+        }
+
+        $stmt = $pdo->prepare('UPDATE notices SET ' . implode(', ', $sets) . ' WHERE id = :id');
+        $stmt->execute($params);
+        AuditService::log($user['id'], 'notice_update', 'Notice #' . $noticeId . ' updated.');
+        $alerts[] = ['type' => 'success', 'message' => 'Notice updated.'];
+      }
+    }
+    if ($page === 'notices' && ($_POST['action'] ?? '') === 'delete_notice') {
+      $noticeId = (int) ($_POST['notice_id'] ?? 0);
+      if ($noticeId > 0) {
+        $stmt = $pdo->prepare('DELETE FROM notices WHERE id = :id');
+        $stmt->execute(['id' => $noticeId]);
+        AuditService::log($user['id'], 'notice_delete', 'Notice #' . $noticeId . ' deleted.');
+        $alerts[] = ['type' => 'success', 'message' => 'Notice deleted.'];
+      } else {
+        $alerts[] = ['type' => 'error', 'message' => 'Invalid notice.'];
+      }
+    }
     if ($page === 'fallen-wings' && ($_POST['action'] ?? '') === 'approve_fallen') {
       $entryId = (int) ($_POST['fallen_id'] ?? 0);
       $stmt = $pdo->prepare('UPDATE fallen_wings SET status = "APPROVED", approved_by = :user_id, approved_at = NOW(), updated_at = NOW() WHERE id = :id');
@@ -2415,6 +2515,18 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         </div>
                         <span
                           class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?></span>
+                        <div class="flex items-center gap-1.5 ml-2">
+                          <button type="button"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            onclick="document.getElementById('edit-notice-<?= (int) $notice['id'] ?>').showModal()">
+                            <span class="material-icons-outlined text-sm">edit</span>Edit
+                          </button>
+                          <button type="button"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                            onclick="document.getElementById('delete-notice-<?= (int) $notice['id'] ?>').showModal()">
+                            <span class="material-icons-outlined text-sm">delete</span>Delete
+                          </button>
+                        </div>
                       </div>
                       <?php if (!empty($notice['attachment_url'])): ?>
                         <div class="mb-3 rounded-xl border border-gray-100 overflow-hidden">
@@ -2466,6 +2578,18 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <?= e(format_date_au($notice['published_at'] ?? $notice['created_at'])) ?>
                         </p>
                         <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
+                        <div class="flex items-center gap-1.5 pt-2 border-t border-gray-100 mt-2">
+                          <button type="button"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            onclick="document.getElementById('edit-notice-<?= (int) $notice['id'] ?>').showModal()">
+                            <span class="material-icons-outlined text-sm">edit</span>Edit
+                          </button>
+                          <button type="button"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                            onclick="document.getElementById('delete-notice-<?= (int) $notice['id'] ?>').showModal()">
+                            <span class="material-icons-outlined text-sm">delete</span>Delete
+                          </button>
+                        </div>
                       </div>
                     </article>
                   <?php endforeach; ?>
@@ -2527,6 +2651,150 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <?php endif; ?>
             </div>
           </div>
+
+          <?php foreach ($liveNotices as $notice): ?>
+            <?php
+            $editScope = $notice['audience_scope'] ?? 'all';
+            $editState = $notice['audience_state'] ?? '';
+            $editChapter = (int) ($notice['audience_chapter_id'] ?? 0);
+            $editCategory = $notice['category'] ?? 'notice';
+            $editAttachmentUrl = $notice['attachment_url'] ?? '';
+            $editAttachmentType = $notice['attachment_type'] ?? '';
+            ?>
+            <dialog id="edit-notice-<?= (int) $notice['id'] ?>"
+              class="p-0 rounded-2xl shadow-2xl backdrop:bg-gray-900/40 w-full max-w-2xl my-auto mx-auto border-0 isolate overflow-hidden">
+              <form method="post" class="flex flex-col text-left" data-notice-edit-form>
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="update_notice">
+                <input type="hidden" name="notice_id" value="<?= (int) $notice['id'] ?>">
+                <input type="hidden" name="notice_attachment_url" value="<?= e($editAttachmentUrl) ?>"
+                  data-edit-attachment-url>
+                <input type="hidden" name="notice_attachment_type" value="<?= e($editAttachmentType) ?>"
+                  data-edit-attachment-type>
+
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                  <h3 class="font-display font-bold text-lg text-gray-900">Edit Notice</h3>
+                  <button type="button" class="text-gray-400 hover:text-gray-900"
+                    onclick="this.closest('dialog').close()" formnovalidate>
+                    <span class="material-icons-outlined">close</span>
+                  </button>
+                </div>
+
+                <div class="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="text-sm font-medium text-gray-700">Title
+                      <input type="text" name="notice_title" value="<?= e($notice['title']) ?>"
+                        class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+                    </label>
+                    <label class="text-sm font-medium text-gray-700">Category
+                      <select name="notice_category"
+                        class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                        <option value="notice" <?= $editCategory === 'notice' ? 'selected' : '' ?>>Notice</option>
+                        <option value="advert" <?= $editCategory === 'advert' ? 'selected' : '' ?>>Advert</option>
+                        <option value="announcement" <?= $editCategory === 'announcement' ? 'selected' : '' ?>>Important
+                          Announcement</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label class="text-sm font-medium text-gray-700">Audience
+                      <select name="notice_audience_scope" data-edit-scope
+                        class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                        <option value="all" <?= $editScope === 'all' ? 'selected' : '' ?>>All members</option>
+                        <option value="state" <?= $editScope === 'state' ? 'selected' : '' ?>>State</option>
+                        <option value="chapter" <?= $editScope === 'chapter' ? 'selected' : '' ?>>Chapter</option>
+                      </select>
+                    </label>
+                    <label class="text-sm font-medium text-gray-700">State
+                      <select name="notice_audience_state" data-edit-state
+                        class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        <?= $editScope === 'state' ? '' : 'disabled' ?>>
+                        <option value="">Select state</option>
+                        <?php foreach ($noticeStates as $state): ?>
+                          <option value="<?= e($state['code']) ?>" <?= $editState === $state['code'] ? 'selected' : '' ?>>
+                            <?= e($state['label']) ?> (<?= e($state['code']) ?>)
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </label>
+                    <label class="text-sm font-medium text-gray-700">Chapter
+                      <select name="notice_audience_chapter" data-edit-chapter
+                        class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        <?= $editScope === 'chapter' ? '' : 'disabled' ?>>
+                        <option value="">Select chapter</option>
+                        <?php foreach ($noticeChapters as $chapter): ?>
+                          <option value="<?= e((string) $chapter['id']) ?>" <?= $editChapter === (int) $chapter['id'] ? 'selected' : '' ?>>
+                            <?= e($chapter['name']) ?>
+                            <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="text-sm font-medium text-gray-700 block">Description (HTML)
+                    <textarea name="notice_content" rows="8" required
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono"><?= e($notice['content']) ?></textarea>
+                  </label>
+
+                  <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-3"
+                    data-edit-upload-zone>
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <p class="text-sm font-semibold text-gray-700">Attachment (image or PDF)</p>
+                        <p class="text-xs text-gray-500">Upload to replace the current attachment.</p>
+                      </div>
+                      <input type="file" accept="image/*,application/pdf" class="text-xs" data-edit-attachment-input>
+                    </div>
+                    <div data-edit-attachment-preview>
+                      <?php if (!empty($editAttachmentUrl)): ?>
+                        <?php if ($editAttachmentType === 'pdf'): ?>
+                          <div class="flex items-center gap-2 text-gray-600 text-xs">
+                            <span class="material-icons-outlined text-base">picture_as_pdf</span>Current: PDF attached
+                          </div>
+                        <?php else: ?>
+                          <img src="<?= e($editAttachmentUrl) ?>" alt="Current attachment"
+                            class="w-full h-32 object-cover rounded-lg">
+                        <?php endif; ?>
+                      <?php else: ?>
+                        <p class="text-xs text-gray-400">No attachment</p>
+                      <?php endif; ?>
+                    </div>
+                    <?php if (!empty($editAttachmentUrl)): ?>
+                      <label class="flex items-center gap-2 text-xs text-rose-600 font-semibold cursor-pointer">
+                        <input type="checkbox" name="remove_attachment" value="1"
+                          class="rounded border-rose-300 text-rose-600 focus:ring-rose-600 w-3.5 h-3.5">
+                        Remove existing attachment
+                      </label>
+                    <?php endif; ?>
+                  </div>
+                </div>
+
+                <div class="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 bg-gray-50">
+                  <button type="button" class="px-4 py-2 font-semibold text-sm text-gray-600"
+                    onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                  <button type="submit"
+                    class="px-4 py-2 font-semibold text-sm rounded-lg bg-primary text-gray-900">Save Changes</button>
+                </div>
+              </form>
+            </dialog>
+
+            <dialog id="delete-notice-<?= (int) $notice['id'] ?>"
+              class="p-6 rounded-2xl shadow-xl backdrop:bg-gray-900/50 w-full max-w-md my-auto mx-auto border-0 isolate">
+              <form method="post" class="space-y-4 text-left">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="delete_notice">
+                <input type="hidden" name="notice_id" value="<?= (int) $notice['id'] ?>">
+                <h3 class="font-display font-bold text-lg text-rose-600">Delete Notice?</h3>
+                <p class="text-sm text-gray-600">Are you sure you want to permanently delete
+                  &ldquo;<?= e($notice['title']) ?>&rdquo;? This cannot be undone.</p>
+                <div class="flex gap-3 justify-end pt-2">
+                  <button type="button" class="px-4 py-2 font-semibold text-gray-600"
+                    onclick="this.closest('dialog').close()" formnovalidate>Cancel</button>
+                  <button type="submit" class="px-4 py-2 font-semibold bg-rose-600 text-white rounded-lg">Delete</button>
+                </div>
+              </form>
+            </dialog>
+          <?php endforeach; ?>
         </section>
         <script>
           (() => {
@@ -2729,6 +2997,58 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               const savedTab = localStorage.getItem('adminNoticeTab') || 'live';
               applyNoticeTab(savedTab);
             }
+
+            document.querySelectorAll('[data-notice-edit-form]').forEach((form) => {
+              const scope = form.querySelector('[data-edit-scope]');
+              const state = form.querySelector('[data-edit-state]');
+              const chapter = form.querySelector('[data-edit-chapter]');
+              const syncScope = () => {
+                if (!scope) return;
+                if (state) state.disabled = scope.value !== 'state';
+                if (chapter) chapter.disabled = scope.value !== 'chapter';
+              };
+              if (scope) scope.addEventListener('change', syncScope);
+              syncScope();
+
+              const fileInput = form.querySelector('[data-edit-attachment-input]');
+              const urlInput = form.querySelector('[data-edit-attachment-url]');
+              const typeInput = form.querySelector('[data-edit-attachment-type]');
+              const preview = form.querySelector('[data-edit-attachment-preview]');
+              const submitBtn = form.querySelector('button[type="submit"]');
+              if (fileInput && urlInput && typeInput) {
+                fileInput.addEventListener('change', async (event) => {
+                  const file = event.target.files[0];
+                  if (!file) return;
+                  if (preview) {
+                    preview.innerHTML = '<span class="text-xs text-gray-500">Uploading…</span>';
+                  }
+                  if (submitBtn) submitBtn.disabled = true;
+                  let result;
+                  try {
+                    result = await uploadFile(file, 'notices');
+                  } catch (e) {
+                    if (preview) preview.innerHTML = '<span class="text-xs text-red-600">Upload failed.</span>';
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                  }
+                  if (!result || result.error) {
+                    if (preview) preview.innerHTML = `<span class="text-xs text-red-600">${result?.error || 'Upload failed.'}</span>`;
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                  }
+                  urlInput.value = result.url || '';
+                  typeInput.value = result.type || '';
+                  if (preview) {
+                    if (file.type === 'application/pdf') {
+                      preview.innerHTML = `<div class="flex items-center gap-2 text-gray-600 text-xs"><span class="material-icons-outlined text-base">picture_as_pdf</span>${file.name}</div>`;
+                    } else {
+                      preview.innerHTML = `<img src="${result.url}" alt="Attachment" class="w-full h-32 object-cover rounded-lg">`;
+                    }
+                  }
+                  if (submitBtn) submitBtn.disabled = false;
+                });
+              }
+            });
           })();
         </script>
       <?php elseif ($page === 'fallen-wings'): ?>
