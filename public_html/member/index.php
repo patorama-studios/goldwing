@@ -1315,6 +1315,7 @@ $pageTitles = [
   'dashboard' => 'Member Dashboard',
   'profile' => 'Profile',
   'wings' => 'Wings Magazine',
+  'calendar' => 'Ride Calendar',
   'notices-view' => 'Notice Board',
   'notices-create' => 'Create Notice',
   'fallen-wings' => 'Fallen Wings',
@@ -1326,7 +1327,13 @@ $pageTitles = [
   'committee' => 'Committee & Leadership',
 ];
 $pageTitle = $pageTitles[$page] ?? 'Member Portal';
-$activePage = in_array($page, ['notices-view', 'notices-create'], true) ? 'notices' : $page;
+if (in_array($page, ['notices-view', 'notices-create'], true)) {
+  $activePage = 'notices';
+} elseif (in_array($page, ['wings', 'calendar'], true)) {
+  $activePage = 'wings';
+} else {
+  $activePage = $page;
+}
 $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
@@ -2791,6 +2798,22 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php else: ?>
               <p class="text-sm text-gray-500 mt-3">No issues available.</p>
             <?php endif; ?>
+          </div>
+        </section>
+      <?php elseif ($page === 'calendar'): ?>
+        <section class="space-y-6">
+          <div>
+            <h2 class="font-display text-2xl font-bold text-gray-900">Ride Calendar</h2>
+            <p class="text-sm text-gray-500">Upcoming rides and events from across the network.</p>
+          </div>
+          <div class="bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <iframe
+              src="/calendar/events_public.php"
+              title="Ride Calendar"
+              loading="lazy"
+              class="w-full block bg-transparent"
+              style="border: 0; min-height: 1200px;"
+              id="member-calendar-frame"></iframe>
           </div>
         </section>
       <?php elseif ($page === 'notices-create'): ?>
