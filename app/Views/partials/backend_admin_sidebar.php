@@ -41,7 +41,9 @@ $items = [
     ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],
     ['key' => 'applications', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
     ['key' => 'payments', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
-    ['key' => 'events', 'label' => 'Events', 'icon' => 'event', 'href' => '/admin/index.php?page=events', 'permission' => 'admin.events.manage'],
+    // 'events' (legacy admin page reading the old `events` table) removed —
+    // all event management now happens via the Calendar entry below, which
+    // points at the modern calendar_events workflow.
     ['key' => 'calendar-events', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php', 'permission' => 'admin.calendar.view'],
     ['key' => 'navigation', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php', 'permission' => 'admin.pages.edit'],
     ['key' => 'notices', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices', 'permission' => 'admin.pages.edit'],
