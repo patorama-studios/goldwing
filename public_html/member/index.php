@@ -1327,13 +1327,7 @@ $pageTitles = [
   'committee' => 'Committee & Leadership',
 ];
 $pageTitle = $pageTitles[$page] ?? 'Member Portal';
-if (in_array($page, ['notices-view', 'notices-create'], true)) {
-  $activePage = 'notices';
-} elseif (in_array($page, ['wings', 'calendar'], true)) {
-  $activePage = 'wings';
-} else {
-  $activePage = $page;
-}
+$activePage = in_array($page, ['notices-view', 'notices-create'], true) ? 'notices' : $page;
 $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';

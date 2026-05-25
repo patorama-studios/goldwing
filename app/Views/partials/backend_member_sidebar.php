@@ -6,15 +6,8 @@ if ($mainSiteUrl === '') {
 $items = [
   ['key' => 'main-site', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
   ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
-  [
-    'key' => 'wings',
-    'label' => 'Wings',
-    'icon' => 'menu_book',
-    'children' => [
-      ['key' => 'wings', 'label' => 'Wings Magazine', 'href' => '/member/index.php?page=wings'],
-      ['key' => 'calendar', 'label' => 'Calendar', 'href' => '/member/index.php?page=calendar'],
-    ],
-  ],
+  ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/member/index.php?page=wings'],
+  ['key' => 'calendar', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/member/index.php?page=calendar'],
   ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
   [
     'key' => 'notices',
