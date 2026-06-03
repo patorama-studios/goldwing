@@ -293,18 +293,19 @@ class SettingsService
 
     private static function encodeValue($value, array $options = []): string
     {
+        $flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
         if (!empty($options['encrypt'])) {
             $encrypted = CryptoService::encrypt((string) $value);
             if ($encrypted === null) {
-                return json_encode($value, JSON_UNESCAPED_SLASHES);
+                return json_encode($value, $flags);
             }
             $payload = [
                 'encrypted' => true,
                 'value' => $encrypted ?? '',
             ];
-            return json_encode($payload, JSON_UNESCAPED_SLASHES);
+            return json_encode($payload, $flags);
         }
-        return json_encode($value, JSON_UNESCAPED_SLASHES);
+        return json_encode($value, $flags);
     }
 
     private static function decodeValue(string $valueJson)

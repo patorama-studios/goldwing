@@ -468,6 +468,14 @@ class NotificationService
             if (!isset($defaults[$key]) || !is_array($settings)) {
                 continue;
             }
+            // If the saved body is empty or contains raw byte-escape sequences
+            // (e.g. \xe2\x80\x94) fall back to the clean code default.
+            if (isset($settings['body']) && (
+                trim((string) $settings['body']) === '' ||
+                preg_match('/\\\\x[0-9a-fA-F]{2}/', (string) $settings['body'])
+            )) {
+                unset($settings['body']);
+            }
             $merged[$key] = array_merge($defaults[$key], $settings);
         }
         return $merged;
