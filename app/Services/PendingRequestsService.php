@@ -100,11 +100,184 @@ class PendingRequestsService
 
     public static function find(string $type, int $id): ?array
     {
+        // Fast path: look up the specific row directly. Avoids fetching the
+        // entire type listing (which can be slow, and which silently swallows
+        // a failing JOIN in one fetcher and returns no rows — leaving the
+        // detail page looking blank).
+        $direct = self::fetchOne($type, $id);
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        // Fallback to the bulk fetch (preserves any per-type fields that
+        // fetchOne might not assemble identically).
         $rows = self::all($type, 'all');
         foreach ($rows as $row) {
             if ((int) $row['id'] === $id) {
                 return $row;
             }
+        }
+        return null;
+    }
+
+    private static function fetchOne(string $type, int $id): ?array
+    {
+        try {
+            $pdo = Database::connection();
+            switch ($type) {
+                case self::TYPE_FEEDBACK:
+                    $stmt = $pdo->prepare(
+                        "SELECT f.id, f.user_id, f.submitter_name, f.submitter_email, f.message,
+                                f.page_url, f.user_agent, f.status, f.response, f.reviewed_by,
+                                f.reviewed_at, f.created_at,
+                                u.name AS user_name, u.email AS user_email
+                         FROM beta_feedback f
+                         LEFT JOIN users u ON u.id = f.user_id
+                         WHERE f.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $displayStatus = match ((string) $r['status']) {
+                        'resolved' => 'approved',
+                        'wont_fix' => 'rejected',
+                        'archived' => 'archived',
+                        default    => 'pending',
+                    };
+                    $title = 'Ticket #' . $r['id'] . ' — ' . substr(strip_tags((string) $r['message']), 0, 60);
+                    $name = $r['submitter_name'] ?: $r['user_name'] ?: 'Anonymous';
+                    $email = $r['submitter_email'] ?: $r['user_email'] ?: null;
+                    $summary = ($r['page_url'] ? 'Page: ' . $r['page_url'] . ' · ' : '')
+                             . substr((string) $r['message'], 0, 160);
+                    $r['ticket_status'] = $r['status'];
+                    return self::row(self::TYPE_FEEDBACK, $r['id'], $title, $displayStatus, $r['created_at'],
+                        $name, $email, $summary, $r);
+
+                case self::TYPE_NOTICE:
+                    $stmt = $pdo->prepare(
+                        "SELECT n.id, n.title, n.content, n.status, n.created_at, n.created_by, n.feedback_message,
+                                n.reviewed_by, n.reviewed_at,
+                                u.name AS submitter_name, u.email AS submitter_email
+                         FROM notices n
+                         LEFT JOIN users u ON u.id = n.created_by
+                         WHERE n.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    return self::row(self::TYPE_NOTICE, $r['id'], $r['title'], $r['status'], $r['created_at'],
+                        $r['submitter_name'], $r['submitter_email'], substr(strip_tags((string) $r['content']), 0, 160), $r);
+
+                case self::TYPE_EVENT:
+                    $stmt = $pdo->prepare(
+                        "SELECT e.id, e.title, e.description, e.status, e.created_at, e.created_by,
+                                e.start_at, e.end_at, e.feedback_message, e.reviewed_by, e.reviewed_at,
+                                u.name AS submitter_name, u.email AS submitter_email
+                         FROM calendar_events e
+                         LEFT JOIN users u ON u.id = e.created_by
+                         WHERE e.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    return self::row(self::TYPE_EVENT, $r['id'], $r['title'], $r['status'], $r['created_at'],
+                        $r['submitter_name'], $r['submitter_email'],
+                        ($r['start_at'] ? 'Starts ' . $r['start_at'] . ' · ' : '') . substr(strip_tags((string) $r['description']), 0, 140),
+                        $r);
+
+                case self::TYPE_MEMBER_OF_YEAR:
+                    $stmt = $pdo->prepare(
+                        "SELECT id, submitted_at, status, nominator_first_name, nominator_last_name, nominator_email,
+                                nominee_first_name, nominee_last_name, nominee_chapter, nomination_details,
+                                admin_notes, feedback_message
+                         FROM member_of_year_nominations WHERE id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $title = 'Nominee: ' . trim($r['nominee_first_name'] . ' ' . $r['nominee_last_name']);
+                    $submitter = trim($r['nominator_first_name'] . ' ' . $r['nominator_last_name']);
+                    return self::row(self::TYPE_MEMBER_OF_YEAR, $r['id'], $title, $r['status'], $r['submitted_at'],
+                        $submitter, $r['nominator_email'],
+                        'Chapter: ' . ($r['nominee_chapter'] ?? 'n/a') . ' · ' . substr((string) $r['nomination_details'], 0, 140),
+                        $r);
+
+                case self::TYPE_FALLEN_WINGS:
+                    $stmt = $pdo->prepare(
+                        "SELECT fw.id, fw.full_name, fw.year_of_passing, fw.tribute, fw.status, fw.created_at,
+                                fw.feedback_message, fw.member_number, fw.image_url, fw.pdf_url,
+                                u.name AS submitter_name, u.email AS submitter_email
+                         FROM fallen_wings fw
+                         LEFT JOIN users u ON u.id = fw.submitted_by
+                         WHERE fw.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    return self::row(self::TYPE_FALLEN_WINGS, $r['id'], $r['full_name'], strtolower((string) $r['status']), $r['created_at'],
+                        $r['submitter_name'], $r['submitter_email'],
+                        'Year of passing: ' . $r['year_of_passing'] . ' · ' . substr((string) $r['tribute'], 0, 140),
+                        $r);
+
+                case self::TYPE_CHAPTER_CHANGE:
+                    $stmt = $pdo->prepare(
+                        "SELECT ccr.id, ccr.member_id, ccr.requested_chapter_id, ccr.status, ccr.requested_at,
+                                ccr.feedback_message, ccr.rejection_reason,
+                                m.first_name, m.last_name, m.email,
+                                c.name AS chapter_name, c.state AS chapter_state
+                         FROM chapter_change_requests ccr
+                         LEFT JOIN members m ON m.id = ccr.member_id
+                         LEFT JOIN chapters c ON c.id = ccr.requested_chapter_id
+                         WHERE ccr.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                    $title = $submitter . ' → ' . ($r['chapter_name'] ?? 'Chapter');
+                    return self::row(self::TYPE_CHAPTER_CHANGE, $r['id'], $title, strtolower((string) $r['status']), $r['requested_at'],
+                        $submitter, $r['email'] ?? null,
+                        'Requested chapter: ' . ($r['chapter_name'] ?? 'n/a') . ' (' . ($r['chapter_state'] ?? '') . ')',
+                        $r);
+
+                case self::TYPE_STORE_ORDER:
+                    $stmt = $pdo->prepare(
+                        "SELECT so.id, so.member_id, so.total_amount, so.created_at,
+                                so.order_status, so.payment_status, so.fulfillment_status,
+                                m.first_name, m.last_name, m.email
+                         FROM store_orders so
+                         LEFT JOIN members m ON m.id = so.member_id
+                         WHERE so.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                    return self::row(self::TYPE_STORE_ORDER, $r['id'], 'Order #' . $r['id'],
+                        $r['payment_status'] === 'unpaid' ? 'pending' : strtolower((string) $r['payment_status']),
+                        $r['created_at'], $submitter, $r['email'] ?? null,
+                        'Total: $' . number_format((float) $r['total_amount'], 2) . ' · ' . $r['payment_status'] . ' / ' . $r['order_status'],
+                        $r);
+
+                case self::TYPE_MEMBERSHIP:
+                    $stmt = $pdo->prepare(
+                        "SELECT a.id, a.member_id, a.member_type, a.status, a.created_at,
+                                m.first_name, m.last_name, m.email
+                         FROM membership_applications a
+                         LEFT JOIN members m ON m.id = a.member_id
+                         WHERE a.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                    return self::row(self::TYPE_MEMBERSHIP, $r['id'], $submitter ?: 'Member #' . $r['member_id'],
+                        strtolower((string) $r['status']), $r['created_at'],
+                        $submitter, $r['email'] ?? null,
+                        'Type: ' . $r['member_type'], $r);
+            }
+        } catch (Throwable $e) {
+            // Swallow — caller will fall back to bulk fetch path.
         }
         return null;
     }

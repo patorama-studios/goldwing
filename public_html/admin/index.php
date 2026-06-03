@@ -1035,6 +1035,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt->execute(['user_id' => $user['id'], 'id' => $entryId]);
       $alerts[] = ['type' => 'success', 'message' => 'Memorial entry rejected.'];
     }
+    if ($page === 'fallen-wings' && ($_POST['action'] ?? '') === 'add_fallen_wings') {
+      $fullName = trim($_POST['full_name'] ?? '');
+      $year = (int) ($_POST['year_of_passing'] ?? 0);
+      $memberNumberRaw = trim($_POST['member_number'] ?? '');
+      $memberNumberNormalized = $memberNumberRaw !== '' ? preg_replace('/\\s+/', '', $memberNumberRaw) : null;
+      $tribute = trim($_POST['tribute'] ?? '');
+      $tribute = $tribute !== '' ? $tribute : null;
+      $statusInput = strtoupper(trim($_POST['status'] ?? 'APPROVED'));
+      $status = in_array($statusInput, ['APPROVED', 'PENDING'], true) ? $statusInput : 'APPROVED';
+
+      if ($fullName === '' || $year <= 0) {
+        $alerts[] = ['type' => 'error', 'message' => 'Please provide a valid name and year.'];
+      } elseif ($memberNumberNormalized !== null && !preg_match('/^[A-Za-z0-9\\.\\-]+$/', $memberNumberNormalized)) {
+        $alerts[] = ['type' => 'error', 'message' => 'Member number may only contain letters, numbers, dots, or dashes.'];
+      } else {
+        $imageUrl = null;
+        $pdfUrl = null;
+        $uploadDir = __DIR__ . '/../uploads/fallen_wings/';
+        if (!is_dir($uploadDir)) {
+          mkdir($uploadDir, 0755, true);
+        }
+        $uploadError = '';
+
+        if (isset($_FILES['tribute_image']) && $_FILES['tribute_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+          if ($_FILES['tribute_image']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['tribute_image']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
+              $filename = uniqid('img_') . '.' . $ext;
+              if (move_uploaded_file($_FILES['tribute_image']['tmp_name'], $uploadDir . $filename)) {
+                $imageUrl = '/uploads/fallen_wings/' . $filename;
+              }
+            } else {
+              $uploadError = 'Image must be JPG, PNG, or WEBP.';
+            }
+          } else {
+            $uploadError = 'Failed to upload image. Error code: ' . $_FILES['tribute_image']['error'];
+          }
+        }
+
+        if ($uploadError === '' && isset($_FILES['tribute_pdf']) && $_FILES['tribute_pdf']['error'] !== UPLOAD_ERR_NO_FILE) {
+          if ($_FILES['tribute_pdf']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['tribute_pdf']['name'], PATHINFO_EXTENSION));
+            if ($ext === 'pdf') {
+              $filename = uniqid('pdf_') . '.pdf';
+              if (move_uploaded_file($_FILES['tribute_pdf']['tmp_name'], $uploadDir . $filename)) {
+                $pdfUrl = '/uploads/fallen_wings/' . $filename;
+              }
+            } else {
+              $uploadError = 'Tribute document must be a PDF.';
+            }
+          } else {
+            $uploadError = 'Failed to upload PDF. Error code: ' . $_FILES['tribute_pdf']['error'];
+          }
+        }
+
+        if ($uploadError !== '') {
+          $alerts[] = ['type' => 'error', 'message' => $uploadError];
+        } else {
+          $approvedBy = $status === 'APPROVED' ? $user['id'] : null;
+          $approvedAt = $status === 'APPROVED' ? date('Y-m-d H:i:s') : null;
+          $stmt = $pdo->prepare('INSERT INTO fallen_wings (full_name, year_of_passing, member_number, tribute, status, submitted_by, approved_by, approved_at, image_url, pdf_url, created_at, updated_at) VALUES (:full_name, :year_of_passing, :member_number, :tribute, :status, :submitted_by, :approved_by, :approved_at, :image_url, :pdf_url, NOW(), NOW())');
+          $stmt->execute([
+            'full_name' => $fullName,
+            'year_of_passing' => $year,
+            'member_number' => $memberNumberNormalized,
+            'tribute' => $tribute,
+            'status' => $status,
+            'submitted_by' => $user['id'],
+            'approved_by' => $approvedBy,
+            'approved_at' => $approvedAt,
+            'image_url' => $imageUrl,
+            'pdf_url' => $pdfUrl,
+          ]);
+          AuditService::log($user['id'], 'fallen_wings_create', 'Memorial added for ' . $fullName . ' (' . $year . ').');
+          $alerts[] = ['type' => 'success', 'message' => 'Memorial added.'];
+        }
+      }
+    }
+    if ($page === 'fallen-wings' && ($_POST['action'] ?? '') === 'delete_fallen_wings') {
+      $entryId = (int) ($_POST['fallen_id'] ?? 0);
+      if ($entryId > 0) {
+        $stmt = $pdo->prepare('DELETE FROM fallen_wings WHERE id = :id');
+        $stmt->execute(['id' => $entryId]);
+        AuditService::log($user['id'], 'fallen_wings_delete', 'Memorial #' . $entryId . ' deleted.');
+        $alerts[] = ['type' => 'success', 'message' => 'Memorial deleted.'];
+      } else {
+        $alerts[] = ['type' => 'error', 'message' => 'Invalid memorial entry.'];
+      }
+    }
     if ($page === 'fallen-wings' && ($_POST['action'] ?? '') === 'edit_fallen_wings') {
       $entryId = (int) ($_POST['fallen_id'] ?? 0);
       $fullName = trim($_POST['full_name'] ?? '');
@@ -3077,7 +3166,88 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           <?php endif; ?>
 
-          <?php $editFallenId = (int) ($_GET['edit_fallen'] ?? 0); ?>
+          <?php
+          $editFallenId = (int) ($_GET['edit_fallen'] ?? 0);
+          $addFallen = !empty($_GET['add_fallen']);
+          ?>
+
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-gray-900">Memorial entries</h2>
+            <?php if (!$addFallen): ?>
+              <a href="?page=fallen-wings&add_fallen=1"
+                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800">
+                <span class="material-icons-outlined text-[16px]">add</span> Add new memorial
+              </a>
+            <?php else: ?>
+              <a href="?page=fallen-wings" class="text-xs text-gray-500 hover:text-gray-900">Close form</a>
+            <?php endif; ?>
+          </div>
+
+          <?php if ($addFallen): ?>
+            <form method="post" enctype="multipart/form-data"
+                  class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
+              <h3 class="text-sm font-semibold text-gray-900">Add new memorial</h3>
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="add_fallen_wings">
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
+                  <input type="text" name="full_name"
+                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Year of Passing</label>
+                  <input type="number" name="year_of_passing"
+                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                         min="1900" max="<?= date('Y') ?>" required>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Member Number</label>
+                  <input type="text" name="member_number"
+                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                         pattern="[A-Za-z0-9.\-]+">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                  <select name="status"
+                          class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <option value="APPROVED" selected>Approved (publish immediately)</option>
+                    <option value="PENDING">Pending (queue for review)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute Text</label>
+                <textarea name="tribute" rows="4"
+                          class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"></textarea>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Image (optional)</label>
+                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
+                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute PDF (optional)</label>
+                  <input type="file" name="tribute_pdf" accept=".pdf"
+                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2">
+                <a href="?page=fallen-wings"
+                   class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</a>
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">Save memorial</button>
+              </div>
+            </form>
+          <?php endif; ?>
 
           <div class="space-y-4">
             <h2 class="text-lg font-semibold text-gray-900">Pending submissions</h2>
@@ -3124,6 +3294,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </form>
                     <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
                       class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">Edit</a>
+                    <form method="post" onsubmit="return confirm('Delete this memorial entry? This cannot be undone.');">
+                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                      <input type="hidden" name="action" value="delete_fallen_wings">
+                      <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+                      <button type="submit"
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button>
+                    </form>
                   </div>
                 </div>
               <?php endforeach; ?>
@@ -3238,10 +3415,17 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
                         <?php endif; ?>
                       </div>
-                      <div class="flex items-center gap-4 whitespace-nowrap">
+                      <div class="flex items-center gap-2 whitespace-nowrap">
                         <span class="text-sm font-semibold text-gray-600"><?= e((string) $entry['year_of_passing']) ?></span>
                         <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
                           class="text-xs font-semibold text-gray-500 hover:text-gray-900 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200">Edit</a>
+                        <form method="post" onsubmit="return confirm('Delete this memorial entry? This cannot be undone.');">
+                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                          <input type="hidden" name="action" value="delete_fallen_wings">
+                          <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+                          <button type="submit"
+                            class="text-xs font-semibold text-rose-700 hover:bg-rose-50 bg-white px-3 py-1.5 rounded-md border border-rose-200">Delete</button>
+                        </form>
                       </div>
                     </li>
                   <?php endif; ?>

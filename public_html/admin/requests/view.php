@@ -4,6 +4,14 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 use App\Services\Csrf;
 use App\Services\PendingRequestsService;
 
+// Capture fatal errors so a blank page leaves a debuggable trace in the HTML source.
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        echo '<!-- PHP_FATAL:' . base64_encode(json_encode($err)) . ' -->';
+    }
+});
+
 require_permission('admin.requests.view');
 
 $type = trim((string) ($_GET['type'] ?? ''));
@@ -56,9 +64,18 @@ function reqStatusBadge2(?string $status): string {
       </a>
 
       <?php if (!$item): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h1 class="font-display text-xl font-bold text-gray-900">Request not found</h1>
-          <p class="mt-2 text-sm text-gray-600">It may have been removed or already actioned.</p>
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
+          <h1 class="font-display text-xl font-bold text-gray-900">Notification not found</h1>
+          <p class="text-sm text-gray-600">
+            We couldn't load notification
+            <span class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"><?= e($type) ?> #<?= (int) $id ?></span>.
+            It may have been deleted, archived, or the underlying record was removed.
+          </p>
+          <div class="pt-2">
+            <a href="/admin/requests/" class="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">
+              <span class="material-icons-outlined text-sm">arrow_back</span> Back to notification hub
+            </a>
+          </div>
         </section>
       <?php else: ?>
         <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
