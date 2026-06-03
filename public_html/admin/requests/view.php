@@ -1,16 +1,15 @@
 <?php
-// version: 2026-06-03b — bump mtime to force OPcache reload
+// version: 2026-06-03c — nuclear OPcache reset + debug dump
+// Nuke OPcache BEFORE bootstrap so freshly-deployed service files are picked
+// up on this very request, not the next one. (opcache_invalidate is a no-op
+// on PHP installs where validate_timestamps=0.)
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 use App\Services\PendingRequestsService;
-
-// Force-bust OPcache for the request services on this admin endpoint so a
-// freshly-deployed PendingRequestsService is picked up immediately instead of
-// rendering with stale (null-field) rows.
-if (function_exists('opcache_invalidate')) {
-    @opcache_invalidate(__DIR__ . '/../../../app/Services/PendingRequestsService.php', true);
-}
 
 // Capture fatal errors so a blank page leaves a debuggable trace in the HTML source.
 register_shutdown_function(function () {
@@ -32,6 +31,25 @@ if (!in_array($type, $validTypes, true) || $id <= 0) {
 }
 
 $item = PendingRequestsService::find($type, $id);
+
+// Optional debug dump — append ?debug=1 to the URL and view-source to see
+// exactly what find() returned, plus OPcache state. Helps diagnose
+// "blank header" issues caused by stale bytecode or missing columns.
+if (!empty($_GET['debug'])) {
+    $debugPayload = [
+        'type'         => $type,
+        'id'           => $id,
+        'item_keys'    => $item ? array_keys($item) : null,
+        'item_summary' => $item ? array_diff_key($item, ['raw' => 1]) : null,
+        'raw_keys'     => $item && isset($item['raw']) ? array_keys((array) $item['raw']) : null,
+        'opcache'      => function_exists('opcache_get_status') ? array_intersect_key(
+            (array) opcache_get_status(false),
+            ['opcache_enabled' => 1, 'cache_full' => 1, 'restart_pending' => 1, 'restart_in_progress' => 1]
+        ) : 'unavailable',
+        'service_path' => realpath(__DIR__ . '/../../../app/Services/PendingRequestsService.php'),
+    ];
+    echo '<!-- NOTIF_DEBUG:' . base64_encode(json_encode($debugPayload)) . ' -->';
+}
 
 $flash = $_SESSION['requests_flash'] ?? null;
 unset($_SESSION['requests_flash']);
