@@ -451,7 +451,10 @@ class NotificationService
         ];
         foreach (self::definitions() as $key => $definition) {
             $definitionDefaults = $definition['defaults'] ?? [];
-            $defaults[$key] = array_merge($globalSender, $definitionDefaults);
+            $defaults[$key] = array_merge($globalSender, $definitionDefaults, [
+                'is_mandatory' => (bool) ($definition['is_mandatory'] ?? false),
+                'category'     => (string) ($definition['category'] ?? 'general'),
+            ]);
         }
         return $defaults;
     }
