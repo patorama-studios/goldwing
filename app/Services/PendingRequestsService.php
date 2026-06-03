@@ -1,4 +1,5 @@
 <?php
+// version: 2026-06-03b — bump mtime to force OPcache reload after fetchOne() addition
 namespace App\Services;
 
 use PDO;

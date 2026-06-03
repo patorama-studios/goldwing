@@ -1,7 +1,14 @@
 <?php
+// version: 2026-06-03b — bump mtime to force OPcache reload
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\PendingRequestsService;
+
+// Bust OPcache for the request service so freshly-deployed fixes are picked up
+// without waiting for the cache to expire.
+if (function_exists('opcache_invalidate')) {
+    @opcache_invalidate(__DIR__ . '/../../../app/Services/PendingRequestsService.php', true);
+}
 
 register_shutdown_function(function () {
     $err = error_get_last();

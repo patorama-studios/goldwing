@@ -1,8 +1,16 @@
 <?php
+// version: 2026-06-03b — bump mtime to force OPcache reload
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 use App\Services\PendingRequestsService;
+
+// Force-bust OPcache for the request services on this admin endpoint so a
+// freshly-deployed PendingRequestsService is picked up immediately instead of
+// rendering with stale (null-field) rows.
+if (function_exists('opcache_invalidate')) {
+    @opcache_invalidate(__DIR__ . '/../../../app/Services/PendingRequestsService.php', true);
+}
 
 // Capture fatal errors so a blank page leaves a debuggable trace in the HTML source.
 register_shutdown_function(function () {
