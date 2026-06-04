@@ -30,7 +30,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title><?= $pageTitle ?></title>
   <?php if ($faviconUrl): ?>
     <link rel="icon" href="<?= htmlspecialchars($faviconUrl, ENT_QUOTES, 'UTF-8') ?>">
@@ -51,10 +51,16 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       background: #111827;
       font-family: 'Inter', sans-serif;
       color: #fff;
+      /* 100vh is wrong on iOS Safari (it's the URL-bar-collapsed height).
+         dvh is the dynamic viewport height — the actually-visible area. */
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      /* Respect notches / home indicators on iPhone + modern iPad */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     /* ── Top bar ── */
@@ -463,14 +469,26 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   let pageFlip = null;
   let totalPages = 0;
 
+  // visualViewport reflects the ACTUALLY-visible area (URL bar shown, keyboard open, etc.).
+  // window.innerWidth/innerHeight are the URL-bar-collapsed dimensions on iOS — using
+  // them at load time over-sizes the book and the bottom gets cropped behind the URL bar.
+  function viewportSize() {
+    const vp = window.visualViewport;
+    return {
+      width:  vp ? vp.width  : window.innerWidth,
+      height: vp ? vp.height : window.innerHeight,
+    };
+  }
+
   // Treat anything under 1024px as mobile (catches phones in landscape + small tablets)
   // ?mobile=1 in URL forces mobile mode (useful for testing on desktop)
-  const isMobile = window.innerWidth < 1024 || new URLSearchParams(location.search).get('mobile') === '1';
+  const isMobile = viewportSize().width < 1024 || new URLSearchParams(location.search).get('mobile') === '1';
   if (isMobile) document.body.classList.add('is-mobile');
 
   function getBookDimensions() {
     const topBar    = document.getElementById('top-bar').offsetHeight;
     const bottomBar = document.getElementById('bottom-bar').offsetHeight;
+    const { width: winW, height: winH } = viewportSize();
 
     // A4 portrait ratio (1 : 1.414)
     const aspect = 1 / 1.414;
@@ -480,8 +498,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       // No side arrows — fill the full width and as much height as possible
       const vPad  = 12;   // small vertical breathing room
       const hPad  = 10;   // minimal horizontal padding
-      const availH = window.innerHeight - topBar - bottomBar - vPad;
-      const availW = window.innerWidth  - hPad;
+      const availH = winH - topBar - bottomBar - vPad;
+      const availW = winW - hPad;
 
       w = Math.floor(availW * 0.98);
       h = Math.floor(w / aspect);
@@ -492,8 +510,8 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       // Two-page spread — side arrows take ~150px total
       const vPad    = 48;
       const arrowGap = 150;
-      const availH  = window.innerHeight - topBar - bottomBar - vPad;
-      const availW  = window.innerWidth  - arrowGap;
+      const availH  = winH - topBar - bottomBar - vPad;
+      const availW  = winW - arrowGap;
 
       w = Math.floor((availW * 0.88) / 2);
       h = Math.floor(w / aspect);
@@ -729,18 +747,24 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
       applyZoom(zoomScale * (e.deltaY < 0 ? 1.12 : 0.89), true);
     }, { passive: false });
 
-    // Responsive resize
+    // Responsive resize — also fires when iOS Safari's URL bar collapses or device rotates.
     let resizeTimer;
-    window.addEventListener('resize', () => {
+    function refit() {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (pageFlip) {
-          const dims = getBookDimensions();
-          // StPageFlip auto-resizes via autoSize:true, but we can nudge it
-          pageFlip.updateState({ width: dims.w, height: dims.h });
-        }
+        if (!pageFlip) return;
+        const dims = getBookDimensions();
+        pageFlip.updateState({ width: dims.w, height: dims.h });
       }, 200);
-    });
+    }
+    window.addEventListener('resize', refit);
+    window.addEventListener('orientationchange', refit);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', refit);
+    }
+    // Also refit once the cover has actually rendered — first paint on iOS sometimes
+    // reports the URL-bar-collapsed height even via visualViewport.
+    setTimeout(refit, 350);
 
   } catch (err) {
     console.error('Flipbook error:', err);
