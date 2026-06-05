@@ -396,8 +396,7 @@ $paymentStatusLabel = $paymentStatusLabel !== '' ? ucfirst(strtolower((string) $
 $addressLines = array_filter([
   trim((string) ($member['address_line1'] ?? '')),
   trim((string) ($member['address_line2'] ?? '')),
-  trim((string) ($member['suburb'] ?? '')),
-  trim((string) ($member['city'] ?? '')),
+  trim((string) ($member['suburb'] ?? $member['city'] ?? '')),
   trim((string) ($member['state'] ?? '')),
   trim((string) ($member['postal_code'] ?? '')),
   trim((string) ($member['country'] ?? '')),
@@ -1091,13 +1090,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <div>
                               <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">New
                                 password</label>
-                              <input type="password" name="new_password"
+                              <input type="password" name="new_password" autocomplete="new-password"
+                                data-password-strength data-pw-confirm="new_password_confirm"
                                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm py-2.5">
                             </div>
                             <div>
                               <label
                                 class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Confirm</label>
-                              <input type="password" name="new_password_confirm"
+                              <input type="password" name="new_password_confirm" autocomplete="new-password"
                                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm py-2.5">
                             </div>
                             <button type="submit"
@@ -1353,7 +1353,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div class="md:col-span-2">
                             <label class="text-sm font-medium text-gray-700">Address line 1</label>
                             <input id="admin_address_line1" data-google-autocomplete="address"
-                              data-google-autocomplete-city="#admin_address_city"
+                              data-google-autocomplete-city="#admin_address_suburb"
                               data-google-autocomplete-state="#admin_address_state"
                               data-google-autocomplete-postal="#admin_address_postcode"
                               data-google-autocomplete-country="#admin_address_country" type="text" name="address_line1"
@@ -1369,8 +1369,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
                           <div>
-                            <label class="text-sm font-medium text-gray-700">City</label>
-                            <input id="admin_address_city" type="text" name="suburb"
+                            <label class="text-sm font-medium text-gray-700">Suburb</label>
+                            <input id="admin_address_suburb" type="text" name="suburb"
                               value="<?= e($profileMember['suburb'] ?? '') ?>"
                               class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                               <?= $canEditAddress ? '' : 'disabled' ?>>

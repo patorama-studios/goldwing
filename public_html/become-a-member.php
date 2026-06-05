@@ -131,8 +131,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         <?php if (!$user): ?>
           <label class="form-field">
             <span class="form-label">Create a password</span>
-            <input class="form-input" type="password" name="password" minlength="8">
-            <span class="form-helper">At least 8 characters.</span>
+            <input class="form-input" type="password" name="password" minlength="8" autocomplete="new-password" data-password-strength>
           </label>
         <?php endif; ?>
       </section>

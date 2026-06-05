@@ -128,11 +128,11 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
                     <input type="hidden" name="token" value="<?= e($token) ?>">
                     <div class="form-group">
                         <label>New Password</label>
-                        <input type="password" name="password" required>
+                        <input type="password" name="password" required autocomplete="new-password" data-password-strength data-pw-confirm="confirm_password">
                     </div>
                     <div class="form-group">
                         <label>Confirm Password</label>
-                        <input type="password" name="confirm_password" required>
+                        <input type="password" name="confirm_password" required autocomplete="new-password">
                     </div>
                     <button class="button primary" type="submit">Update password</button>
                 </form>

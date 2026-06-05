@@ -123,6 +123,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
 </head>
 <body class="bg-background-light text-gray-800 font-sans transition-colors duration-300">
 
+<script src="/assets/js/password-strength.js" defer></script>
 <?php if ($loadGoogleMaps): ?>
   <script src="/assets/js/address-autocomplete.js" defer></script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=<?= e($googleMapsApiKey) ?>&libraries=places&callback=goldwingAddressAutocompleteInit"></script>

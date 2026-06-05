@@ -23,6 +23,7 @@ $stylesVersion = file_exists($stylesPath) ? (string) filemtime($stylesPath) : (s
   <?php endif; ?>
   <link rel="stylesheet" href="/assets/styles.css?v=<?= e($stylesVersion) ?>">
   <script src="/assets/navigation.js" defer></script>
+  <script src="/assets/js/password-strength.js" defer></script>
   <?php if ($loadGoogleMaps): ?>
     <script src="/assets/js/address-autocomplete.js" defer></script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=<?= e($googleMapsApiKey) ?>&libraries=places&callback=goldwingAddressAutocompleteInit"></script>
