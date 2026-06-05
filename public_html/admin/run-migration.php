@@ -878,13 +878,17 @@ if ($alreadyRun) {
             'chapters-sa'                => '<p>South Australian riders connect through a dedicated chapter and local events.</p>[chapter-reps state="South Australia"]',
             'chapters-tas'               => '<p>Tasmanian members stay connected through local rides and chapter support.</p>[chapter-reps state="Tasmania"]',
         ];
+        // Note: this server runs PDO with ATTR_EMULATE_PREPARES=false, so the
+        // same value cannot be bound to two placeholders with the same name.
+        // We bind html_content and live_html separately to satisfy MySQL's
+        // native prepared-statement parser.
         $updatePage = $pdo->prepare("
-            UPDATE pages SET html_content = :body, live_html = :body, updated_at = NOW()
+            UPDATE pages SET html_content = :body_html, live_html = :body_live, updated_at = NOW()
             WHERE slug = :slug
         ");
         $pageCount = 0;
         foreach ($pageUpdates as $slug => $body) {
-            $updatePage->execute([':body' => $body, ':slug' => $slug]);
+            $updatePage->execute([':body_html' => $body, ':body_live' => $body, ':slug' => $slug]);
             if ($updatePage->rowCount() > 0) { $pageCount++; }
         }
         $applied[] = "$pageCount page(s) wired to shortcodes";
