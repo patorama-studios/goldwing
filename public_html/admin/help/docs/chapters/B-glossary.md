@@ -1,0 +1,81 @@
+# B — Glossary
+
+Terms used throughout the System Documentation, with a short definition and a pointer to the chapter that goes deeper.
+
+If you find a term in another chapter that isn't defined here, add it. Keep entries to 1–3 sentences. Alphabetical.
+
+---
+
+- **2FA** — Two-factor authentication. A second proof-of-identity in addition to the password. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **ABN** — Australian Business Number. Required on invoices for GST-registered AU businesses. See [18 — Invoices](view.php?slug=18-invoices).
+- **Access control** — The path/role mapping that decides which URLs each role can hit. Edited at `/admin/settings/access-control.php`. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Activity log** — The `activity_log` table — records member-targeted admin actions (refunds, profile changes, password resets, etc.). Distinct from audit_log. See [08 — Activity & audit log](view.php?slug=08-activity-audit).
+- **Admin** — The top-tier built-in role with site-wide powers. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Admin Role Builder** — UI at `/admin/settings/roles.php` for defining custom admin roles and their permission sets.
+- **AI page builder** — Visual/chat-driven page editor under `/admin/page-builder/`, locked to kie.ai. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
+- **APP_KEY** — Required env var; encryption key for every secret stored at rest. Lose it, lose access to all encrypted Stripe keys, SMTP passwords, and TOTP secrets. See [10 — Encryption & secrets](view.php?slug=10-encryption-secrets).
+- **Area rep** — Built-in role: an admin scoped to a single chapter. Sees only their chapter's members and events. See [21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+- **AUD** — Australian dollars. The site's only currency. Stored in cents internally.
+- **Audit log** — The `audit_log` table — records settings changes (writes through `SettingsService` are stamped here automatically). Distinct from activity_log. See [08 — Activity & audit log](view.php?slug=08-activity-audit).
+- **Baseline (FIM)** — The captured set of file hashes that file-integrity scans compare against. Approved via Admin → Settings → Security & Authentication. See [11 — File integrity monitoring](view.php?slug=11-file-integrity).
+- **Baseline (member)** — A snapshot of a member's profile data that future changes diff against, so the activity log can show what changed. Run from `backfill_member_baseline.php`. See [20 — Members admin console](view.php?slug=20-members-admin).
+- **Catalogue import** — The bulk-load workflow at `scripts/import_store_catalogue.php` that idempotently syncs store products from a JSON spec. See [30 — Bulk catalogue import](view.php?slug=30-catalogue-import).
+- **Chapter** — A regional Goldwing group (e.g. Riverina). Members belong to one chapter; area reps are scoped to one. See [21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+- **Checkout session** — Stripe-hosted payment page used as a fallback when a custom PaymentIntent flow isn't appropriate. See [15 — Orders & checkout](view.php?slug=15-orders-checkout).
+- **Committee** — Chapter or association governance group (chair, secretary, treasurer, etc.). Managed via `CommitteeService`. See [21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+- **cPanel** — The shared hosting control panel the site runs on. Document root is `public_html/`. Git pulls and cron are configured here. See [33 — Deployment](view.php?slug=33-deployment).
+- **CryptoService** — AES-256-CBC encryption helper. Used for envelope-encrypted values in `settings_global` and similar. See [10 — Encryption & secrets](view.php?slug=10-encryption-secrets).
+- **CSP** — Content Security Policy. One of several HTTP security headers set by `SecurityHeadersService`. See [09 — Security headers & policies](view.php?slug=09-security-headers).
+- **doc-sync-check** — Pre-push skill (this very docs project) that flags chapters whose `watched_files` overlap with a code change. Sibling of `tour-impact-check`.
+- **Draft (page)** — The unpublished editable copy of a page. Publishing it creates a `page_versions` snapshot and replaces the live HTML. See [23 — Pages, navigation & menus](view.php?slug=23-pages-navigation).
+- **Driver.js** — Third-party JavaScript library that powers the in-app guided tours. See [36 — Tours system](view.php?slug=36-tours-system).
+- **EncryptionService** — AES-256-GCM encryption helper (authenticated). Used for TOTP secrets and AI provider keys. See [10 — Encryption & secrets](view.php?slug=10-encryption-secrets).
+- **Env file** — `.env` and `.env.local` — non-committed environment variables loaded by `App\Services\Env`. See [04 — Configuration & environment](view.php?slug=04-configuration).
+- **FIM** — File Integrity Monitoring. Hashes critical files and alerts on unexpected changes. See [11 — File integrity monitoring](view.php?slug=11-file-integrity).
+- **FPDF** — Vendored single-file PHP library used to render invoice PDFs. Located at `app/ThirdParty/fpdf/`. See [18 — Invoices](view.php?slug=18-invoices).
+- **Grace period (2FA)** — A configurable window after enrolment is required during which login still works without 2FA. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **GST** — Australian Goods and Services Tax (10%). Applied where appropriate on invoices. See [18 — Invoices](view.php?slug=18-invoices).
+- **Idempotency (webhook)** — Property that lets Stripe re-deliver a webhook without producing duplicate side effects. Enforced via the `webhook_events.stripe_event_id` UNIQUE constraint. See [16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
+- **Impersonation** — Admin feature that lets staff act as a specific member (debugging support cases). Logged to `activity_log`; member-portal shows a banner. See [20 — Members admin console](view.php?slug=20-members-admin).
+- **Integrations** — Settings Hub section for SMTP, Resend, and similar external service credentials. See [32 — Settings by section](view.php?slug=32-settings-by-section).
+- **kie.ai** — The AI provider the page builder is hard-locked to. Key stored encrypted via `AiProviderKeyService`. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
+- **Lapsed** — Membership state after the expiry date passes without renewal. Set by `cron/expire_memberships.php`. See [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
+- **Life member** — Permanent membership with no expiry. See [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
+- **Login rate limiter** — Tracks failed login attempts per IP and per account; locks out after configured thresholds. See [12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout).
+- **Maintenance mode** — Setting (`advanced.maintenance_mode`) that serves a 503 to non-admins. See [04 — Configuration & environment](view.php?slug=04-configuration).
+- **Media library** — Centralised asset store under `public_html/uploads/` with metadata in the `media` table. Referenced from pages via `[media:NN]` shortcodes. See [25 — Media library](view.php?slug=25-media-library).
+- **Member number** — Unique identifier allocated to a member at application approval. Format and allocation rules in [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
+- **Membership period** — A time-bounded active membership row in `membership_periods`. Renewals create a new period. See [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
+- **Menu location** — Slot on the site where a menu attaches (primary, footer, secondary). One menu per location. See [23 — Pages, navigation & menus](view.php?slug=23-pages-navigation).
+- **Notification Hub** — Admin in-app inbox at `/admin/requests/` for pending member actions. Distinct from email. See [22 — Notifications & email](view.php?slug=22-notifications-email).
+- **PaymentIntent** — Stripe's custom payment flow primitive. Used by the membership application flow. See [15 — Orders & checkout](view.php?slug=15-orders-checkout).
+- **Permission key** — Dotted-string capability check (e.g. `admin.payments.refund`). Used by `current_admin_can($key, $user)`. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Pricing matrix** — The 2 × 2 × 6 grid (Printed/PDF × period × member type) stored at `membership.pricing_matrix`. See [14 — Membership pricing matrix](view.php?slug=14-membership-pricing).
+- **RBAC** — Role-Based Access Control. The roles + permission keys + access-control paths system. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Recovery codes** — One-time use 2FA fallback codes generated at TOTP enrolment. Regenerable by the user or reset by an admin. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **Refund** — Money returned to a customer via Stripe. Initiated from admin only; gated by `require_stepup()`; logged everywhere. See [17 — Refunds](view.php?slug=17-refunds).
+- **Resend** — Optional alternative email transport (resend.com), used when SMTP isn't configured. See [22 — Notifications & email](view.php?slug=22-notifications-email).
+- **Role-locked page** — A page with `access_level` set so only certain roles can view it. Enforced by `PageBuilderService::canAccessPage()`. See [23 — Pages, navigation & menus](view.php?slug=23-pages-navigation).
+- **Sensitive action** — An action the site treats as high-risk (refunds, exports, settings changes, profile edits). Requires step-up auth and writes to `activity_log`. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **Session** — PHP session, stored in the `sessions` table via `DbSessionHandler` (not files). Lets admins force-logout everyone with a single SQL delete. See [05 — Authentication & sessions](view.php?slug=05-authentication).
+- **Settings_global / settings_user** — The two-table runtime config store. Global is site-wide; user is per-account preferences. See [31 — Settings architecture](view.php?slug=31-settings-architecture).
+- **Settings Hub** — The Admin → Settings UI. Renders sections backed by the two settings tables. See [31 — Settings architecture](view.php?slug=31-settings-architecture) and [32 — Settings by section](view.php?slug=32-settings-by-section).
+- **Shortcode** — `[media:NN]` placeholder in page HTML that the renderer (`render_media_shortcodes()`) replaces with an `<img>` at output time. See [25 — Media library](view.php?slug=25-media-library).
+- **SmtpMailer** — Primary email transport, reads SMTP credentials from Settings Hub → Integrations. See [22 — Notifications & email](view.php?slug=22-notifications-email).
+- **Step-up auth** — Re-prove identity (password + OTP) to extend a short-lived "elevated" session window before performing sensitive actions. Implemented by `StepUpService`. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **Store** — The members-only e-commerce module under `/store` and `/admin/store/`. Shares the Stripe account with memberships. See [27 — Store architecture](view.php?slug=27-store-architecture).
+- **Store manager** — Built-in role with admin access to the store but nothing else. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Stripe** — The sole payment processor for both memberships and store. Vendored SDK at `app/ThirdParty/stripe-php/`. See [13 — Stripe integration overview](view.php?slug=13-stripe-overview).
+- **Stripe webhook secret** — The `whsec_…` signing secret used to verify incoming webhook payloads. Stored encrypted at `payments.stripe.webhook_secret`. See [16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
+- **Test mode (Stripe)** — Driven entirely by the secret key prefix (`sk_test_` vs `sk_live_`). No separate flag. See [13 — Stripe integration overview](view.php?slug=13-stripe-overview).
+- **Ticket product** — `product_type='ticket'` store product that, on paid order, generates unique redeemable codes and emails them to the buyer. See [28 — Tickets](view.php?slug=28-tickets).
+- **TOTP** — Time-based One-Time Password. The 6-digit code from Google Authenticator / Authy / 1Password. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **Tour** — Driver.js-powered guided walkthrough that highlights UI elements and explains them. Defined in `config/tour-manifest.json`. See [36 — Tours system](view.php?slug=36-tours-system).
+- **tour-impact-check** — Pre-push skill that flags tours whose `watched_files` overlap with a code change. Sibling of `doc-sync-check`. See [36 — Tours system](view.php?slug=36-tours-system).
+- **Trusted device** — A cookie-backed marker that lets a user skip 2FA on this device for N days. See [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
+- **Variant** — A specific combination of product options (size, colour, etc.). One product can have many variants, each with its own SKU/price/stock. See [27 — Store architecture](view.php?slug=27-store-architecture).
+- **Versions (page)** — The `page_versions` table stores a snapshot every time a page is published. Restorable into draft. See [23 — Pages, navigation & menus](view.php?slug=23-pages-navigation).
+- **Watched files** — Per-chapter (or per-tour) list in the manifest/TOC. If a code change touches any of these, the impact-check skill flags the chapter/tour for review. See [36 — Tours system](view.php?slug=36-tours-system).
+- **Webhook event** — A Stripe-to-us POST notifying us of a payment-related state change (e.g. `checkout.session.completed`). Recorded in `webhook_events`. See [16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
+- **Webmaster** — Built-in role intended for technical maintainers — similar privileges to admin but conceptually separate. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
+- **Wings Magazine** — The association's member magazine; PDF issues uploaded and the latest one flagged at `/admin/index.php?page=wings`. See [25 — Media library](view.php?slug=25-media-library).

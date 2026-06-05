@@ -1,0 +1,115 @@
+{
+  "$schema_doc": "Source of truth for the Admin System Documentation. The viewer (admin/help/docs/index.php) reads `parts` to build the TOC. The doc-sync skill (scripts/check_doc_impact.php) reads `watched_files` per chapter to flag stale docs after a code change. Adding a new chapter = adding an entry under the right part + dropping a markdown file into chapters/.",
+  "title": "Goldwing System Documentation",
+  "intro": "Admin-only documentation: how the site is built, why it was built that way, and where to change it. Use the table of contents to jump to a chapter. Every chapter is structured the same way (What / Why / How / Where to change it / Settings / Screenshots / Gotchas / Related).",
+  "parts": [
+    {
+      "key": "foundations",
+      "title": "Part 1 — Foundations",
+      "blurb": "How the site is put together at a high level.",
+      "chapters": [
+        { "slug": "01-system-overview",       "title": "System overview & architecture",  "file": "chapters/01-system-overview.md",       "watched_files": ["app/bootstrap.php", "config/app.php", "README.md", "public_html/index.php", ".cpanel.yml"] },
+        { "slug": "02-codebase-map",          "title": "Codebase map",                     "file": "chapters/02-codebase-map.md",          "watched_files": ["app/Services/", "app/Views/", "public_html/admin/", "config/", "scripts/", "cron/", "database/"] },
+        { "slug": "03-database-migrations",   "title": "Database & migrations",            "file": "chapters/03-database-migrations.md",   "watched_files": ["database/", "app/Services/Database.php", "app/Services/DbSessionHandler.php"] },
+        { "slug": "04-configuration",         "title": "Configuration & environment",      "file": "chapters/04-configuration.md",         "watched_files": [".env", ".env.local", "config/app.php", "config/database.php", "app/Services/Env.php", "app/Services/SettingsService.php"] }
+      ]
+    },
+    {
+      "key": "identity",
+      "title": "Part 2 — Identity & Access",
+      "blurb": "Who can log in, what they can do, and how we know who's who.",
+      "chapters": [
+        { "slug": "05-authentication",        "title": "Authentication & sessions",        "file": "chapters/05-authentication.md",        "watched_files": ["app/Services/AuthService.php", "app/Services/DbSessionHandler.php", "app/Services/PasswordPolicyService.php", "public_html/login.php", "public_html/logout.php", "public_html/auth/"] },
+        { "slug": "06-2fa-stepup",            "title": "2FA, step-up & trusted devices",   "file": "chapters/06-2fa-stepup.md",            "watched_files": ["app/Services/TwoFactorService.php", "app/Services/TotpService.php", "app/Services/StepUpService.php", "app/Services/TrustedDeviceService.php", "app/Services/EmailOtpService.php", "public_html/member/2fa_enroll.php", "public_html/member/2fa_verify.php", "public_html/stepup.php"] },
+        { "slug": "07-roles-permissions",     "title": "Roles & permissions",              "file": "chapters/07-roles-permissions.md",     "watched_files": ["app/Services/SecurityPolicyService.php", "app/Services/AdminMemberAccess.php", "public_html/admin/settings/roles.php", "public_html/admin/settings/access-control.php", "public_html/admin/settings/roles-save.php", "public_html/admin/settings/access-control-save.php"] },
+        { "slug": "08-activity-audit",        "title": "Activity & audit log",             "file": "chapters/08-activity-audit.md",        "watched_files": ["app/Services/ActivityLogger.php", "app/Services/ActivityRepository.php", "app/Services/AuditService.php", "public_html/admin/security/activity_log.php"] }
+      ]
+    },
+    {
+      "key": "security",
+      "title": "Part 3 — Security",
+      "blurb": "What protects the site, what's encrypted, and how we catch tampering.",
+      "chapters": [
+        { "slug": "09-security-headers",      "title": "Security headers & policies",      "file": "chapters/09-security-headers.md",      "watched_files": ["app/Services/SecurityHeadersService.php", "app/Services/SecurityPolicyService.php", "app/Services/SecuritySettingsService.php"] },
+        { "slug": "10-encryption-secrets",    "title": "Encryption & secrets at rest",     "file": "chapters/10-encryption-secrets.md",    "watched_files": ["app/Services/CryptoService.php", "app/Services/EncryptionService.php", "app/Services/Env.php"] },
+        { "slug": "11-file-integrity",        "title": "File integrity monitoring",        "file": "chapters/11-file-integrity.md",        "watched_files": ["app/Services/FileIntegrityService.php", "cron/fim_scan.php"] },
+        { "slug": "12-rate-limit-lockout",    "title": "Login rate limiting & lockout",    "file": "chapters/12-rate-limit-lockout.md",    "watched_files": ["app/Services/LoginRateLimiter.php", "public_html/locked-out/", "public_html/login.php"] }
+      ]
+    },
+    {
+      "key": "finance",
+      "title": "Part 4 — Banking, Payments & Finance",
+      "blurb": "Stripe, money in and out, refunds, invoices.",
+      "chapters": [
+        { "slug": "13-stripe-overview",       "title": "Stripe integration overview",      "file": "chapters/13-stripe-overview.md",       "watched_files": ["app/Services/StripeService.php", "app/Services/StripeSettingsService.php", "app/ThirdParty/stripe-php/", "app/Services/PaymentSettingsService.php"] },
+        { "slug": "14-membership-pricing",    "title": "Membership pricing matrix",        "file": "chapters/14-membership-pricing.md",    "watched_files": ["app/Services/MembershipPricingService.php", "app/Services/MembershipService.php", "public_html/become-a-member/", "public_html/memberships/"] },
+        { "slug": "15-orders-checkout",       "title": "Orders & checkout flow",           "file": "chapters/15-orders-checkout.md",       "watched_files": ["app/Services/OrderService.php", "app/Services/OrderRepository.php", "app/Services/MembershipOrderService.php", "public_html/checkout/", "public_html/order/"] },
+        { "slug": "16-webhooks-idempotency",  "title": "Webhooks & idempotency",           "file": "chapters/16-webhooks-idempotency.md",  "watched_files": ["app/Services/PaymentWebhookService.php", "public_html/api/stripe_webhook.php"] },
+        { "slug": "17-refunds",               "title": "Refunds",                          "file": "chapters/17-refunds.md",               "watched_files": ["app/Services/RefundService.php"] },
+        { "slug": "18-invoices",              "title": "Invoices",                         "file": "chapters/18-invoices.md",              "watched_files": ["app/Services/InvoiceService.php", "app/Services/PdfInvoiceService.php", "app/ThirdParty/fpdf/"] }
+      ]
+    },
+    {
+      "key": "members",
+      "title": "Part 5 — Members & Memberships",
+      "blurb": "The member lifecycle, the admin console, chapters and reps, and how members get notified.",
+      "chapters": [
+        { "slug": "19-membership-lifecycle",  "title": "Membership lifecycle",             "file": "chapters/19-membership-lifecycle.md",  "watched_files": ["app/Services/MembershipService.php", "app/Services/MembershipMigrationService.php", "app/Services/MemberRepository.php", "cron/expire_memberships.php", "cron/send_renewal_reminders.php"] },
+        { "slug": "20-members-admin",         "title": "Members admin console",            "file": "chapters/20-members-admin.md",         "watched_files": ["public_html/admin/members/", "app/Services/AdminMemberAccess.php", "app/Services/MemberRepository.php", "app/Services/VehicleRepository.php"] },
+        { "slug": "21-chapters-area-reps",    "title": "Chapters & area reps",             "file": "chapters/21-chapters-area-reps.md",    "watched_files": ["app/Services/ChapterRepository.php", "app/Services/CommitteeService.php", "app/Services/AdminMemberAccess.php"] },
+        { "slug": "22-notifications-email",   "title": "Notifications & email",            "file": "chapters/22-notifications-email.md",   "watched_files": ["app/Services/NotificationService.php", "app/Services/NotificationPreferenceService.php", "app/Services/EmailService.php", "app/Services/SmtpMailer.php", "app/Services/EmailOtpService.php", "app/Services/EmailPreferencesTokenService.php"] }
+      ]
+    },
+    {
+      "key": "content",
+      "title": "Part 6 — Content",
+      "blurb": "Public pages, navigation, the AI page builder, media, and events.",
+      "chapters": [
+        { "slug": "23-pages-navigation",      "title": "Pages, navigation & menus",        "file": "chapters/23-pages-navigation.md",      "watched_files": ["app/Services/PageService.php", "app/Services/NavigationService.php", "app/Services/PageSchemaService.php", "public_html/admin/pages/", "public_html/admin/navigation.php"] },
+        { "slug": "24-ai-page-builder",       "title": "AI page builder",                  "file": "chapters/24-ai-page-builder.md",       "watched_files": ["app/Services/PageBuilderService.php", "app/Services/AiPageBuilderService.php", "app/Services/AiService.php", "app/Services/AiProviderKeyService.php", "app/Services/AiProviders/", "app/Services/DomSnapshotService.php", "app/Services/UnifiedDiffService.php", "public_html/admin/page-builder/", "public_html/admin/ai_editor.php"] },
+        { "slug": "25-media-library",         "title": "Media library",                    "file": "chapters/25-media-library.md",         "watched_files": ["app/Services/MediaService.php", "public_html/uploads/"] },
+        { "slug": "26-events-rsvps",          "title": "Events & RSVPs",                   "file": "chapters/26-events-rsvps.md",          "watched_files": ["app/Services/EventService.php", "app/Services/EventRsvpRepository.php", "calendar/", "public_html/calendar/"] }
+      ]
+    },
+    {
+      "key": "store",
+      "title": "Part 7 — Store",
+      "blurb": "Products, tickets, discounts, shipping, and bulk imports.",
+      "chapters": [
+        { "slug": "27-store-architecture",    "title": "Store architecture",               "file": "chapters/27-store-architecture.md",    "watched_files": ["database/store_module.sql", "public_html/admin/store/", "public_html/store/"] },
+        { "slug": "28-tickets",               "title": "Tickets (ticket products)",        "file": "chapters/28-tickets.md",               "watched_files": ["app/Services/OrderService.php", "app/Services/PaymentWebhookService.php", "public_html/admin/store/product_form.php"] },
+        { "slug": "29-discounts-shipping",    "title": "Discounts, shipping & fees",       "file": "chapters/29-discounts-shipping.md",    "watched_files": ["public_html/admin/store/discounts.php", "public_html/admin/store/settings.php", "app/Services/OrderService.php"] },
+        { "slug": "30-catalogue-import",      "title": "Bulk catalogue import",            "file": "chapters/30-catalogue-import.md",      "watched_files": ["scripts/import_store_catalogue.php", "scripts/data/"] }
+      ]
+    },
+    {
+      "key": "settings",
+      "title": "Part 8 — Settings Hub",
+      "blurb": "How settings are stored, who can change them, and what each section does.",
+      "chapters": [
+        { "slug": "31-settings-architecture", "title": "Settings architecture",            "file": "chapters/31-settings-architecture.md", "watched_files": ["app/Services/SettingsService.php", "database/settings_hub.sql", "app/Services/AuditService.php"] },
+        { "slug": "32-settings-by-section",   "title": "Settings by section (reference)",  "file": "chapters/32-settings-by-section.md",   "watched_files": ["public_html/admin/settings/", "app/Services/SettingsService.php", "app/Services/PaymentSettingsService.php", "app/Services/StripeSettingsService.php", "app/Services/SecuritySettingsService.php"] }
+      ]
+    },
+    {
+      "key": "operations",
+      "title": "Part 9 — Operations",
+      "blurb": "Deploying, scheduling, troubleshooting, and the tour system that documents the UI.",
+      "chapters": [
+        { "slug": "33-deployment",            "title": "Deployment",                       "file": "chapters/33-deployment.md",            "watched_files": [".cpanel.yml", "DEPLOY.md", "scripts/ftp_upload.py"] },
+        { "slug": "34-cron-jobs",             "title": "Cron jobs",                        "file": "chapters/34-cron-jobs.md",             "watched_files": ["cron/"] },
+        { "slug": "35-logs-troubleshooting",  "title": "Logs & troubleshooting",           "file": "chapters/35-logs-troubleshooting.md",  "watched_files": ["app/Services/LogViewerService.php", "app/storage/logs/"] },
+        { "slug": "36-tours-system",          "title": "Tours system",                     "file": "chapters/36-tours-system.md",          "watched_files": ["app/Services/TourService.php", "config/tour-manifest.json", "public_html/admin/help/", "public_html/assets/js/tours/", "scripts/check_tour_impact.php", "scripts/lint_tours.php"] }
+      ]
+    },
+    {
+      "key": "appendix",
+      "title": "Appendix",
+      "blurb": "Decisions, glossary, and reference material.",
+      "chapters": [
+        { "slug": "A-decision-log",           "title": "A — Decision log",                 "file": "chapters/A-decision-log.md",           "watched_files": [] },
+        { "slug": "B-glossary",               "title": "B — Glossary",                     "file": "chapters/B-glossary.md",               "watched_files": [] }
+      ]
+    }
+  ]
+}
