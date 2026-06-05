@@ -29,6 +29,15 @@ try {
     $pendingRequestsCount = 0;
 }
 
+$tourAttentionCount = 0;
+try {
+    if (class_exists(\App\Services\TourService::class)) {
+        $tourAttentionCount = (int) \App\Services\TourService::attentionCount();
+    }
+} catch (Throwable $e) {
+    $tourAttentionCount = 0;
+}
+
 $items = [
     ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
     ['key' => 'requests', 'label' => 'Notification Hub', 'icon' => 'notifications_active', 'href' => '/admin/requests/', 'permission' => 'admin.requests.view', 'badge' => $pendingRequestsCount],
@@ -61,6 +70,7 @@ $items = [
         ],
     ],
     ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
+    ['key' => 'help-validator', 'label' => 'Tour Validator', 'icon' => 'fact_check', 'href' => '/admin/help/validator.php', 'badge' => $tourAttentionCount],
 ];
 $user = $user ?? current_user();
 if (function_exists('current_admin_can')) {

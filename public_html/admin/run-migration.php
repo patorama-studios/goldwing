@@ -1035,6 +1035,75 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 017 — Tours system tables
+//
+// Adds the three tables used by the Driver.js guided-tour system:
+//   - tour_completions       per-user tour completion (powers the "Done" badge
+//                            on the member help panel)
+//   - tour_test_runs         linter + admin Tour Validator results, used by the
+//                            admin sidebar "Tours need attention" badge and by
+//                            failure-email routing
+//   - tour_file_dependencies optional reverse lookup populated from
+//                            config/tour-manifest.json (currently unused by the
+//                            runtime — the manifest JSON is consulted directly
+//                            — but kept for future SQL-side impact queries)
+//
+// Safe to re-run: every CREATE uses IF NOT EXISTS.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_017_tours_system';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 017 — Tours system tables', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tour_completions (
+              user_id      INT          NOT NULL,
+              tour_slug    VARCHAR(96)  NOT NULL,
+              completed_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (user_id, tour_slug),
+              INDEX idx_tour_completions_slug (tour_slug)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $applied[] = 'tour_completions ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tour_test_runs (
+              id              INT AUTO_INCREMENT PRIMARY KEY,
+              tour_slug       VARCHAR(96)  NOT NULL,
+              run_kind        ENUM('linter','validator','playwright') NOT NULL,
+              run_as_role     VARCHAR(32)  NULL,
+              tested_by       INT          NULL,
+              status          ENUM('pass','fail','partial') NOT NULL,
+              details_json    LONGTEXT     NULL,
+              created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              INDEX idx_tour_test_runs_slug (tour_slug),
+              INDEX idx_tour_test_runs_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $applied[] = 'tour_test_runs ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tour_file_dependencies (
+              tour_slug   VARCHAR(96)  NOT NULL,
+              file_path   VARCHAR(255) NOT NULL,
+              PRIMARY KEY (tour_slug, file_path)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $applied[] = 'tour_file_dependencies ready';
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 017 — Tours system tables', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 017 — Tours system tables', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

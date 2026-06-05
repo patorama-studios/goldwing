@@ -1,3 +1,4 @@
+<?php include __DIR__ . '/help_button.php'; ?>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const toggle = document.querySelector('[data-backend-nav-toggle]');

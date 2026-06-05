@@ -1931,7 +1931,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php endif; ?>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div class="lg:col-span-2 space-y-6">
-                <form method="post" action="/member/index.php?page=profile" class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+                <form data-tour="profile-form" method="post" action="/member/index.php?page=profile" class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
                   <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                   <input type="hidden" name="action" value="update_profile">
                   <input type="hidden" name="profile_member_id" value="<?= e((string) $profileMemberId) ?>">
@@ -1946,20 +1946,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </div>
                     </div>
                     <?php if ($canEditProfile): ?>
-                      <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold shadow-sm hover:bg-primary/90">Save changes</button>
+                      <button data-tour="profile-save" type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold shadow-sm hover:bg-primary/90">Save changes</button>
                     <?php endif; ?>
                   </div>
                   <fieldset class="p-8 space-y-8" <?php if (!$canEditProfile) echo 'disabled'; ?>>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label class="text-sm font-medium text-gray-700">Email</label>
-                          <input type="email" name="email" value="<?= e($profileMember['email']) ?>"
+                          <input data-tour="profile-email" type="email" name="email" value="<?= e($profileMember['email']) ?>"
                             class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20"
                             required>
                         </div>
                         <div>
                           <label class="text-sm font-medium text-gray-700">Phone</label>
-                          <input type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
+                          <input data-tour="profile-phone" type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
                             class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                         </div>
                         <div class="md:col-span-2">
