@@ -92,13 +92,82 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </td>
                 <td class="px-5 py-4 align-top text-right">
-                  <a href="<?= e(gw_tour_append($tour['page_url'] ?? '', 'gw_validate', $slug)) ?>"
-                     target="_blank" rel="noopener"
-                     class="inline-flex items-center px-3 py-2 rounded-lg bg-primary text-gray-900 text-xs font-semibold hover:bg-primary/90">
-                    Test now
-                  </a>
+                  <div class="flex flex-col items-end gap-1">
+                    <a href="<?= e(gw_tour_append($tour['page_url'] ?? '', 'gw_validate', $slug)) ?>"
+                       target="_blank" rel="noopener"
+                       class="inline-flex items-center px-3 py-2 rounded-lg bg-primary text-gray-900 text-xs font-semibold hover:bg-primary/90">
+                      Test now
+                    </a>
+                    <a href="/admin/help/edit.php?slug=<?= urlencode($slug) ?>"
+                       class="text-xs text-secondary hover:underline">Edit wording</a>
+                  </div>
                 </td>
               </tr>
+              <?php $recent = TourService::recentRunsFor($slug, 5); ?>
+              <?php if ($recent): ?>
+                <tr class="bg-gray-50/60">
+                  <td colspan="5" class="px-5 py-3">
+                    <details>
+                      <summary class="cursor-pointer text-xs font-semibold text-gray-700 select-none">
+                        View last <?= count($recent) ?> run<?= count($recent) === 1 ? '' : 's' ?>
+                      </summary>
+                      <div class="mt-3 space-y-3">
+                        <?php foreach ($recent as $run): ?>
+                          <?php
+                            $runStatus = $run['status'];
+                            $runCls = $runStatus === 'pass' ? 'bg-emerald-100 text-emerald-800'
+                                    : ($runStatus === 'fail' ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-amber-100 text-amber-800');
+                            $stepResults = $run['details']['steps'] ?? [];
+                            $failedOrSkipped = array_filter($stepResults, function ($s) {
+                                return ($s['verdict'] ?? 'pass') !== 'pass';
+                            });
+                          ?>
+                          <div class="bg-white rounded-lg border border-gray-200 p-3">
+                            <div class="flex items-center justify-between gap-3 text-xs">
+                              <div class="flex items-center gap-2">
+                                <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold <?= e($runCls) ?>"><?= e(strtoupper($runStatus)) ?></span>
+                                <span class="text-gray-600"><?= e($run['run_kind']) ?></span>
+                                <?php if (!empty($run['run_as_role'])): ?>
+                                  <span class="text-gray-500">as <?= e($run['run_as_role']) ?></span>
+                                <?php endif; ?>
+                              </div>
+                              <span class="text-gray-500"><?= e(date('j M Y g:i a', strtotime((string) $run['created_at']))) ?></span>
+                            </div>
+                            <?php if ($failedOrSkipped): ?>
+                              <ul class="mt-3 space-y-2">
+                                <?php foreach ($failedOrSkipped as $s): ?>
+                                  <li class="text-xs">
+                                    <span class="font-semibold <?= ($s['verdict'] ?? '') === 'fail' ? 'text-rose-700' : 'text-amber-700' ?>">
+                                      Step <?= (int) ($s['step_index'] ?? 0) + 1 ?> · <?= e(strtoupper((string) ($s['verdict'] ?? ''))) ?>:
+                                    </span>
+                                    <span class="text-gray-800"><?= e((string) ($s['title'] ?? '')) ?></span>
+                                    <?php if (!empty($s['element'])): ?>
+                                      <code class="ml-1 text-gray-500"><?= e((string) $s['element']) ?></code>
+                                    <?php endif; ?>
+                                    <?php if (!empty($s['note'])): ?>
+                                      <div class="mt-0.5 ml-2 text-gray-700 italic">"<?= e((string) $s['note']) ?>"</div>
+                                    <?php endif; ?>
+                                  </li>
+                                <?php endforeach; ?>
+                              </ul>
+                            <?php elseif (!empty($run['details']['missing'])): ?>
+                              <ul class="mt-3 text-xs">
+                                <li class="font-semibold text-rose-700">Linter — missing selectors:</li>
+                                <?php foreach ($run['details']['missing'] as $m): ?>
+                                  <li class="ml-3"><code class="text-rose-700"><?= e((string) $m) ?></code></li>
+                                <?php endforeach; ?>
+                              </ul>
+                            <?php elseif (!empty($run['details']['error'])): ?>
+                              <div class="mt-2 text-xs text-rose-700"><?= e((string) $run['details']['error']) ?></div>
+                            <?php endif; ?>
+                          </div>
+                        <?php endforeach; ?>
+                      </div>
+                    </details>
+                  </td>
+                </tr>
+              <?php endif; ?>
             <?php endforeach; ?>
           </tbody>
         </table>

@@ -170,6 +170,100 @@ class TourService
         return $count;
     }
 
+    /**
+     * Load the steps for a tour from the DB.
+     *
+     * @param string $slug
+     * @param bool $includeDrafts when true (admin preview), returns the draft_*
+     *        values overlaid on the published ones for any row with has_draft=1
+     * @return array list of step objects shaped for the JS engine
+     */
+    public static function stepsFor(string $slug, bool $includeDrafts = false): array
+    {
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare(
+                'SELECT step_index, element_selector, title, description, side, align,
+                        draft_title, draft_description, draft_side, draft_align,
+                        draft_element_selector, has_draft
+                   FROM tour_steps
+                  WHERE tour_slug = :slug
+                  ORDER BY step_index ASC'
+            );
+            $stmt->execute(['slug' => $slug]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $out = [];
+            foreach ($rows as $r) {
+                $useDraft = $includeDrafts && (int) ($r['has_draft'] ?? 0) === 1;
+                $title = $useDraft && $r['draft_title'] !== null ? $r['draft_title'] : $r['title'];
+                $desc  = $useDraft && $r['draft_description'] !== null ? $r['draft_description'] : $r['description'];
+                $side  = $useDraft && $r['draft_side'] !== null ? $r['draft_side'] : $r['side'];
+                $align = $useDraft && $r['draft_align'] !== null ? $r['draft_align'] : $r['align'];
+                $sel   = $useDraft && $r['draft_element_selector'] !== null ? $r['draft_element_selector'] : $r['element_selector'];
+                $out[] = [
+                    'element' => $sel,
+                    'popover' => [
+                        'title' => $title,
+                        'description' => $desc,
+                        'side' => $side,
+                        'align' => $align,
+                    ],
+                ];
+            }
+            return $out;
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Admin-side: load step rows with full draft + published columns for the editor UI.
+     * @return array<int, array<string,mixed>>
+     */
+    public static function stepRowsFor(string $slug): array
+    {
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare(
+                'SELECT id, tour_slug, step_index, element_selector, title, description, side, align,
+                        draft_title, draft_description, draft_side, draft_align,
+                        draft_element_selector, has_draft, updated_at, updated_by, published_at
+                   FROM tour_steps
+                  WHERE tour_slug = :slug
+                  ORDER BY step_index ASC'
+            );
+            $stmt->execute(['slug' => $slug]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /** Last N runs for a tour, newest first, decoded details. */
+    public static function recentRunsFor(string $slug, int $limit = 5): array
+    {
+        try {
+            $pdo = db();
+            $limit = max(1, min(50, $limit));
+            $stmt = $pdo->prepare(
+                "SELECT id, run_kind, run_as_role, tested_by, status, details_json, created_at
+                   FROM tour_test_runs
+                  WHERE tour_slug = :slug
+                  ORDER BY id DESC
+                  LIMIT $limit"
+            );
+            $stmt->execute(['slug' => $slug]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$r) {
+                $r['details'] = $r['details_json'] ? json_decode($r['details_json'], true) : null;
+                unset($r['details_json']);
+            }
+            return $rows;
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
     public static function recordRun(
         string $slug,
         string $kind,           // 'linter' | 'validator' | 'playwright'

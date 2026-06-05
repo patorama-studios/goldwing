@@ -64,26 +64,37 @@
     return cfg;
   }
 
-  /** Resolve a tour either from in-memory registration or the manifest's steps_file. */
-  function ensureLoaded(slug, cb) {
-    if (registered[slug]) {
+  /** Resolve a tour. Source of truth is the DB via /admin/help/api_steps.php.
+   *  In-memory register() entries (legacy JS step files) are still respected
+   *  as a fallback so locally-registered tours can override DB content while
+   *  authoring.
+   *  @param opts.preview when true, ask the API for draft-overlaid steps. */
+  function ensureLoaded(slug, opts, cb) {
+    if (typeof opts === 'function') { cb = opts; opts = {}; }
+    opts = opts || {};
+    if (!opts.preview && registered[slug]) {
       cb(null, registered[slug]);
       return;
     }
     var entry = GT.manifest.tours && GT.manifest.tours[slug];
-    if (!entry || !entry.steps_file) {
-      cb(new Error('Tour not found: ' + slug));
+    if (!entry) {
+      cb(new Error('Tour not in manifest: ' + slug));
       return;
     }
-    var script = document.createElement('script');
-    script.src = entry.steps_file;
-    script.async = true;
-    script.onload = function () {
-      if (registered[slug]) cb(null, registered[slug]);
-      else cb(new Error('Tour script loaded but did not register: ' + slug));
-    };
-    script.onerror = function () { cb(new Error('Could not load ' + entry.steps_file)); };
-    document.head.appendChild(script);
+    var url = '/admin/help/api_steps.php?slug=' + encodeURIComponent(slug) +
+              (opts.preview ? '&preview=1' : '');
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.steps) || data.steps.length === 0) {
+          throw new Error('No steps returned for ' + slug);
+        }
+        cb(null, { steps: data.steps });
+      })
+      .catch(function (err) { cb(err); });
   }
 
   /** Record completion server-side (best-effort, never blocks). */
@@ -101,7 +112,7 @@
 
   GT.run = function (slug, opts) {
     opts = opts || {};
-    ensureLoaded(slug, function (err, tour) {
+    ensureLoaded(slug, { preview: !!opts.preview }, function (err, tour) {
       if (err) { console.warn('[GoldwingTours]', err.message); return; }
       GT.currentSlug = slug;
       var cfg = baseConfig({
@@ -136,7 +147,7 @@
    * Results are POSTed to /admin/help/api_validator.php at the end.
    */
   GT.runInValidator = function (slug, runAsRole) {
-    ensureLoaded(slug, function (err, tour) {
+    ensureLoaded(slug, {}, function (err, tour) {
       if (err) { alert('Could not load tour: ' + err.message); return; }
       GT.currentSlug = slug;
 

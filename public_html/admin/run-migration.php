@@ -1104,6 +1104,96 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 018 — Tour steps table (Option A: wording editor)
+//
+// Moves Driver.js tour step CONTENT (title, description, popover side/align)
+// out of JS files and into the database so admins can edit tour wording from
+// /admin/help/edit.php without a code deploy.
+//
+// The manifest (config/tour-manifest.json) still owns structural metadata —
+// slug, audience, page_url, page_match, selectors — because changing those
+// usually requires editing the target page too.
+//
+// Schema notes:
+//   - step_index orders steps (0-based)
+//   - draft_* columns hold pending edits; admin clicks "Publish" to copy them
+//     into the live title/description/side/align
+//   - has_draft is a quick flag so the editor can show "unsaved changes"
+//   - updated_by + activity_log tracking ties edits back to a user
+//
+// Seeds the existing member-update-contact tour from its current JS file so
+// the tour keeps working immediately after the engine refactor.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_018_tour_steps';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 018 — Tour steps table', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS tour_steps (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              tour_slug VARCHAR(96) NOT NULL,
+              step_index INT NOT NULL,
+              element_selector VARCHAR(255) NOT NULL,
+              title VARCHAR(255) NOT NULL,
+              description TEXT NOT NULL,
+              side VARCHAR(16) NOT NULL DEFAULT 'bottom',
+              align VARCHAR(16) NOT NULL DEFAULT 'start',
+              draft_title VARCHAR(255) NULL,
+              draft_description TEXT NULL,
+              draft_side VARCHAR(16) NULL,
+              draft_align VARCHAR(16) NULL,
+              draft_element_selector VARCHAR(255) NULL,
+              has_draft TINYINT(1) NOT NULL DEFAULT 0,
+              updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              updated_by INT NULL,
+              published_at DATETIME NULL,
+              UNIQUE KEY uniq_slug_index (tour_slug, step_index),
+              INDEX idx_slug (tour_slug)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $applied[] = 'tour_steps ready';
+
+        // Seed member-update-contact (existing tour) so it keeps working.
+        $seedStmt = $pdo->prepare(
+            "INSERT IGNORE INTO tour_steps
+                (tour_slug, step_index, element_selector, title, description, side, align, published_at)
+             VALUES
+                (:slug, :idx, :sel, :title, :desc, :side, :align, NOW())"
+        );
+        $memberContactSteps = [
+            [0, '[data-tour=\"profile-form\"]', 'Updating your details', "We'll walk through changing your email or phone number. Click <strong>Next</strong> when you're ready.", 'top', 'start'],
+            [1, '[data-tour=\"profile-email\"]', 'Your email address', "This is where the club sends your magazine and notices. Click in the box and type your new email if you'd like to change it.", 'bottom', 'start'],
+            [2, '[data-tour=\"profile-phone\"]', 'Your phone number', "Click in the box and type your new phone number. Don't worry about spaces — type it any way you like.", 'bottom', 'start'],
+            [3, '[data-tour=\"profile-save\"]', 'Save your changes', "When you're happy, click the gold <strong>Save changes</strong> button. You'll see a green message at the top to confirm it worked.<br><br><strong>That's it — you did it!</strong>", 'left', 'start'],
+        ];
+        foreach ($memberContactSteps as $row) {
+            [$idx, $sel, $title, $desc, $side, $align] = $row;
+            $seedStmt->execute([
+                'slug'  => 'member-update-contact',
+                'idx'   => $idx,
+                'sel'   => $sel,
+                'title' => $title,
+                'desc'  => $desc,
+                'side'  => $side,
+                'align' => $align,
+            ]);
+        }
+        $applied[] = 'member-update-contact seeded (4 steps)';
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 018 — Tour steps table', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 018 — Tour steps table', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
