@@ -14,6 +14,13 @@ $staleAfter = TourService::STALE_AFTER_DAYS;
 $now      = time();
 $attention = TourService::attentionCount();
 
+/** Append ?key=value (or &key=value) to a URL that may already have a query string. */
+function gw_tour_append(string $url, string $key, string $value): string {
+    if ($url === '') { return '#'; }
+    $sep = (strpos($url, '?') !== false) ? '&' : '?';
+    return $url . $sep . rawurlencode($key) . '=' . rawurlencode($value);
+}
+
 function gw_tour_status_label(array $tours, array $latest, int $now, int $staleAfter, string $slug): array {
     $run = $latest[$slug] ?? null;
     if (!$run) {
@@ -85,7 +92,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </td>
                 <td class="px-5 py-4 align-top text-right">
-                  <a href="<?= e($tour['page_url'] ?? '#') ?>?gw_validate=<?= urlencode($slug) ?>"
+                  <a href="<?= e(gw_tour_append($tour['page_url'] ?? '', 'gw_validate', $slug)) ?>"
                      target="_blank" rel="noopener"
                      class="inline-flex items-center px-3 py-2 rounded-lg bg-primary text-gray-900 text-xs font-semibold hover:bg-primary/90">
                     Test now

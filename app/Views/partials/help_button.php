@@ -46,18 +46,44 @@ $gwHelpCsrf = Csrf::token();
 </script>
 <script src="/assets/js/tours/help-button.js" defer></script>
 <?php
-// Auto-launch validator mode if an admin opens a page with ?gw_validate=<slug>.
+// Auto-launch when a member follows a ?gw_tour=<slug> link from the Help panel
+// or an admin opens a ?gw_validate=<slug> link from the Tour Validator page.
+$gwTourSlug     = isset($_GET['gw_tour']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string) $_GET['gw_tour']) : '';
 $gwValidateSlug = isset($_GET['gw_validate']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string) $_GET['gw_validate']) : '';
-$gwValidateAllowed = $gwValidateSlug !== '' && (in_array('admin', $gwHelpUser['roles'] ?? [], true) || in_array('webmaster', $gwHelpUser['roles'] ?? [], true));
+$gwIsAdmin = in_array('admin', $gwHelpUser['roles'] ?? [], true)
+          || in_array('webmaster', $gwHelpUser['roles'] ?? [], true);
+$gwValidateAllowed = $gwValidateSlug !== '' && $gwIsAdmin;
+$gwTourAllowed     = $gwTourSlug !== '';
 ?>
-<?php if ($gwValidateAllowed): ?>
+<?php if ($gwTourAllowed || $gwValidateAllowed): ?>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // Strip the query param immediately so reloads don't re-launch.
+    try {
+      if (window.history && window.history.replaceState) {
+        var u = new URL(window.location.href);
+        u.searchParams.delete('gw_tour');
+        u.searchParams.delete('gw_validate');
+        window.history.replaceState({}, document.title, u.pathname + (u.search ? u.search : '') + u.hash);
+      }
+    } catch (e) { /* old browsers — fine to skip */ }
+
     var tries = 0;
     var iv = setInterval(function () {
-      if (window.GoldwingTours && window.GoldwingTours.runInValidator) {
+      var gt = window.GoldwingTours;
+      if (gt && gt.manifest && (gt.run || gt.runInValidator)) {
         clearInterval(iv);
-        window.GoldwingTours.runInValidator(<?= json_encode($gwValidateSlug) ?>, null);
+        <?php if ($gwValidateAllowed): ?>
+        if (typeof gt.runInValidator === 'function') {
+          gt.runInValidator(<?= json_encode($gwValidateSlug) ?>, null);
+          return;
+        }
+        <?php endif; ?>
+        <?php if ($gwTourAllowed): ?>
+        if (typeof gt.run === 'function') {
+          gt.run(<?= json_encode($gwTourSlug) ?>);
+        }
+        <?php endif; ?>
       } else if (++tries > 40) {
         clearInterval(iv);
       }

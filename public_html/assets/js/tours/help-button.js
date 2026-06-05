@@ -71,7 +71,18 @@
       panel.querySelectorAll('button[data-tour-slug]').forEach(function (b) {
         b.addEventListener('click', function () {
           var slug = b.getAttribute('data-tour-slug');
+          var tour = manifest[slug];
           closePanel();
+          if (!tour) return;
+
+          // Are we already on the tour's target page?
+          var pageMatch = tour.page_match || '';
+          var onTargetPage = pageMatch === '' || currentUrl.indexOf(pageMatch) !== -1;
+          if (!onTargetPage && tour.page_url) {
+            var sep = tour.page_url.indexOf('?') !== -1 ? '&' : '?';
+            window.location.href = tour.page_url + sep + 'gw_tour=' + encodeURIComponent(slug);
+            return;
+          }
           window.GoldwingTours.run(slug, {
             onComplete: function () {
               completions[slug] = true;
