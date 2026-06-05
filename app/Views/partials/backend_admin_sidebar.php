@@ -132,70 +132,124 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
       </div>
     </div>
   </div>
-  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-    <?php $lastGroup = null; foreach ($items as $item): ?>
-      <?php
-        $itemGroup = $item['group'] ?? '';
-        if ($itemGroup !== $lastGroup):
-          $isFirstGroup = $lastGroup === null;
-      ?>
-        <div class="px-3 <?= $isFirstGroup ? 'pt-1 pb-2' : 'pt-4 pb-2 mt-2 border-t border-gray-100' ?> text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-          <?= e($itemGroup) ?>
-        </div>
-        <?php $lastGroup = $itemGroup; endif; ?>
-      <?php if (!empty($item['children'])): ?>
-        <?php
-          $isDropdownActive = false;
-          if ($currentPath) {
-              foreach ($item['children'] as $child) {
-                  if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
-                      $isDropdownActive = true;
-                      break;
-                  }
+  <?php
+    $groups = [];
+    foreach ($items as $item) {
+      $groups[$item['group'] ?? 'Other'][] = $item;
+    }
+    $activeGroup = null;
+    foreach ($items as $item) {
+      $matches = false;
+      if (($item['key'] ?? null) === $activePage) {
+          $matches = true;
+      } elseif ($item['key'] === 'settings' && $isSettingsActive) {
+          $matches = true;
+      } elseif (!empty($item['children']) && $currentPath) {
+          foreach ($item['children'] as $child) {
+              if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                  $matches = true;
+                  break;
               }
           }
-        ?>
-        <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
-          <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
-            <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-            <span class="flex-1"><?= e($item['label']) ?></span>
-            <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
-          </summary>
-          <div class="mt-1 space-y-0.5 pl-11 pr-2 pb-2">
-            <?php foreach ($item['children'] as $child): ?>
+      }
+      if ($matches) {
+          $activeGroup = $item['group'] ?? null;
+          break;
+      }
+    }
+  ?>
+  <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-0.5" data-sidebar-nav="admin">
+    <?php $isFirstGroup = true; foreach ($groups as $groupName => $groupItems): ?>
+      <?php $isActiveGroup = $groupName === $activeGroup; ?>
+      <details class="sidebar-cat" data-sidebar-group="<?= e($groupName) ?>" data-active-group="<?= $isActiveGroup ? '1' : '0' ?>" <?= $isActiveGroup ? 'open' : '' ?>>
+        <summary class="flex items-center justify-between cursor-pointer list-none px-3 <?= $isFirstGroup ? 'pt-1' : 'pt-4 mt-2 border-t border-gray-100' ?> pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors">
+          <span><?= e($groupName) ?></span>
+          <span class="material-icons-outlined text-sm sidebar-cat-chevron transition-transform">expand_more</span>
+        </summary>
+        <div class="space-y-0.5 pb-1">
+          <?php foreach ($groupItems as $item): ?>
+            <?php if (!empty($item['children'])): ?>
               <?php
-                $isChildActive = false;
-                if ($activePage === $child['key']) {
-                    $isChildActive = true;
-                }
-                if (!$isChildActive && $currentPath && !empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
-                    $isChildActive = true;
+                $isDropdownActive = false;
+                if ($currentPath) {
+                    foreach ($item['children'] as $child) {
+                        if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                            $isDropdownActive = true;
+                            break;
+                        }
+                    }
                 }
               ?>
-              <a class="block rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($child['href']) ?>">
-                <?= e($child['label']) ?>
+              <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
+                <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
+                  <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
+                  <span class="flex-1"><?= e($item['label']) ?></span>
+                  <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+                </summary>
+                <div class="mt-1 space-y-0.5 pl-11 pr-2 pb-2">
+                  <?php foreach ($item['children'] as $child): ?>
+                    <?php
+                      $isChildActive = false;
+                      if ($activePage === $child['key']) {
+                          $isChildActive = true;
+                      }
+                      if (!$isChildActive && $currentPath && !empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                          $isChildActive = true;
+                      }
+                    ?>
+                    <a class="block rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($child['href']) ?>">
+                      <?= e($child['label']) ?>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php else: ?>
+              <?php
+                $isActive = $activePage === $item['key'];
+                if ($item['key'] === 'settings' && $isSettingsActive) {
+                    $isActive = true;
+                }
+                $badge = (int) ($item['badge'] ?? 0);
+              ?>
+              <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
+                <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
+                <span class="flex-1"><?= e($item['label']) ?></span>
+                <?php if ($badge > 0): ?>
+                  <span class="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold"><?= $badge ?></span>
+                <?php endif; ?>
               </a>
-            <?php endforeach; ?>
-          </div>
-        </details>
-      <?php else: ?>
-        <?php
-          $isActive = $activePage === $item['key'];
-          if ($item['key'] === 'settings' && $isSettingsActive) {
-              $isActive = true;
-          }
-          $badge = (int) ($item['badge'] ?? 0);
-        ?>
-        <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
-          <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-          <span class="flex-1"><?= e($item['label']) ?></span>
-          <?php if ($badge > 0): ?>
-            <span class="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold"><?= $badge ?></span>
-          <?php endif; ?>
-        </a>
-      <?php endif; ?>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+      </details>
+      <?php $isFirstGroup = false; ?>
     <?php endforeach; ?>
   </nav>
+  <style>
+    details[data-sidebar-group] > summary::-webkit-details-marker { display: none; }
+    details[data-sidebar-group] > summary { list-style: none; }
+    details[data-sidebar-group][open] > summary .sidebar-cat-chevron { transform: rotate(180deg); }
+  </style>
+  <script>
+  (function() {
+    try {
+      var storageKey = 'gw:sidebar:admin:v1';
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (e) { saved = {}; }
+      var groups = document.querySelectorAll('[data-sidebar-nav="admin"] details[data-sidebar-group]');
+      groups.forEach(function(d) {
+        var name = d.dataset.sidebarGroup;
+        var isActive = d.dataset.activeGroup === '1';
+        if (saved[name] === 'open') d.setAttribute('open', '');
+        else if (saved[name] === 'closed' && !isActive) d.removeAttribute('open');
+        d.addEventListener('toggle', function() {
+          saved[name] = d.open ? 'open' : 'closed';
+          try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (e) {}
+        });
+      });
+    } catch (e) {}
+  })();
+  </script>
   <div class="p-4 border-t border-gray-100">
     <div class="flex items-center gap-3 px-4 py-3">
       <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-gray-900 font-bold text-xs">

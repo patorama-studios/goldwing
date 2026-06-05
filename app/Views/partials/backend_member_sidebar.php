@@ -111,49 +111,90 @@ if (!empty($member)) {
       </div>
     </div>
   </div>
-  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-    <?php $lastGroup = null; foreach ($items as $item): ?>
-      <?php
-        $itemGroup = $item['group'] ?? '';
-        if ($itemGroup !== $lastGroup):
-          $isFirstGroup = $lastGroup === null;
-      ?>
-        <div class="px-3 <?= $isFirstGroup ? 'pt-1 pb-2' : 'pt-4 pb-2 mt-2 border-t border-gray-100' ?> text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-          <?= e($itemGroup) ?>
-        </div>
-        <?php $lastGroup = $itemGroup; endif; ?>
-      <?php if (!empty($item['children'])): ?>
-        <?php $isActive = $activePage === $item['key']; ?>
-        <details class="group" <?= $isActive ? 'open' : '' ?>>
-          <summary
-            class="flex items-center justify-between gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
-            <span class="flex items-center gap-3">
-              <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-              <?= e($item['label']) ?>
-            </span>
-            <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
-          </summary>
-          <div class="ml-10 mt-1 space-y-0.5">
-            <?php foreach ($item['children'] as $child): ?>
-              <?php $isChildActive = $activeSubPage === $child['key']; ?>
-              <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
-                href="<?= e($child['href']) ?>">
-                <span class="material-icons-outlined text-base">chevron_right</span>
-                <?= e($child['label']) ?>
+  <?php
+    $groups = [];
+    foreach ($items as $item) {
+      $groups[$item['group'] ?? 'Other'][] = $item;
+    }
+    $activeGroup = null;
+    foreach ($items as $item) {
+      if (($item['key'] ?? null) === $activePage) {
+        $activeGroup = $item['group'] ?? null;
+        break;
+      }
+    }
+  ?>
+  <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-0.5" data-sidebar-nav="member">
+    <?php $isFirstGroup = true; foreach ($groups as $groupName => $groupItems): ?>
+      <?php $isActiveGroup = $groupName === $activeGroup; ?>
+      <details class="sidebar-cat" data-sidebar-group="<?= e($groupName) ?>" data-active-group="<?= $isActiveGroup ? '1' : '0' ?>" <?= $isActiveGroup ? 'open' : '' ?>>
+        <summary class="flex items-center justify-between cursor-pointer list-none px-3 <?= $isFirstGroup ? 'pt-1' : 'pt-4 mt-2 border-t border-gray-100' ?> pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors">
+          <span><?= e($groupName) ?></span>
+          <span class="material-icons-outlined text-sm sidebar-cat-chevron transition-transform">expand_more</span>
+        </summary>
+        <div class="space-y-0.5 pb-1">
+          <?php foreach ($groupItems as $item): ?>
+            <?php if (!empty($item['children'])): ?>
+              <?php $isActive = $activePage === $item['key']; ?>
+              <details class="group" <?= $isActive ? 'open' : '' ?>>
+                <summary
+                  class="flex items-center justify-between gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
+                  <span class="flex items-center gap-3">
+                    <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
+                    <?= e($item['label']) ?>
+                  </span>
+                  <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+                </summary>
+                <div class="ml-10 mt-1 space-y-0.5">
+                  <?php foreach ($item['children'] as $child): ?>
+                    <?php $isChildActive = $activeSubPage === $child['key']; ?>
+                    <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
+                      href="<?= e($child['href']) ?>">
+                      <span class="material-icons-outlined text-base">chevron_right</span>
+                      <?= e($child['label']) ?>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php else: ?>
+              <?php $isActive = $activePage === $item['key']; ?>
+              <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>"
+                href="<?= e($item['href']) ?>">
+                <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
+                <?= e($item['label']) ?>
               </a>
-            <?php endforeach; ?>
-          </div>
-        </details>
-      <?php else: ?>
-        <?php $isActive = $activePage === $item['key']; ?>
-        <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>"
-          href="<?= e($item['href']) ?>">
-          <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-          <?= e($item['label']) ?>
-        </a>
-      <?php endif; ?>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+      </details>
+      <?php $isFirstGroup = false; ?>
     <?php endforeach; ?>
   </nav>
+  <style>
+    details[data-sidebar-group] > summary::-webkit-details-marker { display: none; }
+    details[data-sidebar-group] > summary { list-style: none; }
+    details[data-sidebar-group][open] > summary .sidebar-cat-chevron { transform: rotate(180deg); }
+  </style>
+  <script>
+  (function() {
+    try {
+      var storageKey = 'gw:sidebar:member:v1';
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (e) { saved = {}; }
+      var groups = document.querySelectorAll('[data-sidebar-nav="member"] details[data-sidebar-group]');
+      groups.forEach(function(d) {
+        var name = d.dataset.sidebarGroup;
+        var isActive = d.dataset.activeGroup === '1';
+        if (saved[name] === 'open') d.setAttribute('open', '');
+        else if (saved[name] === 'closed' && !isActive) d.removeAttribute('open');
+        d.addEventListener('toggle', function() {
+          saved[name] = d.open ? 'open' : 'closed';
+          try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (e) {}
+        });
+      });
+    } catch (e) {}
+  })();
+  </script>
   <div class="p-4 border-t border-gray-100">
     <div class="flex items-center gap-3 px-4 py-3">
       <?php if (!empty($avatarUrl)): ?>
