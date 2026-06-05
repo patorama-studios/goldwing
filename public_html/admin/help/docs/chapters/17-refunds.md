@@ -29,7 +29,12 @@ If you're none of these, you won't see the refund button. Ask an admin to change
 There are two places, depending on what you're looking at:
 
 1. **From an order** — Admin → Store → Orders → click the order number → scroll to the **Refunds** panel.
+
+    {{link:/admin/store/orders|Take me to Store Orders}}
+
 2. **From a member's profile** — Admin → Members → click the member → **Orders** tab → click the order → **Refund** button.
+
+    {{link:/admin/members/|Take me to Members}}
 
 Both routes do exactly the same thing.
 

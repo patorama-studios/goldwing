@@ -55,6 +55,8 @@ If a member is missing from the public committee or chapter rep page despite hav
 
 ### How to add a new chapter
 
+{{link:/admin/settings/index.php?section=membership_pricing|Take me to Membership & Pricing}}
+
 Admins only. You'll do this rarely — usually only when the national committee formally creates a new chapter.
 
 1. Admin → Settings → **Membership & Pricing**.

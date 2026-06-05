@@ -35,6 +35,9 @@ The public calendar (what members see) lives at `/calendar/` on the site.
 
 ### How to create an event (step by step)
 
+{{tour:admin-create-event}}
+{{tour:admin-manage-events}}
+
 1. Admin sidebar → **Calendar** → **Create Event**.
 2. Fill in the basics:
     - **Title** — short and clear ("Sunday Breakfast Ride — Bulli Tops", not just "Ride").

@@ -230,4 +230,51 @@
   };
 
   window.GoldwingTours = GT;
+
+  // URL autostart — if the page was loaded with ?tour=<slug>, run that tour
+  // automatically once the manifest + Driver.js are ready. Used by the
+  // System Documentation's "Walk me through this" buttons to drop the user
+  // straight onto the right page with the tour already running.
+  //
+  // The deep-link form is: /admin/<page>?tour=<slug>  (the page_url for the
+  // tour, with an extra ?tour=… that this hook picks up). The hook tolerates
+  // both `?tour=…` and `&tour=…` and is a no-op when the slug isn't in the
+  // manifest or doesn't match the current page.
+  function tryAutostart() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var slug = params.get('tour');
+      if (!slug) return;
+      // Strip the param so refreshing or sharing the URL doesn't keep
+      // re-triggering the tour every time.
+      params.delete('tour');
+      var newSearch = params.toString();
+      var clean = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+      try { window.history.replaceState(null, '', clean); } catch (e) {}
+
+      var entry = GT.manifest.tours && GT.manifest.tours[slug];
+      if (!entry) {
+        console.warn('[GoldwingTours] Autostart: tour not in manifest:', slug);
+        return;
+      }
+      // Quick guard — only run if the tour's page_match (or page_url) loosely
+      // matches the current page, so a stale link doesn't fire a tour on the
+      // wrong page.
+      var match = entry.page_match || entry.page_url || '';
+      if (match && window.location.href.indexOf(match) === -1) {
+        console.warn('[GoldwingTours] Autostart: tour', slug, 'does not match current page; refusing to run.');
+        return;
+      }
+      // Wait a beat for the page to settle (layout, fonts, sidebar) so
+      // Driver.js can locate elements reliably.
+      setTimeout(function () { GT.run(slug); }, 250);
+    } catch (e) {
+      console.warn('[GoldwingTours] Autostart error:', e);
+    }
+  }
+  if (document.readyState === 'complete') {
+    tryAutostart();
+  } else {
+    window.addEventListener('load', tryAutostart);
+  }
 })();

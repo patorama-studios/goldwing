@@ -47,6 +47,8 @@ If you can't see the buttons you expect, ask the site admin to check your role i
 
 ### How to approve an application (step by step)
 
+{{tour:admin-approve-application}}
+
 1. Go to **Admin → Applications**. New ones show in the **Pending** tab.
 2. Click the applicant's name to open the full application. You'll see their address, vehicles, requested chapter, magazine preference, and any associate (e.g. spouse) sub-application.
 3. Check the basics:

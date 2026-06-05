@@ -40,6 +40,8 @@ All three routes show the same data — pick whichever matches what you already 
 
 ### How to look up an order
 
+{{tour:admin-process-order}}
+
 - **You have the order number** (looks like `M-2026-000482` for memberships or a similar code for store orders) — type it into the search box on Admin → Store → Orders.
 - **You have the member's name** — go to Admin → Members, find them, open the Orders tab.
 - **You have the customer's email** — the search box on Admin → Store → Orders accepts emails too.

@@ -34,6 +34,10 @@ If you can't see Store in the admin sidebar, you don't have one of these roles. 
 
 Everything sits under **Admin → Store** in the sidebar:
 
+{{link:/admin/store/orders|Take me to Orders}}
+{{link:/admin/store/products|Take me to Products}}
+{{tour:admin-add-product}}
+
 - **Orders** — the queue of orders to process.
 - **Products** — the catalogue editor.
 - **Categories** — group products ("Apparel", "Manuals", "Patches").

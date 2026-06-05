@@ -44,6 +44,8 @@ Three different places, depending on what you're doing:
 
 ### How to enrol yourself in 2FA (step by step)
 
+{{tour:member-2fa}}
+
 1. Install an authenticator app on your phone if you don't have one (Google Authenticator and Authy are both free).
 2. Go to **Profile → Two-factor authentication**.
 3. Click **Enable 2FA**. You'll see a QR code and a row of letters/numbers (the same secret, in two formats).

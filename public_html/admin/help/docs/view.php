@@ -248,8 +248,67 @@ function gw_md_split_row(string $line): array
     return array_map(fn($s) => trim($s), $parts);
 }
 
+/**
+ * Load the tour manifest once and cache it for shortcode lookups.
+ * Returns a slug -> entry map, or an empty array if the manifest is missing.
+ */
+function gw_docs_tour_manifest(): array
+{
+    static $tours = null;
+    if ($tours !== null) return $tours;
+    $path = __DIR__ . '/../../../../config/tour-manifest.json';
+    if (!is_file($path)) { $tours = []; return $tours; }
+    $data = json_decode((string) file_get_contents($path), true);
+    $tours = is_array($data) && isset($data['tours']) && is_array($data['tours']) ? $data['tours'] : [];
+    return $tours;
+}
+
 function gw_md_inline(string $s): string
 {
+    // Resolve action shortcodes BEFORE htmlspecialchars so the generated
+    // HTML survives the escaping pass. We slot a placeholder while we work
+    // and substitute the real HTML at the end.
+    $placeholders = [];
+    // {{tour:tour-slug}} — renders a "Walk me through this" button that
+    // opens the tour's page with ?tour=slug; the tour engine autostarts.
+    $s = preg_replace_callback('/\{\{tour:([a-z0-9_-]+)\}\}/i', function ($m) use (&$placeholders) {
+        $slug = $m[1];
+        $tours = gw_docs_tour_manifest();
+        if (!isset($tours[$slug])) {
+            $html = '<span class="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-0.5">⚠ tour not in manifest: ' . htmlspecialchars($slug, ENT_QUOTES) . '</span>';
+        } else {
+            $entry = $tours[$slug];
+            $pageUrl = (string) ($entry['page_url'] ?? '/');
+            $sep = (strpos($pageUrl, '?') === false) ? '?' : '&';
+            $href = $pageUrl . $sep . 'tour=' . urlencode($slug);
+            $label = htmlspecialchars((string) ($entry['name'] ?? $slug), ENT_QUOTES);
+            $html = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
+                  . 'class="not-prose inline-flex items-center gap-1.5 my-1 px-3 py-1.5 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-emerald-700 shadow-sm transition" '
+                  . 'data-tour-launch="' . htmlspecialchars($slug, ENT_QUOTES) . '">'
+                  . '<span class="material-icons-outlined text-base">play_circle</span>'
+                  . '<span>Walk me through: ' . $label . '</span>'
+                  . '</a>';
+        }
+        $key = '@@SHORTCODE_' . count($placeholders) . '@@';
+        $placeholders[$key] = $html;
+        return $key;
+    }, $s);
+    // {{link:url|label}} — renders a styled deep-link button. Use when there's
+    // no tour for the action but you want to give admins a single-click way
+    // to land on the right admin page.
+    $s = preg_replace_callback('/\{\{link:([^|}]+)\|([^}]+)\}\}/', function ($m) use (&$placeholders) {
+        $url = trim($m[1]);
+        $label = htmlspecialchars(trim($m[2]), ENT_QUOTES);
+        $html = '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
+              . 'class="not-prose inline-flex items-center gap-1.5 my-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 transition">'
+              . '<span class="material-icons-outlined text-base">launch</span>'
+              . '<span>' . $label . '</span>'
+              . '</a>';
+        $key = '@@SHORTCODE_' . count($placeholders) . '@@';
+        $placeholders[$key] = $html;
+        return $key;
+    }, $s);
+
     // Escape HTML first so generated <strong>/<em>/<a>/<img> tags survive.
     $s = htmlspecialchars($s, ENT_QUOTES);
     // Images ![alt](src) — must run BEFORE links
@@ -277,6 +336,10 @@ function gw_md_inline(string $s): string
     $s = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $s);
     // Italic *..*  (non-greedy, avoid eating ** by requiring non-* on each side)
     $s = preg_replace('/(?<!\*)\*([^*\n]+)\*(?!\*)/', '<em>$1</em>', $s);
+    // Restore action shortcodes from the placeholders captured at the top.
+    if (!empty($placeholders)) {
+        $s = strtr($s, $placeholders);
+    }
     return $s;
 }
 
