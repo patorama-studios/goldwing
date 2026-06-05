@@ -1,24 +1,16 @@
 <?php
-$settingsChildren = [
-    ['key' => 'settings-hub', 'label' => 'Settings Hub', 'href' => '/admin/settings/index.php', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-site', 'label' => 'Site Settings', 'href' => '/admin/settings/index.php?section=site', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-store', 'label' => 'Store Settings', 'href' => '/admin/settings/index.php?section=store', 'path' => '/admin/settings/index.php', 'permission' => 'admin.store.view'],
-    ['key' => 'settings-payments', 'label' => 'Payments (Stripe)', 'href' => '/admin/settings/index.php?section=payments', 'path' => '/admin/settings/index.php', 'permission' => 'admin.payments.view'],
-    ['key' => 'settings-notifications', 'label' => 'Notifications', 'href' => '/admin/settings/index.php?section=notifications', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-accounts', 'label' => 'Accounts & Roles', 'href' => '/admin/settings/index.php?section=accounts', 'path' => '/admin/settings/index.php', 'permission' => 'admin.users.view'],
-    ['key' => 'settings-security', 'label' => 'Security & Authentication', 'href' => '/admin/settings/index.php?section=security', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-integrations', 'label' => 'Integrations', 'href' => '/admin/settings/index.php?section=integrations', 'path' => '/admin/settings/index.php', 'permission' => 'admin.integrations.manage'],
-    ['key' => 'settings-media', 'label' => 'Media & Files', 'href' => '/admin/settings/index.php?section=media', 'path' => '/admin/settings/index.php', 'permission' => 'admin.media_library.manage'],
-    ['key' => 'settings-events', 'label' => 'Events', 'href' => '/admin/settings/index.php?section=events', 'path' => '/admin/settings/index.php', 'permission' => 'admin.events.manage'],
-    ['key' => 'settings-ai', 'label' => 'AI Settings', 'href' => '/admin/settings/ai.php', 'path' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-membership', 'label' => 'Membership Settings', 'href' => '/admin/settings/index.php?section=membership_pricing', 'path' => '/admin/settings/index.php', 'permission' => 'admin.membership_types.manage'],
-    ['key' => 'settings-audit-log', 'label' => 'Audit Log', 'href' => '/admin/settings/index.php?section=audit', 'path' => '/admin/settings/index.php', 'permission' => 'admin.logs.view'],
-    ['key' => 'settings-advanced', 'label' => 'Advanced / Developer', 'href' => '/admin/settings/index.php?section=advanced', 'path' => '/admin/settings/index.php', 'permission' => 'admin.settings.general.manage'],
-    ['key' => 'settings-roles', 'label' => 'Admin Role Builder', 'href' => '/admin/settings/roles.php', 'path' => '/admin/settings/roles.php', 'permission' => 'admin.roles.view'],
-    ['key' => 'settings-access-control', 'label' => 'Access Control', 'href' => '/admin/settings/access-control.php', 'path' => '/admin/settings/access-control.php', 'permission' => 'admin.roles.manage'],
-    ['key' => 'security-log', 'label' => 'Security Log', 'href' => '/admin/security/activity_log.php', 'path' => '/admin/security/activity_log.php', 'permission' => 'admin.logs.view'],
-    ['key' => 'reports', 'label' => 'Reports', 'href' => '/admin/index.php?page=reports', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
-    ['key' => 'audit', 'label' => 'Audit', 'href' => '/admin/index.php?page=audit', 'path' => '/admin/index.php', 'permission' => 'admin.logs.view'],
+$settingsPermissions = [
+    'admin.settings.general.manage',
+    'admin.store.view',
+    'admin.payments.view',
+    'admin.users.view',
+    'admin.integrations.manage',
+    'admin.media_library.manage',
+    'admin.events.manage',
+    'admin.membership_types.manage',
+    'admin.logs.view',
+    'admin.roles.view',
+    'admin.roles.manage',
 ];
 $pendingRequestsCount = 0;
 try {
@@ -39,29 +31,32 @@ try {
 }
 
 $items = [
-    ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
-    ['key' => 'requests', 'label' => 'Notification Hub', 'icon' => 'notifications_active', 'href' => '/admin/requests/', 'permission' => 'admin.requests.view', 'badge' => $pendingRequestsCount],
-    [
-        'key' => 'settings',
-        'label' => 'Settings',
-        'icon' => 'settings',
-        'children' => $settingsChildren,
-    ],
-    ['key' => 'members', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],
-    ['key' => 'applications', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
-    ['key' => 'payments', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
+    // OVERVIEW
+    ['key' => 'dashboard', 'group' => 'Overview', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
+    ['key' => 'requests', 'group' => 'Overview', 'label' => 'Notification Hub', 'icon' => 'notifications_active', 'href' => '/admin/requests/', 'permission' => 'admin.requests.view', 'badge' => $pendingRequestsCount],
+
+    // MEMBERSHIP
+    ['key' => 'members', 'group' => 'Membership', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],
+    ['key' => 'applications', 'group' => 'Membership', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
+    ['key' => 'payments', 'group' => 'Membership', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
+
+    // CONTENT
     // 'events' (legacy admin page reading the old `events` table) removed —
-    // all event management now happens via the Calendar entry below, which
-    // points at the modern calendar_events workflow.
-    ['key' => 'calendar-events', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php', 'permission' => 'admin.calendar.view'],
-    ['key' => 'navigation', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php', 'permission' => 'admin.pages.edit'],
-    ['key' => 'notices', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices', 'permission' => 'admin.pages.edit'],
-    ['key' => 'member-of-year', 'label' => 'Member of the Year Submissions', 'icon' => 'emoji_events', 'href' => '/admin/member-of-the-year', 'permission' => 'admin.member_of_year.view'],
-    ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings', 'permission' => 'admin.pages.view'],
-    ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings', 'permission' => 'admin.wings_magazine.manage'],
-    ['key' => 'media', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media', 'permission' => 'admin.media_library.manage'],
+    // all event management now happens via the Calendar entry below.
+    ['key' => 'calendar-events', 'group' => 'Content', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php', 'permission' => 'admin.calendar.view'],
+    ['key' => 'navigation', 'group' => 'Content', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php', 'permission' => 'admin.pages.edit'],
+    ['key' => 'notices', 'group' => 'Content', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices', 'permission' => 'admin.pages.edit'],
+    ['key' => 'wings', 'group' => 'Content', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings', 'permission' => 'admin.wings_magazine.manage'],
+    ['key' => 'media', 'group' => 'Content', 'label' => 'Media', 'icon' => 'photo_library', 'href' => '/admin/index.php?page=media', 'permission' => 'admin.media_library.manage'],
+
+    // RECOGNITION
+    ['key' => 'member-of-year', 'group' => 'Recognition', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/admin/member-of-the-year', 'permission' => 'admin.member_of_year.view'],
+    ['key' => 'fallen-wings', 'group' => 'Recognition', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings', 'permission' => 'admin.pages.view'],
+
+    // STORE
     [
         'key' => 'store',
+        'group' => 'Store',
         'label' => 'Store',
         'icon' => 'storefront',
         'children' => [
@@ -69,9 +64,12 @@ $items = [
             ['key' => 'store-products', 'label' => 'Products (Inventory)', 'href' => '/admin/store/products', 'path' => '/admin/store/products', 'permission' => 'admin.products.manage'],
         ],
     ],
-    ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
-    ['key' => 'help-validator', 'label' => 'Tour Validator', 'icon' => 'fact_check', 'href' => '/admin/help/validator.php', 'badge' => $tourAttentionCount],
-    ['key' => 'help-docs', 'label' => 'System Docs', 'icon' => 'menu_book', 'href' => '/admin/help/docs/'],
+
+    // SYSTEM
+    ['key' => 'settings', 'group' => 'System', 'label' => 'Settings', 'icon' => 'settings', 'href' => '/admin/settings/index.php', 'permission_any' => $settingsPermissions],
+    ['key' => 'ai-editor', 'group' => 'System', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
+    ['key' => 'help-validator', 'group' => 'System', 'label' => 'Tour Validator', 'icon' => 'fact_check', 'href' => '/admin/help/validator.php', 'badge' => $tourAttentionCount],
+    ['key' => 'help-docs', 'group' => 'System', 'label' => 'System Docs', 'icon' => 'menu_book', 'href' => '/admin/help/docs/'],
 ];
 $user = $user ?? current_user();
 if (function_exists('current_admin_can')) {
@@ -98,6 +96,15 @@ if (function_exists('current_admin_can')) {
         if (!empty($item['permission']) && !current_admin_can($item['permission'], $user)) {
             continue;
         }
+        if (!empty($item['permission_any'])) {
+            $allowed = false;
+            foreach ($item['permission_any'] as $perm) {
+                if (current_admin_can($perm, $user)) { $allowed = true; break; }
+            }
+            if (!$allowed) {
+                continue;
+            }
+        }
         $path = $item['path'] ?? $item['href'];
         if (!function_exists('can_access_path') || can_access_path($user, $path)) {
             $filteredItems[] = $item;
@@ -109,6 +116,9 @@ $activePage = $activePage ?? 'dashboard';
 $settingsActiveKeys = ['settings', 'security-log', 'reports', 'audit', 'settings-ai'];
 $isSettingsActive = in_array($activePage, $settingsActiveKeys, true);
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+if (!$isSettingsActive && $currentPath && strpos($currentPath, '/admin/settings/') === 0) {
+    $isSettingsActive = true;
+}
 // Keep the admin sidebar logo consistent with the member area.
 $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
 ?>
@@ -122,65 +132,40 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
       </div>
     </div>
   </div>
-  <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-    <?php foreach ($items as $item): ?>
+  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+    <?php $lastGroup = null; foreach ($items as $item): ?>
+      <?php
+        $itemGroup = $item['group'] ?? '';
+        if ($itemGroup !== $lastGroup):
+          $isFirstGroup = $lastGroup === null;
+      ?>
+        <div class="px-3 <?= $isFirstGroup ? 'pt-1 pb-2' : 'pt-4 pb-2 mt-2 border-t border-gray-100' ?> text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <?= e($itemGroup) ?>
+        </div>
+        <?php $lastGroup = $itemGroup; endif; ?>
       <?php if (!empty($item['children'])): ?>
         <?php
-          if ($item['key'] === 'settings') {
-              $isDropdownActive = $isSettingsActive;
-          } else {
-              $isDropdownActive = false;
-              if ($currentPath) {
-                  foreach ($item['children'] as $child) {
-                      if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
-                          $isDropdownActive = true;
-                          break;
-                      }
+          $isDropdownActive = false;
+          if ($currentPath) {
+              foreach ($item['children'] as $child) {
+                  if (!empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
+                      $isDropdownActive = true;
+                      break;
                   }
               }
           }
         ?>
         <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
-          <summary class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
+          <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
             <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
             <span class="flex-1"><?= e($item['label']) ?></span>
             <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
           </summary>
-          <div class="mt-2 space-y-1 pl-11 pr-2 pb-2">
+          <div class="mt-1 space-y-0.5 pl-11 pr-2 pb-2">
             <?php foreach ($item['children'] as $child): ?>
               <?php
                 $isChildActive = false;
-                if ($activePage === 'settings' && isset($section)) {
-                    $sectionKey = match ($child['key']) {
-                        'settings-site' => 'site',
-                        'settings-store' => 'store',
-                        'settings-payments' => 'payments',
-                        'settings-notifications' => 'notifications',
-                        'settings-accounts' => 'accounts',
-                        'settings-security' => 'security',
-                        'settings-integrations' => 'integrations',
-                        'settings-media' => 'media',
-                        'settings-events' => 'events',
-                        'settings-membership' => 'membership_pricing',
-                        'settings-audit-log' => 'audit',
-                        'settings-advanced' => 'advanced',
-                        default => null,
-                    };
-                    if ($sectionKey !== null) {
-                        $isChildActive = $section === $sectionKey;
-                    }
-                }
-                if ($activePage === 'settings' && $child['key'] === 'settings-hub') {
-                    $isChildActive = (!isset($section) || $section === 'site')
-                        && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/access-control.php') !== 0;
-                }
                 if ($activePage === $child['key']) {
-                    $isChildActive = true;
-                }
-                if ($activePage === 'settings' && $child['key'] === 'settings-access-control' && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/access-control.php') === 0) {
-                    $isChildActive = true;
-                }
-                if ($activePage === 'settings' && $child['key'] === 'settings-roles' && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/settings/roles.php') === 0) {
                     $isChildActive = true;
                 }
                 if (!$isChildActive && $currentPath && !empty($child['path']) && strpos($currentPath, $child['path']) === 0) {
@@ -194,8 +179,14 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
           </div>
         </details>
       <?php else: ?>
-        <?php $isActive = $activePage === $item['key']; $badge = (int) ($item['badge'] ?? 0); ?>
-        <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
+        <?php
+          $isActive = $activePage === $item['key'];
+          if ($item['key'] === 'settings' && $isSettingsActive) {
+              $isActive = true;
+          }
+          $badge = (int) ($item['badge'] ?? 0);
+        ?>
+        <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
           <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
           <span class="flex-1"><?= e($item['label']) ?></span>
           <?php if ($badge > 0): ?>

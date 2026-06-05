@@ -4,13 +4,15 @@ if ($mainSiteUrl === '') {
   $mainSiteUrl = '/';
 }
 $items = [
-  ['key' => 'main-site', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
-  ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
-  ['key' => 'wings', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/member/index.php?page=wings'],
-  ['key' => 'calendar', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/member/index.php?page=calendar'],
-  ['key' => 'store', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
+  // HOME
+  ['key' => 'dashboard', 'group' => 'Home', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
+  ['key' => 'notifications', 'group' => 'Home', 'label' => 'My Notifications', 'icon' => 'notifications', 'href' => '/member/notifications.php'],
+
+  // COMMUNITY
+  ['key' => 'calendar', 'group' => 'Community', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/member/index.php?page=calendar'],
   [
     'key' => 'notices',
+    'group' => 'Community',
     'label' => 'Notice Board',
     'icon' => 'campaign',
     'children' => [
@@ -18,17 +20,25 @@ $items = [
       ['key' => 'notices-create', 'label' => 'Create Notice', 'href' => '/member/index.php?page=notices-create'],
     ],
   ],
-  ['key' => 'fallen-wings', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
-  ['key' => 'member-of-the-year', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
-  ['key' => 'directory', 'label' => 'Members Directory', 'icon' => 'people', 'href' => '/member/index.php?page=directory'],
-  ['key' => 'committee', 'label' => 'Committee', 'icon' => 'groups', 'href' => '/member/index.php?page=committee'],
-  ['key' => 'dealers', 'label' => 'Honda Dealers', 'icon' => 'two_wheeler', 'href' => '/member/index.php?page=dealers'],
-  ['key' => 'profile', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
-  ['key' => 'settings', 'label' => 'Settings', 'icon' => 'tune', 'href' => '/member/index.php?page=settings'],
-  ['key' => 'billing', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],
-  ['key' => 'history', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
-  ['key' => 'notifications', 'label' => 'My Notifications', 'icon' => 'notifications', 'href' => '/member/notifications.php'],
-  ['key' => 'help', 'label' => 'Help & Guides', 'icon' => 'help_outline', 'href' => '/member/help.php'],
+  ['key' => 'wings', 'group' => 'Community', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/member/index.php?page=wings'],
+  ['key' => 'fallen-wings', 'group' => 'Community', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
+  ['key' => 'member-of-the-year', 'group' => 'Community', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
+
+  // RESOURCES
+  ['key' => 'directory', 'group' => 'Resources', 'label' => 'Members Directory', 'icon' => 'people', 'href' => '/member/index.php?page=directory'],
+  ['key' => 'committee', 'group' => 'Resources', 'label' => 'Committee', 'icon' => 'groups', 'href' => '/member/index.php?page=committee'],
+  ['key' => 'dealers', 'group' => 'Resources', 'label' => 'Honda Dealers', 'icon' => 'two_wheeler', 'href' => '/member/index.php?page=dealers'],
+  ['key' => 'store', 'group' => 'Resources', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
+
+  // MY ACCOUNT
+  ['key' => 'profile', 'group' => 'My Account', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
+  ['key' => 'billing', 'group' => 'My Account', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],
+  ['key' => 'history', 'group' => 'My Account', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
+  ['key' => 'settings', 'group' => 'My Account', 'label' => 'Settings', 'icon' => 'tune', 'href' => '/member/index.php?page=settings'],
+
+  // HELP
+  ['key' => 'help', 'group' => 'Help', 'label' => 'Help & Guides', 'icon' => 'help_outline', 'href' => '/member/help.php'],
+  ['key' => 'main-site', 'group' => 'Help', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
 ];
 $user = $user ?? current_user();
 $impersonation = function_exists('impersonation_context') ? impersonation_context() : null;
@@ -101,20 +111,29 @@ if (!empty($member)) {
       </div>
     </div>
   </div>
-  <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-    <?php foreach ($items as $item): ?>
+  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+    <?php $lastGroup = null; foreach ($items as $item): ?>
+      <?php
+        $itemGroup = $item['group'] ?? '';
+        if ($itemGroup !== $lastGroup):
+          $isFirstGroup = $lastGroup === null;
+      ?>
+        <div class="px-3 <?= $isFirstGroup ? 'pt-1 pb-2' : 'pt-4 pb-2 mt-2 border-t border-gray-100' ?> text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <?= e($itemGroup) ?>
+        </div>
+        <?php $lastGroup = $itemGroup; endif; ?>
       <?php if (!empty($item['children'])): ?>
         <?php $isActive = $activePage === $item['key']; ?>
         <details class="group" <?= $isActive ? 'open' : '' ?>>
           <summary
-            class="flex items-center justify-between gap-3 px-4 py-3 text-sm font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
+            class="flex items-center justify-between gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
             <span class="flex items-center gap-3">
               <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
               <?= e($item['label']) ?>
             </span>
             <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
           </summary>
-          <div class="ml-10 mt-2 space-y-1">
+          <div class="ml-10 mt-1 space-y-0.5">
             <?php foreach ($item['children'] as $child): ?>
               <?php $isChildActive = $activeSubPage === $child['key']; ?>
               <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
@@ -127,7 +146,7 @@ if (!empty($member)) {
         </details>
       <?php else: ?>
         <?php $isActive = $activePage === $item['key']; ?>
-        <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
+        <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>"
           href="<?= e($item['href']) ?>">
           <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
           <?= e($item['label']) ?>
