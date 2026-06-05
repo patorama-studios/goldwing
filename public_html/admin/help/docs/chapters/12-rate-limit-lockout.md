@@ -1,5 +1,109 @@
 # Login rate limiting & lockout
 
+## For administrators
+
+### What this is
+
+If someone (or a bot) keeps failing the login form, we lock them out for a while. After too many wrong passwords in a short window, the site simply refuses the next attempt and shows *"Too many attempts. Try again later."* — no countdown, no email, just a door that won't open.
+
+We track two separate things on every failed login: the **IP address** the attempt came from, and the **email** the attempt was made against. Either one can trigger a lockout on its own.
+
+### What it does for you
+
+- **Stops password-guessing attacks.** Someone trying `Spring2025!` against every email they've ever seen gets cut off after a handful of tries.
+- **Protects individual member accounts.** Even if an attacker rotates IPs, hammering one email locks that email out.
+- **Slows attackers down even before the lockout fires.** Each failed attempt adds a small delay (up to 5 seconds) — invisible to a real member who mistyped once, painful for a script trying thousands per minute.
+
+### Who's allowed to change settings
+
+**Admin only.** Anyone else won't see the Login Security card in Settings Hub.
+
+### Where to find it in admin
+
+Admin → Settings → Security & Authentication → **Login Security** card.
+
+The Security Log (Admin → Security Log) is where you go to *see* lockouts happening — search for an email or look for `security.login_locked` and `security.login_failed` entries.
+
+### The settings, explained plainly
+
+There are six knobs. The defaults are sensible — don't change them without a reason.
+
+#### Max attempts per IP (default: 10)
+
+An **IP address** is the rough "street address" of whatever internet connection a person is using. Every device on your home wifi shares one. A whole office on the same router shares one. Mobile networks sometimes share one across thousands of phones.
+
+We track failed logins by IP because most attackers come from a single computer or server — limiting per-IP is one of the cheapest defences. `10` failed attempts inside the IP window will lock that IP. Set this to `0` to turn the IP counter off entirely (you probably never want to).
+
+#### IP window minutes (default: 10)
+
+The sliding window in which those 10 attempts count. After 10 minutes of no failures, the counter resets to zero. So "10 failures in 10 minutes" is the trigger; 10 failures spread over an hour is not.
+
+#### Max attempts per account (default: 5)
+
+The same idea but applied to a specific email address. `5` failed logins against `someone@example.com` inside the account window locks that account regardless of which IP they came from. This is the one that defends against a botnet attack on a known admin email.
+
+#### Account window minutes (default: 15)
+
+The sliding window for the account counter. Same logic as the IP window, longer fuse.
+
+#### Lockout duration (default: 30 minutes)
+
+Once either counter trips, how long the lockout lasts. After the timer is up, the next attempt is allowed; if it fails too, the window simply rolls forward — there's no escalating "second offence" ban.
+
+#### Progressive delay (default: ON)
+
+When this is on, each failed attempt makes the site pause for one extra second before checking the password (capped at 5 seconds). A real person who mistyped once won't notice. A script trying to guess passwords at speed grinds to a crawl.
+
+### "A member says they can't log in" — diagnosis flow
+
+This is the support call you'll get. Work through these steps in order.
+
+1. **Ask them when they last tried.** If it was less than 30 minutes ago and they've been bashing the password in repeatedly, they're almost certainly in a lockout. Even if not, the timing helps the Security Log search.
+
+2. **Check whether they're locked out.** Admin → Security Log. Search for their email. Look for recent `security.login_locked` or a string of `security.login_failed` entries. If you see a lockout in the last 30 minutes, that's the answer.
+
+3. **If locked out, two options:**
+   - **Wait it out.** The lockout is 30 minutes by default. Tell them to try again after that. This is the right answer 90% of the time.
+   - **Clear the lockout manually.** There is *no admin button* for this — it has to be done with a SQL statement in phpMyAdmin. **Flag this to your developer** unless you're comfortable in phpMyAdmin yourself (the dev notes below have the exact query).
+
+4. **If not locked out, check for 2FA issues.** They may be entering the right password but failing on the second-factor code. See [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup) for how to reset their 2FA.
+
+5. **If still failing, reset their password.** They may genuinely have forgotten it. See [Chapter 20 — Member self-service & password reset](view.php?slug=20-member-self-service) — you can trigger a reset link from their member profile.
+
+### What can go wrong
+
+- **A legit member gets locked out repeatedly.** Usually a typo, a saved-but-wrong password in a browser/password manager, or they're confusing their member account with another login. Walk them through clearing the saved password and trying once carefully.
+- **A whole office or shared wifi gets locked out.** Multiple members on the same IP all failing once each can add up to the IP limit. Annoying but rare; wait it out or unlock the IP manually.
+- **The lockout is too aggressive.** If you keep getting legit-member lockouts, the limits may be too tight for how your members actually log in. Talk to your developer before changing them — these defaults are deliberately conservative.
+- **An admin locks themselves out.** It happens. Same fix as any member — wait it out, or another admin clears the row manually. If *every* admin is locked out at once, you need developer (or hosting) access to run the SQL directly.
+- **Turning a counter off entirely.** Setting max attempts to `0` *disables* that counter — it doesn't mean "lock immediately". Setting both to `0` turns the whole rate limiter off. Don't do that.
+
+### What gets recorded
+
+- **Every failed login attempt** writes to the `login_attempts` table (per IP and per email).
+- **Every lockout that fires** writes `security.login_locked` to the activity log and dispatches a `failed_login` security alert email to the address configured under Settings → Security Alerting.
+- **Every successful login** resets that user's counters to zero.
+
+If you ever need to ask "was this account being attacked last week?", the Security Log has the answer.
+
+### Good practice
+
+- **Don't lower the limits without a reason.** The defaults (10 per IP / 5 per account / 30-min lockout) are tuned to block attacks while almost never catching a real member. Tightening them produces more support calls; loosening them weakens the defence.
+- **If you keep getting legit lockouts, look at the cause first.** Are members sharing a device with a wrong saved password? Are they typing email + password from a club roster that has typos in it? Fix the cause before changing the numbers.
+- **Watch the security alert emails.** A spike of `failed_login` alerts against admin emails is a real attack signal — change passwords, enable 2FA on every admin, and tell your developer.
+- **Remember password reset is throttled by the same numbers.** Tightening login tightens the reset form too. See Chapter 20.
+
+### Who to ask if you're stuck
+
+- **Clearing a lockout manually** — your developer. It's a one-line SQL statement but it has to be run in phpMyAdmin and there's no admin button for it.
+- **A suspected attack in progress** — your developer, immediately. The security alert emails should already be firing; they may want to change settings or block an IP at the hosting level.
+- **Settings questions** — same developer; the defaults are good and changing them has knock-on effects.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 How the site stops a brute-force attack against `/login.php`. Two independent counters run on every failed login — one per IP address, one per account (email) — and either one can trip a temporary lockout. This chapter covers the counters, the lockout window, what gets written to the database, how an admin unlocks a stuck member, the (minimal) locked-out UX, and how to tune everything from Settings Hub. The same numbers are reused by the password-reset throttle at `/member/reset_password.php`.
@@ -85,16 +189,6 @@ All settings live in the `security_settings` table (single row, id=1), wrapped b
 
 One related global setting lives in `settings_global`: `advanced.disable_password_reset_rate_limit` (boolean) bypasses *just* the password-reset throttle — useful when bulk-issuing reset links during a migration.
 
-
-<!-- SCREENSHOT: Settings Hub → Security tab, scrolled to the "Login Security" card. Capture all six fields with defaults visible. Save to public_html/admin/help/images/12-login-security-card.png and uncomment the line below. -->
-<!-- ![Login Security settings card](../images/12-login-security-card.png) -->
-
-<!-- SCREENSHOT: /login.php showing the "Too many attempts. Try again later." error after a lockout. Save as 12-login-locked-error.png. -->
-<!-- ![Login form showing the lockout error](../images/12-login-locked-error.png) -->
-
-<!-- SCREENSHOT: phpMyAdmin showing a SELECT on login_attempts with one IP row and one account row, locked_until populated. Save as 12-login-attempts-table.png. -->
-<!-- ![login_attempts table with a live lockout](../images/12-login-attempts-table.png) -->
-
 ## Gotchas
 
 - **The locked-out user gets no helpful UI.** `login.php` shows *"Too many attempts. Try again later."* — no countdown, no email. If a real member is locked they will phone the secretary. The activity-log entry and the security alert email are how *we* find out it happened.
@@ -106,6 +200,17 @@ One related global setting lives in `settings_global`: `advanced.disable_passwor
 - **Password reset reuses these numbers.** `login_ip_max_attempts` / `login_ip_window_minutes` also throttle `/member/reset_password.php` against the `password_resets` table. Tightening login tightens reset.
 - **NAT eats the IP counter.** Members behind a shared office or carrier NAT all look like one IP. Ten members fat-fingering passwords can lock that whole IP for `login_lockout_minutes`. The account counter is unaffected.
 - **No admin "unlock" button exists.** Unlocking is a manual `UPDATE login_attempts ... SET locked_until = NULL` in phpMyAdmin. A small unlock UI under `/admin/security/` would be a worthwhile follow-up.
+
+</details>
+
+<!-- SCREENSHOT: Settings Hub → Security tab, scrolled to the "Login Security" card. Capture all six fields with defaults visible. Save to public_html/admin/help/images/12-login-security-card.png and uncomment the line below. -->
+<!-- ![Login Security settings card](../images/12-login-security-card.png) -->
+
+<!-- SCREENSHOT: /login.php showing the "Too many attempts. Try again later." error after a lockout. Save as 12-login-locked-error.png. -->
+<!-- ![Login form showing the lockout error](../images/12-login-locked-error.png) -->
+
+<!-- SCREENSHOT: phpMyAdmin showing a SELECT on login_attempts with one IP row and one account row, locked_until populated. Save as 12-login-attempts-table.png. -->
+<!-- ![login_attempts table with a live lockout](../images/12-login-attempts-table.png) -->
 
 ## Related chapters
 

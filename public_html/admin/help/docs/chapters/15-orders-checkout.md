@@ -1,18 +1,122 @@
 # Orders & checkout flow
 
-## What this covers
+## For administrators
+
+### What this is
+
+An **order** is the record we keep every time someone pays us. Whether it's a new member paying their first year, an existing member renewing, somebody buying a polo shirt from the store, or a ticket to a rally — it all turns into an order row that we can look up later.
+
+There are two flavours of order:
+
+- **Membership orders** — paying for a membership term (new join, renewal, upgrade).
+- **Store orders** — buying a product or ticket from the online store.
+
+They look slightly different inside the admin because they carry different details (a membership doesn't ship anywhere; a polo does), but the basic idea is the same: one person, one payment, one record.
+
+### What it lets you do
+
+- Look up any order a member has placed, ever.
+- See whether they actually paid, what they bought, and what state it's in (new, packed, shipped, completed, cancelled).
+- Spot orders that got stuck — for example, a member who started checkout but never finished paying.
+- Update the status as you work the order (mark it packed, add a tracking number, mark it shipped).
+- Initiate a refund if you need to (see Chapter 17).
+- Add internal notes for the next admin who looks at it.
+
+### Who's allowed
+
+You need the **store orders view** permission to see them, and **store orders manage** to change anything. By default the Admin, Committee Member, and Treasurer roles can do both. Membership orders are visible to anyone who can see members.
+
+If buttons are missing or you can't open an order, your role probably doesn't have the right permission. A site admin can adjust this in Admin → Settings → Accounts & Roles.
+
+### Where to find it
+
+Three doors lead to orders:
+
+1. **Admin → Store → Orders** — the master list of every store order, with filters for status, fulfilment, date, and a search box that finds order numbers, customer names, emails, and product codes.
+2. **Admin → Members → click a member → Orders tab** — every order that member has placed, both memberships and store.
+3. **Recent payments card on the admin dashboard** — the latest handful of orders from both types, useful for a quick "did that payment come through?" check.
+
+All three routes show the same data — pick whichever matches what you already know (order number vs member name vs "what came in today").
+
+### How to look up an order
+
+- **You have the order number** (looks like `M-2026-000482` for memberships or a similar code for store orders) — type it into the search box on Admin → Store → Orders.
+- **You have the member's name** — go to Admin → Members, find them, open the Orders tab.
+- **You have the customer's email** — the search box on Admin → Store → Orders accepts emails too.
+- **You have a product code (SKU)** — same search box finds every order containing that SKU.
+- **You only know the rough date** — use the date filter on Admin → Store → Orders.
+
+### Reading an order detail page
+
+Once you open an order, you'll see several panels. Here's what each one means in plain English:
+
+- **Status panel** — the headline state of the order. The two big words to look at are the **payment status** (have we got their money?) and the **order status** (have we got it out the door?). A healthy in-progress store order looks like *Paid + Processing*. A finished one looks like *Paid + Completed*.
+- **Customer / member** — who placed the order. If the order was a guest checkout, you may see an email but no linked member. You can link it to a member from this panel if you spot a match.
+- **Line items** — what they bought. Each row shows the product name, the code (SKU), the quantity, and the price. **These prices are frozen at the moment the order was placed** — even if you change the price in the store later, this order still shows what they actually paid.
+- **Totals** — the subtotal, any discount that was applied, shipping, the processing fee, and the grand total. These numbers also stay frozen.
+- **Shipping** — the address it's going to, and how (post, or pickup). For pickup orders you'll see the pickup instructions that were shown to the buyer at checkout.
+- **Shipment / tracking panel** — where you record that you've packed it, picked the carrier, and entered the tracking number. Adding a tracking number is what flips the order to *shipped*.
+- **Refunds** — any refunds that have been issued against this order. Full instructions are in Chapter 17.
+- **Notes / timeline** — internal notes you (or someone before you) wrote, plus an auto-generated timeline of every state change. Use the notes for anything the next person needs to know ("rang the member, posting Monday").
+
+### What can go wrong (and what to do)
+
+- **The order is stuck on "pending" forever.** The member started checkout but never finished paying. The page redirected them to the payment provider and they bailed, or their card was declined. There's nothing to do — these aren't real orders. You can safely ignore them. The orders list lets you filter them out.
+- **The payment shows "paid" but the order status is still "new".** That's normal — payment status and order status are tracked separately. *Paid* just means the money's in. The order status moves through *new → processing → packed → shipped → completed* as you (or whoever does fulfilment) works through it.
+- **The member says they paid but I can't find the order.** Two things to check: (1) was it under a different email or as a guest checkout? Search by email rather than by member. (2) Look at the recent payments card on the dashboard — if Stripe took the money but the order didn't appear in the admin, the webhook might be misconfigured. Flag it to a developer with the order number and amount.
+- **The order isn't linked to a member.** Some checkouts come in as guest. You can link the order to a member from the order's detail page. This matters for refunds — refunds need a linked member account.
+- **The shipping address looks wrong.** What's on the order is what the customer typed at checkout. If they got it wrong, message them, get the correct address, update the address on the order, and add a note explaining why.
+- **The price on the order doesn't match the current price in the store.** That's correct, not a bug. We deliberately freeze the price at purchase time so refunds and history stay accurate. The customer paid what's shown; today's store catalogue is irrelevant.
+- **A member says they're being charged twice.** Look at their Orders tab. Two paid orders for the same thing = either a genuine double-purchase (refund one) or a stuck checkout that got retried (the first one should be *pending* not *paid* — confirm in the order detail before refunding). If only one shows *paid* and they're still seeing two charges on their bank, that's a Stripe-side question for the Treasurer.
+- **I cancelled an order but stock didn't come back.** That's deliberate. Cancelling does not restock — the item may have already been picked or posted. If you genuinely need the units back on the shelf, use the refund flow (Chapter 17). Refunds restock; cancellations don't.
+
+### What gets recorded
+
+Every order keeps a permanent record of:
+
+- Who bought, what they bought, what they paid, and when.
+- Every status change, with timestamps and who made the change.
+- Any internal notes typed against it.
+- Any refunds issued.
+- The shipping address and tracking number (for store orders).
+- The receipt ID from the payment provider (looks like `pi_xxxxxxxxx`), so the Treasurer can cross-reference it in the Stripe dashboard.
+
+This means a year-old order can be reconstructed exactly. Useful for treasurer's reports, audit questions, and member disputes.
+
+### Good practice
+
+- **Update the order status as you work it.** Marking an order *packed* and then *shipped* lets the next admin (and the member) see progress without asking.
+- **Add a tracking number when you post something.** This is the difference between "we sent it" and "we *say* we sent it".
+- **Type a note for anything weird.** "Address changed at member's request", "rang to confirm size", "out of stock — sent next colour with permission" — future-you needs to know.
+- **Don't change prices on an open order.** If a member wants a different deal, refund and re-take the payment. Editing totals after the fact breaks the audit trail.
+- **Filter out "pending" orders when you're triaging the list.** They're checkout abandonment, not real work.
+- **Cross-check Stripe once a month.** Treasurer should make sure paid orders in the admin match payments in the Stripe dashboard. Discrepancies are rare but worth catching.
+
+### Who to ask if stuck
+
+- **Permission issue** — site admin can change roles in Admin → Settings → Accounts & Roles.
+- **Order is stuck and I don't know why** — flag the order number to a developer; they can check whether the webhook fired.
+- **Stripe says one thing, the admin says another** — Treasurer (they have the Stripe login).
+- **The error message is jargon** — copy-paste it to your developer.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
+### What this covers
 
 Every transaction on the site — membership renewal, polo shirt, rally ticket — ends up as an **order row**. This chapter explains the two parallel order types (membership vs store), the two tables behind them, what happens during checkout, what each status means, and why line items are snapshotted at order time so refunds keep working even when the catalogue moves on.
 
-## Why it exists
+### Why it exists
 
 An order row is the single source of truth for *what was bought, by whom, at what price, and what state it's in*. Stripe is the cash register, but Stripe doesn't know that "Pat's 3-year renewal" is `membership_periods` row #482 — only the order row links them. When a refund or dispute lands a year later we need to look up *exactly* what was charged without re-pricing against today's catalogue. That's the snapshot rule: every order item carries its own name, SKU, quantity, and unit price frozen at purchase time.
 
 Two types exist because the data each needs diverges. A membership order needs only "which member, which period, what was paid". A store order needs SKUs, variants, stock, shipping, fulfilment, tracking. So `orders` is the universal payment ledger Stripe sees, `store_orders` is the store-domain table — store checkouts write both and link them.
 
-## How it works
+### How it works
 
-### The two tables
+#### The two tables
 
 | Table | Owner | Holds |
 |---|---|---|
@@ -21,7 +125,7 @@ Two types exist because the data each needs diverges. A membership order needs o
 
 A **store checkout writes both rows.** `store_orders` is created first; then `OrderService::createOrder()` writes the matching `orders` row with a `shipping_address_json` blob embedding `store_order_id` and `store_order_number`. That's how `PaymentWebhookService` (Ch 16) finds the store row after Stripe confirms.
 
-### The membership checkout flow
+#### The membership checkout flow
 
 1. **Apply** at `/apply.php` (new) or *Renew* in the member portal — both end at `/become-a-member`.
 2. **`MembershipPricingService`** (Ch 14) prices the term + chapter + pro-rata month.
@@ -30,7 +134,7 @@ A **store checkout writes both rows.** `store_orders` is created first; then `Or
 5. **Success URL** returns them to `/order/success/`. The order is still `pending` here.
 6. **Webhook** (Ch 16) lands at `/api/stripe_webhook.php` and calls `MembershipOrderService::activateMembershipForOrder()`, which flips `orders.status` to `paid`, sets the `membership_periods` row to `ACTIVE` with calculated start/end dates (respecting any existing active period so renewals don't overlap), sets `members.status='ACTIVE'`, and writes an activity log entry.
 
-### The store checkout flow
+#### The store checkout flow
 
 1. **Browse** `/store/catalog.php`, **add to cart** at `/store/product.php`. Cart lives in `store_carts` / `store_cart_items` (DB-backed, survives logout).
 2. **Review** at `/store/cart.php`, **checkout** at `/checkout`. `store_calculate_cart_totals()` applies the discount code (Ch 29), shipping, and processing fee; stock is re-checked per-variant.
@@ -39,15 +143,15 @@ A **store checkout writes both rows.** `store_orders` is created first; then `Or
 5. **Stripe Checkout Session** is built from the snapshotted lines (shipping, GST, processing fee as separate Stripe lines) and the user is redirected.
 6. **Webhook** flips both tables to paid/accepted and decrements inventory on `store_products` / `store_product_variants`.
 
-### Order states
+#### Order states
 
 `orders.status` is the high-level state: `pending` → `paid` → `refunded` or `cancelled`. Finer-grained columns track payment and fulfilment separately — `payment_status` (`pending` / `accepted` / `rejected` / `failed` / `refunded`), membership `fulfillment_status` (`pending` / `active` / `expired`), and `store_orders.order_status` (`new` / `processing` / `packed` / `shipped` / `completed` / `cancelled`). The Stripe-status mapping lives in `OrderRepository::mapStripeStatus()`: `succeeded` / `processing` / `requires_capture` → `paid`, `canceled` → `cancelled`, else `pending`.
 
-### Snapshot pricing (the refund-math rule)
+#### Snapshot pricing (the refund-math rule)
 
 Every line item carries its **own copy** of the name and unit price. Store items also carry `unit_price_final` — the price after the order-level discount was apportioned across the cart. Nothing reads from `store_products` at refund time. If you re-price a polo from $45 to $50 tomorrow, last week's order still refunds at $45 per unit. Ch 17 covers how `RefundService` uses the snapshot.
 
-## Where to change it
+### Where to change it
 
 - **Store orders list:** `/admin/store/orders` (`public_html/admin/store/orders.php`). Filters by status, fulfilment, date, and free-text search across order number, customer, email, SKU. Bulk status changes supported.
 - **Single store order:** `/admin/store/order_view.php?id=X` (or `?order=ORDER_NUMBER`). Status changes, shipment creation (carrier + tracking → `store_shipments`), internal notes, refund initiation.
@@ -56,10 +160,20 @@ Every line item carries its **own copy** of the name and unit price. Store items
 
 Permission keys: `store_orders_view`, `store_orders_manage`, `store_refunds_manage`. See Ch 07.
 
-## Settings
+### Settings
 
 Order-time pricing pulls from store settings: flat vs free-over-threshold shipping, pickup on/off, processing-fee percentage, shipping region (`AU` by default — blocks non-AU postcodes). All live on the Store settings page; full reference in [Ch 29](view.php?slug=29-discounts-shipping). The membership order-number prefix is `membership.order_prefix` (default `M`), with the running counter in `membership.order_counter` / `_year`.
 
+### Gotchas
+
+- **The order row is created BEFORE Stripe confirms.** Both flows insert `pending`, redirect to Stripe, then wait for the webhook to flip to `paid`. Abandoned checkouts leave harmless `pending` rows forever — filter `status != 'pending'` for "real orders".
+- **The webhook does the activation, not the success page.** Don't put side-effects in `/order/success/`. If the webhook is misconfigured, the user sees "thanks!" but the order is still pending. The redirect is UX; the webhook is truth.
+- **Two tables, one Stripe session.** Store checkout writes both `store_orders` and `orders`, linked through `orders.shipping_address_json.store_order_id`. Use `orders` for payment-ledger questions (totals, Stripe IDs, refundability); `store_orders` for store-ops (shipping, fulfilment, tracking).
+- **Snapshotted prices mean catalogue updates don't touch historical orders.** Refund math, invoice reprints, and order history all read the snapshot — never the live `store_products` row. If a price looks "wrong" on an old order, that's what it was at the time.
+- **Cancellation doesn't auto-restock.** Marking a store order `cancelled` via the admin drop-down does not put units back on `store_products.stock_quantity`. Use the refund flow (Ch 17) if you need stock returned — refunds restock; cancellations don't, in case the stock was already shipped.
+- **Order numbers are per-series, not per-table.** Memberships use `M-YYYY-NNNNNN`; store orders use their own series via `store_generate_order_number()`.
+
+</details>
 
 <!-- SCREENSHOT: Admin store orders list at /admin/store/orders, showing the filter row and a few rows of mixed statuses. Save as 15-store-orders-list.png. -->
 <!-- ![Store orders list](../images/15-store-orders-list.png) -->
@@ -69,15 +183,6 @@ Order-time pricing pulls from store settings: flat vs free-over-threshold shippi
 
 <!-- SCREENSHOT: Stripe-hosted Checkout page reached by going through /store/checkout (use test mode). Save as 15-stripe-checkout.png. -->
 <!-- ![Stripe Checkout page](../images/15-stripe-checkout.png) -->
-
-## Gotchas
-
-- **The order row is created BEFORE Stripe confirms.** Both flows insert `pending`, redirect to Stripe, then wait for the webhook to flip to `paid`. Abandoned checkouts leave harmless `pending` rows forever — filter `status != 'pending'` for "real orders".
-- **The webhook does the activation, not the success page.** Don't put side-effects in `/order/success/`. If the webhook is misconfigured, the user sees "thanks!" but the order is still pending. The redirect is UX; the webhook is truth.
-- **Two tables, one Stripe session.** Store checkout writes both `store_orders` and `orders`, linked through `orders.shipping_address_json.store_order_id`. Use `orders` for payment-ledger questions (totals, Stripe IDs, refundability); `store_orders` for store-ops (shipping, fulfilment, tracking).
-- **Snapshotted prices mean catalogue updates don't touch historical orders.** Refund math, invoice reprints, and order history all read the snapshot — never the live `store_products` row. If a price looks "wrong" on an old order, that's what it was at the time.
-- **Cancellation doesn't auto-restock.** Marking a store order `cancelled` via the admin drop-down does not put units back on `store_products.stock_quantity`. Use the refund flow (Ch 17) if you need stock returned — refunds restock; cancellations don't, in case the stock was already shipped.
-- **Order numbers are per-series, not per-table.** Memberships use `M-YYYY-NNNNNN`; store orders use their own series via `store_generate_order_number()`.
 
 ## Related chapters
 
