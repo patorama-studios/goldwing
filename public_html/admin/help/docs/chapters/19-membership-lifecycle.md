@@ -94,7 +94,6 @@ All `settings_global` unless noted.
 
 Full pricing matrix lives in `MembershipPricingService` — see [Chapter 14](view.php?slug=14-membership-pricing). Reminder windows (60, 30 days) are hard-coded in `cron/send_renewal_reminders.php`'s `$intervals` array.
 
-## Screenshots
 
 <!-- SCREENSHOT: /admin/index.php?page=applications, Pending tab. Save as 19-applications-list.png. -->
 <!-- ![Applications queue](../images/19-applications-list.png) -->

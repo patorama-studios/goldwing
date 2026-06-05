@@ -88,9 +88,7 @@ This means a future audit, member dispute, or treasurer's report can always be r
 ---
 
 <details>
-<summary>
-<strong>Technical reference (for developers)</strong>
-</summary>
+<summary><strong>Dev notes</strong></summary>
 
 ### What this covers
 
@@ -177,13 +175,14 @@ The `store_refund_processed` template (in `App\Services\NotificationService`) em
 
 </details>
 
-## Screenshots
-
-<!-- SCREENSHOT: The Refunds panel on an order detail page at /admin/store/orders/<order_number>, showing the amount + reason fields and the red "Process refund" button. Capture on draft.goldwing.org.au logged in as admin. Save to public_html/admin/help/images/17-refund-button.png and uncomment below. -->
-<!-- ![Refund button on order detail page](../images/17-refund-button.png) -->
-
-<!-- SCREENSHOT: The browser confirm() dialog ("Process this refund in Stripe?") that fires when an admin clicks the button. Same instructions. Save as 17-refund-confirm.png. -->
-<!-- ![Refund confirmation prompt](../images/17-refund-confirm.png) -->
+<!--
+  Screenshots to capture once the pipeline is ready:
+  • Refunds panel on an order detail page at /admin/store/orders/<order_number>,
+    showing amount + reason fields and the red "Process refund" button.
+    Save as public_html/admin/help/images/17-refund-button.png and add:
+    ![Refund button on order detail page](../images/17-refund-button.png)
+  • The confirm() dialog that fires on click. Save as 17-refund-confirm.png.
+-->
 
 ## Related chapters
 

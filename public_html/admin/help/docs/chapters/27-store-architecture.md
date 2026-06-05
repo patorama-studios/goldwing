@@ -90,7 +90,6 @@ Webhooks land on `/api/stripe_webhook.php` and are dispatched by `PaymentWebhook
 
 All store settings are namespaced `store.*` in `settings_global`, edited under **Settings → Store Settings**. Full key list (names, types, defaults) in [Ch 32 — Settings by section](view.php?slug=32-settings-by-section#store). The most-touched: `store.members_only`, `store.shipping_flat_enabled` / `shipping_flat_rate`, `store.shipping_free_threshold`, `store.pickup_enabled`, and the Stripe-fee passthrough trio.
 
-## Screenshots
 
 <!-- SCREENSHOT: Storefront /store as a logged-in member. Save as 27-storefront-catalog.png. -->
 <!-- ![Storefront catalog](../images/27-storefront-catalog.png) -->

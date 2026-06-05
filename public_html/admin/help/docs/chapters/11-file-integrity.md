@@ -78,7 +78,6 @@ All keys are columns on `security_settings` (id = 1), surfaced by `SecuritySetti
 
 The baseline itself lives in `file_integrity_baseline.baseline_json`, not in `settings_global`.
 
-## Screenshots
 
 <!-- SCREENSHOT: The "File Integrity Monitoring" card at /admin/settings/index.php?section=security, showing the enable toggle, the paths/excludes textareas with the defaults visible, and the "Approve baseline" button. Save as 11-fim-card.png. -->
 <!-- ![FIM settings card](../images/11-fim-card.png) -->

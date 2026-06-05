@@ -75,7 +75,6 @@ For the legacy server bootstrap (initial setup, MySQL user creation, Stripe webh
 
 This chapter has no settings of its own. Deploy behaviour is hard-coded in `.cpanel.yml` and the cPanel UI.
 
-## Screenshots
 
 <!-- SCREENSHOT: cPanel Git Version Control page for the draft.goldwing.org.au repo, showing the "Update from Remote" and "Deploy HEAD Commit" buttons and the current/remote SHAs. Save as public_html/admin/help/images/33-cpanel-git-deploy.png and uncomment the line below. -->
 <!-- ![cPanel Git deploy](../images/33-cpanel-git-deploy.png) -->

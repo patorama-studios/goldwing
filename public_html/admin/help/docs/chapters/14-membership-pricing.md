@@ -86,7 +86,6 @@ A "Reset to defaults" checkbox repopulates from `defaultPricingRows()` before sa
 - `payments.membership_prices` — Stripe Price IDs, legacy Checkout Session path. Edited via `?section=payments`.
 - `stripe.membership_prices.*` (`config/app.php`) — fallback Price IDs read by `cron/send_renewal_reminders.php`.
 
-## Screenshots
 
 <!-- SCREENSHOT: The pricing matrix grid at /admin/settings/index.php?section=membership_pricing. Capture the full Pricing card showing PRINTED and PDF tabs (or both grids) with all six period columns and Full/Associate rows. Save as public_html/admin/help/images/14-pricing-matrix.png. -->
 <!-- ![Pricing matrix editor](../images/14-pricing-matrix.png) -->

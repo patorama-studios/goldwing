@@ -52,7 +52,6 @@ There is **no `advanced.debug_mode`** key — production never runs with `displa
 
 The Log Viewer itself has no settings — it always reads `app/storage/logs/system.log` (last 300 lines, capped at ~200 KB by `LogViewerService::readTail()`). The "Clear log" button on the Advanced settings page requires step-up.
 
-## Screenshots
 
 <!-- SCREENSHOT: /admin/settings/?section=advanced — the "System Logs" card showing tailed system.log content with the Clear log button. Save as 35-system-log-viewer.png. -->
 <!-- ![System Log viewer](../images/35-system-log-viewer.png) -->

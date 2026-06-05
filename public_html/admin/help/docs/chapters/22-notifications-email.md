@@ -95,7 +95,6 @@ Security alerts (FIM changes, repeated failed logins, new admin device, refund c
 | `integrations.resend_api_key` | empty | Bearer token for `https://api.resend.com/emails`. |
 | `alerts.*` (in `security_settings`) | mostly `true` | `webhook_failure`, `role_escalation`, `failed_login`, `new_admin_device`, `refund_created`, `member_import`, `member_export`, `fim_changes`. |
 
-## Screenshots
 
 <!-- SCREENSHOT: Admin → Settings → Notifications tab, showing the sender block at the top and the template catalogue list below. Save as 22-notifications-tab.png. -->
 <!-- ![Notifications settings tab](../images/22-notifications-tab.png) -->

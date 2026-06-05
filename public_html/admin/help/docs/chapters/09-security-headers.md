@@ -137,7 +137,6 @@ Two storage backends — two flavours of setting.
 |---|---|
 | `twofa_override` | `DEFAULT`, `REQUIRED`, `EXEMPT` |
 
-## Screenshots
 
 <!-- SCREENSHOT: Browser devtools Network tab on draft.goldwing.org.au showing the response headers (CSP, X-Frame-Options, HSTS, Permissions-Policy) on /admin/index.php. Save to public_html/admin/help/images/09-response-headers.png. -->
 <!-- ![Response headers in devtools](../images/09-response-headers.png) -->

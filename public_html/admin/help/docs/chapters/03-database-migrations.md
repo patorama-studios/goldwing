@@ -73,7 +73,6 @@ cPanel takes a daily full backup (files + DB); restores go through cPanel → Ba
 
 No admin-UI settings here. DB credentials live in `.env` / `config/database.php` — see [Chapter 04](view.php?slug=04-configuration). Settings *stored* in the DB are covered in [Chapter 31](view.php?slug=31-settings-architecture), which uses the `settings_global` table created by `settings_hub.sql`.
 
-## Screenshots
 
 <!-- SCREENSHOT: phpMyAdmin showing the goldwing database with the table list visible (sessions, members, settings_global, store_products, audit_log). Capture from cPanel → phpMyAdmin while logged into the draft account. Save as 03-phpmyadmin-tables.png and uncomment below. -->
 <!-- ![phpMyAdmin table list](../images/03-phpmyadmin-tables.png) -->

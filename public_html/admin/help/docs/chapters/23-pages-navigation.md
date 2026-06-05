@@ -75,7 +75,6 @@ This chapter has no settings of its own in `settings_global`, but two related on
 
 Both are stripped of element IDs (`PageBuilderService::stripElementIds`) before render so they don't collide with the per-page builder IDs. See [Chapter 31](view.php?slug=31-settings-architecture).
 
-## Screenshots
 
 <!-- SCREENSHOT: Admin Pages list at /admin/pages/ showing the editable pages with slug, title, access, and updated_at. Save as 23-pages-list.png and uncomment below. -->
 <!-- ![Pages list](../images/23-pages-list.png) -->

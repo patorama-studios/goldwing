@@ -89,7 +89,6 @@ Per-user, in `user_security_overrides.twofa_override`: `DEFAULT` / `REQUIRED` / 
 
 Email-OTP rate-limit knobs (`MAX_ATTEMPTS`, `RESEND_DELAY_SECONDS`, `EXPIRY_MINUTES`, `TRUST_DAYS`) are PHP constants in `EmailOtpService` — change in code and redeploy.
 
-## Screenshots
 
 <!-- SCREENSHOT: /member/2fa_enroll.php showing the QR code, the secret text below it, and the "Authenticator code" input. Save to public_html/admin/help/images/06-2fa-enroll.png. -->
 <!-- ![2FA enrollment QR](../images/06-2fa-enroll.png) -->

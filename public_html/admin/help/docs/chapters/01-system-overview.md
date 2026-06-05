@@ -131,7 +131,6 @@ This chapter doesn't own any settings of its own — but every other chapter doe
 
 Reads go through `App\Services\SettingsService::getGlobal('site.timezone', 'Australia/Sydney')` and writes go through the same service, which also stamps the change into `audit_log`. See [Chapter 31 — Settings architecture](view.php?slug=31-settings-architecture).
 
-## Screenshots
 
 <!-- SCREENSHOT: Admin dashboard at /admin/index.php, showing the sidebar with all major sections. Capture as draft.goldwing.org.au logged in as admin. Save to public_html/admin/help/images/01-admin-dashboard.png and uncomment the line below. -->
 <!-- ![Admin dashboard](../images/01-admin-dashboard.png) -->

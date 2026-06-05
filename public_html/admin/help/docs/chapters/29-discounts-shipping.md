@@ -101,7 +101,6 @@ All keys live under `store.*` in `settings_global`. Full reference in [Ch 32 —
 
 The `store_discounts` table is its own thing — discounts are rows, not settings.
 
-## Screenshots
 
 <!-- SCREENSHOT: The discount create/edit form at /admin/store/discounts.php, showing code, type, value, date window, max-uses and min-spend alongside the discounts list. Save to public_html/admin/help/images/29-discount-form.png. -->
 <!-- ![Discount form](../images/29-discount-form.png) -->

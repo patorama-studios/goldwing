@@ -73,7 +73,6 @@ Per-channel, in `settings_payments` (one row per `payment_channels.id`):
 
 Site-wide, in `settings_global`: `store.gst_enabled` (boolean, default true) and `site.name` (shown at the top of the PDF).
 
-## Screenshots
 
 <!-- SCREENSHOT: A sample generated PDF (e.g. INV-2026-00001.pdf) opened in a browser. Save to public_html/admin/help/images/18-sample-invoice.png. -->
 <!-- ![Sample tax invoice PDF](../images/18-sample-invoice.png) -->

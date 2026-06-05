@@ -91,7 +91,6 @@ This chapter doesn't define its own settings, but it consumes the alert toggles 
 | `alerts.member_export` / `alerts.member_import` | `true` | Member CSV export and import. |
 | `alerts.fim_changes` | `true` | FIM scan diffs — see [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity). |
 
-## Screenshots
 
 <!-- SCREENSHOT: /admin/security/activity_log.php showing the filter bar and a table of recent rows. Capture on draft.goldwing.org.au as admin. Save as 08-activity-log.png. -->
 <!-- ![Activity log](../images/08-activity-log.png) -->

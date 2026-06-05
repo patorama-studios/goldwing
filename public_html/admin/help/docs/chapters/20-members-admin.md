@@ -83,7 +83,6 @@ Every state-changing case ends with `ActivityLogger::log(...)`. Verbs you'll see
 
 No global settings are unique to this chapter. The directory-preference visibility flags (A–F) live per-member on the `members` row itself, not in `settings_global`.
 
-## Screenshots
 
 <!-- SCREENSHOT: List view at /admin/members/index.php with filters expanded. Capture on draft.goldwing.org.au as a full admin. Save to public_html/admin/help/images/20-members-list.png and uncomment. -->
 <!-- ![Members list view](../images/20-members-list.png) -->

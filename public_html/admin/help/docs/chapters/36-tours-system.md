@@ -86,7 +86,6 @@ The tours system has no entries in `settings_global` — its config is the manif
 
 Stale-after window (60 days) is a `public const` on `TourService`, not a setting. Change it in code if needed; nobody's asked.
 
-## Screenshots
 
 <!-- SCREENSHOT: The "?" floating button on a member page (e.g. /member/index.php?page=billing). Capture bottom-right corner. Save as 36-tour-help-button.png. -->
 <!-- ![Tour help button](../images/36-tour-help-button.png) -->

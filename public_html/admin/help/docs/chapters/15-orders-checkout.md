@@ -60,7 +60,6 @@ Permission keys: `store_orders_view`, `store_orders_manage`, `store_refunds_mana
 
 Order-time pricing pulls from store settings: flat vs free-over-threshold shipping, pickup on/off, processing-fee percentage, shipping region (`AU` by default — blocks non-AU postcodes). All live on the Store settings page; full reference in [Ch 29](view.php?slug=29-discounts-shipping). The membership order-number prefix is `membership.order_prefix` (default `M`), with the running counter in `membership.order_counter` / `_year`.
 
-## Screenshots
 
 <!-- SCREENSHOT: Admin store orders list at /admin/store/orders, showing the filter row and a few rows of mixed statuses. Save as 15-store-orders-list.png. -->
 <!-- ![Store orders list](../images/15-store-orders-list.png) -->

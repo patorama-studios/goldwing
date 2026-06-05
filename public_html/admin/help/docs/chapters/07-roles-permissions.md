@@ -90,7 +90,6 @@ if (current_admin_can('admin.payments.refund')) {
 
 This chapter doesn't own any `settings_global` keys. The role/permission tables (`roles`, `user_roles`, `role_permissions`, `pages_registry`, `page_role_access`) are their own storage and are edited through the UIs above.
 
-## Screenshots
 
 <!-- SCREENSHOT: /admin/settings/roles.php with a custom role selected, permission checkboxes visible. Save as 07-role-builder.png. -->
 <!-- ![Admin Role Builder](../images/07-role-builder.png) -->

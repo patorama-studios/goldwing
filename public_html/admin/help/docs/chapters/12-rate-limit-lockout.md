@@ -85,7 +85,6 @@ All settings live in the `security_settings` table (single row, id=1), wrapped b
 
 One related global setting lives in `settings_global`: `advanced.disable_password_reset_rate_limit` (boolean) bypasses *just* the password-reset throttle — useful when bulk-issuing reset links during a migration.
 
-## Screenshots
 
 <!-- SCREENSHOT: Settings Hub → Security tab, scrolled to the "Login Security" card. Capture all six fields with defaults visible. Save to public_html/admin/help/images/12-login-security-card.png and uncomment the line below. -->
 <!-- ![Login Security settings card](../images/12-login-security-card.png) -->

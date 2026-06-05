@@ -65,7 +65,6 @@ Tickets don't have their own settings section. They reuse:
 - All Stripe / fee settings from [Ch 13](view.php?slug=13-stripe-overview) and Ch 27.
 - The product's **Track Inventory** + **Stock quantity** fields, identical to physical products — stock decrements by quantity when the webhook marks the order paid. Set stock to venue capacity to get a "sold out" badge automatically.
 
-## Screenshots
 
 <!-- SCREENSHOT: A ticket product being configured. /admin/store/product/edit/<id>, Product Type set to "Ticket / Event", Event Name filled in. Save to public_html/admin/help/images/28-ticket-product-form.png. -->
 <!-- ![Ticket product configuration](../images/28-ticket-product-form.png) -->

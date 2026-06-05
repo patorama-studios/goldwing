@@ -76,7 +76,6 @@ No settings page of its own. It touches:
 - `integrations.smtp_password` — `/admin/settings/index.php` under Integrations.
 - AI provider keys — `/admin/settings/ai.php`. Save is disabled when `EncryptionService::isReady()` is false.
 
-## Screenshots
 
 <!-- SCREENSHOT: AI settings page at /admin/settings/ai.php showing the "encryption not ready" warning when APP_KEY is unset. Capture on a throwaway env with APP_KEY removed. Save to public_html/admin/help/images/10-ai-encryption-warning.png and uncomment below. -->
 <!-- ![AI encryption-not-ready warning](../images/10-ai-encryption-warning.png) -->

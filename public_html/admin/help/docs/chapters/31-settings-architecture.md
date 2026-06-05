@@ -156,7 +156,6 @@ Optionally add it to `SettingsService::defaults()` so `ensureDefaults()` seeds i
 
 This chapter doesn't define settings — it defines how settings *work*. For the actual list of every key in `settings_global`, what each one does, and where in the UI it's edited, see [Chapter 32 — Settings by section](view.php?slug=32-settings-by-section).
 
-## Screenshots
 
 <!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php showing the section tiles. Capture on draft.goldwing.org.au logged in as a full admin so all sections are visible. Save to public_html/admin/help/images/31-settings-hub-landing.png and uncomment below. -->
 <!-- ![Settings Hub landing](../images/31-settings-hub-landing.png) -->

@@ -78,7 +78,6 @@ All under the `media.*` category in `settings_global`:
 | `media.image_optimization_enabled` | `false` | Re-encode JPEG/PNG/WebP through GD on upload to shrink them. No resize, no thumbnails. |
 | `media.privacy_default` | `'member'` | Default `visibility` for new uploads. One of `public` / `member` / `admin`. |
 
-## Screenshots
 
 <!-- SCREENSHOT: Media library grid at /admin/index.php?page=media. Save as 25-media-library-grid.png. -->
 <!-- ![Media library grid](../images/25-media-library-grid.png) -->

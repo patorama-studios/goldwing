@@ -72,6 +72,10 @@ $next = ($idx !== false && $idx < count($slugs) - 1) ? $flat[$slugs[$idx + 1]] :
 function gw_render_markdown(string $md): string
 {
     $md = str_replace(["\r\n", "\r"], "\n", $md);
+    // Strip HTML comments entirely (including multi-line ones). Comments are
+    // used for screenshot placeholders and other authoring notes that should
+    // not surface to readers.
+    $md = preg_replace('/<!--.*?-->/s', '', $md);
     $lines = explode("\n", $md);
     $out = [];
     $i = 0;
@@ -202,8 +206,12 @@ function gw_render_markdown(string $md): string
         }
 
         // Raw HTML line (pass through). Lets us write callouts as
-        // <div class="callout"> ... </div> blocks directly.
-        if (preg_match('/^\s*<[a-zA-Z!\/][^>]*>?\s*$/', $line)) {
+        // <div class="callout"> ... </div> blocks directly, and lets a
+        // single-line <details><summary>Label</summary> survive intact.
+        // Matches any line that starts with `<` (followed by a letter, !, or /)
+        // and ends with `>` — covers single tags, closing tags, and complete
+        // inline elements like `<summary>Dev notes</summary>`.
+        if (preg_match('/^\s*<[a-zA-Z!\/].*>\s*$/', $line)) {
             $flushPara();
             $closeList();
             $out[] = $line;

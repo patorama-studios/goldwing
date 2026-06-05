@@ -74,7 +74,6 @@ There is **no `settings_global` key** for "default chapter" — new applicants m
 
 The handful of related settings that *do* exist (number padding, magazine type, etc.) belong to membership and are documented in [Chapter 19](view.php?slug=19-membership-lifecycle).
 
-## Screenshots
 
 <!-- SCREENSHOT: Chapters editor at /admin/settings/index.php?section=membership_pricing, scrolled to the "Chapters" table. Capture as draft.goldwing.org.au. Save as public_html/admin/help/images/21-chapters-editor.png. -->
 <!-- ![Chapters editor](../images/21-chapters-editor.png) -->

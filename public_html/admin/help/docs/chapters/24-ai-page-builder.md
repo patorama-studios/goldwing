@@ -63,7 +63,6 @@ All AI settings live in `settings_global` under the `ai.*` namespace (see [Chapt
 - `ai.template_header_html`, `ai.template_footer_html` — the HTML wrapped around every CMS page render (used by `public_html/index.php`, `preview.php`, and `api.php`). Written via the page-builder template manager, **not** the AI Settings page — see the gotcha below.
 - The kie.ai API key itself lives in `ai_provider_keys` (encrypted), not in `settings_global`.
 
-## Screenshots
 
 <!-- SCREENSHOT: The page builder at /admin/page-builder/, page sidebar on the left, preview in the centre, chat on the right. Save as 24-page-builder.png. -->
 <!-- ![Page builder](../images/24-page-builder.png) -->

@@ -76,7 +76,6 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 | `stripe.membership_prices.{TYPE}_1Y` (`config/app.php`) | Price IDs the renewal reminder builds checkout links from. |
 | `system_settings.last_renewal_reminder_run` / `last_expire_run` / `last_daily_summary_run` | Heartbeat markers. If these stop advancing, cron is broken. |
 
-## Screenshots
 
 <!-- SCREENSHOT: cPanel → Cron Jobs page showing the four entries and the "Cron Email" field populated. Save as 34-cpanel-cron-list.png. -->
 <!-- ![cPanel cron list](../images/34-cpanel-cron-list.png) -->

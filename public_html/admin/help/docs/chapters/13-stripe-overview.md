@@ -124,7 +124,6 @@ All keys are under `payments.stripe.*` in `settings_global`, plus a few `payment
 
 Env-var fallbacks (used only when the DB value is blank): `STRIPE_TEST_PUBLISHABLE_KEY`, `STRIPE_TEST_SECRET_KEY`, `STRIPE_LIVE_PUBLISHABLE_KEY`, `STRIPE_LIVE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Plus `APP_KEY` in `.env` is what makes the encrypted columns decryptable.
 
-## Screenshots
 
 <!-- SCREENSHOT: Settings Hub → Payments (Stripe) page with both test and live key sections visible and the "Use Stripe test mode" toggle on. Capture on draft.goldwing.org.au as admin. Save as public_html/admin/help/images/13-stripe-settings.png. -->
 <!-- ![Stripe settings page](../images/13-stripe-settings.png) -->

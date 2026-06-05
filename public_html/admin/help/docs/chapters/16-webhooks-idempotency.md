@@ -86,7 +86,6 @@ Webhook monitoring — `SecuritySettingsService`, stored in the `security_settin
 
 Per-channel webhook health (on `settings_payments`, written by `PaymentSettingsService::updateWebhookStatus()`): `last_webhook_received_at` and `last_webhook_error`. Rendered in the Stripe settings card as **OK / Failing / Stale** via `StripeSettingsService::webhookHealth()`.
 
-## Screenshots
 
 <!-- SCREENSHOT: Settings Hub → Payments → Stripe section, showing the read-only webhook URL field, the masked webhook signing secret, and the health line ("Status: OK, Last webhook: ..., Last error: None"). Save as 16-stripe-webhook-card.png. -->
 <!-- ![Stripe webhook card](../images/16-stripe-webhook-card.png) -->

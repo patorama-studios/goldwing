@@ -131,7 +131,6 @@ You *can* run `--apply` locally pointing at the production DB by editing `config
 
 The importer has no settings of its own. The only setting it writes is when `--update-shipping` is passed, which pushes `shipping.flat_rate` into `store_settings` (covered in [Chapter 32 — Settings by section](view.php?slug=32-settings-by-section) under Store → Shipping).
 
-## Screenshots
 
 <!-- SCREENSHOT: Terminal output of `php scripts/import_store_catalogue.php` (dry-run) on draft, showing the per-product log lines and the summary stats block. Save as 30-import-dryrun.png. -->
 <!-- ![Catalogue importer dry-run](../images/30-import-dryrun.png) -->

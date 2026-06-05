@@ -94,7 +94,6 @@ The Events section of the Settings Hub owns these `events.*` keys (see [Chapter 
 
 Reminder/digest behaviour comes from `notifications.event_reminders_enabled` and `notifications.weekly_digest_enabled` (owned by Chapter 22).
 
-## Screenshots
 
 <!-- SCREENSHOT: Admin calendar list at /calendar/events.php with a `pending` row visible so Approve/Reject show. Save as 26-admin-calendar.png. -->
 <!-- ![Admin calendar list](../images/26-admin-calendar.png) -->

@@ -287,7 +287,6 @@ What it controls: which page each role can access in the admin sidebar. Reads `p
 
 Owns no `settings_global` keys — its source of truth is the `page_role_access` table.
 
-## Screenshots
 
 <!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php on draft.goldwing.org.au, showing the sidebar with all sections expanded. Save to public_html/admin/help/images/32-hub-landing.png. -->
 <!-- ![Settings Hub landing](../images/32-hub-landing.png) -->

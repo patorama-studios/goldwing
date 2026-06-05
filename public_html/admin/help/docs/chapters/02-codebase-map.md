@@ -196,7 +196,6 @@ Impact-check pair (`check_doc_impact.php` / `.sh` and `check_tour_impact.php` / 
 
 None — pure orientation. Every other chapter declares its own.
 
-## Screenshots
 
 <!-- SCREENSHOT: Repo open in VS Code with top-level folders collapsed. Save as ../images/02-repo-tree.png. -->
 <!-- ![Repo tree](../images/02-repo-tree.png) -->

@@ -90,7 +90,6 @@ An admin can "act as" a member from `/admin/members/actions.php`. It writes `$_S
 - `security.twofa_grace_days`, `security.twofa_required_roles`, `security.email_otp_enabled` — owned by 2FA but consumed in the login branch. See [Chapter 06](view.php?slug=06-2fa-stepup).
 - `security.force_https` — bootstrap 301s to HTTPS before the session cookie is sent. See [Chapter 09](view.php?slug=09-security-headers).
 
-## Screenshots
 
 <!-- SCREENSHOT: The /login.php page on draft.goldwing.org.au showing the "Email or Member ID" field, password field, and Forgot password link. Save to public_html/admin/help/images/05-login-page.png. -->
 <!-- ![Login page](../images/05-login-page.png) -->

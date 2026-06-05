@@ -92,7 +92,6 @@ Anything an admin should change without a deploy lives in `settings_global` (sit
 
 This chapter doesn't own user-facing settings. The full catalogue of `settings_global` keys (categories, defaults, which page edits them) is in [Ch 32 — Settings by section](view.php?slug=32-settings-by-section).
 
-## Screenshots
 
 <!-- SCREENSHOT: Redacted view of the server's .env file (key names only). Save to public_html/admin/help/images/04-env-file.png. -->
 <!-- ![Server .env keys](../images/04-env-file.png) -->
