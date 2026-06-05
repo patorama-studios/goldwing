@@ -30,7 +30,7 @@ if (!in_array($type, $validTypes, true) || $id <= 0) {
     exit;
 }
 
-$item = PendingRequestsService::find($type, $id);
+$detailItem = PendingRequestsService::find($type, $id);
 
 // Optional debug dump — append ?debug=1 to the URL and view-source to see
 // exactly what find() returned, plus OPcache state. Helps diagnose
@@ -39,9 +39,9 @@ if (!empty($_GET['debug'])) {
     $debugPayload = [
         'type'         => $type,
         'id'           => $id,
-        'item_keys'    => $item ? array_keys($item) : null,
-        'item_summary' => $item ? array_diff_key($item, ['raw' => 1]) : null,
-        'raw_keys'     => $item && isset($item['raw']) ? array_keys((array) $item['raw']) : null,
+        'item_keys'    => $detailItem ? array_keys($detailItem) : null,
+        'item_summary' => $detailItem ? array_diff_key($detailItem, ['raw' => 1]) : null,
+        'raw_keys'     => $detailItem && isset($detailItem['raw']) ? array_keys((array) $detailItem['raw']) : null,
         'opcache'      => function_exists('opcache_get_status') ? array_intersect_key(
             (array) opcache_get_status(false),
             ['opcache_enabled' => 1, 'cache_full' => 1, 'restart_pending' => 1, 'restart_in_progress' => 1]
@@ -57,7 +57,7 @@ unset($_SESSION['requests_flash']);
 $canAction = current_admin_can('admin.requests.action');
 
 // Load conversation thread
-$threadMessages = $item ? PendingRequestsService::getMessages($type, $id) : [];
+$threadMessages = $detailItem ? PendingRequestsService::getMessages($type, $id) : [];
 
 $pageTitle  = 'Request Detail';
 $activePage = 'requests';
@@ -89,7 +89,20 @@ function reqStatusBadge2(?string $status): string {
         <span class="material-icons-outlined text-sm">arrow_back</span> Back to hub
       </a>
 
-      <?php if (!$item): ?>
+      <?php
+      // Inline debug: dump $detailItem right at render-time to see if anything between
+      // find() and here is wiping it out.
+      if (!empty($_GET['debug'])) {
+          echo '<!-- NOTIF_RENDER:' . base64_encode(json_encode([
+              'item_at_render' => $detailItem ? array_diff_key($detailItem, ['raw' => 1]) : null,
+              'item_is_null'   => $detailItem === null,
+              'item_empty'     => empty($detailItem),
+              'item_type'      => gettype($detailItem),
+              'raw_at_render'  => $detailItem && is_array($detailItem['raw'] ?? null) ? array_keys($detailItem['raw']) : 'NO_RAW',
+          ])) . ' -->';
+      }
+      ?>
+      <?php if (!$detailItem): ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
           <h1 class="font-display text-xl font-bold text-gray-900">Notification not found</h1>
           <p class="text-sm text-gray-600">
@@ -108,16 +121,16 @@ function reqStatusBadge2(?string $status): string {
           <div class="border-b border-gray-100 px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <div class="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-gray-500">
-                <span class="material-icons-outlined text-base"><?= e($item['type_icon']) ?></span>
-                <?= e($item['type_label']) ?> #<?= (int) $item['id'] ?>
+                <span class="material-icons-outlined text-base"><?= e($detailItem['type_icon']) ?></span>
+                <?= e($detailItem['type_label']) ?> #<?= (int) $detailItem['id'] ?>
               </div>
-              <h1 class="font-display text-2xl font-bold text-gray-900 mt-1"><?= e($item['title']) ?></h1>
-              <p class="text-sm text-gray-500">Submitted <?= e($item['submitted_at'] ?? '') ?>
-                <?php if (!empty($item['submitter_name'])): ?>· by <?= e($item['submitter_name']) ?><?php endif; ?>
-                <?php if (!empty($item['submitter_email'])): ?>(<?= e($item['submitter_email']) ?>)<?php endif; ?>
+              <h1 class="font-display text-2xl font-bold text-gray-900 mt-1"><?= e($detailItem['title']) ?></h1>
+              <p class="text-sm text-gray-500">Submitted <?= e($detailItem['submitted_at'] ?? '') ?>
+                <?php if (!empty($detailItem['submitter_name'])): ?>· by <?= e($detailItem['submitter_name']) ?><?php endif; ?>
+                <?php if (!empty($detailItem['submitter_email'])): ?>(<?= e($detailItem['submitter_email']) ?>)<?php endif; ?>
               </p>
             </div>
-            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= reqStatusBadge2($item['status']) ?>"><?= e(strtoupper($item['status'])) ?></span>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= reqStatusBadge2($detailItem['status']) ?>"><?= e(strtoupper($detailItem['status'])) ?></span>
           </div>
 
           <div class="p-6 space-y-4">
@@ -138,11 +151,11 @@ function reqStatusBadge2(?string $status): string {
               // Defensive: row() always sets 'raw' to an array, but if an older cached
               // bytecode returns a partial row, fall back to an empty array so the
               // page still renders instead of dying inside array_filter().
-              $itemRaw = is_array($item['raw'] ?? null) ? $item['raw'] : [];
+              $detailItemRaw = is_array($detailItem['raw'] ?? null) ? $detailItem['raw'] : [];
             ?>
 
             <?php foreach ($richFields as $rf): ?>
-              <?php $rfVal = (string) ($itemRaw[$rf] ?? ''); if ($rfVal === '') continue; ?>
+              <?php $rfVal = (string) ($detailItemRaw[$rf] ?? ''); if ($rfVal === '') continue; ?>
               <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-2"><?= e(ucwords(str_replace('_', ' ', $rf))) ?></p>
                 <div class="text-sm text-gray-800 leading-relaxed prose prose-sm max-w-none">
@@ -152,7 +165,7 @@ function reqStatusBadge2(?string $status): string {
             <?php endforeach; ?>
 
             <?php
-              $metaFields = array_filter($itemRaw, function ($v, $k) use ($skipMeta) {
+              $metaFields = array_filter($detailItemRaw, function ($v, $k) use ($skipMeta) {
                   if (in_array($k, $skipMeta, true)) return false;
                   if (is_array($v) || is_object($v)) return false;
                   return $v !== null && $v !== '';
@@ -172,17 +185,17 @@ function reqStatusBadge2(?string $status): string {
               </div>
             <?php endif; ?>
 
-            <?php if (!empty($item['raw']['feedback_message'])): ?>
+            <?php if (!empty($detailItem['raw']['feedback_message'])): ?>
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p class="text-xs uppercase tracking-[0.3em] text-amber-700 mb-1">Existing feedback</p>
-                <p class="text-sm text-amber-900 whitespace-pre-wrap"><?= e((string) $item['raw']['feedback_message']) ?></p>
+                <p class="text-sm text-amber-900 whitespace-pre-wrap"><?= e((string) $detailItem['raw']['feedback_message']) ?></p>
               </div>
             <?php endif; ?>
 
-            <?php if (!empty($item['raw']['response'])): ?>
+            <?php if (!empty($detailItem['raw']['response'])): ?>
               <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <p class="text-xs uppercase tracking-[0.3em] text-blue-700 mb-1">Admin response on record</p>
-                <p class="text-sm text-blue-900 whitespace-pre-wrap"><?= e((string) $item['raw']['response']) ?></p>
+                <p class="text-sm text-blue-900 whitespace-pre-wrap"><?= e((string) $detailItem['raw']['response']) ?></p>
               </div>
             <?php endif; ?>
           </div>
@@ -199,10 +212,10 @@ function reqStatusBadge2(?string $status): string {
           $messageLabel  = $isFeedback
             ? 'Response to submitter (optional for resolve / won\'t fix, required for reply)'
             : 'Message to submitter (optional for approve, required for deny/feedback)';
-          $itemStatus    = $item['status'] ?? '';
-          $isPending     = !in_array($itemStatus, ['approved', 'rejected', 'archived'], true);
-          $isActioned    = in_array($itemStatus, ['approved', 'rejected'], true);
-          $isArchived    = ($itemStatus === 'archived');
+          $detailItemStatus    = $detailItem['status'] ?? '';
+          $isPending     = !in_array($detailItemStatus, ['approved', 'rejected', 'archived'], true);
+          $isActioned    = in_array($detailItemStatus, ['approved', 'rejected'], true);
+          $isArchived    = ($detailItemStatus === 'archived');
         ?>
 
         <?php if (!empty($threadMessages)): ?>
@@ -266,9 +279,9 @@ function reqStatusBadge2(?string $status): string {
         <?php elseif ($canAction && $isActioned): ?>
           <section class="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <p class="text-sm text-gray-600">This request has been <strong><?= e($itemStatus) ?></strong>.
-                <?php if (!empty($item['raw']['reviewed_at'])): ?>
-                  Reviewed <?= e((string) $item['raw']['reviewed_at']) ?>.
+              <p class="text-sm text-gray-600">This request has been <strong><?= e($detailItemStatus) ?></strong>.
+                <?php if (!empty($detailItem['raw']['reviewed_at'])): ?>
+                  Reviewed <?= e((string) $detailItem['raw']['reviewed_at']) ?>.
                 <?php endif; ?>
               </p>
               <form method="post" action="/admin/requests/actions.php" class="shrink-0">
