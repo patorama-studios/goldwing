@@ -14,7 +14,7 @@ if (!is_array($payload) || empty($payload['slug']) || empty($payload['csrf'])) {
     echo json_encode(['error' => 'Bad request']);
     return;
 }
-if (!Csrf::validate($payload['csrf'])) {
+if (!Csrf::verify((string) $payload['csrf'])) {
     http_response_code(419);
     echo json_encode(['error' => 'CSRF token invalid']);
     return;
