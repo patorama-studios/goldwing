@@ -34,21 +34,19 @@ $gwHelpCsrf = Csrf::token();
 <script src="/assets/js/tours/driver.js.iife.js" defer></script>
 <script src="/assets/js/tours/tour-engine.js" defer></script>
 <script>
-  // Set up GoldwingTours globals once the engine has loaded.
+  // Set up GoldwingTours globals once the engine has loaded so the
+  // ?gw_tour=<slug> and ?gw_validate=<slug> auto-launchers below have
+  // everything they need. (The floating "?" button was removed once
+  // the Help & Guides sidebar entries gave users a clearer entry point.)
   document.addEventListener('DOMContentLoaded', function () {
     if (!window.GoldwingTours) return;
     window.GoldwingTours.manifest = <?= json_encode($gwHelpManifest, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
     window.GoldwingTours.completions = <?= json_encode((object) $gwHelpCompletions, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
     window.GoldwingTours.csrfToken = <?= json_encode($gwHelpCsrf) ?>;
-    window.GoldwingTours.isAdmin = <?= json_encode(in_array('admin', $gwHelpUser['roles'] ?? [], true) || in_array('webmaster', $gwHelpUser['roles'] ?? [], true)) ?>;
+    window.GoldwingTours.isAdmin = <?= json_encode($gwHelpIsAdmin) ?>;
+    window.GoldwingTours.allGuidesUrl = <?= json_encode($gwHelpAllGuidesUrl) ?>;
+    window.GoldwingTours.supportEmail = <?= json_encode($gwHelpSupportEmail) ?>;
   });
-  window.GoldwingHelpConfig = {
-    allGuidesUrl: <?= json_encode($gwHelpAllGuidesUrl) ?>,
-    supportEmail: <?= json_encode($gwHelpSupportEmail) ?>,
-    currentUrl: <?= json_encode($gwHelpCurrentUrl) ?>,
-  };
-</script>
-<script src="/assets/js/tours/help-button.js" defer></script>
 <?php
 // Auto-launch when a member follows a ?gw_tour=<slug> link from the Help panel
 // or an admin opens a ?gw_validate=<slug> link from the Tour Validator page.
