@@ -35,6 +35,12 @@ Both routes do exactly the same thing.
 
 ### How to issue a refund (step by step)
 
+The Refunds panel sits at the bottom of the order detail page and looks like this:
+
+![Refunds panel on the order detail page](../images/17-refund-button.png)
+
+Then:
+
 1. Find the order you want to refund (either route above).
 2. Scroll to the **Refunds** panel.
 3. Type the **amount** (in dollars). Leave it blank to refund the whole order's remaining balance.
@@ -42,6 +48,9 @@ Both routes do exactly the same thing.
 5. Click **Process refund**.
 6. You'll be asked for your **2FA code** if it's been more than a few minutes since you last entered one (this is the "step-up" check — a deliberate extra layer of safety on actions involving money).
 7. Confirm the browser pop-up: "Process this refund in Stripe?"
+
+    ![Browser confirm dialog before the Stripe call](../images/17-refund-confirm.png)
+
 8. Wait a few seconds. The page reloads and you'll see the refund listed in the panel with a status of **Processed**.
 
 That's it. Stripe sends the money. The member gets an email immediately. We never touch any cards or bank details ourselves — Stripe does all of that.
