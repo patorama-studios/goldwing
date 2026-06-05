@@ -1,5 +1,89 @@
 # Logs & troubleshooting
 
+## For administrators
+
+### What this is
+
+A quick reference for **where to look when something's not working**. The site has a few different places where evidence of a problem ends up — a member's account, an order, an email, a webhook — and they each live in a different log or dashboard. This chapter is the map.
+
+You don't need to memorise it. You need to know which page to open first when a member emails you saying "it's broken".
+
+### The "what to do when…" playbook
+
+#### A member can't log in
+
+1. Go to **Admin → Security Log** and search for their email address.
+2. If you see "rate limit exceeded" or "account locked", they've tried too many wrong passwords — see [Chapter 12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout) to clear the lockout.
+3. If they have 2FA on and are stuck on the code, see [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup) — you may need to clear a trusted device or reset their 2FA.
+4. If none of the above, offer them a **password reset** — see [Chapter 05 — Password reset & lost device](view.php?slug=05-password-reset).
+
+#### A payment didn't go through
+
+1. Open the **Stripe Dashboard** first — that's the source of truth for anything money-related. Search for the customer's email or the order number.
+2. If Stripe shows the payment as failed, the reason is in the Stripe event log (usually "card declined" with a sub-reason like insufficient funds or wrong CVC). Pass that wording on to the member.
+3. Then check **Admin → Audit Log** for the order's events to see how our site recorded it.
+4. If Stripe shows it as succeeded but our site shows it as pending, escalate to the developer with the **Stripe payment intent ID** (looks like `pi_3Q4…`).
+
+#### An email didn't arrive
+
+1. Ask the member to check their **spam / junk folder** — that's the most common cause by far.
+2. In admin, go to **Settings → Integrations → SMTP** and click **Test SMTP connection**. If the test fails, SMTP credentials are broken — flag the developer.
+3. If SMTP works, **re-send the email** (e.g. resend the welcome email from the member's profile, or re-issue the order receipt).
+4. If *every* outbound email is failing across multiple members, that's a system-wide SMTP problem — flag the developer immediately.
+
+#### A refund failed
+
+1. See [Chapter 17 — Refunds](view.php?slug=17-refunds) — the "What can go wrong" section covers the common refund errors and what each one means.
+2. The **Stripe dashboard** holds the real error message. Look up the original charge and check the Events log on it — Stripe will tell you exactly why it rejected the refund.
+
+#### A webhook keeps failing
+
+1. Go to **Admin → Settings → Payments** and check the **webhook health** indicator.
+2. If it's flashing red or showing repeated failures, flag the developer with:
+   - The **webhook signing secret** (or at least which environment it's for — live or test).
+   - The **recent failure messages** (Stripe's webhook delivery page shows the last few attempts and the response codes our endpoint returned).
+
+#### A FIM alert fired
+
+1. See [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity).
+2. Investigate the file change — was it a deploy you knew about? Did the developer mention it?
+3. If it was expected, **approve** the new baseline. If it wasn't, **escalate** — treat it as a possible intrusion until proven otherwise.
+
+#### A page isn't showing recent changes
+
+1. Did the developer tell you a deploy needed to happen? Has the **deploy step** been done (see [Chapter 33 — Deployment](view.php?slug=33-deployment))?
+2. If yes — **hard-refresh** your browser (Cmd+Shift+R on Mac, Ctrl+F5 on Windows) to clear cached files.
+3. If still missing, the deploy may not have finished — ask the developer to check.
+
+### What you should NEVER do
+
+- **Don't delete logs to "make the error go away."** The error doesn't go away; you just lose the only evidence of what happened. If the same problem comes back next week, you've got nothing.
+- **Don't turn on "debug mode" in production.** The site is deliberately built so this isn't even an option — but if anyone ever suggests it, the answer is no. Showing PHP stack traces to the public leaks sensitive information.
+- **Don't share screenshots of error messages publicly.** Error messages can contain database table names, file paths, member IDs, partial credentials, or other internal details. Send them in a private channel or email to the developer only.
+
+### Good practice
+
+- **Copy the EXACT error message** when escalating. Not a paraphrase — the literal text. A single wrong word can send the developer hunting in the wrong place.
+- **Note the time** it happened (and roughly what timezone you're in). Logs are timestamped, and "around 2pm" is much easier to grep than "earlier today".
+- **Check whether other people have the same issue** before assuming it's a site-wide outage. If one member can't log in, that's a user problem. If five members in five minutes can't log in, that's a site problem.
+- **Check the Audit Log to rule out recent settings changes.** If something started misbehaving today, ask "did someone change a setting today?" — the Audit Log answers that in 30 seconds.
+
+### Who to ask if stuck
+
+The developer. When you escalate, give them:
+
+- **The time** it happened (with your timezone).
+- **The URL** the member or you were on when it broke.
+- **The member** (email or ID) if a specific person is affected.
+- **The exact error message** — copy-pasted, not retyped.
+
+That's enough to get them looking in the right place. Without it, the first 20 minutes of any debugging session is them asking you for it.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 Where to look when something on the site is broken, slow, or behaving weirdly. This chapter is the triage map: which log holds what, which table tells you which story, which third-party dashboard owns which problem, and at what point you stop poking and call the dev. Everything below assumes you're logged in as an admin and have shell or cPanel access to the server.
@@ -52,19 +136,6 @@ There is **no `advanced.debug_mode`** key — production never runs with `displa
 
 The Log Viewer itself has no settings — it always reads `app/storage/logs/system.log` (last 300 lines, capped at ~200 KB by `LogViewerService::readTail()`). The "Clear log" button on the Advanced settings page requires step-up.
 
-
-<!-- SCREENSHOT: /admin/settings/?section=advanced — the "System Logs" card showing tailed system.log content with the Clear log button. Save as 35-system-log-viewer.png. -->
-<!-- ![System Log viewer](../images/35-system-log-viewer.png) -->
-
-<!-- SCREENSHOT: cPanel "Errors" tile content for the goldwing.org.au account. Save as 35-cpanel-error-log.png. -->
-<!-- ![cPanel error log](../images/35-cpanel-error-log.png) -->
-
-<!-- SCREENSHOT: Stripe Dashboard → Developers → Webhooks → Endpoint details, showing recent failed delivery attempts. Save as 35-stripe-webhook-failures.png. -->
-<!-- ![Stripe webhook failures](../images/35-stripe-webhook-failures.png) -->
-
-<!-- SCREENSHOT: /admin/settings/?section=security — FIM card with one or more unexpected changes flagged, before approval. Save as 35-fim-diff.png. -->
-<!-- ![FIM diff](../images/35-fim-diff.png) -->
-
 ## Tools
 
 - **Log Viewer (Settings → Advanced)** — `/admin/settings/?section=advanced`. Tails `system.log` in the browser. Use this 90% of the time.
@@ -94,8 +165,24 @@ Call the dev when:
 
 For hosting-level outages, the cPanel support contact path is the host's helpdesk (currently raised through the cPanel WHM ticket form on the provider's portal). Pat keeps the account login and ticket history.
 
+</details>
+
+<!-- SCREENSHOT: /admin/settings/?section=advanced — the "System Logs" card showing tailed system.log content with the Clear log button. Save as 35-system-log-viewer.png. -->
+<!-- ![System Log viewer](../images/35-system-log-viewer.png) -->
+
+<!-- SCREENSHOT: cPanel "Errors" tile content for the goldwing.org.au account. Save as 35-cpanel-error-log.png. -->
+<!-- ![cPanel error log](../images/35-cpanel-error-log.png) -->
+
+<!-- SCREENSHOT: Stripe Dashboard → Developers → Webhooks → Endpoint details, showing recent failed delivery attempts. Save as 35-stripe-webhook-failures.png. -->
+<!-- ![Stripe webhook failures](../images/35-stripe-webhook-failures.png) -->
+
+<!-- SCREENSHOT: /admin/settings/?section=security — FIM card with one or more unexpected changes flagged, before approval. Save as 35-fim-diff.png. -->
+<!-- ![FIM diff](../images/35-fim-diff.png) -->
+
 ## Related chapters
 
+- [05 — Password reset & lost device](view.php?slug=05-password-reset) — offering a member a password reset when they're locked out.
+- [06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup) — what to do when a member is stuck on a 2FA code.
 - [08 — Activity & audit log](view.php?slug=08-activity-audit) — schemas and what each event type means.
 - [11 — File integrity monitoring](view.php?slug=11-file-integrity) — how FIM baselines and diffs work.
 - [12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout) — `login_attempts`, lockout reset.

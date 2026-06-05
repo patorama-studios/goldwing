@@ -1,5 +1,62 @@
 # Bulk catalogue import
 
+## For administrators
+
+When the annual catalogue update comes in as a spreadsheet, the developer can import all the products in one go rather than re-creating each one by hand. **You don't run this yourself** — this page is just so you know what's happening.
+
+### What this is
+
+A **developer tool** that takes a catalogue spreadsheet and updates the store's products in bulk — titles, prices, sizes, stock counts. Used for the annual catalogue refresh, not for one-off edits.
+
+### When you'd use it
+
+- The **annual catalogue update** when the AGA reissues the merchandise list.
+- A **large-scale catalogue restructure** (e.g. renaming a product line, reshuffling sizes).
+- **Never for one product at a time.** Single-product changes go through admin.
+
+### Who's allowed
+
+- **Developer only.** It runs from the server's command line — there's no button in admin.
+
+### What you should do
+
+1. **Send the developer the catalogue file** (usually the warehouse xlsx).
+2. **Ask for a dry-run first.** It previews exactly what *would* change without writing anything. Review that output before they apply for real.
+3. **Confirm the timing** with the store manager — pick a quiet window, not during a checkout rush.
+
+### What admins can do directly in admin
+
+You don't need a developer for everyday product work. Go to **Admin → Store → Products** to:
+
+- Edit a single product's title, price, description, or stock count.
+- Upload product images (the bulk importer doesn't touch images).
+- Mark a discontinued product as inactive.
+- Add or rename categories and tags.
+
+Use the bulk importer only when there are dozens of changes at once.
+
+### What can go wrong
+
+- **The developer applies a stale catalogue file and overwrites recent admin edits.** If you tweaked a price in the UI yesterday and the file still has the old price, the file wins.
+- **Variants get replaced and the cart breaks for in-progress shoppers.** The importer rebuilds sizes/options from scratch. Anyone with a half-finished order may see a "this item is no longer available" error.
+
+Both are why the **dry-run is mandatory** — never let it be skipped.
+
+### Good practice
+
+- **Always require a dry-run before apply.** No exceptions.
+- **Back up the database before any big import** so a botched run can be rolled back.
+- **Coordinate the timing with the store manager.** Avoid sales pushes and right after a newsletter goes out.
+
+### Who to ask if stuck
+
+- **The developer.** If something looks off after an import — wrong prices, missing items, broken variants — flag it to them with the SKUs affected.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 How to load (or reload) the AGA merchandise catalogue from a single JSON spec instead of clicking through the admin product CRUD product-by-product. Specifically: the `scripts/import_store_catalogue.php` CLI, its dry-run vs apply modes, the optional shipping push, and what gets touched vs left alone.
@@ -131,13 +188,6 @@ You *can* run `--apply` locally pointing at the production DB by editing `config
 
 The importer has no settings of its own. The only setting it writes is when `--update-shipping` is passed, which pushes `shipping.flat_rate` into `store_settings` (covered in [Chapter 32 — Settings by section](view.php?slug=32-settings-by-section) under Store → Shipping).
 
-
-<!-- SCREENSHOT: Terminal output of `php scripts/import_store_catalogue.php` (dry-run) on draft, showing the per-product log lines and the summary stats block. Save as 30-import-dryrun.png. -->
-<!-- ![Catalogue importer dry-run](../images/30-import-dryrun.png) -->
-
-<!-- SCREENSHOT: Admin product list at /admin/store/products/ before and after running --apply for a fresh catalogue version. Save as 30-products-before-after.png. -->
-<!-- ![Products list after import](../images/30-products-before-after.png) -->
-
 ## Gotchas
 
 - **Variants get fully replaced on every run.** If you remove a variant from the JSON, it disappears from the live catalogue. Past orders still show the snapshotted SKU/title/price, but the variant ID is gone and the customer can't re-buy the exact same line.
@@ -146,6 +196,14 @@ The importer has no settings of its own. The only setting it writes is when `--u
 - **Running `--apply` on a stale JSON WILL revert UI edits.** If a SKU exists in both DB and JSON, the JSON wins for every field listed under "The script flow" — including stock counts and `is_active`. Refresh the JSON from the latest xlsx before a hotfix re-run.
 - **Taxonomy is additive only.** Categories/tags named in the JSON get created if missing, but unused entries from previous catalogues stay in `store_categories`. Clean them up from `/admin/store/categories.php` if needed.
 - **No cron schedule.** This is a deliberate manual step — see [Chapter 34 — Cron jobs](view.php?slug=34-cron-jobs) for what *is* scheduled. We don't want stock counts silently rewritten overnight.
+
+</details>
+
+<!-- SCREENSHOT: Terminal output of `php scripts/import_store_catalogue.php` (dry-run) on draft, showing the per-product log lines and the summary stats block. Save as 30-import-dryrun.png. -->
+<!-- ![Catalogue importer dry-run](../images/30-import-dryrun.png) -->
+
+<!-- SCREENSHOT: Admin product list at /admin/store/products/ before and after running --apply for a fresh catalogue version. Save as 30-products-before-after.png. -->
+<!-- ![Products list after import](../images/30-products-before-after.png) -->
 
 ## Related chapters
 

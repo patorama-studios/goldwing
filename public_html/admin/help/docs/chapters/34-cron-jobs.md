@@ -1,5 +1,70 @@
 # Cron jobs
 
+## For administrators
+
+### What this is
+
+A **cron job** is a small task the website runs automatically on a schedule — no one has to click a button. Goldwing's site uses a handful of them to handle the boring-but-critical jobs that absolutely have to happen on time:
+
+- Emailing members **renewal reminders** before their membership runs out.
+- Marking memberships **lapsed** the day after they expire, so member-only access turns off.
+- Doing a **file integrity scan** to catch tampering or unexpected file changes.
+- Optionally, sending admins a **daily summary** of activity.
+
+These run quietly in the background. Most of the time you don't need to think about them — but if reminders stop going out, or memberships aren't lapsing on time, this is where to look.
+
+### What you can see
+
+- The list of scheduled jobs and **when each one runs** (in cPanel).
+- Whether each job is **enabled** (in the list at all) or **disabled** (removed from the list).
+- The **last output** of each job — cPanel emails any output (errors, notices) to a configured address.
+- A **"last run" marker** for each job, recorded in the database, so you can confirm jobs are actually firing.
+
+### Who's allowed
+
+Anyone with **cPanel access** to the hosting account can see and edit the cron schedule. That's typically just the developer and a small number of trusted admins. Editing cron jobs isn't done from the website's admin area — it's done through the hosting control panel.
+
+### Where to find them
+
+In **cPanel → Cron Jobs**. The page shows every scheduled command, the schedule it runs on, and a **"Cron Email"** field at the top — that's the address that gets sent any output the jobs produce. Make sure it's set to an address someone actually checks.
+
+### The jobs that run on this site
+
+- **Renewal reminders** — runs daily. Emails (and SMS's, where a phone is on file) members who are due to renew in 60 days, and again at 30 days. Builds them a ready-to-pay Stripe checkout link.
+- **Membership expiry** — runs daily, just after midnight. Looks for any active memberships whose end date has passed, and marks them as **lapsed**. After this runs, those members lose member-only access until they renew.
+- **File integrity scan** — runs hourly (or nightly, depending on configuration). Compares the site's files against a saved baseline and alerts the security recipient if anything has changed unexpectedly. Cross-reference with [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity).
+- **Daily admin summary** — optional. Emails the first admin a one-paragraph digest each morning: how many active members, how many pending applications, how many memberships are due soon. A useful "is the site still alive?" heartbeat.
+
+### What you might need to do
+
+- **Turn one off temporarily** — flag the developer first. They'll delete (or comment out) the cron entry in cPanel. Restoring is just re-adding the line.
+- **Check why a job stopped running** — look at the "Cron Email" inbox for error output, and ask the developer to check the `last_*_run` marker in the database for that job. If the marker hasn't advanced in days, the job isn't firing.
+- **Verify the schedule** — open cPanel → Cron Jobs and read the times in the left column. The schedule is in the *server's* clock, not necessarily Sydney time (see "What can go wrong" below).
+
+### What can go wrong
+
+- **A cron entry gets deleted by accident.** Renewal reminders stop, no one notices for a few days, members lapse without warning. Always check the cron list is complete after any hosting work.
+- **Cron output isn't being emailed.** If the "Cron Email" field is blank, a fatal error in a cron script is silent — you only find out when a member complains. Always keep an address in that field, and make sure someone reads it.
+- **Renewal reminders not going out.** Members miss their renewal date and lapse with no warning. Symptoms: members reporting "I didn't know I needed to renew." Check the cron entry exists, the email log, and ask the developer to check the `renewal_reminders` heartbeat.
+- **File integrity scan not running.** No alerts when files change. Symptoms: silence (which is the problem). Ask the developer to confirm the scan is enabled and the baseline is set.
+- **Cron output fills up disk.** Rare, but a script that errors loudly every hour can fill the cPanel mailbox. If "Cron Email" is bouncing, that's the cause.
+
+### Good practice
+
+- **Don't disable a cron job without flagging the developer.** What looks like "I'll just turn off reminders for a week" can lead to members lapsing silently.
+- **Check the cPanel cron history once a month.** Confirm all four jobs are still in the list and the "Cron Email" address is still set.
+- **Make sure the cron-output email goes somewhere monitored.** A shared admin inbox is fine — a personal address that no one checks during holidays is not.
+- **If a job seems to have stopped, look at the "last run" marker before assuming the script is broken.** Often cron itself has been disabled (after a hosting change, for instance) and the script is fine.
+
+### Who to ask if a job seems broken
+
+The **developer**. Cron jobs run outside the website's admin area and need cPanel access (or SSH) to diagnose. If reminders aren't going out or memberships aren't lapsing on time, that's a developer ticket, not something to troubleshoot from the admin panel.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 The four scheduled PHP scripts in `cron/` — what each one does, when it runs, what it writes to the database, who gets emailed when it works, and what to do when it doesn't. Plus the cPanel-side setup: how to add a cron entry, where its output goes, and the timezone trap that catches everyone the first time.
@@ -76,13 +141,6 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 | `stripe.membership_prices.{TYPE}_1Y` (`config/app.php`) | Price IDs the renewal reminder builds checkout links from. |
 | `system_settings.last_renewal_reminder_run` / `last_expire_run` / `last_daily_summary_run` | Heartbeat markers. If these stop advancing, cron is broken. |
 
-
-<!-- SCREENSHOT: cPanel → Cron Jobs page showing the four entries and the "Cron Email" field populated. Save as 34-cpanel-cron-list.png. -->
-<!-- ![cPanel cron list](../images/34-cpanel-cron-list.png) -->
-
-<!-- SCREENSHOT: A sample renewal reminder email as received by a member (Hi {first_name} … Renew now). Save as 34-renewal-email.png. -->
-<!-- ![Sample renewal email](../images/34-renewal-email.png) -->
-
 ## Gotchas
 
 - **Server timezone is not site timezone.** cron schedules are interpreted in the *server's* timezone (whatever cPanel is set to), not `site.timezone`. `0 6 * * *` is 6am server-time. The bootstrap re-applies `site.timezone` *inside* the script for `CURDATE()` / `NOW()`, so SQL is consistent — but the trigger moment is server-clock. If the server is UTC and Sydney is +10, your "6am" reminder fires at 4pm local. Check what cPanel reports and align.
@@ -91,6 +149,14 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 - **CLI PHP can use a different `php.ini` than the web SAPI.** `/usr/bin/php` may load a different config than the FPM worker serving the site — different memory limits, different extensions, different env vars. If a cron works in the browser via a debug page but fails on schedule, suspect this first. `php -i | grep "Loaded Configuration"` on SSH tells you which ini.
 - **`renewal_reminders` is the only thing stopping double sends.** Truncating that table will email everyone twice. Don't.
 - **What's *not* on cron, despite feeling like it should be:** `scripts/check_tour_impact.php` and `scripts/check_doc_impact.php` run pre-push, never on a schedule. The catalogue import ([Chapter 30](view.php?slug=30-catalogue-import)) is manual on purpose. Database backups are handled by cPanel's daily backup, not by anything in `cron/`.
+
+</details>
+
+<!-- SCREENSHOT: cPanel → Cron Jobs page showing the four entries and the "Cron Email" field populated. Save as 34-cpanel-cron-list.png. -->
+<!-- ![cPanel cron list](../images/34-cpanel-cron-list.png) -->
+
+<!-- SCREENSHOT: A sample renewal reminder email as received by a member (Hi {first_name} … Renew now). Save as 34-renewal-email.png. -->
+<!-- ![Sample renewal email](../images/34-renewal-email.png) -->
 
 ## Related chapters
 

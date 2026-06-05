@@ -1,5 +1,83 @@
 # Media library
 
+## For administrators
+
+### What this is
+
+The **media library** is one central place where every photo, PDF, and other file uploaded to the site lives. Member photos, committee shots, Wings Magazine PDFs, Fallen Wings / Member-of-the-Year submissions, page banners, store product images — they all sit in the same library.
+
+The point: upload a file once, then reuse it anywhere on the site without having to upload it again.
+
+### What you can do
+
+- **Upload new files** — drag-and-drop, or browse from your computer.
+- **Find old files** — search by title or tag, filter by type (image / PDF / video / other).
+- **Insert images into pages** — either pick them in the AI Page Builder, or paste a `[media:NN]` shortcode into a page's HTML.
+- **Replace a file across the whole site** — change one file in the library and every page that references it updates automatically.
+- **Delete files you no longer need** — with a check first to make sure nothing on the site is still using it.
+
+### Who's allowed
+
+**Admin** only. The library can hold sensitive things (member photos, draft Wings issues), so general committee members don't get access by default.
+
+### Where to find it
+
+**Admin → Media** (in the left sidebar).
+
+Settings for the library live separately at **Admin → Settings → Media & Files** — that's where you set the maximum upload size and the allowed file types.
+
+### How to upload a file
+
+1. Go to **Admin → Media**.
+2. Either **drag the file** onto the page, or click **Upload** and pick it from your computer.
+3. (Optional) Give it a **title** and some **tags** so you can find it later.
+4. (Optional) Set **visibility** — public (anyone), member (logged-in members only), admin (only admins).
+5. Click **Save**.
+
+Supported file types include common images (JPG, PNG, WebP), PDFs, and most document/video formats. The site rejects anything risky (PHP files, scripts, etc.) automatically.
+
+### How to reference an image in a page
+
+Two ways:
+
+1. **Via the AI Page Builder** — when you ask the builder to add an image, pick from the library and it inserts the right reference for you. (See Chapter 24.)
+2. **Using a shortcode** — paste `[media:NN]` into the page's HTML, where `NN` is the file's library ID (you'll see this next to the file in the library). When the page renders, the shortcode is replaced with the actual image, PDF link, or video embed.
+
+Prefer the shortcode over pasting a raw `/uploads/...` URL — if the filename ever changes, the shortcode keeps working. A hardcoded URL doesn't.
+
+### File limits
+
+- **Max upload size** — set in **Settings → Media & Files** (default 10 MB).
+- **Allowed types** — also set in **Settings → Media & Files**. Empty = anything except risky executable files.
+- Phone photos are often 5–10 MB. Magazine PDFs can be larger — bump the limit if needed before uploading a new Wings issue.
+
+### What can go wrong
+
+- **"Upload failed" / file too big** — the file is over the **max upload size** limit. Either resize the image (most phone photos can drop to 1–2 MB without anyone noticing) or raise the limit in **Settings → Media & Files**.
+- **"File type not allowed"** — the file's type isn't on the allow-list, or it's a blocked type (PHP, scripts). Save it as a JPG/PNG/PDF and try again.
+- **A member's photo is accidentally public** — when uploading anything personal, double-check the **visibility** setting. The site default is "member" (logged-in members only), but it's worth verifying for sensitive uploads.
+- **A page suddenly shows "Missing media"** — someone deleted a file the page was still using. The fix: re-upload the file and update the page to reference the new one, or restore the old file if you have a backup.
+- **A photo looks huge / squashed on a page** — the library doesn't resize images. A 6000-pixel phone photo is still 6000 pixels in the library. Resize before uploading for best results.
+
+### Good practice
+
+- **Use descriptive filenames.** `2024-state-rally-group-shot.jpg` beats `IMG_2934.jpg`. Future-you will thank you when searching the library.
+- **Resize big photos before uploading.** A 1500–2000 pixel wide JPEG is plenty for any page on the site, and loads much faster than a 6000-pixel one.
+- **Don't delete files without checking what uses them.** The library shows reference counts in the database, but it can't always tell whether a file is embedded in page HTML. Search for the file's ID (`[media:NN]`) across pages before deleting.
+- **Tag "do not delete" files.** Logos, the site favicon, Wings covers, anything load-bearing — give it a `do-not-delete` tag (or similar) so the next admin doesn't bin it by mistake.
+- **Re-run "Sync media index" after big uploads.** If you've uploaded a stack of files outside the main library flow (Wings issues, member-of-the-year submissions), the Sync button re-indexes everything so it all shows up in the library view.
+
+### Who to ask if stuck
+
+- **"It won't let me upload this type"** — check the allow-list in **Settings → Media & Files**, or ask another admin to add the type.
+- **"I deleted something I shouldn't have"** — your developer may be able to restore it from a server backup. Production uploads aren't in git, so the sooner you ask, the better the chance.
+- **"Uploads have stopped working entirely after a deploy"** — that's almost always a server file-permissions issue. Flag it to your developer with the exact error message.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 How the site stores, indexes, references, and deletes uploaded files: the `media` table, `App\Services\MediaService`, the `/admin/index.php?page=media` UI, the `[media:NNN]` shortcode, and the satellite flows (Wings Magazine, Fallen Wings) that share the same `uploads/` directory.
@@ -78,16 +156,6 @@ All under the `media.*` category in `settings_global`:
 | `media.image_optimization_enabled` | `false` | Re-encode JPEG/PNG/WebP through GD on upload to shrink them. No resize, no thumbnails. |
 | `media.privacy_default` | `'member'` | Default `visibility` for new uploads. One of `public` / `member` / `admin`. |
 
-
-<!-- SCREENSHOT: Media library grid at /admin/index.php?page=media. Save as 25-media-library-grid.png. -->
-<!-- ![Media library grid](../images/25-media-library-grid.png) -->
-
-<!-- SCREENSHOT: Upload modal / form on the same page, showing title/tags/visibility. Save as 25-media-upload.png. -->
-<!-- ![Upload form](../images/25-media-upload.png) -->
-
-<!-- SCREENSHOT: Page builder content area with a [media:NNN] shortcode inserted, beside the rendered preview from /admin/page-builder/preview.php. Save as 25-media-shortcode.png. -->
-<!-- ![Shortcode in page HTML](../images/25-media-shortcode.png) -->
-
 ## Gotchas
 
 - **`public_html/uploads/` ships in deploys.** The folder is in the git repo, so anything committed lives forever in history. Don't commit member PII you uploaded for testing — and don't `git clean` the server's `uploads/` folder, you'll wipe production media.
@@ -98,6 +166,17 @@ All under the `media.*` category in `settings_global`:
 - **No thumbnails, no resizes.** "Optimization" is in-place re-encoding only. A 6000-pixel phone photo stays 6000 pixels.
 - **The library upload writes to `public_html/uploads/`** (flat), not `public_html/uploads/library/` despite the subfolder name.
 - **`uploaded_by` vs. `uploaded_by_user_id`.** Both columns exist and get the same value — `uploaded_by` is the legacy FK to `users(id)`, `uploaded_by_user_id` is what newer code reads.
+
+</details>
+
+<!-- SCREENSHOT: Media library grid at /admin/index.php?page=media. Save as 25-media-library-grid.png. -->
+<!-- ![Media library grid](../images/25-media-library-grid.png) -->
+
+<!-- SCREENSHOT: Upload modal / form on the same page, showing title/tags/visibility. Save as 25-media-upload.png. -->
+<!-- ![Upload form](../images/25-media-upload.png) -->
+
+<!-- SCREENSHOT: Page builder content area with a [media:NNN] shortcode inserted, beside the rendered preview from /admin/page-builder/preview.php. Save as 25-media-shortcode.png. -->
+<!-- ![Shortcode in page HTML](../images/25-media-shortcode.png) -->
 
 ## Related chapters
 

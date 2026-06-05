@@ -1,5 +1,88 @@
 # Tours system
 
+## For administrators
+
+### What this is
+
+The yellow **?** button that walks users through a feature. Tours are short interactive walkthroughs that pop up on a page, highlight a button or field, and explain what to click next.
+
+On any member or admin page that has tours available, a circular yellow **?** button sits in the bottom-right corner. Click it, pick a tour from the list, and the page lights up step-by-step — "click here, then here, then here" — with a short explanation at each stop.
+
+### Why they exist
+
+Members are mostly retirees and admins are volunteers. Neither group wants to read a PDF manual to figure out how to pay their yearly fees or approve a new application. Tours put help *inside* the page — the walkthrough literally points at the button you need next — so people can learn the site without external docs, training calls, or hand-overs.
+
+### What you can do
+
+- **Edit the wording** of an existing tour — fix awkward phrasing, clarify a step, correct a typo. No deploy needed.
+- **Report a broken tour** — when you spot one whose highlight lands on the wrong thing, flag it from the validator so the developer sees it.
+- **Mark tours as verified after a deploy** — walk through the affected tours and tick "Looks right" or "Wrong / confusing" at each step.
+
+### Who's allowed
+
+Editing tour wording and using the Tour Validator are restricted to:
+
+- **Admin**
+- **Webmaster**
+
+Anyone logged in (members and admins alike) can *see* and *run* tours on pages they have access to.
+
+### Where to find them
+
+- **As an end-user (member or admin):** the yellow **?** button in the bottom-right of any page. Click it → pick a tour from the menu → follow the walkthrough.
+- **As an admin to edit text:** Admin → Tour Validator → click **Edit wording** next to a tour.
+- **As an admin to verify after deploy:** Admin → Tour Validator → click **Test now** on each tour you want to check.
+
+### The Tour Validator workflow
+
+The Tour Validator (Admin → Tour Validator) lists every tour in the system with a status badge:
+
+- **Verified** — recently walked through and confirmed working.
+- **Stale** — was verified, but more than 60 days ago.
+- **Partial** — some steps confirmed, others not.
+- **Fail** — last person to test it flagged a step as wrong or confusing.
+- **Never tested** — nobody's walked it yet.
+
+When the sidebar shows a **number badge** next to "Tour Validator", that's the count of tours needing attention (failing, never tested, or stale). The badge is a gentle nag — it doesn't block anything, but a forgotten tour will eventually nudge somebody to look at it.
+
+### How to edit a tour's wording
+
+1. Admin → **Tour Validator**.
+2. Click **Edit wording** next to the tour you want to change.
+3. Edit any step's title or description.
+4. Click **Save draft** — your change is saved but not live yet.
+5. Click **Preview** to walk the tour with your draft text, so you can see how it reads in context.
+6. When you're happy, click **Publish all** to make every draft step live for everyone.
+
+No code deploy is required. Members and admins see your new wording the next time they open the tour.
+
+You can also publish a single step on its own if you only changed one — "Publish all" is just the shortcut for "every draft I have open".
+
+### What can go wrong
+
+- **Tour highlights the wrong element.** A developer renamed or moved a button and the tour's pointer now lands on the wrong thing (or nothing). Flag it in the validator as "Wrong / confusing" — the developer gets emailed.
+- **Tour skips a step.** Same root cause: the element the step expected isn't there anymore, so Driver.js silently jumps to the next one. Again, flag it.
+- **Tour wording is stale.** The page still works but the description references a button that was renamed, or steps the user through a flow that's changed. Edit the wording yourself — no developer needed.
+- **Tour selector "drift" after a refactor.** Whenever a developer renames things in the underlying page, tours that targeted those things can quietly break. This is exactly what the "Test now" button is for after a deploy.
+
+### Good practice
+
+- **Test affected tours after each deploy.** When the sidebar badge shows a number, work through the list. Five minutes now beats a member email next week.
+- **Keep tour wording short and action-oriented.** "Click **Pay now** to start paying this year's fee" reads better than "This button is where you can begin the process of submitting payment for your annual membership dues."
+- **Tag broken tours with "Wrong / confusing".** That's the signal the developer watches for — they get an email and can fix the underlying selector. Don't just leave a failing tour with no flag.
+- **Don't be afraid to publish small wording fixes.** A typo fix is a 30-second job and lives entirely in the database — no risk of breaking anything in code.
+
+### Who to ask if you're stuck
+
+- **A tour's pointer is on the wrong thing** — the **developer**. They own the page selectors. Flag it as "Wrong / confusing" in the validator and they'll be emailed.
+- **You can't see the Tour Validator** — you're not an Admin or Webmaster. Ask a site admin to check your role.
+- **The "?" button doesn't appear on a page** — there are simply no tours for that page yet. Ask the developer to add one if you think there should be.
+
+---
+
+<details>
+<summary><strong>Dev notes</strong></summary>
+
 ## What this covers
 
 The guided-tour system: in-app, step-by-step walkthroughs that highlight a UI element, explain it in plain English, and move the user to the next thing. Tours are how members learn to pay their fees or set up 2FA without reading a manual, and how admins learn to approve an application or process an order without a hand-over call. The engine is [Driver.js](https://driverjs.com), wrapped in a tiny Goldwing layer that reads `config/tour-manifest.json`, pulls per-step wording out of the database, gates tours by audience/role, and records completions and test runs.
@@ -86,6 +169,16 @@ The tours system has no entries in `settings_global` — its config is the manif
 
 Stale-after window (60 days) is a `public const` on `TourService`, not a setting. Change it in code if needed; nobody's asked.
 
+## Gotchas
+
+- **Driver.js does not auto-detect a removed step.** If you delete a `data-tour="..."` attribute, the matching step will silently fail to attach and the tour skips forward — users see the next step glued to the wrong element. The only safety nets are `scripts/lint_tours.php` (CI / pre-commit) and the impact check.
+- **Selectors must be `data-tour="..."` attributes.** Don't anchor steps to CSS classes or IDs — those move under refactors. The lint script only walks `data-tour`.
+- **The impact check is informational, not a gate.** `scripts/check_tour_impact.php` exits with code `2` when a watched file changed, but nothing blocks the commit. The skill `tour-impact-check` runs before every push to surface the list; you're expected to revalidate flagged tours via the validator after deploy.
+- **The doc-sync-check skill is the same shape.** It reads `public_html/admin/help/docs/_toc.json` instead of the tour manifest, flags affected chapters instead of tours, and points editors at `chapters/*.md` instead of the validator. This whole documentation system you're reading right now is the tour pattern applied to prose.
+- **Chapter-scoped roles see only their tours.** A `store_manager` only sees tours that list `store_manager` in `roles`. If you add a tour aimed at store managers, remember to include them — otherwise it'll be invisible to the people who need it.
+- **Drafts overlay the published version per step, not per tour.** You can publish a single step independently; "Publish all" just collapses every step's draft into its published columns.
+
+</details>
 
 <!-- SCREENSHOT: The "?" floating button on a member page (e.g. /member/index.php?page=billing). Capture bottom-right corner. Save as 36-tour-help-button.png. -->
 <!-- ![Tour help button](../images/36-tour-help-button.png) -->
@@ -98,15 +191,6 @@ Stale-after window (60 days) is a `public const` on `TourService`, not a setting
 
 <!-- SCREENSHOT: The wording editor at /admin/help/edit.php?slug=member-pay-fees with a draft mid-edit. Save as 36-tour-editor.png. -->
 <!-- ![Tour wording editor](../images/36-tour-editor.png) -->
-
-## Gotchas
-
-- **Driver.js does not auto-detect a removed step.** If you delete a `data-tour="..."` attribute, the matching step will silently fail to attach and the tour skips forward — users see the next step glued to the wrong element. The only safety nets are `scripts/lint_tours.php` (CI / pre-commit) and the impact check.
-- **Selectors must be `data-tour="..."` attributes.** Don't anchor steps to CSS classes or IDs — those move under refactors. The lint script only walks `data-tour`.
-- **The impact check is informational, not a gate.** `scripts/check_tour_impact.php` exits with code `2` when a watched file changed, but nothing blocks the commit. The skill `tour-impact-check` runs before every push to surface the list; you're expected to revalidate flagged tours via the validator after deploy.
-- **The doc-sync-check skill is the same shape.** It reads `public_html/admin/help/docs/_toc.json` instead of the tour manifest, flags affected chapters instead of tours, and points editors at `chapters/*.md` instead of the validator. This whole documentation system you're reading right now is the tour pattern applied to prose.
-- **Chapter-scoped roles see only their tours.** A `store_manager` only sees tours that list `store_manager` in `roles`. If you add a tour aimed at store managers, remember to include them — otherwise it'll be invisible to the people who need it.
-- **Drafts overlay the published version per step, not per tour.** You can publish a single step independently; "Publish all" just collapses every step's draft into its published columns.
 
 ## Related chapters
 
