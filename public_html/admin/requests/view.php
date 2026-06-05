@@ -89,19 +89,6 @@ function reqStatusBadge2(?string $status): string {
         <span class="material-icons-outlined text-sm">arrow_back</span> Back to hub
       </a>
 
-      <?php
-      // Inline debug: dump $detailItem right at render-time to see if anything between
-      // find() and here is wiping it out.
-      if (!empty($_GET['debug'])) {
-          echo '<!-- NOTIF_RENDER:' . base64_encode(json_encode([
-              'item_at_render' => $detailItem ? array_diff_key($detailItem, ['raw' => 1]) : null,
-              'item_is_null'   => $detailItem === null,
-              'item_empty'     => empty($detailItem),
-              'item_type'      => gettype($detailItem),
-              'raw_at_render'  => $detailItem && is_array($detailItem['raw'] ?? null) ? array_keys($detailItem['raw']) : 'NO_RAW',
-          ])) . ' -->';
-      }
-      ?>
       <?php if (!$detailItem): ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
           <h1 class="font-display text-xl font-bold text-gray-900">Notification not found</h1>
