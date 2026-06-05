@@ -22,7 +22,9 @@ $gwHelpManifest = TourService::manifest();
 $gwHelpCompletions = TourService::completionsFor((int) $gwHelpUser['id']);
 $gwHelpSupportEmail = SettingsService::getGlobal('site.support_email', 'admin@goldwing.org.au');
 $gwHelpCurrentUrl = ($_SERVER['REQUEST_URI'] ?? '/');
-$gwHelpAllGuidesUrl = '/admin/help/index.php';
+$gwHelpIsAdmin = in_array('admin', $gwHelpUser['roles'] ?? [], true)
+              || in_array('webmaster', $gwHelpUser['roles'] ?? [], true);
+$gwHelpAllGuidesUrl = $gwHelpIsAdmin ? '/admin/help/index.php' : '/member/help.php';
 $gwHelpCsrf = Csrf::token();
 ?>
 <link rel="stylesheet" href="/assets/css/driver.css">

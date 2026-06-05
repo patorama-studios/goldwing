@@ -5,7 +5,14 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 use App\Services\TourService;
 
 require_login();
+// Admin-only — members get bounced to /member/help.php instead so they never
+// see a /admin/ URL in their help panel.
 $user = current_user();
+$isAdmin = in_array('admin', $user['roles'] ?? [], true) || in_array('webmaster', $user['roles'] ?? [], true);
+if (!$isAdmin) {
+    header('Location: /member/help.php');
+    exit;
+}
 $completions = TourService::completionsFor((int) $user['id']);
 $tours = TourService::toursFor($user);
 

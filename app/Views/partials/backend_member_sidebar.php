@@ -28,6 +28,7 @@ $items = [
   ['key' => 'billing', 'label' => 'Billing', 'icon' => 'receipt_long', 'href' => '/member/index.php?page=billing'],
   ['key' => 'history', 'label' => 'History', 'icon' => 'timeline', 'href' => '/member/index.php?page=history'],
   ['key' => 'notifications', 'label' => 'My Notifications', 'icon' => 'notifications', 'href' => '/member/notifications.php'],
+  ['key' => 'help', 'label' => 'Help & Guides', 'icon' => 'help_outline', 'href' => '/member/help.php'],
 ];
 $user = $user ?? current_user();
 $impersonation = function_exists('impersonation_context') ? impersonation_context() : null;

@@ -71,6 +71,7 @@ $items = [
     ],
     ['key' => 'ai-editor', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
     ['key' => 'help-validator', 'label' => 'Tour Validator', 'icon' => 'fact_check', 'href' => '/admin/help/validator.php', 'badge' => $tourAttentionCount],
+    ['key' => 'help-docs', 'label' => 'System Docs', 'icon' => 'menu_book', 'href' => '/admin/help/docs/'],
 ];
 $user = $user ?? current_user();
 if (function_exists('current_admin_can')) {
