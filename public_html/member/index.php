@@ -3997,14 +3997,113 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </script>
       <?php elseif ($page === 'committee'): ?>
         <?php
-        // Committee & Leadership page is now driven entirely by the
-        // committee_roles + member_committee_assignments tables (see
-        // CommitteeService). Cards render via the shared partial so the same
-        // visuals appear on the public PageBuilder pages too.
-        $variant = 'member';
-        $mode = 'committee';
-        require __DIR__ . '/../../app/Views/partials/committee_cards.php';
+        // Committee & Leadership page — pulled from committee_roles +
+        // member_committee_assignments via CommitteeService. Rendered inline
+        // (rather than via the shared partial) so any failure is visible on
+        // the page itself instead of producing a blank pane.
+        $committeeError = null;
+        $cmtNational = [];
+        $cmtByState = [];
+        try {
+            $cmtNational = CommitteeService::nationalRoles();
+            $cmtByState  = CommitteeService::chapterRolesByState();
+        } catch (\Throwable $e) {
+            $committeeError = $e->getMessage();
+        }
+
+        $renderCmtCard = function (array $role): string {
+            $name = trim(($role['first_name'] ?? '') . ' ' . ($role['last_name'] ?? ''));
+            $vacant = $name === '';
+            $avatar = $role['avatar_url'] ?? '';
+            $email  = $role['email'] ?? '';
+            $phone  = $role['phone'] ?? '';
+            $title  = $role['name'] ?? '';
+            $chapter = $role['chapter_name'] ?? '';
+            $h  = '<div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">';
+            if (!$vacant && $avatar !== '') {
+                $h .= '<img src="' . e($avatar) . '" alt="' . e($name) . '" class="w-14 h-14 rounded-full object-cover border border-gray-200 shrink-0">';
+            } else {
+                $bg = $vacant ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-100';
+                $ic = $vacant ? 'text-gray-300' : 'text-red-400';
+                $h .= '<div class="w-14 h-14 rounded-full border flex items-center justify-center shrink-0 ' . $bg . '">'
+                   .  '<span class="material-icons-outlined ' . $ic . ' text-2xl">person</span></div>';
+            }
+            $h .= '<div class="flex-1 min-w-0">';
+            $h .= $vacant
+                ? '<p class="font-semibold text-gray-400 italic truncate">Position vacant</p>'
+                : '<p class="font-semibold text-gray-900 truncate">' . e($name) . '</p>';
+            $h .= '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700 mt-0.5">' . e($title) . '</span>';
+            if ($chapter !== '') {
+                $h .= '<p class="text-xs text-gray-500 mt-1 truncate">' . e($chapter) . '</p>';
+            }
+            if (!$vacant && $phone !== '') {
+                $h .= '<a href="tel:' . e(preg_replace('/\s+/', '', $phone)) . '" class="mt-1 text-xs text-primary hover:underline block">' . e($phone) . '</a>';
+            }
+            if (!$vacant && $email !== '') {
+                $h .= '<a href="mailto:' . e($email) . '" class="text-xs text-primary hover:underline block truncate">' . e($email) . '</a>';
+            }
+            $h .= '</div></div>';
+            return $h;
+        };
         ?>
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="mb-6">
+            <h2 class="font-display text-2xl font-bold text-gray-900">Committee &amp; Leadership</h2>
+            <p class="text-sm text-gray-500 mt-1">Your national committee and chapter representatives.</p>
+          </div>
+
+          <?php if ($committeeError !== null): ?>
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-6">
+              <p class="text-sm font-semibold text-red-800 mb-1">Couldn't load committee data</p>
+              <p class="text-xs text-red-700 break-all"><?= e($committeeError) ?></p>
+              <p class="text-xs text-red-600 mt-2">If you're an admin, visit <a href="/admin/run-migration.php" class="underline">/admin/run-migration.php</a> to apply Migration 015.</p>
+            </div>
+          <?php endif; ?>
+
+          <div class="mb-8">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="p-1.5 rounded-lg bg-red-100">
+                <span class="material-icons-outlined text-red-600 text-base">star</span>
+              </div>
+              <h3 class="font-display text-lg font-bold text-gray-900">National Committee</h3>
+              <span class="text-xs text-gray-400">(<?= count($cmtNational) ?> roles)</span>
+            </div>
+            <?php if ($cmtNational): ?>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <?php foreach ($cmtNational as $cmtRole) { echo $renderCmtCard($cmtRole); } ?>
+              </div>
+            <?php else: ?>
+              <p class="text-sm text-gray-400 py-6 text-center border border-dashed border-gray-200 rounded-xl">No national committee roles configured yet.</p>
+            <?php endif; ?>
+          </div>
+
+          <?php if ($cmtByState): ?>
+            <div>
+              <div class="flex items-center gap-2 mb-4">
+                <div class="p-1.5 rounded-lg bg-indigo-100">
+                  <span class="material-icons-outlined text-indigo-600 text-base">place</span>
+                </div>
+                <h3 class="font-display text-lg font-bold text-gray-900">Area Representatives</h3>
+              </div>
+              <?php foreach ($cmtByState as $stateName => $stateRoles): ?>
+                <div class="mb-6">
+                  <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3"><?= e((string) $stateName) ?></p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <?php foreach ($stateRoles as $cmtRole) { echo $renderCmtCard($cmtRole); } ?>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (!$cmtNational && !$cmtByState && $committeeError === null): ?>
+            <div class="py-12 text-center">
+              <span class="material-icons-outlined text-5xl text-gray-200 mb-3 block">groups</span>
+              <p class="text-gray-400 text-sm">No committee or chapter rep roles configured yet.</p>
+              <p class="text-xs text-gray-400 mt-1">Admins: run Migration 015 to seed the role catalog.</p>
+            </div>
+          <?php endif; ?>
+        </section>
       <?php else: ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <h2 class="font-display text-2xl font-bold text-gray-900">Member Portal</h2>
