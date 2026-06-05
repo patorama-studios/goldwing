@@ -37,12 +37,12 @@ function can_access_section(string $permission, array $user): bool
     return function_exists('current_admin_can') && current_admin_can($permission, $user);
 }
 
-$section = $_GET['section'] ?? 'site';
-if (!isset($sections[$section])) {
-    $section = 'site';
+$section = $_GET['section'] ?? 'hub';
+if ($section !== 'hub' && !isset($sections[$section])) {
+    $section = 'hub';
 }
 
-if (!can_access_section($sections[$section]['permission'], $user)) {
+if ($section !== 'hub' && !can_access_section($sections[$section]['permission'], $user)) {
     admin_render_forbidden();
 }
 
@@ -652,9 +652,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="flex items-center justify-between gap-4">
               <div>
                 <h1 class="font-display text-2xl font-bold text-gray-900"><?= e($pageTitle) ?></h1>
-                <p class="text-sm text-slate-500">Single source of truth for configuration across the platform.</p>
+                <p class="text-sm text-slate-500">
+                  <?php if ($section === 'hub'): ?>
+                    Choose a category below to manage configuration across the platform.
+                  <?php else: ?>
+                    <a href="/admin/settings/" class="text-primary hover:underline">&larr; All settings</a>
+                    &nbsp;&middot;&nbsp; Single source of truth for configuration.
+                  <?php endif; ?>
+                </p>
               </div>
-              <?php if ($section !== 'audit'): ?>
+              <?php if (!in_array($section, ['audit', 'hub'], true)): ?>
                 <div class="text-xs text-slate-500 text-right">
                   <?php
                     $sectionKeys = [
@@ -696,7 +703,74 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
           </div>
 
-          <?php if ($section === 'site'): ?>
+          <?php if ($section === 'hub'): ?>
+            <?php
+              $hubGroups = [
+                'General' => [
+                  ['label' => 'Site Settings', 'icon' => 'language', 'desc' => 'Brand, contact details, social links, legal URLs.', 'href' => '/admin/settings/index.php?section=site', 'permission' => 'admin.settings.general.manage'],
+                  ['label' => 'Store Settings', 'icon' => 'storefront', 'desc' => 'Store basics, GST, shipping, fulfilment.', 'href' => '/admin/settings/index.php?section=store', 'permission' => 'admin.store.view'],
+                  ['label' => 'Payments (Stripe)', 'icon' => 'payments', 'desc' => 'Stripe keys, fees, live/test mode.', 'href' => '/admin/settings/index.php?section=payments', 'permission' => 'admin.payments.view'],
+                  ['label' => 'Notifications', 'icon' => 'notifications', 'desc' => 'Email senders, digests, admin alerts.', 'href' => '/admin/settings/index.php?section=notifications', 'permission' => 'admin.settings.general.manage'],
+                  ['label' => 'Events', 'icon' => 'calendar_month', 'desc' => 'Default visibility and event timezone.', 'href' => '/admin/settings/index.php?section=events', 'permission' => 'admin.events.manage'],
+                ],
+                'People & Access' => [
+                  ['label' => 'Accounts & Roles', 'icon' => 'manage_accounts', 'desc' => 'User approval, audit, account policy.', 'href' => '/admin/settings/index.php?section=accounts', 'permission' => 'admin.users.view'],
+                  ['label' => 'Security & Authentication', 'icon' => 'shield', 'desc' => 'Login policy, password rules, step-up.', 'href' => '/admin/settings/index.php?section=security', 'permission' => 'admin.settings.general.manage'],
+                  ['label' => 'Admin Role Builder', 'icon' => 'engineering', 'desc' => 'Define admin roles and permission sets.', 'href' => '/admin/settings/roles.php', 'permission' => 'admin.roles.view'],
+                  ['label' => 'Access Control', 'icon' => 'lock', 'desc' => 'Map roles to pages and actions.', 'href' => '/admin/settings/access-control.php', 'permission' => 'admin.roles.manage'],
+                  ['label' => 'Membership Settings', 'icon' => 'badge', 'desc' => 'Pricing matrix and member-number format.', 'href' => '/admin/settings/index.php?section=membership_pricing', 'permission' => 'admin.membership_types.manage'],
+                ],
+                'Content & Media' => [
+                  ['label' => 'Media & Files', 'icon' => 'photo_library', 'desc' => 'Allowed file types and upload limits.', 'href' => '/admin/settings/index.php?section=media', 'permission' => 'admin.media_library.manage'],
+                  ['label' => 'Integrations', 'icon' => 'link', 'desc' => 'Email provider, YouTube, third-party keys.', 'href' => '/admin/settings/index.php?section=integrations', 'permission' => 'admin.integrations.manage'],
+                ],
+                'Logs & Diagnostics' => [
+                  ['label' => 'Audit Log', 'icon' => 'receipt_long', 'desc' => 'History of settings changes.', 'href' => '/admin/settings/index.php?section=audit', 'permission' => 'admin.logs.view'],
+                  ['label' => 'Security Log', 'icon' => 'gpp_good', 'desc' => 'Login attempts and security events.', 'href' => '/admin/security/activity_log.php', 'permission' => 'admin.logs.view'],
+                  ['label' => 'Reports', 'icon' => 'assessment', 'desc' => 'Activity and usage reports.', 'href' => '/admin/index.php?page=reports', 'permission' => 'admin.logs.view'],
+                  ['label' => 'Audit', 'icon' => 'fact_check', 'desc' => 'Audit dashboard.', 'href' => '/admin/index.php?page=audit', 'permission' => 'admin.logs.view'],
+                ],
+                'Advanced' => [
+                  ['label' => 'AI Settings', 'icon' => 'smart_toy', 'desc' => 'AI keys, models, feature flags.', 'href' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
+                  ['label' => 'Advanced / Developer', 'icon' => 'code', 'desc' => 'Maintenance mode, system log, raw flags.', 'href' => '/admin/settings/index.php?section=advanced', 'permission' => 'admin.settings.general.manage'],
+                ],
+              ];
+              $visibleGroups = [];
+              foreach ($hubGroups as $groupLabel => $cards) {
+                $allowed = array_values(array_filter($cards, fn($c) => can_access_section($c['permission'], $user)));
+                if ($allowed) {
+                  $visibleGroups[$groupLabel] = $allowed;
+                }
+              }
+            ?>
+            <?php if (!$visibleGroups): ?>
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-8 text-center text-sm text-slate-500">
+                You don't have access to any settings sections. Contact a site administrator if you need access.
+              </div>
+            <?php else: ?>
+              <?php foreach ($visibleGroups as $groupLabel => $cards): ?>
+                <div class="space-y-3">
+                  <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 px-1"><?= e($groupLabel) ?></h2>
+                  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <?php foreach ($cards as $card): ?>
+                      <a href="<?= e($card['href']) ?>"
+                         class="group block bg-card-light rounded-xl border border-gray-200 hover:border-primary hover:shadow-md p-5 transition-all">
+                        <div class="flex items-start gap-4">
+                          <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                            <span class="material-icons-outlined text-primary text-2xl"><?= e($card['icon']) ?></span>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <h3 class="font-display font-semibold text-gray-900 text-base mb-1 group-hover:text-primary transition-colors"><?= e($card['label']) ?></h3>
+                            <p class="text-sm text-slate-500 leading-snug"><?= e($card['desc']) ?></p>
+                          </div>
+                        </div>
+                      </a>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          <?php elseif ($section === 'site'): ?>
             <form method="post" class="space-y-6">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">

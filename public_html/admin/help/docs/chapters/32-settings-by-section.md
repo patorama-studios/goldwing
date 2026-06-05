@@ -6,11 +6,11 @@ A section-by-section catalogue of every page in the Settings Hub: what it contro
 
 ## Why it exists
 
-When something needs to change site-wide — a contact email, the Stripe mode, the password policy, a feature flag — there's exactly one place to do it: the Settings Hub at `/admin/settings/`. But the Hub has thirteen sections and 100+ keys, and the keys themselves are namespaced strings like `payments.stripe.use_test_mode` that you can't grep for without knowing the name. This chapter is the map. Every section here corresponds to one tab in the Hub, one entry in the `$sections` array of `public_html/admin/settings/index.php`, and one item in the `$settingsChildren` sidebar group.
+When something needs to change site-wide — a contact email, the Stripe mode, the password policy, a feature flag — there's exactly one place to do it: the Settings Hub at `/admin/settings/`. Landing on that URL shows a card-grid index of every settings category the current admin can access (defined by `$hubGroups` in `public_html/admin/settings/index.php`). The Hub has thirteen sections and 100+ keys, and the keys themselves are namespaced strings like `payments.stripe.use_test_mode` that you can't grep for without knowing the name. This chapter is the map. Every section here corresponds to one card on the Hub index and one entry in the `$sections` array of `public_html/admin/settings/index.php`.
 
 ## How it works (briefly)
 
-All sections except the three standalone pages (`ai.php`, `roles.php`, `access-control.php`) are rendered by the same dispatcher: `public_html/admin/settings/index.php` reads `?section=<key>`, looks the key up in `$sections`, runs the per-section permission check via `current_admin_can()`, then renders the matching form. Saves go through `SettingsService::setGlobal($userId, $key, $value)` — which JSON-encodes the value, stamps `audit_log`, and (for sensitive keys) encrypts via `CryptoService`. Reads go through `SettingsService::getGlobal($key, $default)`.
+All sections except the three standalone pages (`ai.php`, `roles.php`, `access-control.php`) are rendered by the same dispatcher: `public_html/admin/settings/index.php` reads `?section=<key>` (or `hub`, the default when no section is given). For `hub` it renders the card-grid index, filtering each card by its declared permission so admins only see categories they can actually open. For a real section it looks the key up in `$sections`, runs the per-section permission check via `current_admin_can()`, then renders the matching form. Saves go through `SettingsService::setGlobal($userId, $key, $value)` — which JSON-encodes the value, stamps `audit_log`, and (for sensitive keys) encrypts via `CryptoService`. Reads go through `SettingsService::getGlobal($key, $default)`.
 
 Defaults come from three places:
 
@@ -24,7 +24,7 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 
 | Section | URL | Permission |
 |---|---|---|
-| Hub landing | `/admin/settings/index.php` | `admin.settings.general.manage` |
+| Hub landing | `/admin/settings/index.php` | Any of the section permissions below (per-card filter) |
 | Site Settings | `/admin/settings/index.php?section=site` | `admin.settings.general.manage` |
 | Store Settings | `/admin/settings/index.php?section=store` | `admin.store.view` |
 | Payments (Stripe) | `/admin/settings/index.php?section=payments` | `admin.payments.view` |
@@ -41,7 +41,7 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 | Admin Role Builder | `/admin/settings/roles.php` | `admin.roles.view` (view) / `admin.roles.manage` (edit) |
 | Access Control | `/admin/settings/access-control.php` | `admin.roles.manage` |
 
-The permission map lives in `app/Views/partials/backend_admin_sidebar.php` (`$settingsChildren`) and is enforced in the dispatcher's `can_access_section()` check. Step-up authentication ([Ch 06](view.php?slug=06-2fa-stepup)) is required for every save *except* the Payments section (which uses Stripe's own gating).
+The permission map lives in `$hubGroups` at the top of `public_html/admin/settings/index.php` (each card declares its `permission` key) and is enforced in the dispatcher's `can_access_section()` check on form save. The sidebar entry for Settings (`app/Views/partials/backend_admin_sidebar.php`) is gated by `$settingsPermissions` — visible to any admin with at least one of the section permissions. Step-up authentication ([Ch 06](view.php?slug=06-2fa-stepup)) is required for every save *except* the Payments section (which uses Stripe's own gating).
 
 ## Settings
 
