@@ -197,7 +197,7 @@ try {
 
 function render_media_shortcodes(string $html): string
 {
-    return preg_replace_callback('/\\[media:(\\d+)\\]/', function ($matches) {
+    $html = preg_replace_callback('/\\[media:(\\d+)\\]/', function ($matches) {
         $pdo = db();
         $stmt = $pdo->prepare('SELECT * FROM media WHERE id = :id');
         $stmt->execute(['id' => (int) $matches[1]]);
@@ -216,6 +216,30 @@ function render_media_shortcodes(string $html): string
         }
         return '<a href="' . e($media['path']) . '">' . e($media['title']) . '</a>';
     }, $html);
+
+    // [committee] — National committee grid (uses CommitteeService + the
+    // shared committee_cards partial in 'public' variant so it matches the
+    // existing .card / .grid-3 styling used on PageBuilder pages).
+    $html = preg_replace_callback('/\\[committee\\]/', function () {
+        ob_start();
+        $variant = 'public';
+        $mode = 'committee';
+        require __DIR__ . '/Views/partials/committee_cards.php';
+        return (string) ob_get_clean();
+    }, $html);
+
+    // [chapter-reps]                  — all chapter reps, grouped by state
+    // [chapter-reps state="Tasmania"] — single-state listing (no group header)
+    $html = preg_replace_callback('/\\[chapter-reps(?:\\s+state="([^"]*)")?\\]/', function ($matches) {
+        ob_start();
+        $variant = 'public';
+        $mode = 'chapter-reps';
+        $stateFilter = isset($matches[1]) && $matches[1] !== '' ? $matches[1] : null;
+        require __DIR__ . '/Views/partials/committee_cards.php';
+        return (string) ob_get_clean();
+    }, $html);
+
+    return $html;
 }
 
 require_once __DIR__ . '/../includes/date_helpers.php';

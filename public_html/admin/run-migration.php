@@ -654,6 +654,257 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 015 — Committee & Leadership roles
+//
+// Replaces the free-text members.committee_role + boolean is_committee/is_area_rep
+// flags with a proper catalog + many-to-many assignment system, so the public
+// Committee and Chapter Reps pages can render dynamically from admin-controlled
+// assignments.
+//
+// Creates:
+//   committee_roles               — catalog of roles (national + chapter-rep)
+//   member_committee_assignments  — who holds which role
+//
+// Seeds the 9 national roles + 13 chapter rep roles using the role-based emails
+// already in use (aga.president@…, ar.sydney@… etc), with phone numbers from
+// the current public pages.
+//
+// Then fuzzy-matches existing member records by name and creates assignments.
+// Any roster name that doesn't match a member becomes a lightweight stub
+// member record (no user_id, status='ACTIVE') so the cards still render.
+//
+// Finally, swaps the hand-edited HTML on the committee + chapter-* pages for
+// dynamic [committee] / [chapter-reps state="…"] shortcodes.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_015_committee_roles';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 015 — Committee & leadership roles', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        // ── 1. Schema ────────────────────────────────────────────────────────
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS committee_roles (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              slug VARCHAR(80) NOT NULL UNIQUE,
+              name VARCHAR(120) NOT NULL,
+              category ENUM('national','chapter') NOT NULL,
+              chapter_id INT NULL,
+              email VARCHAR(150) NULL,
+              phone VARCHAR(40) NULL,
+              sort_order INT NOT NULL DEFAULT 0,
+              is_active TINYINT(1) NOT NULL DEFAULT 1,
+              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              INDEX idx_cr_category (category),
+              INDEX idx_cr_chapter (chapter_id),
+              CONSTRAINT fk_committee_roles_chapter FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'committee_roles table ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS member_committee_assignments (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              member_id INT NOT NULL,
+              role_id INT NOT NULL,
+              since DATE NULL,
+              notes VARCHAR(255) NULL,
+              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_mca_pair (member_id, role_id),
+              INDEX idx_mca_role (role_id),
+              CONSTRAINT fk_mca_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+              CONSTRAINT fk_mca_role FOREIGN KEY (role_id) REFERENCES committee_roles(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'member_committee_assignments table ready';
+
+        // ── 2. Role catalog seed ─────────────────────────────────────────────
+        // National roles — sort_order picks display order on cards.
+        $nationalRoles = [
+            ['national_president',          'National President',          10, 'aga.president@goldwing.org.au',      '0429 324 426'],
+            ['national_vice_president',     'National Vice President',     20, 'aga.vicepresident@goldwing.org.au',  null],
+            ['national_secretary',          'National Secretary',          30, 'aga.secretary@goldwing.org.au',      null],
+            ['national_treasurer',          'National Treasurer',          40, 'aga.treasurer@goldwing.org.au',      '0412 662 448'],
+            ['national_promotions_officer', 'National Promotions Officer', 50, 'aga.promotions@goldwing.org.au',     '0449 150 530'],
+            ['committee_member_1',          'Committee Member',            60, 'aga.committee1@goldwing.org.au',     '0412 226 886'],
+            ['committee_member_2',          'Committee Member',            61, 'aga.committee2@goldwing.org.au',     null],
+            ['committee_member_3',          'Committee Member',            62, 'aga.committee3@goldwing.org.au',     null],
+            ['public_officer',              'Public Officer',              70, 'aga.publicofficer@goldwing.org.au',  '0455 380 162'],
+        ];
+        $insertRole = $pdo->prepare("
+            INSERT INTO committee_roles (slug, name, category, chapter_id, email, phone, sort_order, is_active)
+            VALUES (:slug, :name, 'national', NULL, :email, :phone, :sort, 1)
+            ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email),
+              phone = VALUES(phone), sort_order = VALUES(sort_order), is_active = 1
+        ");
+        foreach ($nationalRoles as [$slug, $name, $sort, $email, $phone]) {
+            $insertRole->execute([':slug' => $slug, ':name' => $name, ':email' => $email, ':phone' => $phone, ':sort' => $sort]);
+        }
+        $applied[] = 'national roles seeded (' . count($nationalRoles) . ')';
+
+        // Chapter rep roles — one per chapter that has an area rep. We match
+        // the chapter row by LIKE 'X%' so 'Central Coast' matches both
+        // 'Central Coast Chapter' and 'Central Coast'.
+        $chapterRoles = [
+            // [slug,                       display name,                chapter LIKE,           sort, email,                            phone]
+            ['ar_central_coast',     'Central Coast Area Rep',     'Central Coast%',     100, 'ar.centralcoast@goldwing.org.au',     '0455 380 162'],
+            ['ar_central_west',      'Central West Area Rep',      'Central West%',      110, 'ar.centralwest@goldwing.org.au',      '0402 075 741'],
+            ['ar_coffs_coast',       'Coffs Coast Area Rep',       'Coffs Coast%',       120, 'ar.coffscoast@goldwing.org.au',       '0400 409 681'],
+            ['ar_new_england',       'New England Area Rep',       'New England%',       130, 'ar.newengland@goldwing.org.au',       '02 6772 2706'],
+            ['ar_north_west',        'North West Area Rep',        'North West%',        140, 'ar.northwest@goldwing.org.au',        '02 6743 1725'],
+            ['ar_riverina',          'Riverina Area Rep',          'Riverina%',          150, 'ar.riverina@goldwing.org.au',         '0428 622 777'],
+            ['ar_sydney',            'Sydney Area Rep',            'Sydney%',            160, 'ar.sydney@goldwing.org.au',           '0449 150 530'],
+            ['ar_brisbane',          'Brisbane Area Rep',          'Brisbane%',          200, 'ar.brisbane@goldwing.org.au',         '0410 256 667'],
+            ['ar_fraser_coast',      'Fraser Coast Area Rep',      'Fraser Coast%',      210, 'ar.frasercoast@goldwing.org.au',      '0400 112 012'],
+            ['ar_perth',             'Perth Area Rep',             'Perth%',             300, 'ar.perth@goldwing.org.au',            '0417 987 742'],
+            ['ar_west_coast_wings',  'West Coast Wings Area Rep',  'West Coast Wings%',  310, 'ar.westcoastwings@goldwing.org.au',   '0407 447 159'],
+            ['ar_south_australian',  'South Australian Area Rep',  'South Australian%',  400, 'ar.southaustralian@goldwing.org.au',  '0421 357 116'],
+            ['ar_tasmania',          'Tasmania Area Rep',          'Tasmania%',          500, 'ar.tasmania@goldwing.org.au',         '0429 351 615'],
+        ];
+        $insertChRole = $pdo->prepare("
+            INSERT INTO committee_roles (slug, name, category, chapter_id, email, phone, sort_order, is_active)
+            VALUES (:slug, :name, 'chapter', :chapter_id, :email, :phone, :sort, 1)
+            ON DUPLICATE KEY UPDATE name = VALUES(name), chapter_id = VALUES(chapter_id),
+              email = VALUES(email), phone = VALUES(phone), sort_order = VALUES(sort_order), is_active = 1
+        ");
+        $findChapter = $pdo->prepare("SELECT id FROM chapters WHERE name LIKE :like ORDER BY name LIMIT 1");
+        foreach ($chapterRoles as [$slug, $name, $like, $sort, $email, $phone]) {
+            $findChapter->execute([':like' => $like]);
+            $cid = $findChapter->fetchColumn();
+            $insertChRole->execute([
+                ':slug' => $slug, ':name' => $name, ':chapter_id' => $cid ?: null,
+                ':email' => $email, ':phone' => $phone, ':sort' => $sort,
+            ]);
+        }
+        $applied[] = 'chapter rep roles seeded (' . count($chapterRoles) . ')';
+
+        // ── 3. Match roster names to members; create stubs for the rest ──────
+        // Map: role slug → ['First Last', maybe chapter_id for stub fallback]
+        // Stubs use chapter_id from the role itself so they land in the right
+        // chapter. National roles seed a stub with no chapter.
+        $roster = [
+            ['national_president',          'Lewis',   'Furner',    null],
+            ['national_vice_president',     'Paul',    '',          null],
+            ['national_secretary',          'Vanessa', 'Lindley',   null],
+            ['national_treasurer',          'Robyn',   'Furner',    null],
+            ['national_promotions_officer', 'Wayne',   'Gannon',    null],
+            ['committee_member_1',          'Les',     'Sorensen',  null],
+            ['committee_member_2',          'Ian',     'Kennedy',   null],
+            ['committee_member_3',          'Werner',  'Voss',      null],
+            ['public_officer',              'Mal',     'Allen',     null],
+            ['ar_central_coast',            'Mal',     'Allen',     null],
+            ['ar_central_west',             'Dorothy', 'Springett', null],
+            ['ar_coffs_coast',              'Brian',   'Platts',    null],
+            ['ar_new_england',              'Allan',   'Piddington',null],
+            ['ar_north_west',               'Stephen', 'Ward',      null],
+            ['ar_riverina',                 'Kevin',   'Lindley',   null],
+            ['ar_sydney',                   'Wayne',   'Gannon',    null],
+            ['ar_brisbane',                 'Greg',    'Naylor',    null],
+            ['ar_fraser_coast',             'Robert',  'Watson',    null],
+            ['ar_perth',                    'David',   'Goodchild', null],
+            ['ar_west_coast_wings',         'Gary',    'Cubbage',   null],
+            ['ar_south_australian',         'Colin',   'Underhill', null],
+            ['ar_tasmania',                 'Dennis',  'Davis',     null],
+        ];
+
+        $findMember = $pdo->prepare("
+            SELECT id, chapter_id FROM members
+            WHERE LOWER(first_name) = LOWER(:fn) AND LOWER(last_name) = LOWER(:ln)
+            ORDER BY (status = 'ACTIVE') DESC, id ASC LIMIT 1
+        ");
+        $findRoleBySlug = $pdo->prepare("SELECT id, chapter_id FROM committee_roles WHERE slug = :slug LIMIT 1");
+        $insertStub     = $pdo->prepare("
+            INSERT INTO members (member_type, status, member_number_base, member_number_suffix,
+                                 chapter_id, first_name, last_name, email, phone, created_at)
+            VALUES ('ASSOCIATE', 'ACTIVE', :base, 0, :chapter_id, :fn, :ln, :email, NULL, NOW())
+        ");
+        $upsertAssign = $pdo->prepare("
+            INSERT INTO member_committee_assignments (member_id, role_id, since)
+            VALUES (:member_id, :role_id, CURDATE())
+            ON DUPLICATE KEY UPDATE since = COALESCE(since, VALUES(since))
+        ");
+
+        // Allocate stub member numbers starting from MAX+1 in a dedicated band
+        // (we use a high base so they don't collide with real member numbers).
+        $maxBase = (int) $pdo->query("SELECT COALESCE(MAX(member_number_base), 9000) FROM members")->fetchColumn();
+        $nextStubBase = max($maxBase, 9000) + 1;
+
+        $matched = 0; $stubbed = 0;
+        foreach ($roster as [$slug, $fn, $ln, $_]) {
+            $findRoleBySlug->execute([':slug' => $slug]);
+            $role = $findRoleBySlug->fetch(PDO::FETCH_ASSOC);
+            if (!$role) { continue; }
+
+            $memberId = null;
+            if ($ln !== '') {
+                $findMember->execute([':fn' => $fn, ':ln' => $ln]);
+                $row = $findMember->fetch(PDO::FETCH_ASSOC);
+                if ($row) { $memberId = (int) $row['id']; $matched++; }
+            }
+            if ($memberId === null) {
+                // Stub. Synthesize a unique placeholder email so the NOT NULL
+                // email column is satisfied; admin can fix it later.
+                $stubEmail = strtolower($fn . '.' . ($ln !== '' ? $ln : 'pending') . '+stub@goldwing.org.au');
+                $insertStub->execute([
+                    ':base' => $nextStubBase,
+                    ':chapter_id' => $role['chapter_id'],
+                    ':fn' => $fn,
+                    ':ln' => $ln !== '' ? $ln : 'TBC',
+                    ':email' => $stubEmail,
+                ]);
+                $memberId = (int) $pdo->lastInsertId();
+                $nextStubBase++;
+                $stubbed++;
+            }
+            $upsertAssign->execute([':member_id' => $memberId, ':role_id' => (int) $role['id']]);
+        }
+        $applied[] = "roster linked (matched: $matched, stubbed: $stubbed)";
+
+        // ── 4. Swap PageBuilder page content for dynamic shortcodes ──────────
+        // Keeps intro copy + hero, replaces the hand-rolled grids with
+        // [committee] / [chapter-reps state="…"]. Idempotent because the
+        // migration flag guards re-runs.
+        $pageUpdates = [
+            'committee'                  => '<p>Riding with a powerful motorcycle comes a skilled crew ready to navigate the roads here at the Australian Goldwing Association.</p>[committee]',
+            'chapters-representatives'   => '<p>Local chapters are the heart of the association. Each state has representatives who coordinate rides and support members.</p>[chapter-reps]',
+            'chapters-nsw'               => '<p>Local chapters across New South Wales coordinate rides and support members throughout the region.</p>[chapter-reps state="ACT & New South Wales"]',
+            'chapters-qld'               => '<p>Queensland chapters connect riders across the state with regular rides, events, and support.</p>[chapter-reps state="Queensland"]',
+            'chapters-wa'                => '<p>Western Australia chapters coordinate local rides and keep members connected across the state.</p>[chapter-reps state="Western Australia"]',
+            'chapters-sa'                => '<p>South Australian riders connect through a dedicated chapter and local events.</p>[chapter-reps state="South Australia"]',
+            'chapters-tas'               => '<p>Tasmanian members stay connected through local rides and chapter support.</p>[chapter-reps state="Tasmania"]',
+        ];
+        $updatePage = $pdo->prepare("
+            UPDATE pages SET html_content = :body, live_html = :body, updated_at = NOW()
+            WHERE slug = :slug
+        ");
+        $pageCount = 0;
+        foreach ($pageUpdates as $slug => $body) {
+            $updatePage->execute([':body' => $body, ':slug' => $slug]);
+            if ($updatePage->rowCount() > 0) { $pageCount++; }
+        }
+        $applied[] = "$pageCount page(s) wired to shortcodes";
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = [
+            'label' => 'Migration 015 — Committee & leadership roles',
+            'status' => 'applied',
+            'note' => implode(' · ', $applied),
+        ];
+    } catch (Throwable $e) {
+        $results[] = [
+            'label' => 'Migration 015 — Committee & leadership roles',
+            'status' => 'error',
+            'note' => $e->getMessage(),
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

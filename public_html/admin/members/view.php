@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityRepository;
+use App\Services\CommitteeService;
 use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\DownloadLogRepository;
@@ -2196,39 +2197,93 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <textarea name="notes" rows="3"
                           class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"><?= e($member['notes'] ?? '') ?></textarea>
                       </div>
+                      <?php
+                        // ── Committee & Leadership role assignment ─────────
+                        // New multi-select pulled from CommitteeService. The
+                        // dropdown is fed by the committee_roles catalog and
+                        // saves to member_committee_assignments. The legacy
+                        // is_committee / is_area_rep / committee_role columns
+                        // are kept in sync by the save handler for backward
+                        // compatibility with anything still reading them.
+                        $cmtCatalog       = CommitteeService::catalogForAssignment();
+                        $cmtAssignedIds   = CommitteeService::roleIdsForMember($memberId);
+                        $cmtAssignedSet   = array_fill_keys($cmtAssignedIds, true);
+                        $cmtMemberChapter = (int) ($member['chapter_id'] ?? 0);
+                      ?>
                       <div class="md:col-span-2">
-                        <p class="text-sm font-medium text-gray-700 mb-2">Member roles</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" name="is_area_rep" value="1"
-                              <?= !empty($member['is_area_rep']) ? 'checked' : '' ?>
-                              class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                            <span>Area Representative</span>
-                          </label>
-                          <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" name="is_committee" value="1" id="admin-is-committee"
-                              <?= !empty($member['is_committee']) ? 'checked' : '' ?>
-                              class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
-                            <span>Committee Member</span>
-                          </label>
+                        <div class="flex items-center justify-between mb-2">
+                          <p class="text-sm font-medium text-gray-700">Committee &amp; Leadership Role</p>
+                          <?php if ($cmtAssignedIds): ?>
+                            <span class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                              <?= count($cmtAssignedIds) ?> assigned
+                            </span>
+                          <?php endif; ?>
                         </div>
-                        <div id="admin-committee-role-wrap" <?= empty($member['is_committee']) ? 'style="display:none"' : '' ?>>
-                          <label class="text-sm font-medium text-gray-700">Committee role</label>
-                          <input type="text" name="committee_role" value="<?= e($member['committee_role'] ?? '') ?>"
-                            placeholder="e.g. President, Secretary, Treasurer…"
-                            class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <p class="text-xs text-gray-500 mb-3">
+                          Select one or more roles this member holds. Cards on the public Committee &amp; Chapter Reps pages, plus the member-area Committee &amp; Leadership page, render from these assignments automatically.
+                        </p>
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                          <?php if (!empty($cmtCatalog['national'])): ?>
+                            <div>
+                              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">National Roles</p>
+                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <?php foreach ($cmtCatalog['national'] as $role): ?>
+                                  <label class="flex items-start gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer hover:border-primary/40">
+                                    <input type="checkbox" name="committee_role_ids[]" value="<?= e($role['id']) ?>"
+                                      <?= isset($cmtAssignedSet[(int)$role['id']]) ? 'checked' : '' ?>
+                                      class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                                    <span class="flex-1">
+                                      <span class="block font-medium text-gray-900"><?= e($role['name']) ?></span>
+                                      <?php if (!empty($role['email'])): ?>
+                                        <span class="block text-[11px] text-gray-400 truncate"><?= e($role['email']) ?></span>
+                                      <?php endif; ?>
+                                    </span>
+                                  </label>
+                                <?php endforeach; ?>
+                              </div>
+                            </div>
+                          <?php endif; ?>
+
+                          <?php if (!empty($cmtCatalog['chapter'])): ?>
+                            <div>
+                              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Chapter Representative Roles</p>
+                              <?php
+                                // Surface the role matching this member's home chapter at the very top.
+                                $chapterRoles = $cmtCatalog['chapter'];
+                                usort($chapterRoles, function ($a, $b) use ($cmtMemberChapter) {
+                                    $aMatch = ((int) $a['chapter_id']) === $cmtMemberChapter ? 0 : 1;
+                                    $bMatch = ((int) $b['chapter_id']) === $cmtMemberChapter ? 0 : 1;
+                                    if ($aMatch !== $bMatch) { return $aMatch - $bMatch; }
+                                    return strcmp($a['name'], $b['name']);
+                                });
+                              ?>
+                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <?php foreach ($chapterRoles as $role):
+                                  $isMine = ((int) $role['chapter_id']) === $cmtMemberChapter && $cmtMemberChapter > 0;
+                                ?>
+                                  <label class="flex items-start gap-2 rounded-lg border <?= $isMine ? 'border-primary/40 bg-primary/5' : 'border-gray-100 bg-white' ?> px-3 py-2 text-sm text-gray-700 cursor-pointer hover:border-primary/40">
+                                    <input type="checkbox" name="committee_role_ids[]" value="<?= e($role['id']) ?>"
+                                      <?= isset($cmtAssignedSet[(int)$role['id']]) ? 'checked' : '' ?>
+                                      class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                                    <span class="flex-1">
+                                      <span class="block font-medium text-gray-900"><?= e($role['name']) ?>
+                                        <?php if ($isMine): ?><span class="ml-1 text-[10px] text-primary">(home chapter)</span><?php endif; ?>
+                                      </span>
+                                      <?php if (!empty($role['chapter_state'])): ?>
+                                        <span class="block text-[11px] text-gray-400 truncate"><?= e($role['chapter_state']) ?></span>
+                                      <?php endif; ?>
+                                    </span>
+                                  </label>
+                                <?php endforeach; ?>
+                              </div>
+                            </div>
+                          <?php endif; ?>
+
+                          <?php if (empty($cmtCatalog['national']) && empty($cmtCatalog['chapter'])): ?>
+                            <p class="text-sm text-gray-500 py-2 text-center">No committee roles configured yet. Run the migration to seed the default catalog.</p>
+                          <?php endif; ?>
                         </div>
-                        <script>
-                          (function () {
-                            var cb = document.getElementById('admin-is-committee');
-                            var wrap = document.getElementById('admin-committee-role-wrap');
-                            if (cb && wrap) {
-                              cb.addEventListener('change', function () {
-                                wrap.style.display = cb.checked ? '' : 'none';
-                              });
-                            }
-                          })();
-                        </script>
+                        <input type="hidden" name="committee_roles_submitted" value="1">
                       </div>
                     <?php endif; ?>
                   </div>

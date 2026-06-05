@@ -44,6 +44,9 @@ if ($page && $canView) {
         $heroTitle = $page['title'];
         $rawHtml = PageService::liveHtml($page);
         $rawHtml = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $rawHtml);
+        // Remove shortcode tags ([committee], [chapter-reps], [media:N]) so
+        // they don't leak into the hero subtitle as literal "[committee]" text.
+        $rawHtml = preg_replace('/\\[[a-z][a-z0-9_:-]*(?:\\s+[^\\]]*)?\\]/i', '', $rawHtml);
         $plainContent = trim(strip_tags($rawHtml));
         if ($plainContent !== '') {
             $heroLead = $plainContent;
