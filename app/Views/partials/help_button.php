@@ -20,7 +20,9 @@ if (empty($gwHelpUser['id'])) {
 
 $gwHelpManifest = TourService::manifest();
 $gwHelpCompletions = TourService::completionsFor((int) $gwHelpUser['id']);
-$gwHelpSupportEmail = SettingsService::getGlobal('site.support_email', 'admin@goldwing.org.au');
+// The Webmaster handles all member-facing support enquiries (matches the
+// reply-to address used across NotificationService + the welcome email).
+$gwHelpSupportEmail = 'webmaster@goldwing.org.au';
 $gwHelpCurrentUrl = ($_SERVER['REQUEST_URI'] ?? '/');
 $gwHelpIsAdmin = in_array('admin', $gwHelpUser['roles'] ?? [], true)
               || in_array('webmaster', $gwHelpUser['roles'] ?? [], true);

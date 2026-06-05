@@ -75,7 +75,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <h2 class="font-display text-xl text-gray-900 mb-2">Need a hand from a real person?</h2>
         <p class="text-sm text-gray-600">
           If you're stuck or something doesn't look right,
-          email <a href="mailto:<?= e(\App\Services\SettingsService::getGlobal('site.support_email', 'admin@goldwing.org.au')) ?>" class="text-secondary hover:underline"><?= e(\App\Services\SettingsService::getGlobal('site.support_email', 'admin@goldwing.org.au')) ?></a>
+          email <a href="mailto:webmaster@goldwing.org.au?subject=Help%20with%20the%20AGA%20members%20site" class="text-secondary hover:underline">webmaster@goldwing.org.au</a>
           and we'll help you sort it out.
         </p>
       </div>
