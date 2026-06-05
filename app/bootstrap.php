@@ -217,26 +217,78 @@ function render_media_shortcodes(string $html): string
         return '<a href="' . e($media['path']) . '">' . e($media['title']) . '</a>';
     }, $html);
 
-    // [committee] — National committee grid (uses CommitteeService + the
-    // shared committee_cards partial in 'public' variant so it matches the
-    // existing .card / .grid-3 styling used on PageBuilder pages).
-    $html = preg_replace_callback('/\\[committee\\]/', function () {
-        ob_start();
-        $variant = 'public';
-        $mode = 'committee';
-        require __DIR__ . '/Views/partials/committee_cards.php';
-        return (string) ob_get_clean();
+    // Shared card renderer for the [committee] / [chapter-reps] shortcodes.
+    // Inlined here (rather than going through the committee_cards.php partial)
+    // because the partial was returning empty output through the
+    // preg_replace_callback closure in production, leaving the public pages
+    // with no cards. Using a local closure removes require/scope as a variable.
+    $renderCommitteeCard = function (array $role): string {
+        $name = trim(($role['first_name'] ?? '') . ' ' . ($role['last_name'] ?? ''));
+        $vacant = $name === '';
+        $avatar  = $role['avatar_url']   ?? '';
+        $email   = $role['email']        ?? '';
+        $phone   = $role['phone']        ?? '';
+        $title   = $role['name']         ?? '';
+        $chapter = $role['chapter_name'] ?? '';
+        $h  = '<div class="card">';
+        $imgSrc = (!$vacant && $avatar !== '') ? $avatar : '/uploads/about/committee-placeholder.png';
+        $imgAlt = $vacant ? 'Position vacant' : $name;
+        $h .= '<img src="' . e($imgSrc) . '" alt="' . e($imgAlt) . '" style="width:100%; border-radius:8px; margin-bottom:0.75rem;">';
+        $h .= $vacant
+            ? '<h3 style="font-style:italic; color:#9ca3af;">Position vacant</h3>'
+            : '<h3>' . e($name) . '</h3>';
+        $h .= '<p>' . e($title) . '</p>';
+        if ($chapter !== '') {
+            $h .= '<p style="color:#6b7280; font-size:0.875rem;">' . e($chapter) . '</p>';
+        }
+        $h .= $phone !== ''
+            ? '<p>Phone: <a href="tel:' . e(preg_replace('/\s+/', '', $phone)) . '">' . e($phone) . '</a></p>'
+            : '<p>Phone: TBC</p>';
+        if ($email !== '') {
+            $h .= '<p><a href="mailto:' . e($email) . '">' . e($email) . '</a></p>';
+        }
+        $h .= '</div>';
+        return $h;
+    };
+
+    // [committee] — National committee grid
+    $html = preg_replace_callback('/\\[committee\\]/', function () use ($renderCommitteeCard) {
+        try {
+            $roles = \App\Services\CommitteeService::nationalRoles();
+        } catch (\Throwable $e) {
+            return '<div class="card"><p style="color:#b91c1c">Couldn\'t load committee roles: ' . e($e->getMessage()) . '</p></div>';
+        }
+        if (!$roles) {
+            return '<div class="card"><p style="color:#6b7280">No committee roles configured yet. Visit <a href="/admin/run-migration.php">admin/run-migration.php</a> to seed the catalog.</p></div>';
+        }
+        $out = '<div class="grid grid-3 committee-grid">';
+        foreach ($roles as $role) { $out .= $renderCommitteeCard($role); }
+        $out .= '</div>';
+        return $out;
     }, $html);
 
     // [chapter-reps]                  — all chapter reps, grouped by state
     // [chapter-reps state="Tasmania"] — single-state listing (no group header)
-    $html = preg_replace_callback('/\\[chapter-reps(?:\\s+state="([^"]*)")?\\]/', function ($matches) {
-        ob_start();
-        $variant = 'public';
-        $mode = 'chapter-reps';
+    $html = preg_replace_callback('/\\[chapter-reps(?:\\s+state="([^"]*)")?\\]/', function ($matches) use ($renderCommitteeCard) {
         $stateFilter = isset($matches[1]) && $matches[1] !== '' ? $matches[1] : null;
-        require __DIR__ . '/Views/partials/committee_cards.php';
-        return (string) ob_get_clean();
+        try {
+            $byState = \App\Services\CommitteeService::chapterRolesByState($stateFilter);
+        } catch (\Throwable $e) {
+            return '<div class="card"><p style="color:#b91c1c">Couldn\'t load chapter reps: ' . e($e->getMessage()) . '</p></div>';
+        }
+        if (!$byState) {
+            return '<div class="card"><p style="color:#6b7280">No chapter representatives configured yet for this region.</p></div>';
+        }
+        $out = '';
+        foreach ($byState as $state => $stateRoles) {
+            if ($stateFilter === null) {
+                $out .= '<h2 style="margin-top:2rem;">' . e((string) $state) . '</h2>';
+            }
+            $out .= '<div class="grid grid-3 chapter-grid">';
+            foreach ($stateRoles as $role) { $out .= $renderCommitteeCard($role); }
+            $out .= '</div>';
+        }
+        return $out;
     }, $html);
 
     return $html;

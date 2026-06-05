@@ -909,6 +909,132 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 016 — Committee roles cleanup
+//
+// Two follow-ups to Migration 015:
+//
+// 1) Duplicate stubs. The roster includes "Paul" (Vice President) with no
+//    last name, so the matcher in 015 always skipped fuzzy-matching for him
+//    and went straight to stub creation. If 015 was attempted twice (which
+//    it was on this server because the page UPDATE step initially failed
+//    with HY093), each attempt created a fresh Paul-TBC stub, each assigned
+//    to the same Vice President role. The (member_id, role_id) UNIQUE
+//    constraint blocks the same member being assigned twice, but NOT two
+//    different members holding the same role — so the public grid shows
+//    two cards for the VP slot.
+//
+//    Fix: for any role with >1 assignment, keep the earliest, drop the rest,
+//    and delete any stub member rows that are no longer referenced.
+//
+// 2) Page content. Re-applies the [committee] / [chapter-reps] shortcodes to
+//    the 7 affected PageBuilder pages. Migration 015's page UPDATE block ran
+//    after the SQL was fixed, but this is a safety net in case any page was
+//    missed and so admins can re-run if they hand-edited the body and want
+//    to revert to the dynamic version.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_016_committee_cleanup';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 016 — Committee cleanup', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        // ── 1. Drop duplicate assignments per role ───────────────────────────
+        // For each role with multiple assignments, keep only the earliest by
+        // assignment id, delete the rest.
+        $dupes = $pdo->query("
+            SELECT role_id, COUNT(*) AS n
+            FROM member_committee_assignments
+            GROUP BY role_id
+            HAVING n > 1
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $removedAssignments = 0;
+        foreach ($dupes as $row) {
+            $roleId = (int) $row['role_id'];
+            // Get all assignment ids for this role, keep the lowest
+            $ids = $pdo->prepare("
+                SELECT id FROM member_committee_assignments
+                WHERE role_id = :rid
+                ORDER BY id ASC
+            ");
+            $ids->execute([':rid' => $roleId]);
+            $allIds = array_map('intval', $ids->fetchAll(PDO::FETCH_COLUMN));
+            array_shift($allIds); // drop the earliest from the deletion list
+            if ($allIds) {
+                $ph = implode(',', array_fill(0, count($allIds), '?'));
+                $del = $pdo->prepare("DELETE FROM member_committee_assignments WHERE id IN ($ph)");
+                $del->execute($allIds);
+                $removedAssignments += count($allIds);
+            }
+        }
+        $applied[] = "$removedAssignments duplicate assignment(s) removed";
+
+        // ── 2. Delete orphaned stub members ──────────────────────────────────
+        // Stubs are identifiable by the synthesized "+stub@goldwing.org.au"
+        // email pattern. After step 1, some stubs no longer have any
+        // assignments — these can be removed safely.
+        $orphanStubs = $pdo->query("
+            SELECT m.id FROM members m
+            LEFT JOIN member_committee_assignments a ON a.member_id = m.id
+            WHERE m.email LIKE '%+stub@goldwing.org.au'
+              AND m.user_id IS NULL
+              AND a.id IS NULL
+        ")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        $deletedStubs = 0;
+        if ($orphanStubs) {
+            $ph = implode(',', array_fill(0, count($orphanStubs), '?'));
+            $del = $pdo->prepare("DELETE FROM members WHERE id IN ($ph)");
+            $del->execute(array_map('intval', $orphanStubs));
+            $deletedStubs = $del->rowCount();
+        }
+        $applied[] = "$deletedStubs orphaned stub member(s) removed";
+
+        // ── 3. Re-apply shortcode page content ───────────────────────────────
+        $pageUpdates = [
+            'committee'                  => '<p>Riding with a powerful motorcycle comes a skilled crew ready to navigate the roads here at the Australian Goldwing Association.</p>[committee]',
+            'chapters-representatives'   => '<p>Local chapters are the heart of the association. Each state has representatives who coordinate rides and support members.</p>[chapter-reps]',
+            'chapters-nsw'               => '<p>Local chapters across New South Wales coordinate rides and support members throughout the region.</p>[chapter-reps state="ACT & New South Wales"]',
+            'chapters-qld'               => '<p>Queensland chapters connect riders across the state with regular rides, events, and support.</p>[chapter-reps state="Queensland"]',
+            'chapters-wa'                => '<p>Western Australia chapters coordinate local rides and keep members connected across the state.</p>[chapter-reps state="Western Australia"]',
+            'chapters-sa'                => '<p>South Australian riders connect through a dedicated chapter and local events.</p>[chapter-reps state="South Australia"]',
+            'chapters-tas'               => '<p>Tasmanian members stay connected through local rides and chapter support.</p>[chapter-reps state="Tasmania"]',
+        ];
+        $updatePage = $pdo->prepare("
+            UPDATE pages SET html_content = :body_html, live_html = :body_live, updated_at = NOW()
+            WHERE slug = :slug
+        ");
+        $pageCount = 0;
+        foreach ($pageUpdates as $slug => $body) {
+            $updatePage->execute([':body_html' => $body, ':body_live' => $body, ':slug' => $slug]);
+            if ($updatePage->rowCount() > 0) { $pageCount++; }
+        }
+        $applied[] = "$pageCount page(s) re-wired to shortcodes";
+
+        // ── 4. Quick diagnostic — surface current page content state ─────────
+        $cmtPage = $pdo->query("SELECT LEFT(COALESCE(live_html, html_content, ''), 80) AS preview FROM pages WHERE slug = 'committee'")->fetchColumn();
+        $applied[] = "committee page preview: " . (string) $cmtPage;
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = [
+            'label' => 'Migration 016 — Committee cleanup',
+            'status' => 'applied',
+            'note' => implode(' · ', $applied),
+        ];
+    } catch (Throwable $e) {
+        $results[] = [
+            'label' => 'Migration 016 — Committee cleanup',
+            'status' => 'error',
+            'note' => $e->getMessage(),
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
