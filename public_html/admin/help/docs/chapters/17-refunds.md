@@ -37,7 +37,7 @@ Both routes do exactly the same thing.
 
 The Refunds panel sits at the bottom of the order detail page and looks like this:
 
-![Refunds panel on the order detail page](../images/17-refund-button.png)
+![Refunds panel on the order detail page](images/17-refund-button.png)
 
 Then:
 
@@ -49,7 +49,7 @@ Then:
 6. You'll be asked for your **2FA code** if it's been more than a few minutes since you last entered one (this is the "step-up" check — a deliberate extra layer of safety on actions involving money).
 7. Confirm the browser pop-up: "Process this refund in Stripe?"
 
-    ![Browser confirm dialog before the Stripe call](../images/17-refund-confirm.png)
+    ![Browser confirm dialog before the Stripe call](images/17-refund-confirm.png)
 
 8. Wait a few seconds. The page reloads and you'll see the refund listed in the panel with a status of **Processed**.
 
@@ -189,7 +189,7 @@ The `store_refund_processed` template (in `App\Services\NotificationService`) em
   • Refunds panel on an order detail page at /admin/store/orders/<order_number>,
     showing amount + reason fields and the red "Process refund" button.
     Save as public_html/admin/help/images/17-refund-button.png and add:
-    ![Refund button on order detail page](../images/17-refund-button.png)
+    ![Refund button on order detail page](images/17-refund-button.png)
   • The confirm() dialog that fires on click. Save as 17-refund-confirm.png.
 -->
 

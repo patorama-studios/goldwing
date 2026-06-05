@@ -253,8 +253,17 @@ function gw_md_inline(string $s): string
     // Escape HTML first so generated <strong>/<em>/<a>/<img> tags survive.
     $s = htmlspecialchars($s, ENT_QUOTES);
     // Images ![alt](src) — must run BEFORE links
+    // Rewrite relative paths so they resolve correctly from the viewer URL.
+    // Authors may write images/foo.png OR ../images/foo.png — both should
+    // end up pointing at /admin/help/docs/images/foo.png.
     $s = preg_replace_callback('/!\[([^\]]*)\]\(([^)\s]+)\)/', function ($m) {
-        return '<img src="' . $m[2] . '" alt="' . $m[1] . '" class="rounded-lg border border-gray-200 my-3 max-w-full" loading="lazy">';
+        $src = $m[2];
+        if (preg_match('#^\.\./images/(.+)$#', $src, $mm)) {
+            $src = '/admin/help/docs/images/' . $mm[1];
+        } elseif (preg_match('#^images/(.+)$#', $src, $mm)) {
+            $src = '/admin/help/docs/images/' . $mm[1];
+        }
+        return '<img src="' . $src . '" alt="' . $m[1] . '" class="rounded-lg border border-gray-200 my-3 max-w-full" loading="lazy">';
     }, $s);
     // Links [text](url)
     $s = preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', function ($m) {
