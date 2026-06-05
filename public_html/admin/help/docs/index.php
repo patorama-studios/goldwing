@@ -1,9 +1,11 @@
 <?php
 /**
- * Admin System Documentation — index / table of contents.
+ * Admin System Documentation — index / table of contents / search.
  *
- * Lists every chapter from _toc.json grouped by part. Each chapter links to
- * view.php?slug=... which renders the markdown file under chapters/.
+ * Lists every chapter from _toc.json grouped by part. When `?q=<terms>` is
+ * present, also runs a case-insensitive AND-search across every chapter's
+ * markdown and renders ranked results with highlighted snippets above the
+ * table of contents.
  *
  * Admin-only. Renders inside the standard backend layout so it shows the
  * admin sidebar and matches every other admin page.
@@ -21,8 +23,105 @@ if (!is_array($toc)) {
     exit;
 }
 
+/**
+ * Flatten chapters with the part they belong to.
+ */
+function gw_docs_flatten(array $toc): array
+{
+    $flat = [];
+    foreach (($toc['parts'] ?? []) as $part) {
+        foreach (($part['chapters'] ?? []) as $ch) {
+            $ch['part_title'] = $part['title'] ?? '';
+            $flat[] = $ch;
+        }
+    }
+    return $flat;
+}
+
+/**
+ * Run an AND-search across chapter markdown.
+ * @return array ranked results: [['chapter'=>..., 'matches'=>int, 'snippets'=>string[]], ...]
+ */
+function gw_docs_search(array $chapters, string $q): array
+{
+    $q = trim($q);
+    if ($q === '') return [];
+    $terms = array_values(array_filter(preg_split('/\s+/', mb_strtolower($q))));
+    if (!$terms) return [];
+
+    $results = [];
+    foreach ($chapters as $chapter) {
+        $path = __DIR__ . '/' . ($chapter['file'] ?? '');
+        if (!is_file($path)) continue;
+        $content = (string) file_get_contents($path);
+        // Strip HTML comments — match the renderer's behaviour so readers
+        // don't see hits inside hidden screenshot TODOs.
+        $content = (string) preg_replace('/<!--.*?-->/s', '', $content);
+        $lower = mb_strtolower($content);
+        $titleLower = mb_strtolower($chapter['title'] ?? '');
+
+        // ALL terms must appear somewhere (AND).
+        $total = 0;
+        foreach ($terms as $t) {
+            $body  = substr_count($lower, $t);
+            $title = substr_count($titleLower, $t);
+            if ($body + $title === 0) {
+                continue 2;
+            }
+            // Title hits weighted heavier so "refund" surfaces Ch 17 above
+            // chapters that merely mention refunds in passing.
+            $total += $body + ($title * 10);
+        }
+
+        // Build up to 3 snippets, jumping ahead to avoid overlap.
+        $snippets = [];
+        $lastEnd = -1;
+        // Walk through the lowercase content finding ANY term, in order.
+        $allHits = [];
+        foreach ($terms as $t) {
+            $pos = 0;
+            $len = strlen($t);
+            while (($pos = strpos($lower, $t, $pos)) !== false) {
+                $allHits[] = ['pos' => $pos, 'len' => $len];
+                $pos += $len;
+            }
+        }
+        usort($allHits, fn($a, $b) => $a['pos'] <=> $b['pos']);
+        foreach ($allHits as $hit) {
+            if (count($snippets) >= 3) break;
+            if ($hit['pos'] < $lastEnd) continue; // overlap
+            $start = max(0, $hit['pos'] - 90);
+            $end   = min(strlen($content), $hit['pos'] + $hit['len'] + 110);
+            $slice = substr($content, $start, $end - $start);
+            // Tidy: collapse whitespace, strip code-fence markers + heading hashes
+            $slice = preg_replace('/\s+/', ' ', $slice);
+            $slice = preg_replace('/^#+\s*/', '', $slice);
+            $slice = trim((string) $slice);
+            $snip = htmlspecialchars($slice, ENT_QUOTES);
+            // Highlight every term (case-insensitive).
+            foreach ($terms as $t) {
+                $pattern = '/(' . preg_quote(htmlspecialchars($t, ENT_QUOTES), '/') . ')/i';
+                $snip = preg_replace($pattern, '<mark class="bg-yellow-200 text-gray-900 px-0.5 rounded">$1</mark>', (string) $snip);
+            }
+            $snippets[] = ($start > 0 ? '… ' : '') . $snip . ($end < strlen($content) ? ' …' : '');
+            $lastEnd = $end + 30;
+        }
+
+        $results[] = [
+            'chapter'  => $chapter,
+            'matches'  => $total,
+            'snippets' => $snippets,
+        ];
+    }
+    usort($results, fn($a, $b) => $b['matches'] <=> $a['matches']);
+    return $results;
+}
+
+$q = trim((string) ($_GET['q'] ?? ''));
+$results = $q !== '' ? gw_docs_search(gw_docs_flatten($toc), $q) : [];
+
 $user = current_user();
-$pageTitle = 'System Documentation';
+$pageTitle = $q !== '' ? "Search: $q — System Documentation" : 'System Documentation';
 $activePage = 'help-docs';
 require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
 ?>
@@ -30,7 +129,7 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
   <?php include __DIR__ . '/../../../../app/Views/partials/backend_admin_sidebar.php'; ?>
   <main class="flex-1 p-6 md:p-10">
     <div class="max-w-5xl mx-auto">
-      <header class="mb-8">
+      <header class="mb-6">
         <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 mb-2">
           <span class="material-icons-outlined text-base">menu_book</span>
           <span>Admin documentation</span>
@@ -40,6 +139,58 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
           <p class="mt-2 text-gray-600 max-w-3xl"><?= e($toc['intro']) ?></p>
         <?php endif; ?>
       </header>
+
+      <form method="get" action="/admin/help/docs/" class="mb-6">
+        <div class="flex items-center gap-2 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-2 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400">
+          <span class="material-icons-outlined text-gray-400">search</span>
+          <input type="search" name="q" value="<?= e($q) ?>" autofocus
+                 placeholder="Search the docs — try refund, 2FA, stripe key, lockout, area rep…"
+                 class="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 py-1">
+          <?php if ($q !== ''): ?>
+            <a href="/admin/help/docs/" class="text-xs text-gray-500 hover:text-amber-700">Clear</a>
+          <?php endif; ?>
+          <button type="submit" class="px-3 py-1 text-xs font-semibold rounded-lg bg-primary text-gray-900 hover:bg-amber-300 transition">Search</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Searches every chapter for all your words (AND match). Hits in chapter titles rank higher.</p>
+      </form>
+
+      <?php if ($q !== ''): ?>
+        <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
+          <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-white">
+            <h2 class="font-display text-lg text-gray-900">
+              <?= count($results) === 0 ? 'No results' : (count($results) . ' chapter' . (count($results) === 1 ? '' : 's') . ' match') ?>
+              <span class="text-sm text-gray-500 font-normal"> for &ldquo;<?= e($q) ?>&rdquo;</span>
+            </h2>
+          </div>
+          <?php if (!$results): ?>
+            <div class="px-6 py-8 text-center text-gray-500 text-sm">
+              Nothing matched. Try fewer words, or check the full list of chapters below.
+            </div>
+          <?php else: ?>
+            <ul class="divide-y divide-gray-100">
+              <?php foreach ($results as $r): ?>
+                <?php $ch = $r['chapter']; ?>
+                <li class="px-6 py-4 hover:bg-amber-50 transition">
+                  <a href="view.php?slug=<?= urlencode($ch['slug']) ?>" class="block">
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <div class="text-sm font-semibold text-gray-900"><?= e($ch['title']) ?></div>
+                        <div class="text-xs text-gray-500 mt-0.5"><?= e($ch['part_title']) ?></div>
+                      </div>
+                      <span class="text-xs text-gray-400 font-mono"><?= (int) $r['matches'] ?> hits</span>
+                    </div>
+                    <?php foreach ($r['snippets'] as $snip): ?>
+                      <p class="text-xs text-gray-700 leading-relaxed mt-2 ml-0"><?= $snip ?></p>
+                    <?php endforeach; ?>
+                  </a>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
+        </section>
+
+        <h2 class="font-display text-lg text-gray-900 mt-10 mb-3">All chapters</h2>
+      <?php endif; ?>
 
       <div class="space-y-6">
         <?php foreach (($toc['parts'] ?? []) as $part): ?>

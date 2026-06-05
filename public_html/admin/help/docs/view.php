@@ -291,11 +291,18 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
   <?php include __DIR__ . '/../../../../app/Views/partials/backend_admin_sidebar.php'; ?>
   <main class="flex-1 p-6 md:p-10">
     <div class="max-w-4xl mx-auto">
-      <nav class="text-xs text-gray-500 mb-3 flex items-center gap-2">
-        <a href="/admin/help/docs/" class="hover:text-amber-700">System Documentation</a>
-        <span>›</span>
-        <span class="text-gray-600"><?= e($chapter['part_title']) ?></span>
-      </nav>
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <nav class="text-xs text-gray-500 flex items-center gap-2">
+          <a href="/admin/help/docs/" class="hover:text-amber-700">System Documentation</a>
+          <span>›</span>
+          <span class="text-gray-600"><?= e($chapter['part_title']) ?></span>
+        </nav>
+        <form method="get" action="/admin/help/docs/" class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 focus-within:border-amber-400">
+          <span class="material-icons-outlined text-gray-400 text-sm">search</span>
+          <input type="search" name="q" placeholder="Search docs…"
+                 class="bg-transparent outline-none text-xs text-gray-900 placeholder-gray-400 w-40">
+        </form>
+      </div>
       <header class="mb-6">
         <h1 class="font-display text-3xl text-gray-900"><?= e($chapter['title']) ?></h1>
         <div class="text-xs text-gray-400 font-mono mt-1"><?= e($chapter['slug']) ?> · <?= e($chapter['file']) ?></div>

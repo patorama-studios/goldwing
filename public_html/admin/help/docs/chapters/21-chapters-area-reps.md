@@ -37,6 +37,22 @@ If an Area Rep needs to cover two chapters (e.g. acting in another chapter's rol
 - **Pending chapter-change requests** — Admin → **Notification Hub** (the bell icon / `/admin/requests/`) → filter by **Chapter Change**.
 - **Assigning the Area Rep role to a user** — Admin → Settings → **Access Control**.
 
+### Where this shows up on the public site
+
+The committee and chapter assignments you make in the admin feed three pages on the site automatically — you don't edit those pages by hand. Whenever you tick a Committee Role on a member, change their chapter, or mark them as Area Rep, the public side reflects it within minutes (a small cache refresh).
+
+- **National Committee** — `/?page=committee` (linked from the public nav under **About → National Committee**). Shows everyone you've ticked as a national committee member (President, Vice President, Secretary, Treasurer, etc.) with the role title and the contact email/phone set on the *role*.
+- **Chapters and Area Representatives** — `/?page=chapters-representatives` (linked under **About → Chapters and Area Representatives**). Grouped by state. Each chapter shows its current Area Rep with their name and the contact email/phone set on the role.
+- **Members directory** — the in-portal directory (`/member/index.php?page=directory`) shows each member's chapter against their name, so members can find people in their own chapter.
+
+What this means in practice: at the AGM when committee roles rotate, you don't open the committee page and edit text. You go to Admin → Members → the new role-holder → tick the role. The public page updates itself.
+
+If a member is missing from the public committee or chapter rep page despite having a role ticked, three usual reasons:
+
+1. The role is ticked in the database but their **member status** is inactive — only active members appear publicly.
+2. The role's **contact email/phone** has never been set on the role itself (separate from the person's profile) — there's no admin UI for editing that yet; ask your developer.
+3. The page cache is stale — opening the page in an incognito window or waiting a few minutes clears it.
+
 ### How to add a new chapter
 
 Admins only. You'll do this rarely — usually only when the national committee formally creates a new chapter.
