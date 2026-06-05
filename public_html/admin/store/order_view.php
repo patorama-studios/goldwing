@@ -261,7 +261,7 @@ $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
 ?>
 <section class="grid gap-6 lg:grid-cols-[2fr_1fr]">
   <div class="space-y-6">
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div data-tour="admin-process-order-summary" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 mb-1">Order summary</h2>
@@ -322,7 +322,7 @@ $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div data-tour="admin-process-order-items" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">Items</h3>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
@@ -383,7 +383,7 @@ $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
     <?php endif; ?>
 
     <?php if ($order['fulfillment_method'] === 'shipping'): ?>
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div data-tour="admin-process-order-fulfillment" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">Fulfillment</h3>
         <form method="post" class="space-y-3">
           <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
@@ -400,12 +400,12 @@ $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
             <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Shipped date</label>
             <input type="date" name="shipped_at" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($shippedDateValue) ?>">
           </div>
-          <button class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink" type="submit" <?= $canManage ? '' : 'disabled' ?>>Save tracking + mark shipped</button>
+          <button data-tour="admin-process-order-ship-button" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink" type="submit" <?= $canManage ? '' : 'disabled' ?>>Save tracking + mark shipped</button>
         </form>
       </div>
     <?php endif; ?>
 
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div data-tour="admin-process-order-refund" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">Refunds</h3>
       <form method="post" class="space-y-3">
         <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">

@@ -28,5 +28,6 @@ $termsUrl = is_array($legal) ? ($legal['terms'] ?? '') : '';
   </div>
 </footer>
 <?php endif; ?>
+<?php include __DIR__ . '/help_button.php'; ?>
 </body>
 </html>

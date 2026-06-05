@@ -397,7 +397,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
     <span class="material-icons-outlined" style="font-size:17px">arrow_back</span>
     All Issues
   </a>
-  <div id="issue-title"><?= $issueTitle ?></div>
+  <div id="issue-title" data-tour="wings-title"><?= $issueTitle ?></div>
   <div id="top-right">
     <div id="page-counter">— / —</div>
     <button id="fullscreen-btn" title="Toggle fullscreen">
@@ -410,16 +410,16 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 <div id="zoom-hint">Pinch to zoom · Double-tap to reset</div>
 
 <!-- Reader Area -->
-<div id="reader-area">
-  <button id="btn-prev" class="nav-arrow" aria-label="Previous page" disabled>
+<div id="reader-area" data-tour="wings-reader">
+  <button id="btn-prev" class="nav-arrow" aria-label="Previous page" data-tour="wings-prev" disabled>
     <span class="material-icons-outlined">chevron_left</span>
   </button>
 
-  <div id="flip-book-wrap">
+  <div id="flip-book-wrap" data-tour="wings-book">
     <div id="flip-book"></div>
   </div>
 
-  <button id="btn-next" class="nav-arrow" aria-label="Next page" disabled>
+  <button id="btn-next" class="nav-arrow" aria-label="Next page" data-tour="wings-next" disabled>
     <span class="material-icons-outlined">chevron_right</span>
   </button>
 </div>
@@ -433,7 +433,7 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
   <button id="mobile-next" class="mobile-nav-arrow" aria-label="Next page" disabled>
     <span class="material-icons-outlined">chevron_right</span>
   </button>
-  <a id="download-btn" href="/member/download_wings.php?id=<?= $id ?>" download>
+  <a id="download-btn" data-tour="wings-download" href="/member/download_wings.php?id=<?= $id ?>" download>
     <span class="material-icons-outlined">download</span>
     Download PDF
   </a>
@@ -779,5 +779,6 @@ $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 })();
 </script>
 
+<?php include __DIR__ . '/../../app/Views/partials/help_button.php'; ?>
 </body>
 </html>

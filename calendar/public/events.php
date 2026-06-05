@@ -67,12 +67,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
   <main class="flex-1 overflow-y-auto bg-background-light relative">
     <?php $topbarTitle = 'Calendar Events'; require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <div class="flex flex-wrap items-center justify-between gap-4">
+      <div data-tour="book-event-header" class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p class="text-sm text-gray-500">Dashboard / Calendar</p>
           <h1 class="font-display text-2xl font-bold text-gray-900">Calendar Events</h1>
         </div>
-        <a href="admin_event_create.php" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
+        <a data-tour="manage-events-create" href="admin_event_create.php" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
           <span class="material-icons-outlined text-base">add</span>
           Create Event
         </a>
@@ -89,13 +89,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-      <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+      <section data-tour="manage-events-list book-event-list" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
         <?php if (empty($events)) : ?>
           <p class="text-sm text-gray-500">No events found.</p>
         <?php else : ?>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
-              <thead class="text-left text-xs uppercase text-gray-500 border-b">
+              <thead data-tour="manage-events-columns" class="text-left text-xs uppercase text-gray-500 border-b">
                 <tr>
                   <th class="py-2 pr-3">Title</th>
                   <th class="py-2 pr-3">Scope</th>
@@ -107,8 +107,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <?php foreach ($events as $event) : ?>
-                  <tr class="<?php echo $event['status'] === 'pending' ? 'bg-amber-50' : ''; ?>">
+                <?php $eventRowIndex = 0; foreach ($events as $event) : $eventRowIndex++; ?>
+                  <tr<?php echo $eventRowIndex === 1 ? ' data-tour="manage-events-row book-event-row"' : ''; ?> class="<?php echo $event['status'] === 'pending' ? 'bg-amber-50' : ''; ?>">
                     <td class="py-2 pr-3 text-gray-900 font-medium"><?php echo calendar_e($event['title']); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e(calendar_human_scope($event['scope'])); ?></td>
                     <td class="py-2 pr-3 text-gray-600"><?php echo calendar_e($event['chapter_name'] ?? '-'); ?></td>
@@ -124,7 +124,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </td>
                     <td class="py-2">
                       <div class="flex flex-wrap items-center gap-3">
-                        <a class="text-secondary font-semibold" href="admin_event_view.php?id=<?php echo (int) $event['id']; ?>">View</a>
+                        <a<?php echo $eventRowIndex === 1 ? ' data-tour="manage-events-view book-event-view"' : ''; ?> class="text-secondary font-semibold" href="admin_event_view.php?id=<?php echo (int) $event['id']; ?>">View</a>
                         
                         <?php if ($event['status'] === 'pending') : ?>
                           <form method="post" class="inline">
@@ -141,7 +141,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           </form>
                         <?php endif; ?>
 
-                        <form method="post" onsubmit="return confirm('Delete this event? This cannot be undone.');">
+                        <form<?php echo $eventRowIndex === 1 ? ' data-tour="manage-events-delete"' : ''; ?> method="post" onsubmit="return confirm('Delete this event? This cannot be undone.');">
                           <?php echo calendar_csrf_field(); ?>
                           <input type="hidden" name="action" value="delete">
                           <input type="hidden" name="event_id" value="<?php echo (int) $event['id']; ?>">

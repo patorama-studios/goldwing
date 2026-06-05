@@ -375,7 +375,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <input type="hidden" name="chapter_id" value="<?= e($chapterRestriction) ?>">
           <?php endif; ?>
           <div class="grid gap-4 lg:grid-cols-7">
-            <label class="flex flex-col text-sm font-medium text-gray-700">
+            <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-search">
               Member
               <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, or phone">
             </label>
@@ -383,7 +383,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               Membership #
               <input type="text" name="member_number" value="<?= e($filters['member_number'] ?? '') ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="e.g. 12345 or 12345.1">
             </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700">
+            <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-chapter">
               Chapter
               <select name="chapter_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" <?= $chapterRestriction !== null ? 'disabled' : '' ?>>
                 <option value="">All chapters</option>
@@ -392,7 +392,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php endforeach; ?>
               </select>
             </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700">
+            <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-status">
               Status
               <select name="status" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
                 <option value="">All statuses</option>
@@ -519,7 +519,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
           </details>
         <div class="flex flex-wrap gap-2">
-            <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Apply filters</button>
+            <button type="submit" data-tour="admin-find-member-apply" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Apply filters</button>
             <a href="/admin/members" class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">Reset</a>
             <a href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => 1])) ?>" class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100">
               Pending only
@@ -528,7 +528,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </form>
       </section>
 
-      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm" data-members-list>
+      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm" data-members-list data-tour="admin-find-member-results">
         <!-- Section header with view toggle -->
         <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
           <p class="text-xs text-gray-500"><?= e((string) $totalMembers) ?> result<?= $totalMembers !== 1 ? 's' : '' ?></p>
@@ -590,6 +590,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
+                <?php $tourRowIndex = 0; ?>
                 <?php foreach ($members as $member): ?>
                   <?php
                     $fullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
@@ -606,9 +607,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     $avatarUrl = !empty($member['avatar_url'])
                         ? (string) $member['avatar_url']
                         : ($userId ? ($avatarsByUserId[$userId] ?? '') : '');
+                    $tourRowAttr = $tourRowIndex === 0 ? ' data-tour="admin-find-member-row"' : '';
+                    $tourRowIndex++;
                   ?>
                   <tr class="group hover:bg-gray-50/70 transition-colors <?= $isLifeMember ? 'bg-yellow-50/50' : ($isAssociate ? 'bg-purple-50/20 hover:bg-purple-50/40' : ($statusKey === 'pending' ? 'bg-amber-50/40' : '')) ?>"
-                      data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>">
+                      data-member-row data-member-id="<?= e((int) $member['id']) ?>" data-member-name="<?= e($fullName !== '' ? $fullName : 'Member') ?>"<?= $tourRowAttr ?>>
 
                     <!-- Checkbox -->
                     <td class="pl-4 pr-2 py-2.5 w-8">

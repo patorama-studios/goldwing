@@ -20,6 +20,304 @@
         "public_html/member/index.php",
         "public_html/assets/js/tours/tours/member-update-contact.js"
       ]
+    },
+    "member-pay-fees": {
+      "slug": "member-pay-fees",
+      "name": "How to pay your yearly fees",
+      "blurb": "Show me how to pay this year's membership fee.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/index.php?page=billing",
+      "page_match": "page=billing",
+      "steps_file": "/assets/js/tours/tours/member-pay-fees.js",
+      "selectors": [
+        "[data-tour=\"pay-fees-status-card\"]",
+        "[data-tour=\"pay-fees-expiry\"]",
+        "[data-tour=\"pay-fees-pay-now\"]",
+        "[data-tour=\"pay-fees-renew\"]",
+        "[data-tour=\"pay-fees-history\"]"
+      ],
+      "watched_files": [
+        "public_html/member/index.php",
+        "public_html/assets/js/tours/tours/member-pay-fees.js"
+      ]
+    },
+    "member-find-member": {
+      "slug": "member-find-member",
+      "name": "How to find another member",
+      "blurb": "Show me how to look up another member's details.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/index.php?page=directory",
+      "page_match": "page=directory",
+      "steps_file": "/assets/js/tours/tours/member-find-member.js",
+      "selectors": [
+        "[data-tour=\"find-member-section\"]",
+        "[data-tour=\"find-member-search\"]",
+        "[data-tour=\"find-member-chapter\"]",
+        "[data-tour=\"find-member-type\"]",
+        "[data-tour=\"find-member-table\"]"
+      ],
+      "watched_files": [
+        "public_html/member/index.php",
+        "public_html/assets/js/tours/tours/member-find-member.js"
+      ]
+    },
+    "member-read-notices": {
+      "slug": "member-read-notices",
+      "name": "How to read chapter notices",
+      "blurb": "Show me where the latest chapter notices are.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/index.php?page=notices",
+      "page_match": "page=notices",
+      "steps_file": "/assets/js/tours/tours/member-read-notices.js",
+      "selectors": [
+        "[data-tour=\"read-notices-section\"]",
+        "[data-tour=\"read-notices-heading\"]",
+        "[data-tour=\"read-notices-view-toggle\"]",
+        "[data-tour=\"read-notices-board\"]"
+      ],
+      "watched_files": [
+        "public_html/member/index.php",
+        "public_html/assets/js/tours/tours/member-read-notices.js"
+      ]
+    },
+    "member-read-wings": {
+      "slug": "member-read-wings",
+      "name": "How to read this month's Wings",
+      "blurb": "Show me how to read the latest Wings magazine.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/read_wings.php",
+      "page_match": "read_wings",
+      "steps_file": "/assets/js/tours/tours/member-read-wings.js",
+      "selectors": [
+        "[data-tour=\"wings-title\"]",
+        "[data-tour=\"wings-book\"]",
+        "[data-tour=\"wings-next\"]",
+        "[data-tour=\"wings-download\"]",
+        "[data-tour=\"wings-reader\"]"
+      ],
+      "watched_files": [
+        "public_html/member/read_wings.php",
+        "public_html/assets/js/tours/tours/member-read-wings.js"
+      ]
+    },
+    "member-2fa": {
+      "slug": "member-2fa",
+      "name": "How to turn on extra login security",
+      "blurb": "Show me how to set up two-factor login for safer access.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/2fa_enroll.php",
+      "page_match": "2fa_enroll",
+      "steps_file": "/assets/js/tours/tours/member-2fa.js",
+      "selectors": [
+        "[data-tour=\"twofa-title\"]",
+        "[data-tour=\"twofa-qr\"]",
+        "[data-tour=\"twofa-secret\"]",
+        "[data-tour=\"twofa-code\"]",
+        "[data-tour=\"twofa-submit\"]"
+      ],
+      "watched_files": [
+        "public_html/member/2fa_enroll.php",
+        "public_html/assets/js/tours/tours/member-2fa.js"
+      ]
+    },
+    "member-book-event": {
+      "slug": "member-book-event",
+      "name": "How to book a ride or event",
+      "blurb": "Show me how to RSVP or book my place on an event.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/calendar/events.php",
+      "page_match": "calendar/events",
+      "steps_file": "/assets/js/tours/tours/member-book-event.js",
+      "selectors": [
+        "[data-tour=\"book-event-header\"]",
+        "[data-tour~=\"book-event-list\"]",
+        "[data-tour~=\"book-event-row\"]",
+        "[data-tour~=\"book-event-view\"]"
+      ],
+      "watched_files": [
+        "calendar/public/events.php",
+        "public_html/calendar/events.php",
+        "public_html/assets/js/tours/tours/member-book-event.js"
+      ]
+    },
+    "admin-approve-application": {
+      "slug": "admin-approve-application",
+      "name": "How to approve a new member application",
+      "blurb": "Walk me through reviewing and approving a new member.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/index.php?page=applications",
+      "page_match": "page=applications",
+      "steps_file": "/assets/js/tours/tours/admin-approve-application.js",
+      "selectors": [
+        "[data-tour=\"approve-app-panel\"]",
+        "[data-tour=\"approve-app-filters\"]",
+        "[data-tour=\"approve-app-view\"]",
+        "[data-tour=\"approve-app-chapter\"]",
+        "[data-tour=\"approve-app-button\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/index.php",
+        "public_html/assets/js/tours/tours/admin-approve-application.js"
+      ]
+    },
+    "admin-send-notice": {
+      "slug": "admin-send-notice",
+      "name": "How to post a notice for members",
+      "blurb": "Walk me through posting a notice to members.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/index.php?page=notices",
+      "page_match": "page=notices",
+      "steps_file": "/assets/js/tours/tours/admin-send-notice.js",
+      "selectors": [
+        "[data-tour=\"send-notice-form\"]",
+        "[data-tour=\"send-notice-title\"]",
+        "[data-tour=\"send-notice-audience\"]",
+        "[data-tour=\"send-notice-editor\"]",
+        "[data-tour=\"send-notice-publish\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/index.php",
+        "public_html/assets/js/tours/tours/admin-send-notice.js"
+      ]
+    },
+    "admin-approve-fallen-wing": {
+      "slug": "admin-approve-fallen-wing",
+      "name": "How to approve a Fallen Wings tribute",
+      "blurb": "Walk me through reviewing a Fallen Wings submission.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/index.php?page=fallen-wings",
+      "page_match": "page=fallen-wings",
+      "steps_file": "/assets/js/tours/tours/admin-approve-fallen-wing.js",
+      "selectors": [
+        "[data-tour=\"approve-fallen-panel\"]",
+        "[data-tour=\"approve-fallen-section\"]",
+        "[data-tour=\"approve-fallen-entry\"]",
+        "[data-tour=\"approve-fallen-reject\"]",
+        "[data-tour=\"approve-fallen-approve\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/index.php",
+        "public_html/assets/js/tours/tours/admin-approve-fallen-wing.js"
+      ]
+    },
+    "admin-create-event": {
+      "slug": "admin-create-event",
+      "name": "How to create an event",
+      "blurb": "Walk me through creating a new event on the calendar.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/calendar/admin_event_create.php",
+      "page_match": "admin_event_create",
+      "steps_file": "/assets/js/tours/tours/admin-create-event.js",
+      "selectors": [
+        "[data-tour=\"create-event-form\"]",
+        "[data-tour=\"create-event-title\"]",
+        "[data-tour=\"create-event-classification\"]",
+        "[data-tour=\"create-event-datetime\"]",
+        "[data-tour=\"create-event-location\"]",
+        "[data-tour=\"create-event-publish\"]"
+      ],
+      "watched_files": [
+        "calendar/public/admin_event_create.php",
+        "public_html/calendar/admin_event_create.php",
+        "public_html/assets/js/tours/tours/admin-create-event.js"
+      ]
+    },
+    "admin-manage-events": {
+      "slug": "admin-manage-events",
+      "name": "How to manage your events",
+      "blurb": "Show me where I can edit or cancel an event.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/calendar/admin_events.php",
+      "page_match": "admin_events",
+      "steps_file": "/assets/js/tours/tours/admin-manage-events.js",
+      "selectors": [
+        "[data-tour~=\"manage-events-list\"]",
+        "[data-tour=\"manage-events-columns\"]",
+        "[data-tour~=\"manage-events-view\"]",
+        "[data-tour=\"manage-events-delete\"]",
+        "[data-tour=\"manage-events-create\"]"
+      ],
+      "watched_files": [
+        "calendar/public/admin_events.php",
+        "calendar/public/events.php",
+        "public_html/calendar/admin_events.php",
+        "public_html/assets/js/tours/tours/admin-manage-events.js"
+      ]
+    },
+    "admin-add-product": {
+      "slug": "admin-add-product",
+      "name": "How to add a new product to the store",
+      "blurb": "Walk me through listing a new item in the members' store.",
+      "audience": "admin",
+      "roles": ["admin", "store_manager"],
+      "page_url": "/admin/store/product_form.php",
+      "page_match": "store/product_form",
+      "steps_file": "/assets/js/tours/tours/admin-add-product.js",
+      "selectors": [
+        "[data-tour=\"admin-add-product-form\"]",
+        "[data-tour=\"admin-add-product-title\"]",
+        "[data-tour=\"admin-add-product-price\"]",
+        "[data-tour=\"admin-add-product-stock\"]",
+        "[data-tour=\"admin-add-product-images\"]",
+        "[data-tour=\"admin-add-product-save\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/store/product_form.php",
+        "public_html/assets/js/tours/tours/admin-add-product.js"
+      ]
+    },
+    "admin-process-order": {
+      "slug": "admin-process-order",
+      "name": "How to process a member's order",
+      "blurb": "Walk me through marking an order as packed and shipped.",
+      "audience": "admin",
+      "roles": ["admin", "store_manager"],
+      "page_url": "/admin/store/order_view.php",
+      "page_match": "store/order_view",
+      "steps_file": "/assets/js/tours/tours/admin-process-order.js",
+      "selectors": [
+        "[data-tour=\"admin-process-order-summary\"]",
+        "[data-tour=\"admin-process-order-items\"]",
+        "[data-tour=\"admin-process-order-fulfillment\"]",
+        "[data-tour=\"admin-process-order-ship-button\"]",
+        "[data-tour=\"admin-process-order-refund\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/store/order_view.php",
+        "public_html/assets/js/tours/tours/admin-process-order.js"
+      ]
+    },
+    "admin-find-edit-member": {
+      "slug": "admin-find-edit-member",
+      "name": "How to find and edit a member",
+      "blurb": "Walk me through searching for a member and updating their record.",
+      "audience": "admin",
+      "roles": ["admin", "area_rep"],
+      "page_url": "/admin/members/index.php",
+      "page_match": "admin/members",
+      "steps_file": "/assets/js/tours/tours/admin-find-edit-member.js",
+      "selectors": [
+        "[data-tour=\"admin-find-member-search\"]",
+        "[data-tour=\"admin-find-member-chapter\"]",
+        "[data-tour=\"admin-find-member-status\"]",
+        "[data-tour=\"admin-find-member-apply\"]",
+        "[data-tour=\"admin-find-member-row\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/members/index.php",
+        "public_html/assets/js/tours/tours/admin-find-edit-member.js"
+      ]
     }
   }
 }

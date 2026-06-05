@@ -395,7 +395,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
     <button type="button" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-primary">SEO</button>
   </div>
 
-  <form method="post" enctype="multipart/form-data" class="space-y-6">
+  <form method="post" enctype="multipart/form-data" class="space-y-6" data-tour="admin-add-product-form">
     <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -406,7 +406,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
       <div class="grid gap-6 md:grid-cols-2">
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Title</label>
-          <input name="title" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['title'] ?? '') ?>" required>
+          <input data-tour="admin-add-product-title" name="title" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e($product['title'] ?? '') ?>" required>
         </div>
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Slug</label>
@@ -450,7 +450,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
       <div class="grid gap-6 md:grid-cols-4">
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Base Price ($)</label>
-          <input name="base_price" type="number" step="0.01" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['base_price'] ?? '')) ?>" required>
+          <input data-tour="admin-add-product-price" name="base_price" type="number" step="0.01" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['base_price'] ?? '')) ?>" required>
         </div>
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">SKU</label>
@@ -458,7 +458,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
         </div>
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Stock Quantity</label>
-          <input name="stock_quantity" type="number" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['stock_quantity'] ?? '')) ?>">
+          <input data-tour="admin-add-product-stock" name="stock_quantity" type="number" class="w-full rounded-lg bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-primary" value="<?= e((string) ($product['stock_quantity'] ?? '')) ?>">
         </div>
         <div>
           <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Low Stock Alert</label>
@@ -509,7 +509,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
         <span class="material-icons-outlined text-secondary">image</span>
         Images & Media
       </h2>
-      <input name="product_images[]" type="file" multiple class="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm">
+      <input data-tour="admin-add-product-images" name="product_images[]" type="file" multiple class="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm">
       <?php if ($images): ?>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <?php foreach ($images as $image): ?>
@@ -575,7 +575,7 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
     </section>
 
     <div class="flex justify-end">
-      <button type="submit" name="action" value="save_product" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save product</button>
+      <button data-tour="admin-add-product-save" type="submit" name="action" value="save_product" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save product</button>
     </div>
   </form>
 

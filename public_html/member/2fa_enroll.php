@@ -74,8 +74,8 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
 <main class="site-main">
   <section class="hero hero--compact">
     <div class="container">
-      <div class="page-card reveal form-card">
-        <h1>Set up two-factor authentication</h1>
+      <div class="page-card reveal form-card" data-tour="twofa-card">
+        <h1 data-tour="twofa-title">Set up two-factor authentication</h1>
         <?php if ($message): ?>
           <div class="alert success"><?= e($message) ?></div>
         <?php endif; ?>
@@ -95,16 +95,16 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
         <?php else: ?>
           <p class="text-sm text-gray-700">Scan the QR code with your authenticator app, or enter the secret manually.</p>
           <div class="mt-4 flex flex-col items-center gap-3">
-            <img src="<?= e($qrUrl) ?>" alt="2FA QR code">
-            <div class="rounded bg-gray-100 px-3 py-2 font-mono text-sm"><?= e($secret) ?></div>
+            <img data-tour="twofa-qr" src="<?= e($qrUrl) ?>" alt="2FA QR code">
+            <div data-tour="twofa-secret" class="rounded bg-gray-100 px-3 py-2 font-mono text-sm"><?= e($secret) ?></div>
           </div>
-          <form method="post" class="mt-6 space-y-4">
+          <form data-tour="twofa-form" method="post" class="mt-6 space-y-4">
             <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
             <div class="form-group">
               <label>Authenticator code</label>
-              <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+              <input data-tour="twofa-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required>
             </div>
-            <button class="button primary" type="submit">Enable 2FA</button>
+            <button data-tour="twofa-submit" class="button primary" type="submit">Enable 2FA</button>
           </form>
         <?php endif; ?>
       </div>

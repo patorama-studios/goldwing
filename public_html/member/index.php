@@ -2974,20 +2974,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
       <?php elseif ($page === 'notices-view'): ?>
-        <section class="space-y-6">
+        <section class="space-y-6" data-tour="read-notices-section">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
+            <div data-tour="read-notices-heading">
               <h2 class="font-display text-2xl font-bold text-gray-900">Notice Board</h2>
               <p class="text-sm text-gray-500">Browse the latest approved notices.</p>
             </div>
-            <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1 text-sm">
+            <div data-tour="read-notices-view-toggle" class="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1 text-sm">
               <button type="button" data-notice-view="list"
                 class="px-3 py-1.5 rounded-md font-semibold text-gray-700">List view</button>
               <button type="button" data-notice-view="grid"
                 class="px-3 py-1.5 rounded-md font-semibold text-gray-700">Grid view</button>
             </div>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div data-tour="read-notices-board" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-display text-xl font-bold text-gray-900">Current Notices</h3>
             </div>
@@ -3391,7 +3391,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           }
           ?>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+            <div data-tour="pay-fees-status-card" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
               <div class="flex items-center gap-3">
                 <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
                   <span class="material-icons-outlined">credit_card</span>
@@ -3425,7 +3425,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <span
                     class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= status_badge_classes($billingStatusLabel) ?>"><?= e($billingStatusLabel) ?></span>
                 </div>
-                <div>
+                <div data-tour="pay-fees-expiry">
                   <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Expiry</p>
                   <p class="text-sm font-semibold text-gray-900"><?= e($billingExpiryLabel) ?></p>
                 </div>
@@ -3446,7 +3446,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
                   </div>
                   <?php if ($pendingPaymentMethod === 'stripe'): ?>
-                    <form method="post" class="mt-2">
+                    <form method="post" class="mt-2" data-tour="pay-fees-pay-now">
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                       <input type="hidden" name="action" value="membership_order_pay">
                       <input type="hidden" name="order_id" value="<?= e((string) $pendingMembershipOrder['id']) ?>">
@@ -3470,7 +3470,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <p class="text-sm text-gray-600">No pending membership payments.</p>
               <?php endif; ?>
               <?php if ($renewEligible && !$pendingMembershipOrder): ?>
-                <form method="post">
+                <form method="post" data-tour="pay-fees-renew">
                   <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                   <input type="hidden" name="action" value="membership_renew">
                   <button
@@ -3527,7 +3527,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </form>
             </div>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div data-tour="pay-fees-history" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">
               <div>
                 <h3 class="font-display text-lg font-bold text-gray-900">Order History</h3>
@@ -3762,7 +3762,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         ksort($dirChapters);
         $dirTotal = count($directoryMembers);
         ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+        <section data-tour="find-member-section" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
               <h2 class="font-display text-2xl font-bold text-gray-900">Members Directory</h2>
@@ -3774,20 +3774,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 
           <!-- Filters -->
           <div class="flex flex-col sm:flex-row gap-3 mb-5">
-            <div class="relative flex-1">
+            <div class="relative flex-1" data-tour="find-member-search">
               <span class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                 <span class="material-icons-outlined text-gray-400 text-lg">search</span>
               </span>
               <input type="text" id="dir-search" placeholder="Search by name or member number…"
                 class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
             </div>
-            <select id="dir-chapter" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[180px]">
+            <select data-tour="find-member-chapter" id="dir-chapter" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[180px]">
               <option value="">All Chapters</option>
               <?php foreach ($dirChapters as $chLabel => $_): ?>
                 <option value="<?= e(strtolower($chLabel)) ?>"><?= e($chLabel) ?></option>
               <?php endforeach; ?>
             </select>
-            <select id="dir-type" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[140px]">
+            <select data-tour="find-member-type" id="dir-type" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[140px]">
               <option value="">All Types</option>
               <option value="full">Full</option>
               <option value="associate">Associate</option>
@@ -3815,7 +3815,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <?php endif; ?>
 
           <!-- Table -->
-          <div class="overflow-x-auto -mx-2">
+          <div class="overflow-x-auto -mx-2" data-tour="find-member-table">
             <table class="w-full text-sm min-w-[700px]" id="dir-table">
               <thead class="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
                 <tr>

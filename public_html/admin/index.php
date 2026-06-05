@@ -1939,14 +1939,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
 
-        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <section data-tour="approve-app-panel" class="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div
             class="border-b border-gray-100 px-5 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 class="font-display text-2xl font-bold text-gray-900">Applications</h1>
               <p class="text-sm text-gray-500">Review and action membership applications.</p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div data-tour="approve-app-filters" class="flex flex-wrap items-center gap-2">
               <?php foreach ($statusLabels as $statusKey => $statusMeta): ?>
                 <a class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold <?= $statusFilter === $statusKey ? 'border-gray-900 text-gray-900' : 'border-gray-200 text-gray-600 hover:border-gray-300' ?>"
                   href="/admin/index.php?page=applications&status=<?= strtolower($statusKey) ?>">
@@ -1957,7 +1957,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <?php endforeach; ?>
             </div>
           </div>
-          <div class="overflow-x-auto">
+          <div data-tour="approve-app-table" class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead class="text-left text-xs uppercase text-gray-500 border-b">
                 <tr>
@@ -1974,12 +1974,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </tr>
               </thead>
               <tbody class="divide-y">
+                <?php $applicationRowIndex = 0; ?>
                 <?php foreach ($applicationRows as $row): ?>
                   <?php
                   $application = $row['application'];
                   $statusMeta = $statusLabels[$application['status']] ?? ['label' => $application['status'], 'classes' => 'bg-slate-100 text-slate-800'];
                   $canApprove = $application['status'] !== 'APPROVED';
                   $canReject = $application['status'] === 'PENDING';
+                  $isFirstApplicationRow = ($applicationRowIndex === 0);
+                  $applicationRowIndex++;
                   $requestedChapterName = '';
                   $requestedChapterId = $application['notes_data']['requested_chapter_id'] ?? null;
                   if ($requestedChapterId) {
@@ -2016,7 +2019,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <?php endif; ?>
                     </td>
                     <td class="py-4 pr-4">
-                      <form method="post" class="flex flex-col gap-2">
+                      <form method="post" class="flex flex-col gap-2" <?= $isFirstApplicationRow ? 'data-tour="approve-app-chapter"' : '' ?>>
                         <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                         <input type="hidden" name="member_id" value="<?= e((string) $application['member_id']) ?>">
                         <select name="assign_chapter_id"
@@ -2034,6 +2037,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <td class="py-4 pr-4">
                       <?php if ($canApprove): ?>
                         <button type="button"
+                          <?= $isFirstApplicationRow ? 'data-tour="approve-app-button"' : '' ?>
                           class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 h-9 w-9 hover:bg-emerald-100"
                           data-approve-open data-app-id="<?= e((string) $application['id']) ?>"
                           data-app-name="<?= e($row['display_name']) ?>">
@@ -2076,7 +2080,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </form>
                     </td>
                     <td class="py-4 pr-5">
-                      <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-300"
+                      <a <?= $isFirstApplicationRow ? 'data-tour="approve-app-view"' : '' ?>
+                        class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-300"
                         href="/admin/applications/view.php?id=<?= e((string) $application['id']) ?>&status=<?= strtolower($statusFilter) ?>">
                         <span class="material-icons-outlined text-base">visibility</span>
                         View
@@ -2457,14 +2462,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-sm text-gray-500">Admin notices publish instantly.</p>
                 </div>
               </div>
-              <form method="post" class="space-y-4" id="notice-create-form">
+              <form data-tour="send-notice-form" method="post" class="space-y-4" id="notice-create-form">
                 <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                 <input type="hidden" name="action" value="create_notice_admin">
                 <input type="hidden" name="notice_content" id="notice-content-input">
                 <input type="hidden" name="notice_attachment_url" id="notice-attachment-url">
                 <input type="hidden" name="notice_attachment_type" id="notice-attachment-type">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label class="text-sm font-medium text-gray-700">Title
+                  <label data-tour="send-notice-title" class="text-sm font-medium text-gray-700">Title
                     <input type="text" name="notice_title"
                       class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
                   </label>
@@ -2477,7 +2482,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </select>
                   </label>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div data-tour="send-notice-audience" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <label class="text-sm font-medium text-gray-700">Audience
                     <select name="notice_audience_scope" id="notice-audience-scope"
                       class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
@@ -2539,7 +2544,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <button type="button" id="notice-link"
                       class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
                   </div>
-                  <div id="notice-editor"
+                  <div id="notice-editor" data-tour="send-notice-editor"
                     class="mt-2 min-h-[160px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none"
                     contenteditable="true"></div>
                 </div>
@@ -2553,7 +2558,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </div>
                   <div id="notice-attachment-preview" class="mt-3 hidden"></div>
                 </div>
-                <button
+                <button data-tour="send-notice-publish"
                   class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
                   type="submit">Publish Notice</button>
               </form>
@@ -3155,7 +3160,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           $approvedMemorials = $pdo->query('SELECT *, SUBSTRING_INDEX(full_name, " ", -1) AS last_name FROM fallen_wings WHERE status = "APPROVED" ORDER BY last_name ASC, full_name ASC')->fetchAll();
         }
         ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+        <section data-tour="approve-fallen-panel" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
           <div>
             <h1 class="font-display text-2xl font-bold text-gray-900">Fallen Wings Memorials</h1>
             <p class="text-sm text-gray-500">Approve , reject, or edit memorial submissions.</p>
@@ -3249,11 +3254,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </form>
           <?php endif; ?>
 
-          <div class="space-y-4">
+          <div data-tour="approve-fallen-section" class="space-y-4">
             <h2 class="text-lg font-semibold text-gray-900">Pending submissions</h2>
             <?php if ($pendingMemorials): ?>
+              <?php $pendingFallenIndex = 0; ?>
               <?php foreach ($pendingMemorials as $entry): ?>
-                <div
+                <?php $isFirstPendingFallen = ($pendingFallenIndex === 0); $pendingFallenIndex++; ?>
+                <div <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-entry"' : '' ?>
                   class="border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <div class="flex items-center gap-3">
@@ -3281,6 +3288,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <input type="hidden" name="action" value="approve_fallen">
                       <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
                       <button
+                        <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-approve"' : '' ?>
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-gray-900 text-xs font-semibold"
                         type="submit">Approve</button>
                     </form>
@@ -3289,6 +3297,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <input type="hidden" name="action" value="reject_fallen">
                       <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
                       <button
+                        <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-reject"' : '' ?>
                         class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
                         type="submit">Reject</button>
                     </form>

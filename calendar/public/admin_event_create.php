@@ -257,7 +257,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
         <div class="flex items-center gap-3">
           <a href="admin_events.php" class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Discard</a>
-          <button form="calendar-event-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
+          <button data-tour="create-event-publish" form="calendar-event-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
             <span class="material-icons-outlined text-base">publish</span>
             Publish Event
           </button>
@@ -277,7 +277,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-    <form id="calendar-event-form" method="post" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+    <form id="calendar-event-form" data-tour="create-event-form" method="post" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         <?php echo calendar_csrf_field(); ?>
 
         <div class="space-y-6">
@@ -288,7 +288,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
             <label class="block text-sm font-medium text-gray-700">
               Event Title
-              <input type="text" name="title" value="<?php echo calendar_e($old('title')); ?>" placeholder="e.g. Summer Goldwing Rally 2024" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+              <input data-tour="create-event-title" type="text" name="title" value="<?php echo calendar_e($old('title')); ?>" placeholder="e.g. Summer Goldwing Rally 2024" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
             </label>
             <label class="block text-sm font-medium text-gray-700">
               Description
@@ -328,7 +328,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           </section>
 
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="create-event-location" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">place</span>
               Location & Meeting
@@ -361,7 +361,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
 
         <div class="space-y-6">
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="create-event-classification" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">category</span>
               Classification
@@ -392,7 +392,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </label>
           </section>
 
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="create-event-datetime" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">schedule</span>
               Date & Time

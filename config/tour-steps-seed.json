@@ -1,0 +1,680 @@
+{
+  "admin-add-product": [
+    {
+      "element": "[data-tour=\"admin-add-product-form\"]",
+      "popover": {
+        "title": "Adding a new product",
+        "description": "We'll walk through listing a new item in the members' store. Click <strong>Next</strong> when you're ready.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-add-product-title\"]",
+      "popover": {
+        "title": "Name the product",
+        "description": "Click in the box and type the product name (for example, <em>Goldwing Cap</em>). This is what members will see in the store.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-add-product-price\"]",
+      "popover": {
+        "title": "Set the price",
+        "description": "Type the price in dollars (for example, <em>25.00</em>). Don't include the dollar sign.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-add-product-stock\"]",
+      "popover": {
+        "title": "How many do you have?",
+        "description": "Type the number of items you have on hand. The store will count down as members buy them.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-add-product-images\"]",
+      "popover": {
+        "title": "Add a photo",
+        "description": "Click <strong>Choose Files</strong> and pick a photo from your computer. A clear photo helps members see what they're buying.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-add-product-save\"]",
+      "popover": {
+        "title": "Save the product",
+        "description": "Click the gold <strong>Save product</strong> button to make it live. <strong>Members can now buy this product.</strong>",
+        "side": "left",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-approve-application": [
+    {
+      "element": "[data-tour=\"approve-app-panel\"]",
+      "popover": {
+        "title": "Reviewing applications",
+        "description": "This is where new membership applications appear. Click <strong>Next</strong> to walk through approving one.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-app-filters\"]",
+      "popover": {
+        "title": "Filter by status",
+        "description": "Use these tabs to switch between Pending, Approved and Rejected applications. New applications waiting for review sit under <strong>Pending</strong>.",
+        "side": "bottom",
+        "align": "end"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-app-view\"]",
+      "popover": {
+        "title": "Open the full details",
+        "description": "Click <strong>View</strong> to read the applicant's full submission before deciding. You can return to this list using your browser's back button.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-app-chapter\"]",
+      "popover": {
+        "title": "Assign a chapter",
+        "description": "Pick the chapter the applicant should belong to from the dropdown, then click <strong>Assign</strong>. This step is optional but recommended before approval.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-app-button\"]",
+      "popover": {
+        "title": "Approve the application",
+        "description": "Click the green tick to open the confirmation dialog, then choose <strong>Yes, approve</strong>. <br><br>The applicant will receive an approval email and become a full member.",
+        "side": "left",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-approve-fallen-wing": [
+    {
+      "element": "[data-tour=\"approve-fallen-panel\"]",
+      "popover": {
+        "title": "Reviewing Fallen Wings tributes",
+        "description": "This page lists all tribute submissions for members who have passed. Click <strong>Next</strong> to walk through approving one.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-fallen-section\"]",
+      "popover": {
+        "title": "Pending submissions",
+        "description": "New tributes waiting for review appear in this list. If it says \"No pending submissions\", there's nothing to action right now.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-fallen-entry\"]",
+      "popover": {
+        "title": "Read the tribute",
+        "description": "Each entry shows the member's name, year of passing and the tribute text. Read it carefully and check the image or PDF if one is attached.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-fallen-reject\"]",
+      "popover": {
+        "title": "Reject if needed",
+        "description": "If the submission isn't suitable, click <strong>Reject</strong> to remove it from the list. Use this for duplicates or content that needs to be redone.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"approve-fallen-approve\"]",
+      "popover": {
+        "title": "Approve the tribute",
+        "description": "When you're satisfied, click <strong>Approve</strong>. <br><br>The tribute is now published on the Fallen Wings page.",
+        "side": "left",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-create-event": [
+    {
+      "element": "[data-tour=\"create-event-form\"]",
+      "popover": {
+        "title": "Creating a new event",
+        "description": "We'll walk through the four key pieces: name, date, location, and chapter. Click <strong>Next</strong> to begin.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"create-event-title\"]",
+      "popover": {
+        "title": "Name your event",
+        "description": "Type a clear, short title — this is what members will see in the calendar. A description below the title helps members know what to expect.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"create-event-classification\"]",
+      "popover": {
+        "title": "Choose the chapter",
+        "description": "Pick <strong>Chapter</strong> for a chapter ride or <strong>National</strong> for an Australia-wide event. If it's a chapter event, select the chapter from the dropdown.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"create-event-datetime\"]",
+      "popover": {
+        "title": "Set the date and time",
+        "description": "Fill in the start and end times — the timezone defaults to Sydney. Tick <strong>All-day event</strong> if there are no specific times.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"create-event-location\"]",
+      "popover": {
+        "title": "Add the location",
+        "description": "Enter the meeting point and destination so members know where to go. A Google Maps link is helpful but optional.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"create-event-publish\"]",
+      "popover": {
+        "title": "Publish the event",
+        "description": "When everything looks right, click <strong>Publish Event</strong> at the top. Members and area reps will be notified.<br><br><strong>Done — your event is up.</strong>",
+        "side": "bottom",
+        "align": "end"
+      }
+    }
+  ],
+  "admin-find-edit-member": [
+    {
+      "element": "[data-tour=\"admin-find-member-search\"]",
+      "popover": {
+        "title": "Finding a member",
+        "description": "We'll walk through searching for a member and opening their record to edit it. Click in this box and type a name, email, or phone number.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-find-member-chapter\"]",
+      "popover": {
+        "title": "Narrow it down by chapter",
+        "description": "If you know the member's chapter, pick it here to shorten the list. Leave it on <strong>All chapters</strong> if you're not sure.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-find-member-status\"]",
+      "popover": {
+        "title": "Filter by status",
+        "description": "Use this to show only active, pending, or expired members. Leave it on <strong>All statuses</strong> to see everyone.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-find-member-apply\"]",
+      "popover": {
+        "title": "Apply your filters",
+        "description": "Click the gold <strong>Apply filters</strong> button to update the list below. Your matching members will appear underneath.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-find-member-row\"]",
+      "popover": {
+        "title": "Open the member",
+        "description": "Find the member you want in the list, then click their name to open their record. From there you can update their details and save the changes.<br><br><strong>That's it — you're ready to edit them!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-manage-events": [
+    {
+      "element": "[data-tour~=\"manage-events-list\"]",
+      "popover": {
+        "title": "Your events list",
+        "description": "This table shows every event in the calendar — chapter and national. Click <strong>Next</strong> to see how to edit and cancel one.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"manage-events-columns\"]",
+      "popover": {
+        "title": "Sort and scan the columns",
+        "description": "Use the columns to find what you need — Title, Chapter, Start and Status. Pending events sit at the top with an amber highlight.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour~=\"manage-events-view\"]",
+      "popover": {
+        "title": "View or edit an event",
+        "description": "Click <strong>View</strong> on any row to open the event page. From there you can edit details, see RSVPs, and manage registrations.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"manage-events-delete\"]",
+      "popover": {
+        "title": "Cancel an event",
+        "description": "Click <strong>Delete</strong> on the row to cancel the event — you'll be asked to confirm. This removes the event and all its RSVPs.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"manage-events-create\"]",
+      "popover": {
+        "title": "Add a new event",
+        "description": "Click <strong>Create Event</strong> in the top right to start a new one. <br><br><strong>Done — you can manage events with confidence.</strong>",
+        "side": "bottom",
+        "align": "end"
+      }
+    }
+  ],
+  "admin-process-order": [
+    {
+      "element": "[data-tour=\"admin-process-order-summary\"]",
+      "popover": {
+        "title": "Processing an order",
+        "description": "We'll walk through packing and shipping this order. Click <strong>Next</strong> when you're ready.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-process-order-items\"]",
+      "popover": {
+        "title": "Check what was ordered",
+        "description": "This shows the items the member bought and how many of each. Gather these items so you can pack them.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-process-order-fulfillment\"]",
+      "popover": {
+        "title": "Add the tracking details",
+        "description": "Once the parcel is packed, type the carrier (for example, <em>Australia Post</em>) and the tracking number. Set the date you posted it.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-process-order-ship-button\"]",
+      "popover": {
+        "title": "Mark it as shipped",
+        "description": "Click the gold <strong>Save tracking + mark shipped</strong> button. The buyer will get an email with the tracking number.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-process-order-refund\"]",
+      "popover": {
+        "title": "Need to refund instead?",
+        "description": "If something went wrong, type an amount here (or leave blank for a full refund) and click <strong>Process refund</strong>. <strong>That's it — the order is marked as shipped and the buyer's been emailed.</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-send-notice": [
+    {
+      "element": "[data-tour=\"send-notice-form\"]",
+      "popover": {
+        "title": "Posting a notice",
+        "description": "We'll walk through creating a notice that members see on their dashboard. Click <strong>Next</strong> to begin.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"send-notice-title\"]",
+      "popover": {
+        "title": "Give it a title",
+        "description": "Type a short, clear title that members will see in their notice list. Keep it under about ten words.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"send-notice-audience\"]",
+      "popover": {
+        "title": "Choose who sees it",
+        "description": "Pick <strong>All members</strong>, a single <strong>State</strong>, or a single <strong>Chapter</strong>. The State and Chapter dropdowns only enable when you select that option.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"send-notice-editor\"]",
+      "popover": {
+        "title": "Write the notice",
+        "description": "Click into this box and type your message. Use the toolbar above for basic formatting or to add a link.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"send-notice-publish\"]",
+      "popover": {
+        "title": "Publish it",
+        "description": "When you're happy, click <strong>Publish Notice</strong>. <br><br>The notice is now live on members' dashboards.",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "member-2fa": [
+    {
+      "element": "[data-tour=\"twofa-title\"]",
+      "popover": {
+        "title": "Extra login security",
+        "description": "This adds a second step when you log in — a short code from an app on your phone. It keeps your account safe even if someone learns your password.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"twofa-qr\"]",
+      "popover": {
+        "title": "First, grab an app on your phone",
+        "description": "Open an app like <strong>Google Authenticator</strong> (free from the App Store or Play Store), tap <strong>Add</strong>, then point your phone's camera at this square picture.",
+        "side": "right",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"twofa-secret\"]",
+      "popover": {
+        "title": "Can't scan? Type this instead",
+        "description": "If the camera won't read the picture, just type these letters and numbers into the app. Either way works the same.",
+        "side": "right",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"twofa-code\"]",
+      "popover": {
+        "title": "Type the 6-digit code",
+        "description": "Your phone app will now show a 6-digit code that changes every minute. Type that code into this box.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"twofa-submit\"]",
+      "popover": {
+        "title": "Turn it on",
+        "description": "Click <strong>Enable 2FA</strong> and you're done. Next time you log in, you'll type your password and then a fresh code from your phone.<br><br><strong>You did it — your account is now extra safe!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "member-book-event": [
+    {
+      "element": "[data-tour=\"book-event-header\"]",
+      "popover": {
+        "title": "G'day — booking a ride",
+        "description": "We'll walk through finding a ride or event and confirming your spot. Click <strong>Next</strong> when you're ready.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour~=\"book-event-list\"]",
+      "popover": {
+        "title": "All the upcoming events",
+        "description": "This is the list of rides and events you can join. Have a scroll and find one that takes your fancy.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour~=\"book-event-row\"]",
+      "popover": {
+        "title": "Pick one you like",
+        "description": "Each row shows the event name, chapter, and when it's on. Find one that looks good to you.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour~=\"book-event-view\"]",
+      "popover": {
+        "title": "Click View to book",
+        "description": "Click <strong>View</strong> on that row to open the event, then tap the RSVP button to lock in your spot. <br><br><strong>That's it — you've booked!</strong>",
+        "side": "left",
+        "align": "start"
+      }
+    }
+  ],
+  "member-find-member": [
+    {
+      "element": "[data-tour=\"find-member-section\"]",
+      "popover": {
+        "title": "The Members Directory",
+        "description": "This is the list of all your fellow members. Click <strong>Next</strong> and we'll show you how to look someone up.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"find-member-search\"]",
+      "popover": {
+        "title": "Search by name",
+        "description": "Click in this box and type a name or member number. The list below will narrow down as you type.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"find-member-chapter\"]",
+      "popover": {
+        "title": "Pick a chapter",
+        "description": "Want to see members from one chapter only? Click this box and choose a chapter from the list.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"find-member-table\"]",
+      "popover": {
+        "title": "Their details",
+        "description": "Each row shows a member's name, phone and email. Click their phone number to call, or their email to send a message.<br><br><strong>That's it — you've done it!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "member-pay-fees": [
+    {
+      "element": "[data-tour=\"pay-fees-status-card\"]",
+      "popover": {
+        "title": "Your membership",
+        "description": "This box shows your membership and any fees that need paying. Click <strong>Next</strong> to see how to pay.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"pay-fees-expiry\"]",
+      "popover": {
+        "title": "When your membership runs out",
+        "description": "This is the date your membership ends. If it's getting close, it's time to pay your fees.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"pay-fees-pay-now\"], [data-tour=\"pay-fees-renew\"], [data-tour=\"pay-fees-status-card\"]",
+      "popover": {
+        "title": "Pay your fees",
+        "description": "Click the gold <strong>Pay now</strong> button (or <strong>Renew membership</strong> if it's close to expiring). You'll be taken to a safe page to pay with your card.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"pay-fees-history\"]",
+      "popover": {
+        "title": "Check your past payments",
+        "description": "Down here you can see every fee you've paid. <br><br><strong>That's it — you've done it!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "member-read-notices": [
+    {
+      "element": "[data-tour=\"read-notices-heading\"]",
+      "popover": {
+        "title": "The Notice Board",
+        "description": "This is where the club and your chapter share news and notices. Click <strong>Next</strong> to take a quick look.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"read-notices-view-toggle\"]",
+      "popover": {
+        "title": "Choose how you see them",
+        "description": "Click <strong>List view</strong> to read notices one under the other. Or click <strong>Grid view</strong> to see them as little cards.",
+        "side": "bottom",
+        "align": "end"
+      }
+    },
+    {
+      "element": "[data-tour=\"read-notices-board\"]",
+      "popover": {
+        "title": "Read the latest notices",
+        "description": "Each notice shows the title, who posted it, and the date. Scroll down to read the message and see any pictures or PDFs.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"read-notices-section\"]",
+      "popover": {
+        "title": "All done",
+        "description": "Pop back here anytime to see what's new. <br><br><strong>That's it — you've done it!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "member-read-wings": [
+    {
+      "element": "[data-tour=\"wings-title\"]",
+      "popover": {
+        "title": "G'day — welcome to Wings",
+        "description": "This is the latest Wings magazine, ready to read on your screen. Click <strong>Next</strong> and we'll show you around.",
+        "side": "bottom",
+        "align": "center"
+      }
+    },
+    {
+      "element": "[data-tour=\"wings-book\"]",
+      "popover": {
+        "title": "The magazine",
+        "description": "This is the magazine itself — just like the printed copy. You can read it right here on the page.",
+        "side": "top",
+        "align": "center"
+      }
+    },
+    {
+      "element": "[data-tour=\"wings-next\"]",
+      "popover": {
+        "title": "Turn the page",
+        "description": "Click this arrow to flip to the next page. There's a matching arrow on the left to go back.",
+        "side": "left",
+        "align": "center"
+      }
+    },
+    {
+      "element": "[data-tour=\"wings-download\"]",
+      "popover": {
+        "title": "Save a copy to your computer",
+        "description": "Click <strong>Download PDF</strong> if you'd like to save the magazine to read later or print it out.",
+        "side": "top",
+        "align": "end"
+      }
+    },
+    {
+      "element": "[data-tour=\"wings-reader\"]",
+      "popover": {
+        "title": "You're all set",
+        "description": "That's it — flip through the pages with the arrows, or download a copy to keep.<br><br><strong>Happy reading!</strong>",
+        "side": "top",
+        "align": "center"
+      }
+    }
+  ],
+  "member-update-contact": [
+    {
+      "element": "[data-tour=\"profile-form\"]",
+      "popover": {
+        "title": "Updating your details",
+        "description": "We'll walk through changing your email or phone number. Click <strong>Next</strong> when you're ready.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"profile-email\"]",
+      "popover": {
+        "title": "Your email address",
+        "description": "This is where the club sends your magazine and notices. Click in the box and type your new email if you'd like to change it.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"profile-phone\"]",
+      "popover": {
+        "title": "Your phone number",
+        "description": "Click in the box and type your new phone number. Don't worry about spaces — type it any way you like.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"profile-save\"]",
+      "popover": {
+        "title": "Save your changes",
+        "description": "When you're happy, click the gold <strong>Save changes</strong> button. You'll see a green message at the top to confirm it worked.<br><br><strong>That's it — you did it!</strong>",
+        "side": "left",
+        "align": "start"
+      }
+    }
+  ]
+}

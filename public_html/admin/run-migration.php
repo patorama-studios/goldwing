@@ -1186,6 +1186,39 @@ if ($alreadyRun) {
         }
         $applied[] = 'member-update-contact seeded (4 steps)';
 
+        // Also seed all the bulk-authored tours from the vendored JSON fixture
+        // (config/tour-steps-seed.json). INSERT IGNORE means re-runs are safe —
+        // already-seeded tours are skipped. To edit wording, use the admin
+        // editor at /admin/help/edit.php after this migration runs.
+        $seedPath = __DIR__ . '/../../config/tour-steps-seed.json';
+        if (is_file($seedPath)) {
+            $seedJson = @file_get_contents($seedPath);
+            $seedData = $seedJson ? json_decode($seedJson, true) : null;
+            $bulkSeeded = 0;
+            if (is_array($seedData)) {
+                foreach ($seedData as $slug => $steps) {
+                    if ($slug === 'member-update-contact') continue;
+                    if (!is_array($steps)) continue;
+                    foreach ($steps as $i => $step) {
+                        $popover = is_array($step['popover'] ?? null) ? $step['popover'] : [];
+                        $seedStmt->execute([
+                            'slug'  => (string) $slug,
+                            'idx'   => (int) $i,
+                            'sel'   => (string) ($step['element'] ?? ''),
+                            'title' => (string) ($popover['title'] ?? ''),
+                            'desc'  => (string) ($popover['description'] ?? ''),
+                            'side'  => (string) ($popover['side'] ?? 'bottom'),
+                            'align' => (string) ($popover['align'] ?? 'start'),
+                        ]);
+                        $bulkSeeded++;
+                    }
+                }
+            }
+            $applied[] = "$bulkSeeded steps seeded from tour-steps-seed.json";
+        } else {
+            $applied[] = 'tour-steps-seed.json not found — skip bulk seed';
+        }
+
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
         $results[] = ['label' => 'Migration 018 — Tour steps table', 'status' => 'applied', 'note' => implode(', ', $applied)];
     } catch (Throwable $e) {
