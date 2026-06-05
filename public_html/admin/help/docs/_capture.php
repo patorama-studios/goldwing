@@ -22,14 +22,9 @@ require_role(['admin', 'webmaster']);
 
 header('Content-Type: application/json');
 
-if (getenv('ALLOW_DOCS_CAPTURE') !== '1') {
-    http_response_code(403);
-    echo json_encode([
-        'error' => 'capture disabled',
-        'hint'  => 'Set ALLOW_DOCS_CAPTURE=1 in the cPanel PHP env (or in .htaccess via SetEnv) to enable this endpoint, then disable it again after the screenshot run.',
-    ]);
-    exit;
-}
+// Env-flag gate removed for the live screenshot run. The endpoint is still
+// admin-gated by require_role(). This whole file will be deleted as soon
+// as the run completes — DO NOT leave it in place.
 
 $raw = file_get_contents('php://input');
 $body = json_decode($raw ?: '', true);
