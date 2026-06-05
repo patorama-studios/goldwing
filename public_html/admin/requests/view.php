@@ -134,8 +134,15 @@ function reqStatusBadge2(?string $status): string {
               ]);
             ?>
 
+            <?php
+              // Defensive: row() always sets 'raw' to an array, but if an older cached
+              // bytecode returns a partial row, fall back to an empty array so the
+              // page still renders instead of dying inside array_filter().
+              $itemRaw = is_array($item['raw'] ?? null) ? $item['raw'] : [];
+            ?>
+
             <?php foreach ($richFields as $rf): ?>
-              <?php $rfVal = (string) ($item['raw'][$rf] ?? ''); if ($rfVal === '') continue; ?>
+              <?php $rfVal = (string) ($itemRaw[$rf] ?? ''); if ($rfVal === '') continue; ?>
               <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-2"><?= e(ucwords(str_replace('_', ' ', $rf))) ?></p>
                 <div class="text-sm text-gray-800 leading-relaxed prose prose-sm max-w-none">
@@ -145,7 +152,7 @@ function reqStatusBadge2(?string $status): string {
             <?php endforeach; ?>
 
             <?php
-              $metaFields = array_filter($item['raw'], function ($v, $k) use ($skipMeta) {
+              $metaFields = array_filter($itemRaw, function ($v, $k) use ($skipMeta) {
                   if (in_array($k, $skipMeta, true)) return false;
                   if (is_array($v) || is_object($v)) return false;
                   return $v !== null && $v !== '';
