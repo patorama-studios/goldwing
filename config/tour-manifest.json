@@ -323,6 +323,30 @@
         "public_html/assets/js/tours/tours/admin-process-order.js"
       ]
     },
+    "admin-notification-hub": {
+      "slug": "admin-notification-hub",
+      "name": "The Notification Hub — what it is and how it works",
+      "blurb": "Walk me through the admin inbox where chapter-change requests, MOY nominations, and beta feedback land.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/requests/",
+      "page_match": "admin/requests",
+      "steps_file": "/assets/js/tours/tours/admin-notification-hub.js",
+      "selectors": [
+        "[data-tour=\"notif-hub-header\"]",
+        "[data-tour=\"notif-hub-stats\"]",
+        "[data-tour=\"notif-hub-type-filters\"]",
+        "[data-tour=\"notif-hub-status-pills\"]",
+        "[data-tour=\"notif-hub-list\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/requests/index.php",
+        "public_html/admin/requests/view.php",
+        "public_html/admin/requests/actions.php",
+        "app/Services/PendingRequestsService.php",
+        "public_html/assets/js/tours/tours/admin-notification-hub.js"
+      ]
+    },
     "admin-make-life-member": {
       "slug": "admin-make-life-member",
       "name": "How to make a member a Life Member",

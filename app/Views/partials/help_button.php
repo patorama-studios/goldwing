@@ -47,6 +47,7 @@ $gwHelpCsrf = Csrf::token();
     window.GoldwingTours.allGuidesUrl = <?= json_encode($gwHelpAllGuidesUrl) ?>;
     window.GoldwingTours.supportEmail = <?= json_encode($gwHelpSupportEmail) ?>;
   });
+</script>
 <?php
 // Auto-launch when a member follows a ?gw_tour=<slug> link from the Help panel
 // or an admin opens a ?gw_validate=<slug> link from the Tour Validator page.

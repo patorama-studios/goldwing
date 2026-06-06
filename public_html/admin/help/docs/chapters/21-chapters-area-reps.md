@@ -93,6 +93,8 @@ Next time they log in, the Members admin page will only show them their own chap
 
 ### How chapter-change requests work
 
+{{tour:admin-notification-hub}}
+
 Members can request a chapter change themselves — they don't need to ring the admin.
 
 1. The member opens the **My Account** page on the site and picks a different chapter from the dropdown.

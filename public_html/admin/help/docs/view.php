@@ -280,7 +280,11 @@ function gw_md_inline(string $s): string
             $entry = $tours[$slug];
             $pageUrl = (string) ($entry['page_url'] ?? '/');
             $sep = (strpos($pageUrl, '?') === false) ? '?' : '&';
-            $href = $pageUrl . $sep . 'tour=' . urlencode($slug);
+            // Use the existing site-wide URL param so help_button.php's
+            // inline autostart fires for us. (Our tour-engine.js autostart
+            // ALSO accepts this and provides the sessionStorage persistence
+            // for tours whose page_match differs from page_url.)
+            $href = $pageUrl . $sep . 'gw_tour=' . urlencode($slug);
             $label = htmlspecialchars((string) ($entry['name'] ?? $slug), ENT_QUOTES);
             $html = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
                   . 'class="not-prose inline-flex items-center gap-1.5 my-1 px-3 py-1.5 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-emerald-700 shadow-sm transition" '

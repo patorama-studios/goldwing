@@ -243,7 +243,10 @@
   function tryAutostart() {
     try {
       var params = new URLSearchParams(window.location.search);
-      var slugFromUrl = params.get('tour');
+      // Accept either ?gw_tour= (site-wide convention, set by docs buttons
+      // and Help panel links) or the older ?tour= (set by earlier docs
+      // builds — kept for backward compat).
+      var slugFromUrl = params.get('gw_tour') || params.get('tour');
       var slugFromStorage = null;
       try { slugFromStorage = sessionStorage.getItem('gw_pending_tour'); } catch (e) {}
       var slug = slugFromUrl || slugFromStorage;
@@ -253,6 +256,7 @@
         // Strip the param so refreshing or sharing the URL doesn't keep
         // re-triggering the tour every time.
         params.delete('tour');
+        params.delete('gw_tour');
         var newSearch = params.toString();
         var clean = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
         try { window.history.replaceState(null, '', clean); } catch (e) {}

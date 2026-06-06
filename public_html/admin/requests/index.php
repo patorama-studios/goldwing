@@ -105,7 +105,7 @@ function reqActionButtons(array $item): string {
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
       <!-- Header -->
-      <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header data-tour="notif-hub-header" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 class="font-display text-2xl font-bold text-gray-900">Notification Hub</h1>
           <p class="text-sm text-gray-600 mt-0.5">
@@ -123,7 +123,7 @@ function reqActionButtons(array $item): string {
       </header>
 
       <!-- Stat Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div data-tour="notif-hub-stats" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div class="flex items-center gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50">
@@ -171,7 +171,7 @@ function reqActionButtons(array $item): string {
       </div>
 
       <!-- Type Filter Blocks -->
-      <div class="flex flex-wrap gap-2">
+      <div data-tour="notif-hub-type-filters" class="flex flex-wrap gap-2">
         <a href="?status=<?= e($statusFilter) ?>"
            class="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors <?= $typeFilter === '' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' ?>">
           <span class="material-icons-outlined text-[18px]">inbox</span>
@@ -193,7 +193,7 @@ function reqActionButtons(array $item): string {
       </div>
 
       <!-- Status Pills (secondary filter) -->
-      <div class="flex flex-wrap items-center gap-2">
+      <div data-tour="notif-hub-status-pills" class="flex flex-wrap items-center gap-2">
         <?php foreach (['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'archived' => 'Archived', 'all' => 'All'] as $s => $label): ?>
           <a href="?<?= $typeFilter !== '' ? 'type=' . e($typeFilter) . '&' : '' ?>status=<?= e($s) ?>"
              class="rounded-full px-3 py-1 text-xs font-semibold transition-colors <?= $statusFilter === $s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">
@@ -204,7 +204,7 @@ function reqActionButtons(array $item): string {
 
       <!-- Notification Cards -->
       <?php if (empty($hubItems)): ?>
-        <div class="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+        <div data-tour="notif-hub-list" class="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
           <span class="material-icons-outlined text-5xl text-gray-300">inbox</span>
           <h2 class="mt-3 text-lg font-semibold text-gray-700">Nothing to review</h2>
           <p class="text-sm text-gray-500">
@@ -212,7 +212,7 @@ function reqActionButtons(array $item): string {
           </p>
         </div>
       <?php else: ?>
-        <div class="space-y-3">
+        <div data-tour="notif-hub-list" class="space-y-3">
           <?php foreach ($hubItems as $item): ?>
             <?php
               $status    = strtolower($item['status'] ?? '');
