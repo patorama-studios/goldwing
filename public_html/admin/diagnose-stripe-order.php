@@ -22,13 +22,14 @@ $pdo = Database::connection();
  * 1) Active Stripe account / mode
  * ------------------------------------------------------------------------ */
 echo "--- 1. Active Stripe Account (primary) ---\n";
+$active = StripeSettingsService::getActiveKeys(StripeSettingsService::ACCOUNT_PRIMARY);
 $settings = StripeSettingsService::getSettings(StripeSettingsService::ACCOUNT_PRIMARY);
-$mode = $settings['mode'] ?? 'unknown';
-$secret = StripeSettingsService::getActiveSecretKey(StripeSettingsService::ACCOUNT_PRIMARY);
+$secret = $active['secret_key'] ?? '';
 $secretPrefix = $secret !== '' ? substr($secret, 0, 8) . '...(' . strlen($secret) . ' chars)' : '(empty)';
-echo "Mode:               {$mode}\n";
+echo "Mode (resolved):    " . ($active['mode'] ?? '?') . "\n";
+echo "use_test_mode flag: " . (!empty($settings['use_test_mode']) ? 'true' : 'false') . "\n";
 echo "Active secret key:  {$secretPrefix}\n";
-echo "Account key:        " . ($settings['account_key'] ?? '?') . "\n";
+echo "Account key:        " . ($active['account_key'] ?? '?') . "\n";
 echo "Webhook secret set: " . (StripeSettingsService::getWebhookSecret() !== '' ? 'yes' : 'NO') . "\n\n";
 
 /* --------------------------------------------------------------------------
@@ -167,62 +168,26 @@ if ($piId) {
     echo "\n";
 }
 
-/* Search Stripe sessions by metadata.order_number */
-echo "[search Stripe checkout sessions by metadata.order_number='{$orderNumber}']\n";
+/* List recent checkout sessions and filter locally by metadata.order_number
+ * (older Stripe SDK in this repo doesn't support ->search()). */
+echo "[recent checkout sessions on this Stripe account — filtering for metadata.order_number='{$orderNumber}' and email='{$customerEmail}']\n";
 try {
-    $found = $stripe->checkout->sessions->search([
-        'query' => "metadata['order_number']:'{$orderNumber}'",
-        'limit' => 10,
-    ]);
-    if (count($found->data) === 0) {
-        echo "  (no checkout sessions found with that metadata)\n";
-    } else {
-        foreach ($found->data as $s) {
-            echo "  session={$s->id} status={$s->status} payment_status={$s->payment_status} created=" . date('c', $s->created) . "\n";
+    $sessions = $stripe->checkout->sessions->all(['limit' => 100]);
+    $matches = 0;
+    foreach ($sessions->data as $s) {
+        $meta = is_object($s->metadata) ? $s->metadata->toArray() : (array) $s->metadata;
+        $email = $s->customer_email ?? ($s->customer_details->email ?? '');
+        $hitMeta  = isset($meta['order_number']) && $meta['order_number'] === $orderNumber;
+        $hitOrder = isset($meta['order_id']) && (string) $meta['order_id'] === (string) ($order['id'] ?? '');
+        $hitEmail = $customerEmail && strcasecmp((string) $email, (string) $customerEmail) === 0;
+        if ($hitMeta || $hitOrder || $hitEmail) {
+            $matches++;
+            echo "  session={$s->id} status={$s->status} payment_status={$s->payment_status} amount_total={$s->amount_total} email={$email} created=" . date('c', $s->created) . " metadata=" . json_encode($meta) . "\n";
         }
     }
+    echo "  (scanned " . count($sessions->data) . " most-recent sessions, {$matches} matched)\n";
 } catch (\Throwable $e) {
     echo "  ERROR: " . $e->getMessage() . "\n";
-}
-echo "\n";
-
-/* Search Stripe payment intents by metadata.order_number */
-echo "[search Stripe payment intents by metadata.order_number='{$orderNumber}']\n";
-try {
-    $found = $stripe->paymentIntents->search([
-        'query' => "metadata['order_number']:'{$orderNumber}'",
-        'limit' => 10,
-    ]);
-    if (count($found->data) === 0) {
-        echo "  (no payment intents found with that metadata)\n";
-    } else {
-        foreach ($found->data as $pi) {
-            echo "  pi={$pi->id} status={$pi->status} amount={$pi->amount} created=" . date('c', $pi->created) . "\n";
-        }
-    }
-} catch (\Throwable $e) {
-    echo "  ERROR: " . $e->getMessage() . "\n";
-}
-echo "\n";
-
-/* If we have a customer email, list recent sessions by customer */
-if ($customerEmail) {
-    echo "[recent checkout sessions on this Stripe account for {$customerEmail}]\n";
-    try {
-        $found = $stripe->checkout->sessions->search([
-            'query' => "customer_details.email:'{$customerEmail}'",
-            'limit' => 10,
-        ]);
-        if (count($found->data) === 0) {
-            echo "  (no sessions found for this email on this Stripe account)\n";
-        } else {
-            foreach ($found->data as $s) {
-                echo "  session={$s->id} status={$s->status} payment_status={$s->payment_status} amount_total={$s->amount_total} created=" . date('c', $s->created) . " metadata=" . json_encode($s->metadata) . "\n";
-            }
-        }
-    } catch (\Throwable $e) {
-        echo "  ERROR: " . $e->getMessage() . "\n";
-    }
 }
 
 echo "\n=== End ===\n";
