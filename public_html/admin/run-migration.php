@@ -1227,6 +1227,39 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 017 — Committee privacy flag
+//
+// Adds members.committee_private. When 1, the public Committee + Chapter Rep
+// cards (and member-area equivalents) show first name only and omit the role
+// phone for that member. Role title, chapter, and role-based email still
+// render — they identify the position, not the person.
+//
+// Member can toggle their own flag from Personal Settings; admins can toggle
+// it from the member profile's Committee & Leadership Role section.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_017_committee_private';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 017 — Committee privacy flag', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $existing = $pdo->query("SHOW COLUMNS FROM members")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('committee_private', $existing, true)) {
+            $pdo->exec("ALTER TABLE members ADD COLUMN committee_private TINYINT(1) NOT NULL DEFAULT 0");
+            $note = 'committee_private column added';
+        } else {
+            $note = 'committee_private column already present';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 017 — Committee privacy flag', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 017 — Committee privacy flag', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

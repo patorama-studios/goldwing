@@ -223,27 +223,35 @@ function render_media_shortcodes(string $html): string
     // preg_replace_callback closure in production, leaving the public pages
     // with no cards. Using a local closure removes require/scope as a variable.
     $renderCommitteeCard = function (array $role): string {
-        $name = trim(($role['first_name'] ?? '') . ' ' . ($role['last_name'] ?? ''));
-        $vacant = $name === '';
+        $first   = trim((string) ($role['first_name'] ?? ''));
+        $last    = trim((string) ($role['last_name']  ?? ''));
+        $vacant  = $first === '' && $last === '';
+        $private = !empty($role['committee_private']);
+        // When the member has flagged this listing as private, show first
+        // name only and suppress the role phone. The role email + title +
+        // chapter still render — they identify the position, not the person.
+        $displayName = $vacant ? '' : ($private ? $first : trim($first . ' ' . $last));
         $avatar  = $role['avatar_url']   ?? '';
         $email   = $role['email']        ?? '';
-        $phone   = $role['phone']        ?? '';
+        $phone   = $private ? '' : ((string) ($role['phone'] ?? ''));
         $title   = $role['name']         ?? '';
         $chapter = $role['chapter_name'] ?? '';
         $h  = '<div class="card">';
         $imgSrc = (!$vacant && $avatar !== '') ? $avatar : '/uploads/about/committee-placeholder.png';
-        $imgAlt = $vacant ? 'Position vacant' : $name;
+        $imgAlt = $vacant ? 'Position vacant' : $displayName;
         $h .= '<img src="' . e($imgSrc) . '" alt="' . e($imgAlt) . '" style="width:100%; border-radius:8px; margin-bottom:0.75rem;">';
         $h .= $vacant
             ? '<h3 style="font-style:italic; color:#9ca3af;">Position vacant</h3>'
-            : '<h3>' . e($name) . '</h3>';
+            : '<h3>' . e($displayName) . '</h3>';
         $h .= '<p>' . e($title) . '</p>';
         if ($chapter !== '') {
             $h .= '<p style="color:#6b7280; font-size:0.875rem;">' . e($chapter) . '</p>';
         }
-        $h .= $phone !== ''
-            ? '<p>Phone: <a href="tel:' . e(preg_replace('/\s+/', '', $phone)) . '">' . e($phone) . '</a></p>'
-            : '<p>Phone: TBC</p>';
+        if ($phone !== '') {
+            $h .= '<p>Phone: <a href="tel:' . e(preg_replace('/\s+/', '', $phone)) . '">' . e($phone) . '</a></p>';
+        } elseif (!$vacant && !$private) {
+            $h .= '<p>Phone: TBC</p>';
+        }
         if ($email !== '') {
             $h .= '<p><a href="mailto:' . e($email) . '">' . e($email) . '</a></p>';
         }

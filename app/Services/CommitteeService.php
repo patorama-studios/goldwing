@@ -212,6 +212,14 @@ final class CommitteeService
                 ? "COALESCE(NULLIF(m.avatar_url, ''), JSON_UNQUOTE(su.value_json))"
                 : "JSON_UNQUOTE(su.value_json)";
 
+            // Detect committee_private column lazily so this still works
+            // before Migration 017 has run.
+            $hasPrivateCol = false;
+            try {
+                $hasPrivateCol = (bool) $pdo->query("SHOW COLUMNS FROM members LIKE 'committee_private'")->fetch();
+            } catch (\Throwable $e) {}
+            $privateSelect = $hasPrivateCol ? "m.committee_private" : "0 AS committee_private";
+
             $sql = "
                 SELECT
                     r.id AS role_id, r.slug, r.name, r.category,
@@ -219,6 +227,7 @@ final class CommitteeService
                     c.name AS chapter_name, c.state AS chapter_state,
                     a.member_id,
                     m.first_name, m.last_name, m.email AS member_email, m.phone AS member_phone,
+                    $privateSelect,
                     $avatarSelect AS avatar_url
                 FROM committee_roles r
                 LEFT JOIN chapters c ON c.id = r.chapter_id

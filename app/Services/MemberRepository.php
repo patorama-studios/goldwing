@@ -308,6 +308,24 @@ class MemberRepository
             $columnValues['notes'] = trim((string) $payload['notes']);
         }
 
+        // Committee / leadership flags — these aren't part of the main mapping
+        // above because not every payload includes them (callers vary). Only
+        // touch the column when the key is explicitly present in the payload.
+        $committeeColumns = ['is_committee', 'is_area_rep', 'committee_role', 'committee_private'];
+        foreach ($committeeColumns as $col) {
+            if (!array_key_exists($col, $payload)) {
+                continue;
+            }
+            if (!self::hasMemberColumn($pdo, $col)) {
+                continue;
+            }
+            $value = $payload[$col];
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            $columnValues[$col] = ($col === 'committee_role') ? ($value === '' ? null : $value) : (int) (bool) $value;
+        }
+
         if ($columnValues === []) {
             return false;
         }

@@ -2284,6 +2284,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <?php endif; ?>
                         </div>
                         <input type="hidden" name="committee_roles_submitted" value="1">
+
+                        <?php // Privacy toggle — hide last name + role phone on public/member cards. ?>
+                        <label class="mt-3 flex items-start gap-2 rounded-lg border border-gray-100 bg-amber-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
+                          <input type="checkbox" name="committee_private" value="1"
+                            <?= !empty($member['committee_private']) ? 'checked' : '' ?>
+                            class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                          <span class="flex-1">
+                            <span class="block font-medium text-gray-900">Private listing</span>
+                            <span class="block text-xs text-gray-500 mt-0.5">Hide this member's last name and the role's phone number on public Committee &amp; Chapter Rep cards. The role title, chapter, and role email are still shown so people can still reach them.</span>
+                          </span>
+                        </label>
                       </div>
                     <?php endif; ?>
                   </div>

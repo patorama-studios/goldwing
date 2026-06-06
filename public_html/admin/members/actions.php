@@ -498,6 +498,8 @@ switch ($action) {
             if ($committeeFormSubmitted && AdminMemberAccess::canEditFullProfile($user)) {
                 $submittedRoleIds = array_map('intval', (array) ($_POST['committee_role_ids'] ?? []));
                 CommitteeService::syncAssignments($targetMemberId, $submittedRoleIds);
+                // Persist the privacy flag alongside the assignments.
+                $payload['committee_private'] = isset($_POST['committee_private']) ? 1 : 0;
 
                 // Backward-compat flag sync. Fetch the active roles for this
                 // member directly so we cover roles we just added.

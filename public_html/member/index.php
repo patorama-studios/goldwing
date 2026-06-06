@@ -532,6 +532,18 @@ if ($user && $user['member_id']) {
         NotificationPreferenceService::save((int) $user['id'], $prefs);
         SettingsService::setUser((int) $user['id'], 'avatar_url', $avatarInput);
         SettingsService::setUser((int) $user['id'], 'associate_avatar_url', $assocAvatarInput);
+        // Committee privacy flag — only persisted if the member actually
+        // holds at least one role (the form field only renders in that case).
+        if ($member && CommitteeService::rolesForMember((int) $member['id'])) {
+            $committeePrivate = isset($_POST['committee_private']) ? 1 : 0;
+            try {
+                $stmt = $pdo->prepare('UPDATE members SET committee_private = :p WHERE id = :id');
+                $stmt->execute([':p' => $committeePrivate, ':id' => (int) $member['id']]);
+                $member['committee_private'] = $committeePrivate;
+            } catch (\Throwable $e) {
+                // Column may not exist yet if Migration 017 hasn't run — fail silently.
+            }
+        }
         $userTimezone = SettingsService::getUser((int) $user['id'], 'timezone', SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
         $notificationPrefs = NotificationPreferenceService::load((int) $user['id']);
         $avatarUrl = SettingsService::getUser((int) $user['id'], 'avatar_url', '');
@@ -2560,6 +2572,31 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <?php endforeach; ?>
                   </div>
                 </div>
+                <?php
+                  // Only surface the committee privacy toggle for members who
+                  // actually hold a committee/chapter rep role — there's no
+                  // point showing it for everyone else.
+                  $settingsCmtRoles = $member ? CommitteeService::rolesForMember((int) $member['id']) : [];
+                ?>
+                <?php if ($settingsCmtRoles): ?>
+                <div>
+                  <p class="text-sm font-medium text-gray-700 mb-2">Committee &amp; Leadership Privacy</p>
+                  <div class="rounded-xl border border-gray-100 bg-amber-50 p-4">
+                    <label class="flex items-start gap-3 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" name="committee_private" value="1"
+                        <?= !empty($member['committee_private']) ? 'checked' : '' ?>
+                        class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                      <span class="flex-1">
+                        <span class="block font-semibold text-gray-900">Hide my last name &amp; phone on public listings</span>
+                        <span class="block text-xs text-gray-600 mt-1">
+                          You hold <?= count($settingsCmtRoles) ?> committee/chapter rep role<?= count($settingsCmtRoles) === 1 ? '' : 's' ?>.
+                          When ticked, the public Committee &amp; Chapter Rep cards (and the member-area Committee page) show only your first name and the role-based email. Your role title, chapter, and the persistent role email (e.g. <code>aga.president@…</code>) are still shown so people can still contact you.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                <?php endif; ?>
                 <div class="flex items-center justify-between">
                   <a class="text-sm text-slate-500" href="/member/index.php?page=settings">Cancel</a>
                   <button
@@ -4012,12 +4049,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         }
 
         $renderCmtCard = function (array $role): string {
-            $name = trim(($role['first_name'] ?? '') . ' ' . ($role['last_name'] ?? ''));
-            $vacant = $name === '';
-            $avatar = $role['avatar_url'] ?? '';
-            $email  = $role['email'] ?? '';
-            $phone  = $role['phone'] ?? '';
-            $title  = $role['name'] ?? '';
+            $first   = trim((string) ($role['first_name'] ?? ''));
+            $last    = trim((string) ($role['last_name']  ?? ''));
+            $vacant  = $first === '' && $last === '';
+            $private = !empty($role['committee_private']);
+            // Privacy: show first name only, suppress phone, keep email/title/chapter.
+            $name    = $vacant ? '' : ($private ? $first : trim($first . ' ' . $last));
+            $avatar  = $role['avatar_url'] ?? '';
+            $email   = $role['email'] ?? '';
+            $phone   = $private ? '' : ((string) ($role['phone'] ?? ''));
+            $title   = $role['name'] ?? '';
             $chapter = $role['chapter_name'] ?? '';
             $h  = '<div class="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">';
             if (!$vacant && $avatar !== '') {
