@@ -13,7 +13,7 @@ It was built to be **maintainable by someone who can read English instructions b
 There are two live copies of the site:
 
 - **Live site** — `https://goldwing.org.au` — what members and the public see.
-- **Draft / staging site** — `https://draft.goldwing.org.au` — an identical copy used to test changes before they go live. Only admins and the developer use this one.
+- **Draft / staging site** — `https://goldwing.org.au` — an identical copy used to test changes before they go live. Only admins and the developer use this one.
 
 Both sites live on the association's existing cPanel hosting account. The developer has access to the cPanel control panel and to the code repository on GitHub. Admins have logins to the admin area of the website itself — they don't need (and shouldn't have) cPanel access for normal work.
 
@@ -38,7 +38,7 @@ When the developer makes a change to the website:
 3. You go into cPanel, open the **Git Version Control** screen for the live site, click **Update from Remote**, then click **Deploy HEAD Commit**.
 4. The site updates within a few seconds. Members already logged in don't get logged out. Nothing breaks for the public.
 
-Test changes on `draft.goldwing.org.au` first whenever possible. If something looks wrong on draft, you can simply not deploy it to live until the developer has fixed it.
+Test changes on `goldwing.org.au` first whenever possible. If something looks wrong on draft, you can simply not deploy it to live until the developer has fixed it.
 
 ### What admins should NEVER touch
 
@@ -49,7 +49,7 @@ Test changes on `draft.goldwing.org.au` first whenever possible. If something lo
 ### Good practice
 
 - **Read the chapter that matches what you're doing first.** Each chapter starts with the plain-English "For administrators" half — five minutes there usually saves an hour of guessing.
-- **Don't experiment in live.** If you want to try something — a new page layout, a settings change, importing a member list — try it on `draft.goldwing.org.au` first. The draft site is exactly for this.
+- **Don't experiment in live.** If you want to try something — a new page layout, a settings change, importing a member list — try it on `goldwing.org.au` first. The draft site is exactly for this.
 - **Ask the developer if you're unsure.** "Will this break anything?" is always a fair question. Better a five-minute email than an outage.
 
 ### Who to ask if you're stuck
@@ -152,7 +152,7 @@ Two paths matter most day-to-day:
 | Environment | URL | Where the code is | How it updates |
 |---|---|---|---|
 | Local | `localhost` via MAMP | This repo on Pat's laptop | Edit files directly |
-| Draft / staging | `https://draft.goldwing.org.au` | `/home/goldwing/draft.goldwing.org.au` on cPanel | `git push origin main` → cPanel "Update from Remote" → "Deploy HEAD Commit" |
+| Draft / staging | `https://goldwing.org.au` | `/home2/goldwing` on cPanel | `git push origin main` → cPanel "Update from Remote" → "Deploy HEAD Commit" |
 | Live | (currently same host as draft until production cut-over) | Same cPanel account | Same flow as draft |
 
 Pat triggers deploys manually from cPanel after a push. **Never use FTP** — see [Chapter 33 — Deployment](view.php?slug=33-deployment).
@@ -204,7 +204,7 @@ Reads go through `App\Services\SettingsService::getGlobal('site.timezone', 'Aust
 
 </details>
 
-<!-- SCREENSHOT: Admin dashboard at /admin/index.php, showing the sidebar with all major sections. Capture as draft.goldwing.org.au logged in as admin. Save to public_html/admin/help/images/01-admin-dashboard.png and uncomment the line below. -->
+<!-- SCREENSHOT: Admin dashboard at /admin/index.php, showing the sidebar with all major sections. Capture as goldwing.org.au logged in as admin. Save to public_html/admin/help/images/01-admin-dashboard.png and uncomment the line below. -->
 <!-- ![Admin dashboard](../images/01-admin-dashboard.png) -->
 
 <!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/. Same instructions. Save as 01-settings-hub.png. -->

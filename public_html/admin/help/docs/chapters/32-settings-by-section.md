@@ -525,7 +525,7 @@ Owns no `settings_global` keys — its source of truth is the `page_role_access`
 
 </details>
 
-<!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php on draft.goldwing.org.au, showing the sidebar with all sections expanded. Save to public_html/admin/help/images/32-hub-landing.png. -->
+<!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php on goldwing.org.au, showing the sidebar with all sections expanded. Save to public_html/admin/help/images/32-hub-landing.png. -->
 <!-- ![Settings Hub landing](../images/32-hub-landing.png) -->
 
 <!-- SCREENSHOT: The Payments tab at /admin/settings/index.php?section=payments, showing the test/live key toggle and the encrypted key fields. Save as 32-payments-tab.png. -->

@@ -34,7 +34,7 @@ Admin → **Settings** → **Security & Authentication**.
 
 When **on**, every plain HTTP request is automatically redirected to its `https://` equivalent. This is what you want in production — it stops a member's password ever travelling unencrypted.
 
-Leave it **off** if you're testing on a server without a valid SSL certificate, otherwise you'll lock yourself in a redirect loop. On the live site (`goldwing.org.au` and `draft.goldwing.org.au`), it should always be on.
+Leave it **off** if you're testing on a server without a valid SSL certificate, otherwise you'll lock yourself in a redirect loop. On the live site (`goldwing.org.au` and `goldwing.org.au`), it should always be on.
 
 #### Password minimum length
 
@@ -271,7 +271,7 @@ Two storage backends — two flavours of setting.
 
 </details>
 
-<!-- SCREENSHOT: Browser devtools Network tab on draft.goldwing.org.au showing the response headers (CSP, X-Frame-Options, HSTS, Permissions-Policy) on /admin/index.php. Save to public_html/admin/help/images/09-response-headers.png. -->
+<!-- SCREENSHOT: Browser devtools Network tab on goldwing.org.au showing the response headers (CSP, X-Frame-Options, HSTS, Permissions-Policy) on /admin/index.php. Save to public_html/admin/help/images/09-response-headers.png. -->
 <!-- ![Response headers in devtools](../images/09-response-headers.png) -->
 
 <!-- SCREENSHOT: /admin/settings/index.php scrolled to the Security section showing the 2FA mode, lockout knobs, alerts checkboxes, and Force HTTPS toggle. Save as 09-security-settings.png. -->

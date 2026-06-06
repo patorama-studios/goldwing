@@ -150,7 +150,7 @@ The Log Viewer itself has no settings — it always reads `app/storage/logs/syst
 
 - **Log Viewer (Settings → Advanced)** — `/admin/settings/?section=advanced`. Tails `system.log` in the browser. Use this 90% of the time.
 - **phpMyAdmin (cPanel)** — for the raw `SELECT * FROM webhook_events ORDER BY id DESC LIMIT 50` style queries the UI doesn't expose.
-- **SSH live tail** — `ssh goldwing@host && tail -F /home/goldwing/draft.goldwing.org.au/app/storage/logs/system.log` — best when you can reproduce the bug on demand.
+- **SSH live tail** — `ssh goldwing@host && tail -F /home2/goldwing/app/storage/logs/system.log` — best when you can reproduce the bug on demand.
 - **Stripe CLI** — `stripe events resend evt_…` to replay a webhook against the live endpoint, or `stripe listen --forward-to localhost/api/stripe_webhook.php` for local testing. See Ch 16.
 - **`scripts/check_tour_impact.sh` / `check_doc_impact.sh`** — run after any non-trivial change; they flag tours and docs whose `watched_files` overlap your diff. See Ch 33.
 

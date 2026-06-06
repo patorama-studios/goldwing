@@ -38,7 +38,7 @@ Flag your developer if you need to:
 
 - **Rotate the site's encryption key** (e.g. after a suspected breach). This is a careful procedure — see Chapter 10 — because all encrypted values have to be re-saved.
 - **Move the site to a new database** (e.g. new hosting).
-- **Change the site's domain** (e.g. cutover from `draft.goldwing.org.au` to `goldwing.org.au`).
+- **Change the site's domain** (e.g. cutover from `goldwing.org.au` to `goldwing.org.au`).
 - **Enable Google or Apple "Sign in with…"** — needs OAuth credentials in the server file.
 - **Set up the AI page builder** the first time — needs an API key in the server file.
 
@@ -100,7 +100,7 @@ That last line matters: services like `StripeSettingsService` and `EmailService`
 | Variable | Used by | Required? | Notes |
 |---|---|---|---|
 | `APP_KEY` | `CryptoService` (Ch 10) | **Yes** | 32-byte base64 secret. Rotating it breaks every value already encrypted — see Gotchas. |
-| `APP_BASE_URL` | `config('base_url')`, email links | Yes | e.g. `https://draft.goldwing.org.au`. Trailing slash stripped. |
+| `APP_BASE_URL` | `config('base_url')`, email links | Yes | e.g. `https://goldwing.org.au`. Trailing slash stripped. |
 | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASS` `DB_CHARSET` | `config/database.php` | Effectively yes | Hard-coded production fallbacks exist — always set these in `.env.local`. |
 | `KIE_API_KEY` | AI page builder (Ch 24) | For AI features | Feeds `config('ai.api_key')` and `config('ai.providers.kie.api_key')`. |
 | `AI_DEFAULT_MODEL` | AI page builder | No | Defaults to `claude-sonnet-4-6`. |

@@ -194,7 +194,7 @@ An admin can "act as" a member from `/admin/members/actions.php`. It writes `$_S
 
 </details>
 
-<!-- SCREENSHOT: The /login.php page on draft.goldwing.org.au showing the "Email or Member ID" field, password field, and Forgot password link. Save to public_html/admin/help/images/05-login-page.png. -->
+<!-- SCREENSHOT: The /login.php page on goldwing.org.au showing the "Email or Member ID" field, password field, and Forgot password link. Save to public_html/admin/help/images/05-login-page.png. -->
 <!-- ![Login page](../images/05-login-page.png) -->
 
 <!-- SCREENSHOT: The member portal landing at /member/index.php immediately after login. Save as 05-member-portal.png. -->

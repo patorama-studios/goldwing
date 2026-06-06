@@ -113,10 +113,10 @@ Wraps `FileIntegrityService::scan()` over the configured paths. If the baseline 
 In cPanel → **Cron Jobs**, add an entry per script with the schedule on the left and the command on the right:
 
 ```
-0 6 * * *    /usr/bin/php /home/goldwing/draft.goldwing.org.au/cron/send_renewal_reminders.php
-5 0 * * *    /usr/bin/php /home/goldwing/draft.goldwing.org.au/cron/expire_memberships.php
-15 6 * * *   /usr/bin/php /home/goldwing/draft.goldwing.org.au/cron/daily_summary_admin.php
-0 * * * *    /usr/bin/php /home/goldwing/draft.goldwing.org.au/cron/fim_scan.php
+0 6 * * *    /usr/bin/php /home2/goldwing/cron/send_renewal_reminders.php
+5 0 * * *    /usr/bin/php /home2/goldwing/cron/expire_memberships.php
+15 6 * * *   /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
+0 * * * *    /usr/bin/php /home2/goldwing/cron/fim_scan.php
 ```
 
 cPanel emails any stdout/stderr the script produces to the address in the **"Cron Email"** field at the top of the same page. Set it. Without it, a fatally broken cron is silent — you'll only notice when a member complains they never got a reminder.

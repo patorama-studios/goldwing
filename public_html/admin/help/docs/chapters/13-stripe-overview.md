@@ -233,7 +233,7 @@ Env-var fallbacks (used only when the DB value is blank): `STRIPE_TEST_PUBLISHAB
 
 </details>
 
-<!-- SCREENSHOT: Settings Hub → Payments (Stripe) page with both test and live key sections visible and the "Use Stripe test mode" toggle on. Capture on draft.goldwing.org.au as admin. Save as public_html/admin/help/images/13-stripe-settings.png. -->
+<!-- SCREENSHOT: Settings Hub → Payments (Stripe) page with both test and live key sections visible and the "Use Stripe test mode" toggle on. Capture on goldwing.org.au as admin. Save as public_html/admin/help/images/13-stripe-settings.png. -->
 <!-- ![Stripe settings page](../images/13-stripe-settings.png) -->
 
 <!-- SCREENSHOT: Stripe Dashboard → Developers → Webhooks, showing the goldwing.org.au endpoint with the signing secret partially visible. Save as 13-stripe-webhook-endpoint.png. -->

@@ -287,7 +287,7 @@ This chapter doesn't define settings — it defines how settings *work*. For the
 
 </details>
 
-<!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php showing the section tiles. Capture on draft.goldwing.org.au logged in as a full admin so all sections are visible. Save to public_html/admin/help/images/31-settings-hub-landing.png and uncomment below. -->
+<!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php showing the section tiles. Capture on goldwing.org.au logged in as a full admin so all sections are visible. Save to public_html/admin/help/images/31-settings-hub-landing.png and uncomment below. -->
 <!-- ![Settings Hub landing](../images/31-settings-hub-landing.png) -->
 
 <!-- SCREENSHOT: The Audit section at /admin/settings/index.php?section=audit, with the diff view expanded on a single settings.update row so the before/after JSON is visible. Save as 31-settings-audit-diff.png. -->

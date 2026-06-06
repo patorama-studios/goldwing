@@ -195,7 +195,7 @@ This chapter doesn't define its own settings, but it consumes the alert toggles 
 
 </details>
 
-<!-- SCREENSHOT: /admin/security/activity_log.php showing the filter bar and a table of recent rows. Capture on draft.goldwing.org.au as admin. Save as 08-activity-log.png. -->
+<!-- SCREENSHOT: /admin/security/activity_log.php showing the filter bar and a table of recent rows. Capture on goldwing.org.au as admin. Save as 08-activity-log.png. -->
 <!-- ![Activity log](../images/08-activity-log.png) -->
 
 <!-- SCREENSHOT: /admin/settings/index.php?section=audit showing the audit table with a diff "View" expanded. Save as 08-audit-log.png. -->

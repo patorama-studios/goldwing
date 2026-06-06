@@ -177,7 +177,7 @@ It does **not** write into `audit_log` — capture the terminal output yourself 
 Run from cPanel's Terminal (or SSH) so you're hitting the live DB:
 
 ```bash
-cd ~/draft.goldwing.org.au
+cd ~
 php scripts/import_store_catalogue.php                          # dry-run first, ALWAYS
 php scripts/import_store_catalogue.php --apply --update-shipping
 ```

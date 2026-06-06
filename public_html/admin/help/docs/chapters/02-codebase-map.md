@@ -20,7 +20,7 @@ You'll almost never open this chapter on your own. But there are a few moments w
 
 ### Where the files live
 
-The whole site lives in a single **git repository** at `/home/goldwing/draft.goldwing.org.au` on the cPanel server — everything (admin pages, member pages, database scripts, cron jobs, configuration) ships together as one unit.
+The whole site lives in a single **git repository** at `/home2/goldwing` on the cPanel server — everything (admin pages, member pages, database scripts, cron jobs, configuration) ships together as one unit.
 
 ### Areas you might recognise
 

@@ -222,7 +222,7 @@ The handful of related settings that *do* exist (number padding, magazine type, 
 
 </details>
 
-<!-- SCREENSHOT: Chapters editor at /admin/settings/index.php?section=membership_pricing, scrolled to the "Chapters" table. Capture as draft.goldwing.org.au. Save as public_html/admin/help/images/21-chapters-editor.png. -->
+<!-- SCREENSHOT: Chapters editor at /admin/settings/index.php?section=membership_pricing, scrolled to the "Chapters" table. Capture as goldwing.org.au. Save as public_html/admin/help/images/21-chapters-editor.png. -->
 <!-- ![Chapters editor](../images/21-chapters-editor.png) -->
 
 <!-- SCREENSHOT: /admin/members/ logged in as an area_rep — the chapter filter is disabled and shows only their chapter, the helper text "Showing chapter members only" is visible. Save as 21-area-rep-members-view.png. -->

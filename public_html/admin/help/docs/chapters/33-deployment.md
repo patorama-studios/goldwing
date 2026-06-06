@@ -4,7 +4,7 @@
 
 ### What this is
 
-**Deployment** is how a code change goes from the developer's laptop to the live site at `draft.goldwing.org.au`. When the developer has new code to ship, they push it to GitHub. Someone with cPanel access then clicks two buttons to make it live on the site.
+**Deployment** is how a code change goes from the developer's laptop to the live site at `goldwing.org.au`. When the developer has new code to ship, they push it to GitHub. Someone with cPanel access then clicks two buttons to make it live on the site.
 
 This chapter is for **the person who clicks the deploy buttons**. You don't need to know how the code works, only how to publish it once the developer says it's ready.
 
@@ -24,7 +24,7 @@ In cPanel:
 
 1. Log in to the cPanel account for `goldwing.org.au`.
 2. Find the **Git Version Control** tile (under "Files").
-3. Click the entry for **draft.goldwing.org.au**.
+3. Click the entry for **goldwing.org.au**.
 
 That page is where everything happens. Bookmark it.
 
@@ -33,15 +33,15 @@ That page is where everything happens. Bookmark it.
 1. The developer tells you "deploy commit `XYZ`" (a short string of letters and numbers — the **commit SHA**, e.g. `403e02a`). They'll usually paste it in a message.
 2. Log into **cPanel**.
 3. Open **Git Version Control**.
-4. Click the **draft.goldwing.org.au** repo.
+4. Click the **goldwing.org.au** repo.
 5. Click **Update from Remote**. This pulls the latest code from GitHub into the server, but does **not** publish it yet. Wait for the green tick.
 6. Click **Deploy HEAD Commit**. This is the button that actually publishes the new code to the live site.
-7. **Verify.** Open `draft.goldwing.org.au` in a fresh tab. Visit the section the developer said they changed — e.g. if they fixed the store checkout, click through to checkout and check it loads.
+7. **Verify.** Open `goldwing.org.au` in a fresh tab. Visit the section the developer said they changed — e.g. if they fixed the store checkout, click through to checkout and check it loads.
 8. **Tell the developer it's deployed.** A quick "deployed, looks good" message closes the loop. If something looks broken, tell them what you see.
 
 ### How to confirm the deploy worked
 
-- Open `draft.goldwing.org.au` and click through to the section the developer described.
+- Open `goldwing.org.au` and click through to the section the developer described.
 - The commit SHA shown in cPanel after the deploy should match what the developer asked you to deploy. If it doesn't, the update didn't take — re-click **Update from Remote** and try again.
 - If the change is invisible from the front of the site (a behind-the-scenes fix), trust the SHA match and let the developer verify the rest.
 
@@ -83,7 +83,7 @@ They can take it from there.
 
 ## What this covers
 
-How code gets from Pat's laptop to `draft.goldwing.org.au`: the GitHub repo, the cPanel Git Version Control integration, the `.cpanel.yml` hook, pre-push impact checks, and the manual "Deploy HEAD Commit" step. Plus the things that *will* break the site — chiefly FTP and `git clean` on the server.
+How code gets from Pat's laptop to `goldwing.org.au`: the GitHub repo, the cPanel Git Version Control integration, the `.cpanel.yml` hook, pre-push impact checks, and the manual "Deploy HEAD Commit" step. Plus the things that *will* break the site — chiefly FTP and `git clean` on the server.
 
 ## Why it works this way
 
@@ -101,14 +101,14 @@ The trade-off is that FTP — the other obvious way to push files to cPanel — 
 ### The pieces
 
 - **Repo:** `github.com/patorama-studios/goldwing`, branch `main`. The only branch that gets deployed.
-- **Server clone:** `/home/goldwing/draft.goldwing.org.au/` on the cPanel account. This directory *is* the live working tree — `public_html/` underneath it is what Apache serves. No `dist/`, no rsync target.
+- **Server clone:** `/home2/goldwing/` on the cPanel account. This directory *is* the live working tree — `public_html/` underneath it is what Apache serves. No `dist/`, no rsync target.
 - **`.cpanel.yml`:** the deploy hook cPanel runs after a successful pull. Intentionally minimal:
 
   ```yaml
   ---
   deployment:
     tasks:
-      - export DEPLOYPATH=/home/goldwing/draft.goldwing.org.au/
+      - export DEPLOYPATH=/home2/goldwing/
       - /bin/true
   ```
 
@@ -136,7 +136,7 @@ The trade-off is that FTP — the other obvious way to push files to cPanel — 
 
    Prefixes in use: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`. Scope in parens is optional but helpful (`feat(tours): …`). Body should answer *why*, not just *what*.
 5. **`git push origin main`.** That's the last thing Pat does locally. After this, the session stops and Pat takes over in cPanel.
-6. **In cPanel:** Git Version Control → find the `draft.goldwing.org.au` repo → **Update from Remote** (pulls commits) → **Deploy HEAD Commit** (runs `.cpanel.yml`). The UI shows the SHA before and after.
+6. **In cPanel:** Git Version Control → find the `goldwing.org.au` repo → **Update from Remote** (pulls commits) → **Deploy HEAD Commit** (runs `.cpanel.yml`). The UI shows the SHA before and after.
 7. **Verify.** Log in to `/admin/`, glance at the dashboard, click into the section the change touched. If a tour was flagged, run it from `/admin/help/validator.php` → "Test now".
 
 ### Database changes
@@ -165,11 +165,11 @@ This chapter has no settings of its own. Deploy behaviour is hard-coded in `.cpa
 - **cPanel sometimes silently fails the Update from Remote.** Verify the displayed SHA matches what you pushed (`git rev-parse origin/main` locally). If it doesn't, re-trigger — usually a transient SSH hiccup.
 - **Migrations don't auto-run.** If a deploy added a SQL file under `database/`, apply it via phpMyAdmin or the page will error.
 - **Server timezone vs Australia/Sydney.** cPanel cron times use the server TZ (typically UTC), but PHP code uses `Australia/Sydney` from `site.timezone`. Schedule cron in server time and watch DST boundaries. See [Chapter 34 — Cron jobs](view.php?slug=34-cron-jobs).
-- **No staging vs live split yet.** `draft.goldwing.org.au` is both staging and effectively live until production cut-over. Treat every push as a production push.
+- **No staging vs live split yet.** `goldwing.org.au` is both staging and effectively live until production cut-over. Treat every push as a production push.
 
 </details>
 
-<!-- SCREENSHOT: cPanel Git Version Control page for the draft.goldwing.org.au repo, showing the "Update from Remote" and "Deploy HEAD Commit" buttons and the current/remote SHAs. Save as public_html/admin/help/images/33-cpanel-git-deploy.png and uncomment the line below. -->
+<!-- SCREENSHOT: cPanel Git Version Control page for the goldwing.org.au repo, showing the "Update from Remote" and "Deploy HEAD Commit" buttons and the current/remote SHAs. Save as public_html/admin/help/images/33-cpanel-git-deploy.png and uncomment the line below. -->
 <!-- ![cPanel Git deploy](../images/33-cpanel-git-deploy.png) -->
 
 ## Related chapters

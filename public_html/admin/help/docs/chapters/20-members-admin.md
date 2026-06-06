@@ -269,7 +269,7 @@ No global settings are unique to this chapter. The directory-preference visibili
 
 </details>
 
-<!-- SCREENSHOT: List view at /admin/members/index.php with filters expanded. Capture on draft.goldwing.org.au as a full admin. Save to public_html/admin/help/images/20-members-list.png and uncomment. -->
+<!-- SCREENSHOT: List view at /admin/members/index.php with filters expanded. Capture on goldwing.org.au as a full admin. Save to public_html/admin/help/images/20-members-list.png and uncomment. -->
 <!-- ![Members list view](../images/20-members-list.png) -->
 
 <!-- SCREENSHOT: A member detail page at /admin/members/view.php?id=… with the tab bar visible. Save as 20-member-detail-tabs.png. -->
