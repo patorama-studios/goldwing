@@ -28,11 +28,15 @@ Other roles can view the Settings hub but won't see the Save button on the prici
 
 ### Where to find it in admin
 
+{{link:/admin/settings/?section=membership_pricing|Take me to Membership & Pricing}}
+
 Admin → **Settings** → **Membership Settings** (in the Settings hub sidebar) → scroll to the **Pricing matrix** card.
 
 The same page also has member-ID sequencing and chapter records. Pricing is just one section of it.
 
 ### How to update a price (step by step)
+
+{{link:/admin/settings/?section=membership_pricing|Take me to Membership & Pricing}}
 
 1. Go to **Admin → Settings → Membership Settings**.
 2. Scroll to the **Pricing matrix** card. You'll see a grid for each magazine format (Printed and PDF), with rows for Full and Associate and columns for each period length.

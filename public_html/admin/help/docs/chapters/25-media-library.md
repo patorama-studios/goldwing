@@ -26,6 +26,8 @@ The point: upload a file once, then reuse it anywhere on the site without having
 
 Settings for the library live separately at **Admin → Settings → Media & Files** — that's where you set the maximum upload size and the allowed file types.
 
+{{link:/admin/index.php?page=media|Take me to Media library}}
+
 ### How to upload a file
 
 1. Go to **Admin → Media**.
@@ -36,6 +38,8 @@ Settings for the library live separately at **Admin → Settings → Media & Fil
 
 Supported file types include common images (JPG, PNG, WebP), PDFs, and most document/video formats. The site rejects anything risky (PHP files, scripts, etc.) automatically.
 
+{{link:/admin/index.php?page=media|Take me to Media library}}
+
 ### How to reference an image in a page
 
 Two ways:
@@ -44,6 +48,8 @@ Two ways:
 2. **Using a shortcode** — paste `[media:NN]` into the page's HTML, where `NN` is the file's library ID (you'll see this next to the file in the library). When the page renders, the shortcode is replaced with the actual image, PDF link, or video embed.
 
 Prefer the shortcode over pasting a raw `/uploads/...` URL — if the filename ever changes, the shortcode keeps working. A hardcoded URL doesn't.
+
+{{link:/admin/index.php?page=media|Take me to Media library}}
 
 ### File limits
 

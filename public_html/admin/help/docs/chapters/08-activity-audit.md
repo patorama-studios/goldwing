@@ -33,7 +33,13 @@ Only **Admin** can read either log. Committee members and treasurers don't see t
 
 Three doors, three views, but the activity log views are reading the same underlying table — just with different filters.
 
+{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+{{link:/admin/members/|Take me to Members}}
+{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+
 ### How to search the activity log
+
+{{link:/admin/security/activity_log.php|Take me to the Security Log}}
 
 The filter bar at the top of Admin → Security Log lets you narrow by:
 

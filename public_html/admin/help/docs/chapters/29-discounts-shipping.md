@@ -30,6 +30,8 @@ If you don't see the discounts page or the store settings card, your role doesn'
 
 ### Where to find it in admin
 
+{{link:/admin/store/discounts|Take me to Discounts}}
+
 Three places, depending on what you're changing:
 
 1. **Discount codes** — Admin → Store → Discounts.
@@ -37,6 +39,8 @@ Three places, depending on what you're changing:
 3. **Processing fee passthrough, GST, all the dials together** — Admin → Settings → Store Settings.
 
 ### How to create a discount code (step by step)
+
+{{link:/admin/store/discounts|Take me to Discounts}}
 
 1. Go to **Admin → Store → Discounts**.
 2. Click **New discount**.
@@ -55,6 +59,8 @@ To stop a code working immediately (even mid-date-window), edit it and untick **
 
 ### How to set flat-rate shipping
 
+{{link:/admin/settings/?section=store|Take me to Store Settings}}
+
 1. Go to **Admin → Settings → Store Settings**.
 2. Find the **Shipping & fees** card.
 3. Turn on **Flat-rate shipping**.
@@ -66,6 +72,8 @@ To stop a code working immediately (even mid-date-window), edit it and untick **
 Shipping is one flat line on the order — it's not split across products, and it's not per-region. International freight at a different rate isn't supported today.
 
 ### How the processing fee passthrough works
+
+{{link:/admin/settings/?section=store|Take me to Store Settings}}
 
 Stripe charges the association roughly **1.7% + $0.30** for every card transaction. You get to choose who wears that.
 

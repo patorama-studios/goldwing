@@ -24,6 +24,8 @@ Most committee members have **one** role. Some people wear several hats and hold
 
 ### Where to find it in admin
 
+{{link:/admin/settings/?section=accounts|Take me to Accounts & Roles}}
+
 Three different screens, depending on what you're trying to do:
 
 - **Admin → Settings → Accounts & Roles** — the main "who is what" list. Pick a person, tick the roles they should have.
@@ -31,6 +33,8 @@ Three different screens, depending on what you're trying to do:
 - **Admin → Settings → Access Control** — for fine-tuning which URLs each role can reach, without changing code.
 
 ### How to give someone a role
+
+{{tour:admin-find-edit-member}}
 
 Two routes, same result:
 
@@ -40,6 +44,8 @@ Two routes, same result:
 If they already have a role, just add or remove. A user can hold more than one role; the system uses the most permissive combination.
 
 ### How to create a new custom role
+
+{{link:/admin/settings/roles.php|Take me to the Admin Role Builder}}
 
 If none of the built-in roles fit (e.g. you want a "Welfare Officer" who can see members and send emails but nothing else):
 

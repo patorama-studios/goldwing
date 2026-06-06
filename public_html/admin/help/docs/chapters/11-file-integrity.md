@@ -24,6 +24,8 @@ Activity logs only see things that go through our admin pages. FIM is the only t
 
 ### Where to find it
 
+{{link:/admin/settings/?section=security|Take me to Security & Authentication}}
+
 Admin → Settings → **Security & Authentication** → look for the **File Integrity** card.
 
 ### The two things you'll do here
@@ -35,6 +37,8 @@ There are really only two actions you'll ever take with FIM:
 
 ### How to approve the baseline
 
+{{link:/admin/settings/?section=security|Take me to Security & Authentication}}
+
 1. Go to Admin → Settings → Security & Authentication.
 2. Find the **File Integrity** card.
 3. Click **Approve baseline**.
@@ -44,6 +48,8 @@ There are really only two actions you'll ever take with FIM:
 It's one click, but it requires that fresh 2FA, so don't be surprised by the prompt.
 
 ### How to investigate an alert
+
+{{link:/admin/settings/?section=security|Take me to Security & Authentication}}
 
 The alert email looks roughly like this:
 

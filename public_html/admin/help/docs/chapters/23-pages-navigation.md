@@ -27,6 +27,8 @@ If you can't see **Pages and Nav** in the sidebar, you're not in one of those ro
 
 ### Where to find it in admin
 
+{{link:/admin/navigation.php|Take me to Pages and Nav}}
+
 - **Pages list** — Admin sidebar → **Pages**. Lists every page with its slug, title, access level and when it was last updated.
 - **Visual page editor** — click any page in the list. The AI-assisted visual builder opens. See [Chapter 24 — AI page builder](view.php?slug=24-ai-page-builder).
 - **Menus and navigation slots** — Admin sidebar → **Pages and Nav**.
@@ -42,6 +44,8 @@ You can edit the draft as much as you like — fix typos, restructure, swap phot
 
 ### How to publish a page (step by step)
 
+{{link:/admin/page-builder|Take me to the page builder}}
+
 1. Admin sidebar → **Pages**.
 2. Click the page you want to edit.
 3. Make your changes in the visual editor. Save the draft as often as you like — nothing goes live yet.
@@ -50,6 +54,8 @@ You can edit the draft as much as you like — fix typos, restructure, swap phot
 6. Confirm. The page is now live; the previous version is saved automatically as v(n).
 
 ### How to revert to a previous version
+
+{{link:/admin/page-builder|Take me to the page builder}}
 
 1. Open the page in the visual editor.
 2. Open the **Version history** panel (a sidebar listing v1, v2, v3 …).
@@ -61,6 +67,8 @@ This way a rollback always goes through the same draft → preview → publish l
 
 ### How to add a new page to the main menu
 
+{{link:/admin/navigation.php|Take me to Pages and Nav}}
+
 1. Create the page first — Admin → **Pages** → **New page**. Give it a title, a slug (the URL ending), and some content. Save and publish it.
 2. Admin sidebar → **Pages and Nav**.
 3. Pick the **Primary Menu** from the menu dropdown.
@@ -69,6 +77,8 @@ This way a rollback always goes through the same draft → preview → publish l
 6. Save the menu. The change is live straight away (with a small cache delay — see below).
 
 ### How to mark a page members-only
+
+{{link:/admin/page-builder|Take me to the page builder}}
 
 Each page has an **Access** dropdown with three settings:
 

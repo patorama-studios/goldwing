@@ -21,11 +21,15 @@ Only **Admins** can reset passwords on behalf of other people, or see the login 
 
 ### Where to find it
 
+{{link:/admin/members/|Take me to Members}}
+
 - **Reset a member's password** — Admin → Members → click the member's name → **Reset password** button on their profile.
 - **Recent logins** — on the admin dashboard, the **Recent logins** panel shows the last few people who signed in, with the time and which device. The full list is in Admin → Security log.
 - **Log a member out** — Admin → Members → click the member → **End all sessions** button.
 
 ### How to reset a member's password
+
+{{tour:admin-find-edit-member}}
 
 The member-profile page has a Reset password button near the top:
 

@@ -30,6 +30,8 @@ If you're a Committee Member without the store role, you can see ticket orders b
 
 ### Where to find it in admin
 
+{{link:/admin/store/products|Take me to Products}}
+
 To create a ticket product:
 
 **Admin → Store → Products → New Product**
@@ -39,6 +41,8 @@ In the **Product Type** select, choose **"Ticket / Event"** (instead of the defa
 To see tickets that have already been sold for a given event, open the product and click through to any paid order against it — the codes show in the order detail page.
 
 ### How to set up a ticket product (step by step)
+
+{{tour:admin-add-product}}
 
 1. **Admin → Store → Products → New Product.**
 2. Set **Product Type** to **Ticket / Event**.
@@ -64,6 +68,8 @@ Two emails:
 If the member bought 4 tickets, they get 4 different codes in that table — one per seat. They can forward the email to whoever is going with them.
 
 ### How to check codes at the door
+
+{{tour:admin-process-order}}
 
 There's **no scanner app yet** — admission is checked manually. The simplest workflow:
 

@@ -28,6 +28,8 @@ If you're not an admin, you won't see the Payments settings page at all.
 
 ### Where to find it in admin
 
+{{link:/admin/settings/?section=payments|Take me to Payments (Stripe) settings}}
+
 - **Stripe settings** — Admin → Settings Hub → **Payments (Stripe)**
 - **Webhook health** — same page, near the top, shows the last time Stripe successfully reached us
 - **The Stripe Dashboard itself** — `dashboard.stripe.com` (separate site, separate login, run by Stripe). This is where you go to roll keys or look up a charge.

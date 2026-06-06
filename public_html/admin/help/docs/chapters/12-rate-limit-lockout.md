@@ -22,7 +22,11 @@ We track two separate things on every failed login: the **IP address** the attem
 
 Admin → Settings → Security & Authentication → **Login Security** card.
 
+{{link:/admin/settings/?section=security|Take me to Security & Authentication}}
+
 The Security Log (Admin → Security Log) is where you go to *see* lockouts happening — search for an email or look for `security.login_locked` and `security.login_failed` entries.
+
+{{link:/admin/security/activity_log.php|Take me to the Security Log}}
 
 ### The settings, explained plainly
 
@@ -57,6 +61,9 @@ When this is on, each failed attempt makes the site pause for one extra second b
 ### "A member says they can't log in" — diagnosis flow
 
 This is the support call you'll get. Work through these steps in order.
+
+{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+{{link:/admin/members/|Take me to the Members list}}
 
 1. **Ask them when they last tried.** If it was less than 30 minutes ago and they've been bashing the password in repeatedly, they're almost certainly in a lockout. Even if not, the timing helps the Security Log search.
 

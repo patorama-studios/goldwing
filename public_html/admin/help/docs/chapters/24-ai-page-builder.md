@@ -26,11 +26,15 @@ If you don't see "AI Page Builder" in the admin menu, your role doesn't have acc
 
 ### Where to find it in admin
 
+{{link:/admin/page-builder|Take me to the AI Page Builder}}
+
 **Admin → AI Page Builder**
 
 The sidebar lists every page on the site you're allowed to edit.
 
 ### How to edit a page (step by step)
+
+{{link:/admin/page-builder|Take me to the AI Page Builder}}
 
 1. Open **Admin → AI Page Builder**.
 2. Pick a page from the sidebar on the left.
@@ -52,6 +56,8 @@ Always Save Draft first, preview the whole page, then Push Live.
 
 ### How to revert (roll back to an older version)
 
+{{link:/admin/page-builder|Take me to the AI Page Builder}}
+
 1. Open the page in the page builder.
 2. Click the **Versions** drawer (the history panel).
 3. Pick an older version from the list — each AI change and each Push Live is recorded.
@@ -61,6 +67,8 @@ Always Save Draft first, preview the whole page, then Push Live.
 The restore is itself saved as a new version, so you can roll back a roll-back.
 
 ### How to add an image
+
+{{link:/admin/page-builder|Take me to the AI Page Builder}}
 
 The AI doesn't generate images. To add one, upload it to the [media library](view.php?slug=25-media-library) first, copy its address, then tell the AI "insert this image here" with the address. Easier still: click **Edit HTML** on the selected element and paste an `<img>` tag manually.
 

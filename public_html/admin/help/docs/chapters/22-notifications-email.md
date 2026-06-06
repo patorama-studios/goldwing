@@ -24,6 +24,9 @@ That means there's one place to change the wording, one place to change who emai
 
 ### Where to find it in admin
 
+{{link:/admin/settings/?section=notifications|Take me to Notifications}}
+{{link:/admin/settings/?section=integrations|Take me to Integrations}}
+
 Three places, depending on what you're trying to do:
 
 1. **Admin → Settings → Notifications** — every email template the site sends. Edit copy, change subject lines, toggle individual emails on/off, set per-template recipients, send a test.
@@ -71,6 +74,8 @@ Two routes for the member:
 Members **cannot** opt out of transactional emails. That's intentional.
 
 ### SMTP setup walkthrough
+
+{{link:/admin/settings/?section=integrations|Take me to Integrations}}
 
 Out of the box the site uses PHP's built-in `mail()` function, which on a shared host means anonymous mail relayed through the server. Most inboxes land that straight in spam. The fix is to point the site at a real mailbox over SMTP — typically the `webmaster@goldwing.org.au` mailbox.
 
