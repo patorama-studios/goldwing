@@ -19,7 +19,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+  <link href="/assets/vendor/quill/quill.snow.css" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -153,7 +153,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
 </head>
 <body class="bg-background-light text-gray-800 font-sans transition-colors duration-300">
 
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js" defer></script>
+<script src="/assets/vendor/quill/quill.js" defer></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
 <script src="/assets/js/goldwing-wysiwyg.js" defer></script>
 <script src="/assets/js/password-strength.js" defer></script>
