@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>AGA Members Portal — Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;700;900&family=Crimson+Pro:ital,wght@0,400;1,400&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0e0c09;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  .scene {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0e0c09;
+  }
+
+  /* ── Left text panel (all screenshot scenes) ── */
+  .cpanel {
+    position: absolute;
+    left: 0; top: 0;
+    width: 800px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-left: 110px;
+    padding-right: 50px;
+  }
+
+  .badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 400;
+    font-size: 17px;
+    color: #C9A227;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+  }
+
+  .headline {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 104px;
+    color: #F2EDD7;
+    line-height: 0.91;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    margin-bottom: 30px;
+  }
+
+  .rule {
+    width: 60px;
+    height: 3px;
+    background: #C9A227;
+    margin-bottom: 28px;
+  }
+
+  .body-copy {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    font-size: 26px;
+    color: #b8ad94;
+    line-height: 1.6;
+    max-width: 540px;
+    font-weight: 400;
+  }
+
+  /* ── Right screenshot panel ── */
+  .screen-panel {
+    position: absolute;
+    right: 44px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 968px;
+    height: 605px;   /* 968 / 1.6 = 605 */
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 24px 72px rgba(0,0,0,0.70),
+      0  0   0 1px rgba(255,255,255,0.07);
+  }
+
+  .screen-panel img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: left top;
+    display: block;
+  }
+
+  /* Subtle vertical separator between panels */
+  .divider {
+    position: absolute;
+    left: 808px;
+    top: 160px;
+    width: 1px;
+    height: 760px;
+    background: linear-gradient(180deg, transparent, rgba(201,162,39,0.18) 30%, rgba(201,162,39,0.18) 70%, transparent);
+  }
+</style>
+</head>
+<body>
+
+<div id="root"
+  data-composition-id="main"
+  data-width="1920"
+  data-height="1080"
+  data-start="0"
+  data-duration="196">
+
+  <!-- ═══ SCENE 1 — TITLE  (T=0 … CF at 9.0) ══════════════════ -->
+  <div id="s1" class="scene" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <img  id="s1-logo" src="https://draft.goldwing.org.au/uploads/library/2024/good-logo-cropped-white-notag.png"
+          style="height:152px; margin-bottom:36px;"/>
+    <div  id="s1-rule" style="width:320px; height:1px; background:#C9A227; margin-bottom:30px;"></div>
+    <div  id="s1-org"  style="font-family:'Barlow Condensed',sans-serif; font-weight:300; font-size:17px; color:#6e6255; letter-spacing:0.30em; text-transform:uppercase; margin-bottom:56px;">Australian Goldwing Association</div>
+    <div  id="s1-h1"   style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:136px; color:#C9A227; line-height:0.88; text-transform:uppercase; letter-spacing:-0.02em; text-align:center;">YOUR</div>
+    <div  id="s1-h2"   style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:136px; color:#F2EDD7; line-height:0.88; text-transform:uppercase; letter-spacing:-0.02em; text-align:center; margin-bottom:42px;">MEMBERS PORTAL</div>
+    <div  id="s1-sub"  style="font-family:'Crimson Pro',serif; font-style:italic; font-size:26px; color:#5a5040; text-align:center;">A walkthrough for new members</div>
+  </div>
+
+  <!-- ═══ SCENE 2 — HOMEPAGE ══════════════════════════════════ -->
+  <div id="s2" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s2-badge" class="badge">01 — Welcome</div>
+      <div id="s2-head"  class="headline">YOUR<br>GATEWAY<br>TO THE ASSOCIATION</div>
+      <div id="s2-rule"  class="rule"></div>
+      <div id="s2-body"  class="body-copy">The AGA website is your first stop — events, association news, and your gateway to the full membership experience.</div>
+    </div>
+    <div id="s2-screen" class="screen-panel">
+      <img src="assets/screenshots/homepage.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 3 — LOGIN ═════════════════════════════════════ -->
+  <div id="s3" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s3-badge" class="badge">02 — Getting Access</div>
+      <div id="s3-head"  class="headline">LOG IN.<br>YOU'RE<br>HOME.</div>
+      <div id="s3-rule"  class="rule"></div>
+      <div id="s3-body"  class="body-copy">Once your membership is confirmed, you'll receive your login details by email. One sign-in and the full portal is yours.</div>
+    </div>
+    <div id="s3-screen" class="screen-panel">
+      <img src="assets/screenshots/login.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 4 — DASHBOARD ═════════════════════════════════ -->
+  <div id="s4" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s4-badge" class="badge">03 — Your Dashboard</div>
+      <div id="s4-head"  class="headline">EVERYTHING<br>AT A<br>GLANCE</div>
+      <div id="s4-rule"  class="rule"></div>
+      <div id="s4-body"  class="body-copy">Member number, status, the latest Wings Magazine, and upcoming events — all right here the moment you log in.</div>
+    </div>
+    <div id="s4-screen" class="screen-panel">
+      <img src="assets/screenshots/dashboard.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 5 — WINGS ══════════════════════════════════════ -->
+  <div id="s5" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s5-badge" class="badge">04 — Wings Magazine</div>
+      <div id="s5-head"  class="headline">WINGS<br>MAGAZINE</div>
+      <div id="s5-rule"  class="rule"></div>
+      <div id="s5-body"  class="body-copy">Every issue of Wings Magazine — the official A.G.A. publication — is right here in your portal. Stay up to date with association news, member stories, and everything happening across the organisation.</div>
+    </div>
+    <div id="s5-screen" class="screen-panel">
+      <img src="assets/screenshots/wings.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 6 — NOTICE BOARD ══════════════════════════════ -->
+  <div id="s6" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s6-badge" class="badge">05 — Notice Board</div>
+      <div id="s6-head"  class="headline">STAY<br>IN THE<br>LOOP</div>
+      <div id="s6-rule"  class="rule"></div>
+      <div id="s6-body"  class="body-copy">Association announcements, committee updates, and important news — posted here so you never miss a thing.</div>
+    </div>
+    <div id="s6-screen" class="screen-panel">
+      <img src="assets/screenshots/notices.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 7 — MEMBERS DIRECTORY ════════════════════════ -->
+  <div id="s7" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s7-badge" class="badge">06 — Members Directory</div>
+      <div id="s7-head"  class="headline">YOUR<br>FELLOW<br>RIDERS</div>
+      <div id="s7-rule"  class="rule"></div>
+      <div id="s7-body"  class="body-copy">Search members by name, chapter, or state. The easiest way to find fellow Goldwing riders anywhere in Australia.</div>
+    </div>
+    <div id="s7-screen" class="screen-panel">
+      <img src="assets/screenshots/directory.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 8 — STORE ══════════════════════════════════════ -->
+  <div id="s8" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s8-badge" class="badge">07 — Member Store</div>
+      <div id="s8-head"  class="headline">GEAR<br>UP</div>
+      <div id="s8-rule"  class="rule"></div>
+      <div id="s8-body"  class="body-copy">Browse exclusive AGA merchandise — patches, pins, apparel, and more. Wear your A.G.A. pride on every single ride.</div>
+    </div>
+    <div id="s8-screen" class="screen-panel">
+      <img src="assets/screenshots/store.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 9 — BILLING ════════════════════════════════════ -->
+  <div id="s9" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s9-badge" class="badge">08 — Billing &amp; Renewals</div>
+      <div id="s9-head"  class="headline">SIMPLE<br>RENEWALS</div>
+      <div id="s9-rule"  class="rule"></div>
+      <div id="s9-body"  class="body-copy">View your payment history, update your payment method, and renew your membership — without picking up the phone.</div>
+    </div>
+    <div id="s9-screen" class="screen-panel">
+      <img src="assets/screenshots/billing.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 10 — PROFILE ═══════════════════════════════════ -->
+  <div id="s10" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s10-badge" class="badge">09 — Your Profile</div>
+      <div id="s10-head"  class="headline">YOUR<br>DETAILS,<br>YOUR WAY</div>
+      <div id="s10-rule"  class="rule"></div>
+      <div id="s10-body"  class="body-copy">Keep your contact details current, add associates, and view your complete membership history — all in one place.</div>
+    </div>
+    <div id="s10-screen" class="screen-panel">
+      <img src="assets/screenshots/profile.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 11 — FALLEN WINGS ══════════════════════════════ -->
+  <div id="s11" class="scene" style="opacity:0">
+    <div class="divider" style="background:linear-gradient(180deg,transparent,rgba(154,138,114,0.15) 30%,rgba(154,138,114,0.15) 70%,transparent);"></div>
+    <div class="cpanel">
+      <div id="s11-badge" class="badge" style="color:#9a8a72;">10 — Fallen Wings</div>
+      <div id="s11-head"  class="headline" style="color:#d4cab4;">HONOURING<br>OUR<br>OWN</div>
+      <div id="s11-rule"  class="rule" style="background:#9a8a72;"></div>
+      <div id="s11-body"  class="body-copy" style="color:#8a7d68;">A memorial to the members we've lost. Those who rode with us — and who will always ride with us in spirit.</div>
+    </div>
+    <div id="s11-screen" class="screen-panel">
+      <img src="assets/screenshots/fallen.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 12 — COMMITTEE ══════════════════════════════════ -->
+  <div id="s12" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s12-badge" class="badge">11 — Your Committee</div>
+      <div id="s12-head"  class="headline">MEET<br>THE<br>TEAM</div>
+      <div id="s12-rule"  class="rule"></div>
+      <div id="s12-body"  class="body-copy">Get to know the people who run the association, learn their roles, and reach out to them directly from the portal.</div>
+    </div>
+    <div id="s12-screen" class="screen-panel">
+      <img src="assets/screenshots/committee.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 13 — EVENTS CALENDAR ════════════════════════════ -->
+  <div id="s13" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s13-badge" class="badge">12 — Events Calendar</div>
+      <div id="s13-head"  class="headline">NEVER<br>MISS<br>A RIDE</div>
+      <div id="s13-rule"  class="rule"></div>
+      <div id="s13-body"  class="body-copy">Upcoming rides, rallies, and A.G.A. gatherings all in one place. Stay in the loop and plan your next adventure.</div>
+    </div>
+    <div id="s13-screen" class="screen-panel">
+      <img src="assets/screenshots/calendar.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 14 — HONDA DEALERS ════════════════════════════ -->
+  <div id="s14" class="scene" style="opacity:0">
+    <div class="divider"></div>
+    <div class="cpanel">
+      <div id="s14-badge" class="badge">13 — Honda Dealers</div>
+      <div id="s14-head"  class="headline">FIND<br>YOUR<br>DEALER</div>
+      <div id="s14-rule"  class="rule"></div>
+      <div id="s14-body"  class="body-copy">A full directory of Honda dealers across Australia. Service, parts, or a new bike — find your nearest dealer in seconds.</div>
+    </div>
+    <div id="s14-screen" class="screen-panel">
+      <img src="assets/screenshots/dealers.jpg" alt=""/>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 15 — CLOSING ════════════════════════════════════ -->
+  <div id="s15" class="scene" style="opacity:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div id="s15-line1" style="position:absolute; top:0;    left:0; width:1920px; height:2px; background:linear-gradient(90deg,transparent 0%,#C9A227 30%,#C9A227 70%,transparent 100%);"></div>
+    <div id="s15-line2" style="position:absolute; bottom:0; left:0; width:1920px; height:2px; background:linear-gradient(90deg,transparent 0%,#C9A227 30%,#C9A227 70%,transparent 100%);"></div>
+    <img  id="s15-logo" src="https://draft.goldwing.org.au/uploads/library/2024/good-logo-cropped-white-notag.png"
+          style="height:128px; margin-bottom:40px;"/>
+    <div  id="s15-h1"   style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:118px; color:#F2EDD7; line-height:0.88; text-transform:uppercase; letter-spacing:-0.02em; text-align:center;">WELCOME TO</div>
+    <div  id="s15-h2"   style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:118px; color:#C9A227; line-height:0.88; text-transform:uppercase; letter-spacing:-0.02em; text-align:center; margin-bottom:48px;">THE FAMILY</div>
+    <div  id="s15-rule" style="width:180px; height:1px; background:#C9A227; margin-bottom:34px;"></div>
+    <div  id="s15-sub"  style="font-family:'Crimson Pro',serif; font-style:italic; font-size:30px; color:#8a7d6a; text-align:center; letter-spacing:0.02em;">Friendship and Family Across Australia</div>
+    <div  id="s15-url"  style="font-family:'Barlow Condensed',sans-serif; font-weight:300; font-size:19px; color:#4a4035; letter-spacing:0.20em; text-transform:uppercase; margin-top:20px;">goldwing.org.au</div>
+  </div>
+
+</div><!-- #root -->
+
+<script>
+window.__timelines = window.__timelines || {};
+var tl = gsap.timeline({ paused: true });
+
+/* ─── blur crossfade helper ────────────────────────────────────── */
+function cf(old, nw, T) {
+  tl.to(old, { filter:"blur(25px)", scale:1.05, duration:0.6, ease:"power1.in" }, T);
+  tl.to(old, { opacity:0, duration:0.4, ease:"power1.in" }, T + 0.4);
+  tl.fromTo(nw,
+    { filter:"blur(25px)", scale:0.95, opacity:0 },
+    { filter:"blur(25px)", scale:0.95, opacity:1, duration:0.3, ease:"power1.inOut" },
+    T + 0.5);
+  tl.to(nw, { filter:"blur(0px)", scale:1, duration:0.6, ease:"power1.out" }, T + 0.8);
+}
+
+/* ─── content entrance helper ──────────────────────────────────── */
+function enter(p, T) {
+  tl.from(p+"-badge",  { opacity:0, x:-22, duration:0.55, ease:"power2.out" }, T);
+  tl.from(p+"-head",   { opacity:0, y:32,  duration:0.65, ease:"power2.out" }, T + 0.18);
+  tl.from(p+"-rule",   { scaleX:0, transformOrigin:"left center", duration:0.48, ease:"power2.out" }, T + 0.44);
+  tl.from(p+"-body",   { opacity:0, y:14,  duration:0.55, ease:"power2.out" }, T + 0.54);
+  tl.from(p+"-screen", { opacity:0, x:36,  duration:0.70, ease:"power2.out" }, T + 0.10);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCENE 1 — TITLE  (T=0)
+════════════════════════════════════════════════════════════════ */
+tl.from("#s1-logo", { opacity:0, y:22,  duration:1.1, ease:"power2.out" }, 0.2);
+tl.from("#s1-rule", { scaleX:0,         duration:0.8, ease:"power2.out" }, 0.9);
+tl.from("#s1-org",  { opacity:0, y:8,   duration:0.7, ease:"power2.out" }, 1.2);
+tl.from("#s1-h1",   { opacity:0, y:30,  duration:0.75, ease:"power2.out" }, 1.65);
+tl.from("#s1-h2",   { opacity:0, y:30,  duration:0.75, ease:"power2.out" }, 1.95);
+tl.from("#s1-sub",  { opacity:0,        duration:0.65, ease:"power2.out" }, 2.5);
+
+/* Scenes 2-13: CF every 9s, content 0.9s after CF, panel slides in 0.1s after */
+cf("#s1","#s2",  10.0); enter("#s2",  10.9);
+cf("#s2","#s3",  24.0); enter("#s3",  24.9);
+cf("#s3","#s4",  35.5); enter("#s4",  36.4);
+cf("#s4","#s5",  48.5); enter("#s5",  49.4);
+cf("#s5","#s6",  65.0); enter("#s6",  65.9);
+cf("#s6","#s7",  78.5); enter("#s7",  79.4);
+cf("#s7","#s8",  91.0); enter("#s8",  91.9);
+cf("#s8","#s9", 103.0); enter("#s9", 103.9);
+cf("#s9","#s10",115.5); enter("#s10",116.4);
+cf("#s10","#s11",128.5); enter("#s11",129.4);
+cf("#s11","#s12",142.0); enter("#s12",142.9);
+cf("#s12","#s13",155.0); enter("#s13",155.9);
+
+/* ─── crossfade 13→14  (T=168.0) */
+cf("#s13","#s14", 168.0); enter("#s14",168.9);
+
+/* ─── crossfade 14→15  (T=181.5) */
+cf("#s14","#s15", 181.5);
+
+/* ════════════════════════════════════════════════════════════════
+   SCENE 15 — CLOSING  (content at T=182.4)
+════════════════════════════════════════════════════════════════ */
+var T15 = 182.4;
+tl.from("#s15-line1", { scaleX:0, transformOrigin:"left center",  duration:1.0, ease:"power2.inOut" }, T15);
+tl.from("#s15-line2", { scaleX:0, transformOrigin:"right center", duration:1.0, ease:"power2.inOut" }, T15 + 0.08);
+tl.from("#s15-logo",  { opacity:0, y:18, duration:0.75, ease:"power2.out" }, T15 + 0.30);
+tl.from("#s15-h1",    { opacity:0, y:26, duration:0.68, ease:"power2.out" }, T15 + 0.72);
+tl.from("#s15-h2",    { opacity:0, y:26, duration:0.68, ease:"power2.out" }, T15 + 0.96);
+tl.from("#s15-rule",  { scaleX:0, duration:0.55, ease:"power2.out" }, T15 + 1.22);
+tl.from("#s15-sub",   { opacity:0, duration:0.65, ease:"power2.out" }, T15 + 1.40);
+tl.from("#s15-url",   { opacity:0, duration:0.65, ease:"power2.out" }, T15 + 1.70);
+
+window.__timelines["main"] = tl;
+</script>
+</body>
+</html>
