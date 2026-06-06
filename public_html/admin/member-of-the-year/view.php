@@ -74,3 +74,4 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     </div>
   </main>
 </div>
+<?php include __DIR__ . '/../../../app/Views/partials/help_button.php'; ?>

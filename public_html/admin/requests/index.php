@@ -290,4 +290,5 @@ function reqActionButtons(array $item): string {
     </div>
   </main>
 </div>
+<?php include __DIR__ . '/../../../app/Views/partials/help_button.php'; ?>
 </body></html>

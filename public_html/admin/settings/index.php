@@ -2425,3 +2425,4 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     }, 2000);
   }
 </script>
+<?php include __DIR__ . '/../../../app/Views/partials/help_button.php'; ?>

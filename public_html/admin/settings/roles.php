@@ -224,5 +224,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     });
   });
 </script>
+<?php include __DIR__ . '/../../../app/Views/partials/help_button.php'; ?>
 </body>
 </html>
