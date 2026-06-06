@@ -11,7 +11,7 @@
  *   php scripts/lint_tours.php member-update-contact
  *
  * Configuration (env or CLI flags):
- *   TOUR_LINT_BASE_URL   default https://draft.goldwing.org.au
+ *   TOUR_LINT_BASE_URL   default https://goldwing.org.au
  *   TOUR_LINT_COOKIE     session cookie value for an admin user
  *                        (copy "Cookie:" header from a logged-in browser session)
  *   --base=URL
@@ -29,7 +29,7 @@ use App\Services\TourService;
 $args = $argv;
 array_shift($args);
 
-$baseUrl = getenv('TOUR_LINT_BASE_URL') ?: 'https://draft.goldwing.org.au';
+$baseUrl = getenv('TOUR_LINT_BASE_URL') ?: 'https://goldwing.org.au';
 $cookie  = getenv('TOUR_LINT_COOKIE') ?: '';
 $onlySlug = null;
 foreach ($args as $a) {
