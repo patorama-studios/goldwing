@@ -125,6 +125,29 @@
         "public_html/assets/js/tours/tours/member-2fa.js"
       ]
     },
+    "member-submit-event": {
+      "slug": "member-submit-event",
+      "name": "How to submit an event for review",
+      "blurb": "Show me how to put a new ride or event on the calendar.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/calendar/member_event_submit.php",
+      "page_match": "member_event_submit",
+      "steps_file": "/assets/js/tours/tours/member-submit-event.js",
+      "selectors": [
+        "[data-tour=\"submit-event-form\"]",
+        "[data-tour=\"submit-event-title\"]",
+        "[data-tour=\"submit-event-classification\"]",
+        "[data-tour=\"submit-event-datetime\"]",
+        "[data-tour=\"submit-event-location\"]",
+        "[data-tour=\"submit-event-publish\"]"
+      ],
+      "watched_files": [
+        "calendar/public/member_event_submit.php",
+        "public_html/calendar/member_event_submit.php",
+        "public_html/assets/js/tours/tours/member-submit-event.js"
+      ]
+    },
     "member-book-event": {
       "slug": "member-book-event",
       "name": "How to book a ride or event",

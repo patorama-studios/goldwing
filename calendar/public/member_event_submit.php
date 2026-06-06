@@ -252,7 +252,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
         <div class="flex items-center gap-3">
           <a href="dashboard_events.php" class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Back</a>
-          <button form="calendar-event-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
+          <button form="calendar-event-form" type="submit" data-tour="submit-event-publish" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
             <span class="material-icons-outlined text-base">send</span>
             Submit for Review
           </button>
@@ -274,11 +274,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-    <form id="calendar-event-form" method="post" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+    <form id="calendar-event-form" data-tour="submit-event-form" method="post" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         <?php echo calendar_csrf_field(); ?>
 
         <div class="space-y-6">
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="submit-event-title" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">event</span>
               Event Details
@@ -325,7 +325,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           </section>
 
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="submit-event-location" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">place</span>
               Location & Meeting
@@ -358,7 +358,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
 
         <div class="space-y-6">
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="submit-event-classification" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">category</span>
               Classification
@@ -389,7 +389,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </label>
           </section>
 
-          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <section data-tour="submit-event-datetime" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div class="flex items-center gap-2 text-gray-900 font-semibold">
               <span class="material-icons-outlined text-primary">schedule</span>
               Date & Time
