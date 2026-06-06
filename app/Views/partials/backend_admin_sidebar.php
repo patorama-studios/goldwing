@@ -44,6 +44,22 @@ $items = [
     // 'events' (legacy admin page reading the old `events` table) removed —
     // all event management now happens via the Calendar entry below.
     ['key' => 'calendar-events', 'group' => 'Content', 'label' => 'Calendar', 'icon' => 'calendar_month', 'href' => '/calendar/events.php', 'permission' => 'admin.calendar.view'],
+    [
+        'key' => 'agm',
+        'group' => 'Content',
+        'label' => 'AGM',
+        'icon' => 'celebration',
+        'children' => [
+            ['key' => 'agm-dashboard', 'label' => 'Dashboard', 'href' => '/admin/agm/?tab=dashboard', 'path' => '/admin/agm/', 'permission' => 'admin.agm.view'],
+            ['key' => 'agm-event', 'label' => 'Event Setup', 'href' => '/admin/agm/?tab=event', 'path' => '/admin/agm/', 'permission' => 'admin.agm.manage'],
+            ['key' => 'agm-content', 'label' => 'Content', 'href' => '/admin/agm/?tab=content', 'path' => '/admin/agm/', 'permission' => 'admin.agm.manage'],
+            ['key' => 'agm-products', 'label' => 'Products & Pricing', 'href' => '/admin/agm/?tab=products', 'path' => '/admin/agm/', 'permission' => 'admin.agm.manage'],
+            ['key' => 'agm-fields', 'label' => 'Form Fields', 'href' => '/admin/agm/?tab=fields', 'path' => '/admin/agm/', 'permission' => 'admin.agm.manage'],
+            ['key' => 'agm-submissions', 'label' => 'Submissions', 'href' => '/admin/agm/?tab=submissions', 'path' => '/admin/agm/', 'permission' => 'admin.agm.view'],
+            ['key' => 'agm-archive', 'label' => 'Archive', 'href' => '/admin/agm/?tab=archive', 'path' => '/admin/agm/', 'permission' => 'admin.agm.view'],
+            ['key' => 'agm-settings', 'label' => 'Settings (Stripe)', 'href' => '/admin/agm/?tab=settings', 'path' => '/admin/agm/', 'permission' => 'admin.agm.settings'],
+        ],
+    ],
     ['key' => 'navigation', 'group' => 'Content', 'label' => 'Pages and Nav', 'icon' => 'menu', 'href' => '/admin/navigation.php', 'permission' => 'admin.pages.edit'],
     ['key' => 'notices', 'group' => 'Content', 'label' => 'Notices', 'icon' => 'campaign', 'href' => '/admin/index.php?page=notices', 'permission' => 'admin.pages.edit'],
     ['key' => 'wings', 'group' => 'Content', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/admin/index.php?page=wings', 'permission' => 'admin.wings_magazine.manage'],

@@ -99,7 +99,8 @@
         { "slug": "33-deployment",            "title": "Deployment",                       "file": "chapters/33-deployment.md",            "watched_files": [".cpanel.yml", "DEPLOY.md", "scripts/ftp_upload.py"] },
         { "slug": "34-cron-jobs",             "title": "Cron jobs",                        "file": "chapters/34-cron-jobs.md",             "watched_files": ["cron/"] },
         { "slug": "35-logs-troubleshooting",  "title": "Logs & troubleshooting",           "file": "chapters/35-logs-troubleshooting.md",  "watched_files": ["app/Services/LogViewerService.php", "app/storage/logs/"] },
-        { "slug": "36-tours-system",          "title": "Tours system",                     "file": "chapters/36-tours-system.md",          "watched_files": ["app/Services/TourService.php", "config/tour-manifest.json", "public_html/admin/help/", "public_html/assets/js/tours/", "scripts/check_tour_impact.php", "scripts/lint_tours.php"] }
+        { "slug": "36-tours-system",          "title": "Tours system",                     "file": "chapters/36-tours-system.md",          "watched_files": ["app/Services/TourService.php", "config/tour-manifest.json", "public_html/admin/help/", "public_html/assets/js/tours/", "scripts/check_tour_impact.php", "scripts/lint_tours.php"] },
+        { "slug": "37-agm-registrations",     "title": "AGM registrations",                "file": "chapters/37-agm-registrations.md",     "watched_files": ["database/agm_module.sql", "database/seeds_agm_perth_2026.sql", "app/Services/AgmEventService.php", "app/Services/AgmRegistrationService.php", "app/Services/AgmWebhookService.php", "app/Services/StripeSettingsService.php", "app/Services/StripeService.php", "public_html/admin/agm/", "public_html/agm/", "public_html/api/stripe_webhook_agm.php", "scripts/install_tinymce.sh"] }
       ]
     },
     {

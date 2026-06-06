@@ -1269,6 +1269,34 @@ if ($user && $user['member_id']) {
       ];
     }
 
+    if (!empty($member['id'])) {
+      try {
+        $agmRegistrations = \App\Services\AgmRegistrationService::listForMember((int) $member['id']);
+      } catch (\Throwable $agmErr) {
+        $agmRegistrations = [];
+      }
+      foreach ($agmRegistrations as $reg) {
+        $regDetail = \App\Services\AgmRegistrationService::getRegistrationById((int) $reg['id']);
+        $itemList = [];
+        foreach ((($regDetail['items'] ?? [])) as $it) {
+          $label = $it['name_snapshot'];
+          if (!empty($it['choice_label_snapshot'])) {
+            $label .= ' — ' . $it['choice_label_snapshot'];
+          }
+          $itemList[] = ['label' => $label, 'quantity' => (int) $it['quantity']];
+        }
+        $orderHistory[] = [
+          'type' => 'agm',
+          'date' => $reg['created_at'],
+          'title' => 'AGM ' . ((int) ($reg['event_year'] ?? 0)) . ' — ' . ($reg['event_title'] ?? '') . ' (' . $reg['registration_number'] . ')',
+          'status' => $reg['payment_status'],
+          'amount' => number_format((float) $reg['total'], 2),
+          'items' => $itemList,
+          'order_id' => $reg['id'],
+        ];
+      }
+    }
+
     usort($orderHistory, function ($a, $b) {
       return strtotime($b['date']) <=> strtotime($a['date']);
     });

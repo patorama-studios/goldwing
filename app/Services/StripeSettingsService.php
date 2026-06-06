@@ -4,39 +4,74 @@ namespace App\Services;
 class StripeSettingsService
 {
     public const DEFAULT_CURRENCY = 'AUD';
+    public const ACCOUNT_PRIMARY = 'primary';
+    public const ACCOUNT_AGM = 'agm';
 
-    public static function getSettings(): array
+    private const ACCOUNT_CHANNELS = [
+        self::ACCOUNT_PRIMARY => 'primary',
+        self::ACCOUNT_AGM => 'agm',
+    ];
+
+    private const ACCOUNT_PREFIXES = [
+        self::ACCOUNT_PRIMARY => 'payments.stripe',
+        self::ACCOUNT_AGM => 'payments.agm_stripe',
+    ];
+
+    private const ACCOUNT_ENV_PREFIXES = [
+        self::ACCOUNT_PRIMARY => 'STRIPE',
+        self::ACCOUNT_AGM => 'STRIPE_AGM',
+    ];
+
+    private static function resolveAccountKey(?string $accountKey): string
     {
-        $channel = PaymentSettingsService::getChannelByCode('primary');
-        $legacy = PaymentSettingsService::getSettingsByChannelId((int) ($channel['id'] ?? 0));
-        $legacyMode = (string) SettingsService::getGlobal('payments.stripe.mode', $legacy['mode'] ?? 'test');
-        $legacyPublishable = (string) SettingsService::getGlobal('payments.stripe.publishable_key', $legacy['publishable_key'] ?? '');
-        $legacySecret = (string) SettingsService::getGlobal('payments.stripe.secret_key', $legacy['secret_key'] ?? '');
-        $legacyWebhook = (string) SettingsService::getGlobal('payments.stripe.webhook_secret', $legacy['webhook_secret'] ?? '');
+        $key = (string) ($accountKey ?? self::ACCOUNT_PRIMARY);
+        return isset(self::ACCOUNT_PREFIXES[$key]) ? $key : self::ACCOUNT_PRIMARY;
+    }
 
-        $useTestModeMeta = SettingsService::getGlobalMeta('payments.stripe.use_test_mode');
-        $useTestMode = SettingsService::getGlobal('payments.stripe.use_test_mode', null);
+    private static function settingKey(string $accountKey, string $suffix): string
+    {
+        return self::ACCOUNT_PREFIXES[$accountKey] . '.' . $suffix;
+    }
+
+    private static function envKey(string $accountKey, string $suffix): string
+    {
+        return self::ACCOUNT_ENV_PREFIXES[$accountKey] . '_' . $suffix;
+    }
+
+    public static function getSettings(?string $accountKey = null): array
+    {
+        $accountKey = self::resolveAccountKey($accountKey);
+        $channelCode = self::ACCOUNT_CHANNELS[$accountKey];
+        $channel = PaymentSettingsService::getChannelByCode($channelCode);
+        $legacy = PaymentSettingsService::getSettingsByChannelId((int) ($channel['id'] ?? 0));
+        $legacyMode = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'mode'), $legacy['mode'] ?? 'test');
+        $legacyPublishable = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'publishable_key'), $legacy['publishable_key'] ?? '');
+        $legacySecret = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'secret_key'), $legacy['secret_key'] ?? '');
+        $legacyWebhook = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'webhook_secret'), $legacy['webhook_secret'] ?? '');
+
+        $useTestModeMeta = SettingsService::getGlobalMeta(self::settingKey($accountKey, 'use_test_mode'));
+        $useTestMode = SettingsService::getGlobal(self::settingKey($accountKey, 'use_test_mode'), null);
         if ($useTestModeMeta['updated_at'] === null) {
             $useTestMode = $legacyMode !== 'live';
         }
         $useTestMode = (bool) $useTestMode;
 
-        $testPublishable = (string) SettingsService::getGlobal('payments.stripe.test_publishable_key', '');
-        $testSecret = (string) SettingsService::getGlobal('payments.stripe.test_secret_key', '');
-        $livePublishable = (string) SettingsService::getGlobal('payments.stripe.live_publishable_key', '');
-        $liveSecret = (string) SettingsService::getGlobal('payments.stripe.live_secret_key', '');
+        $testPublishable = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'test_publishable_key'), '');
+        $testSecret = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'test_secret_key'), '');
+        $livePublishable = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'live_publishable_key'), '');
+        $liveSecret = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'live_secret_key'), '');
 
         if ($testPublishable === '') {
-            $testPublishable = (string) Env::get('STRIPE_TEST_PUBLISHABLE_KEY', '');
+            $testPublishable = (string) Env::get(self::envKey($accountKey, 'TEST_PUBLISHABLE_KEY'), '');
         }
         if ($testSecret === '') {
-            $testSecret = (string) Env::get('STRIPE_TEST_SECRET_KEY', '');
+            $testSecret = (string) Env::get(self::envKey($accountKey, 'TEST_SECRET_KEY'), '');
         }
         if ($livePublishable === '') {
-            $livePublishable = (string) Env::get('STRIPE_LIVE_PUBLISHABLE_KEY', '');
+            $livePublishable = (string) Env::get(self::envKey($accountKey, 'LIVE_PUBLISHABLE_KEY'), '');
         }
         if ($liveSecret === '') {
-            $liveSecret = (string) Env::get('STRIPE_LIVE_SECRET_KEY', '');
+            $liveSecret = (string) Env::get(self::envKey($accountKey, 'LIVE_SECRET_KEY'), '');
         }
 
         if ($testPublishable === '' && $livePublishable === '' && $legacyPublishable !== '') {
@@ -54,45 +89,52 @@ class StripeSettingsService
             }
         }
 
-        $webhookSecret = (string) SettingsService::getGlobal('payments.stripe.webhook_secret', '');
+        $webhookSecret = (string) SettingsService::getGlobal(self::settingKey($accountKey, 'webhook_secret'), '');
         if ($webhookSecret === '') {
-            $webhookSecret = (string) Env::get('STRIPE_WEBHOOK_SECRET', '');
+            $webhookSecret = (string) Env::get(self::envKey($accountKey, 'WEBHOOK_SECRET'), '');
         }
         if ($webhookSecret === '' && $legacyWebhook !== '') {
             $webhookSecret = $legacyWebhook;
         }
 
-        $membershipPrices = SettingsService::getGlobal('payments.membership_prices', []);
-        if (!is_array($membershipPrices)) {
-            $membershipPrices = [];
-        }
-
-        return [
+        $base = [
+            'account_key' => $accountKey,
+            'channel_code' => $channelCode,
+            'channel_id' => (int) ($channel['id'] ?? 0),
             'use_test_mode' => $useTestMode,
             'test_publishable_key' => $testPublishable,
             'test_secret_key' => $testSecret,
             'live_publishable_key' => $livePublishable,
             'live_secret_key' => $liveSecret,
             'webhook_secret' => $webhookSecret,
-            'allow_guest_checkout' => (bool) SettingsService::getGlobal('payments.stripe.allow_guest_checkout', true),
-            'require_shipping_for_physical' => (bool) SettingsService::getGlobal('payments.stripe.require_shipping_for_physical', true),
-            'digital_only_minimal' => (bool) SettingsService::getGlobal('payments.stripe.digital_only_minimal', true),
-            'enable_apple_pay' => (bool) SettingsService::getGlobal('payments.stripe.enable_apple_pay', true),
-            'enable_google_pay' => (bool) SettingsService::getGlobal('payments.stripe.enable_google_pay', true),
-            'enable_bnpl' => (bool) SettingsService::getGlobal('payments.stripe.enable_bnpl', false),
-            'send_receipts' => (bool) SettingsService::getGlobal('payments.stripe.send_receipts', true),
-            'save_invoice_refs' => (bool) SettingsService::getGlobal('payments.stripe.save_invoice_refs', true),
-            'customer_portal_enabled' => (bool) SettingsService::getGlobal('payments.stripe.customer_portal_enabled', false),
-            'checkout_enabled' => (bool) SettingsService::getGlobal('payments.stripe.checkout_enabled', true),
-            'membership_prices' => $membershipPrices,
-            'membership_default_term' => (string) SettingsService::getGlobal('payments.membership_default_term', '12M'),
-            'membership_allow_both_types' => (bool) SettingsService::getGlobal('payments.membership_allow_both_types', true),
+            'allow_guest_checkout' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'allow_guest_checkout'), true),
+            'require_shipping_for_physical' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'require_shipping_for_physical'), true),
+            'digital_only_minimal' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'digital_only_minimal'), true),
+            'enable_apple_pay' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'enable_apple_pay'), true),
+            'enable_google_pay' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'enable_google_pay'), true),
+            'enable_bnpl' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'enable_bnpl'), false),
+            'send_receipts' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'send_receipts'), true),
+            'save_invoice_refs' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'save_invoice_refs'), true),
+            'customer_portal_enabled' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'customer_portal_enabled'), false),
+            'checkout_enabled' => (bool) SettingsService::getGlobal(self::settingKey($accountKey, 'checkout_enabled'), true),
         ];
+
+        if ($accountKey === self::ACCOUNT_PRIMARY) {
+            $membershipPrices = SettingsService::getGlobal('payments.membership_prices', []);
+            if (!is_array($membershipPrices)) {
+                $membershipPrices = [];
+            }
+            $base['membership_prices'] = $membershipPrices;
+            $base['membership_default_term'] = (string) SettingsService::getGlobal('payments.membership_default_term', '12M');
+            $base['membership_allow_both_types'] = (bool) SettingsService::getGlobal('payments.membership_allow_both_types', true);
+        }
+
+        return $base;
     }
 
-    public static function getActiveKeys(): array
+    public static function getActiveKeys(?string $accountKey = null): array
     {
-        $settings = self::getSettings();
+        $settings = self::getSettings($accountKey);
         $mode = $settings['use_test_mode'] ? 'test' : 'live';
         $publishable = $settings[$mode . '_publishable_key'] ?? '';
         $secret = $settings[$mode . '_secret_key'] ?? '';
@@ -102,39 +144,41 @@ class StripeSettingsService
             $secret = $settings['test_secret_key'] ?? '';
         }
         return [
+            'account_key' => $settings['account_key'],
             'mode' => $mode,
             'publishable_key' => $publishable,
             'secret_key' => $secret,
         ];
     }
 
-    public static function getActiveMode(): string
+    public static function getActiveMode(?string $accountKey = null): string
     {
-        return self::getActiveKeys()['mode'] ?? 'test';
+        return self::getActiveKeys($accountKey)['mode'] ?? 'test';
     }
 
-    public static function getActivePublishableKey(): string
+    public static function getActivePublishableKey(?string $accountKey = null): string
     {
-        return self::getActiveKeys()['publishable_key'] ?? '';
+        return self::getActiveKeys($accountKey)['publishable_key'] ?? '';
     }
 
-    public static function getActiveSecretKey(): string
+    public static function getActiveSecretKey(?string $accountKey = null): string
     {
-        return self::getActiveKeys()['secret_key'] ?? '';
+        return self::getActiveKeys($accountKey)['secret_key'] ?? '';
     }
 
-    public static function getWebhookSecret(): string
+    public static function getWebhookSecret(?string $accountKey = null): string
     {
-        $settings = self::getSettings();
+        $settings = self::getSettings($accountKey);
         return $settings['webhook_secret'] ?? '';
     }
 
-    public static function getPublicConfig(): array
+    public static function getPublicConfig(?string $accountKey = null): array
     {
-        $settings = self::getSettings();
-        $active = self::getActiveKeys();
+        $settings = self::getSettings($accountKey);
+        $active = self::getActiveKeys($accountKey);
 
         return [
+            'accountKey' => $active['account_key'] ?? self::ACCOUNT_PRIMARY,
             'publishableKey' => $active['publishable_key'] ?? '',
             'mode' => $active['mode'] ?? 'test',
             'currency' => self::DEFAULT_CURRENCY,
@@ -177,6 +221,45 @@ class StripeSettingsService
             'configured' => $value !== '',
             'last4' => $last4,
         ];
+    }
+
+    public static function saveAgmAdminSettings(int $actorUserId, array $payload, array &$errors): void
+    {
+        $accountKey = self::ACCOUNT_AGM;
+        $useTestMode = !empty($payload['agm_stripe_use_test_mode']);
+        $testPublishable = self::normalizeMaskedInput((string) ($payload['agm_stripe_test_publishable_key'] ?? ''));
+        $testSecret = self::normalizeMaskedInput((string) ($payload['agm_stripe_test_secret_key'] ?? ''));
+        $livePublishable = self::normalizeMaskedInput((string) ($payload['agm_stripe_live_publishable_key'] ?? ''));
+        $liveSecret = self::normalizeMaskedInput((string) ($payload['agm_stripe_live_secret_key'] ?? ''));
+        $webhookSecret = self::normalizeMaskedInput((string) ($payload['agm_stripe_webhook_secret'] ?? ''));
+
+        self::validateKey($testPublishable, 'pk_test_', 'AGM test publishable key', $errors);
+        self::validateKey($testSecret, 'sk_test_', 'AGM test secret key', $errors);
+        self::validateKey($livePublishable, 'pk_live_', 'AGM live publishable key', $errors);
+        self::validateKey($liveSecret, 'sk_live_', 'AGM live secret key', $errors);
+        if ($webhookSecret !== '' && !str_starts_with($webhookSecret, 'whsec_')) {
+            $errors[] = 'AGM webhook secret must start with whsec_.';
+        }
+        if ($errors) {
+            return;
+        }
+
+        SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'use_test_mode'), $useTestMode);
+        if ($testPublishable !== '') {
+            SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'test_publishable_key'), $testPublishable);
+        }
+        if ($testSecret !== '') {
+            SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'test_secret_key'), $testSecret, ['encrypt' => true]);
+        }
+        if ($livePublishable !== '') {
+            SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'live_publishable_key'), $livePublishable);
+        }
+        if ($liveSecret !== '') {
+            SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'live_secret_key'), $liveSecret, ['encrypt' => true]);
+        }
+        if ($webhookSecret !== '') {
+            SettingsService::setGlobal($actorUserId, self::settingKey($accountKey, 'webhook_secret'), $webhookSecret, ['encrypt' => true]);
+        }
     }
 
     public static function saveAdminSettings(int $actorUserId, array $payload, array &$errors): void

@@ -248,6 +248,13 @@ if ($selectedOrderId > 0 && $membershipOrders) {
   }
 }
 
+$agmRegistrations = [];
+try {
+  $agmRegistrations = \App\Services\AgmRegistrationService::listForMember((int) ($member['id'] ?? 0));
+} catch (\Throwable $agmErr) {
+  $agmRegistrations = [];
+}
+
 $userId = (int) ($member['user_id'] ?? 0);
 $userTimezone = SettingsService::getUser($userId, 'timezone', SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
 $notificationCategories = NotificationPreferenceService::categories();
@@ -2544,6 +2551,39 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <p class="text-sm text-gray-500">No membership orders recorded yet.</p>
                     <?php endif; ?>
                   </div>
+                  <?php if ($agmRegistrations): ?>
+                    <div class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <p class="text-xs uppercase tracking-[0.3em] text-gray-500">AGM registrations</p>
+                          <p class="text-sm text-gray-500">Annual General Meeting registrations linked to this member.</p>
+                        </div>
+                        <span class="text-xs font-semibold text-gray-500"><?= count($agmRegistrations) ?> registration<?= count($agmRegistrations) === 1 ? '' : 's' ?></span>
+                      </div>
+                      <table class="w-full text-sm">
+                        <thead>
+                          <tr class="text-left text-gray-500 border-b border-gray-200">
+                            <th class="py-2">Event</th>
+                            <th class="py-2">Number</th>
+                            <th class="py-2">Status</th>
+                            <th class="py-2 text-right">Total</th>
+                            <th class="py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($agmRegistrations as $reg): ?>
+                            <tr class="border-b border-gray-100">
+                              <td class="py-2"><?= e(($reg['event_year'] ?? '') . ' — ' . ($reg['event_title'] ?? '')) ?></td>
+                              <td class="py-2 font-mono text-xs"><?= e($reg['registration_number']) ?></td>
+                              <td class="py-2"><span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium <?= ($reg['payment_status'] === 'paid') ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' ?>"><?= e(str_replace('_', ' ', $reg['payment_status'])) ?></span></td>
+                              <td class="py-2 text-right">A$<?= number_format((float) $reg['total'], 2) ?></td>
+                              <td class="py-2 text-right"><a href="/admin/agm/?tab=submissions&event_id=<?= (int) $reg['agm_event_id'] ?>&view=<?= (int) $reg['id'] ?>" class="text-xs text-primary hover:underline">View →</a></td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                  <?php endif; ?>
                   <div class="grid gap-6 lg:grid-cols-2">
                     <div class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
                       <div class="flex items-center justify-between">

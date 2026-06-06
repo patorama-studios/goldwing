@@ -17,9 +17,9 @@ class StripeService
         return new StripeClient($secretKey);
     }
 
-    private static function activeSecretKey(): string
+    private static function activeSecretKey(?string $accountKey = null): string
     {
-        return StripeSettingsService::getActiveSecretKey();
+        return StripeSettingsService::getActiveSecretKey($accountKey);
     }
 
     public static function createCheckoutSession(string $priceId, string $customerEmail, array $metadata): ?array
@@ -81,9 +81,9 @@ class StripeService
         return $session->toArray();
     }
 
-    public static function createCheckoutSessionWithLineItems(array $lineItems, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata = []): ?array
+    public static function createCheckoutSessionWithLineItems(array $lineItems, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata = [], ?string $accountKey = null): ?array
     {
-        $secret = self::activeSecretKey();
+        $secret = self::activeSecretKey($accountKey);
         if ($secret === '') {
             return null;
         }
@@ -153,9 +153,9 @@ class StripeService
         return $customer->toArray();
     }
 
-    public static function createRefund(string $paymentIntentId, int $amountCents = 0): ?array
+    public static function createRefund(string $paymentIntentId, int $amountCents = 0, ?string $accountKey = null): ?array
     {
-        $secret = self::activeSecretKey();
+        $secret = self::activeSecretKey($accountKey);
         if ($secret === '') {
             return null;
         }
@@ -174,9 +174,9 @@ class StripeService
         return $refund->toArray();
     }
 
-    public static function retrievePaymentIntent(string $paymentIntentId): ?array
+    public static function retrievePaymentIntent(string $paymentIntentId, ?string $accountKey = null): ?array
     {
-        $secret = self::activeSecretKey();
+        $secret = self::activeSecretKey($accountKey);
         if ($secret === '') {
             return null;
         }
@@ -196,9 +196,9 @@ class StripeService
         return $refund->toArray();
     }
 
-    public static function verifyWebhook(string $payload, string $signature): bool
+    public static function verifyWebhook(string $payload, string $signature, ?string $accountKey = null): bool
     {
-        $secret = StripeSettingsService::getWebhookSecret();
+        $secret = StripeSettingsService::getWebhookSecret($accountKey);
         if ($secret === '') {
             return false;
         }

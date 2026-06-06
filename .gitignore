@@ -1,8 +1,15 @@
 .env
 .env.local
 scripts/ftp.env
+scripts/ftp_goldwing.env
 public_html/uploads.zip
 
 # macOS metadata
 .DS_Store
 app/storage/logs/system.log
+
+# Claude Code local state
+.claude/
+
+# Spreadsheet working files (not tracked in repo)
+*.xlsx

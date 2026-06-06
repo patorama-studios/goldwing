@@ -42,6 +42,12 @@ function admin_permission_registry(): array
             ['key' => 'admin.calendar.manage', 'label' => 'Manage calendar'],
             ['key' => 'admin.events.manage', 'label' => 'Manage events'],
         ],
+        'AGM' => [
+            ['key' => 'admin.agm.view', 'label' => 'View AGM events and registrations'],
+            ['key' => 'admin.agm.manage', 'label' => 'Manage AGM events, products and registrations'],
+            ['key' => 'admin.agm.settings', 'label' => 'Configure AGM Stripe and notification settings'],
+            ['key' => 'admin.agm.refund', 'label' => 'Refund AGM registrations'],
+        ],
         'Forms / Submissions' => [
             ['key' => 'admin.member_of_year.view', 'label' => 'View Member of the Year submissions'],
             ['key' => 'admin.member_of_year.manage', 'label' => 'Manage Member of the Year submissions'],
@@ -132,6 +138,13 @@ function admin_default_role_permissions(): array
             'admin.orders.view',
             'admin.payments.view',
             'admin.logs.view',
+        ],
+        'agm_manager' => [
+            'admin.dashboard.view',
+            'admin.agm.view',
+            'admin.agm.manage',
+            'admin.agm.settings',
+            'admin.agm.refund',
         ],
     ];
 }
