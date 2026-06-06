@@ -26,6 +26,8 @@ You won't see the invisible browser rules anywhere in admin — they just run. T
 
 ### Where to find it in admin
 
+![Security & Authentication settings](images/09-security-settings.png)
+
 Admin → **Settings** → **Security & Authentication**.
 
 ### The settings on this page, explained

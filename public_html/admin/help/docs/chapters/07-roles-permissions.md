@@ -24,6 +24,8 @@ Most committee members have **one** role. Some people wear several hats and hold
 
 ### Where to find it in admin
 
+![The Access Control page — assigns roles per path](images/07-access-control.png)
+
 {{link:/admin/settings/?section=accounts|Take me to Accounts & Roles}}
 
 Three different screens, depending on what you're trying to do:

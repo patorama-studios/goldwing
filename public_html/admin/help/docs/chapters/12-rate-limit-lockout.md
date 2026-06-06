@@ -20,6 +20,8 @@ We track two separate things on every failed login: the **IP address** the attem
 
 ### Where to find it in admin
 
+![Security & Authentication — login rate limit settings](images/09-security-settings.png)
+
 Admin → Settings → Security & Authentication → **Login Security** card.
 
 {{link:/admin/settings/?section=security|Take me to Security & Authentication}}

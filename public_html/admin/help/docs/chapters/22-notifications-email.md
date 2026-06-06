@@ -24,6 +24,8 @@ That means there's one place to change the wording, one place to change who emai
 
 ### Where to find it in admin
 
+![Notifications settings — the email template list](images/22-notifications-tab.png)
+
 {{link:/admin/settings/?section=notifications|Take me to Notifications}}
 {{link:/admin/settings/?section=integrations|Take me to Integrations}}
 

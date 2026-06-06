@@ -24,6 +24,8 @@ Activity logs only see things that go through our admin pages. FIM is the only t
 
 ### Where to find it
 
+![Security & Authentication — File Integrity Monitoring lives in this settings page](images/09-security-settings.png)
+
 {{link:/admin/settings/?section=security|Take me to Security & Authentication}}
 
 Admin → Settings → **Security & Authentication** → look for the **File Integrity** card.

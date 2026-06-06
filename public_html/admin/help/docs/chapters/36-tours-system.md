@@ -29,6 +29,8 @@ Anyone logged in (members and admins alike) can *see* and *run* tours on pages t
 
 ### Where to find them
 
+![The Tour Validator — admins use this to test tours after a deploy](images/36-tour-validator.png)
+
 {{link:/admin/help/validator.php|Take me to the Tour Validator}}
 
 - **As an end-user (member or admin):** the yellow **?** button in the bottom-right of any page. Click it → pick a tour from the menu → follow the walkthrough.

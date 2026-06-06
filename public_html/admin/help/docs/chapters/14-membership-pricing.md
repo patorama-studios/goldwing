@@ -28,6 +28,8 @@ Other roles can view the Settings hub but won't see the Save button on the prici
 
 ### Where to find it in admin
 
+![The Membership pricing matrix](images/14-pricing-matrix.png)
+
 {{link:/admin/settings/?section=membership_pricing|Take me to Membership & Pricing}}
 
 Admin → **Settings** → **Membership Settings** (in the Settings hub sidebar) → scroll to the **Pricing matrix** card.

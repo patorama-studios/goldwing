@@ -34,6 +34,8 @@ If you open the Settings Hub and a section is missing from the dropdown, you don
 
 ### Where to find it in admin
 
+![The Settings Hub — the main landing page](images/31-settings-hub.png)
+
 {{link:/admin/settings/|Take me to the Settings Hub}}
 
 **Admin → Settings.** That lands you on the Settings Hub. From there, pick a section from the dropdown (or the sidebar): Site, Store, Payments, Notifications, and so on. Each section has its own form. You can be in only one section at a time.

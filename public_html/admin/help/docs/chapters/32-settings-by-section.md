@@ -4,6 +4,8 @@
 
 ### What this is
 
+![The Settings Hub — sections in the left sidebar match the headings below](images/31-settings-hub.png)
+
 The **Settings Hub** is the one place where you change anything that affects the whole site — the association's name, the contact email, what Stripe is doing, who's allowed into which admin page, what an event email looks like.
 
 You get there from **Admin → Settings**. The landing page is a grid of cards, one per category. You'll only see the cards your role has permission to open.

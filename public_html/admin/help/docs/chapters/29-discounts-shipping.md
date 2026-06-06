@@ -30,6 +30,8 @@ If you don't see the discounts page or the store settings card, your role doesn'
 
 ### Where to find it in admin
 
+![The Discounts admin](images/29-discounts-list.png)
+
 {{link:/admin/store/discounts|Take me to Discounts}}
 
 Three places, depending on what you're changing:

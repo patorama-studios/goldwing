@@ -26,6 +26,8 @@ If you don't see "AI Page Builder" in the admin menu, your role doesn't have acc
 
 ### Where to find it in admin
 
+![The AI Page Builder](images/24-page-builder.png)
+
 {{link:/admin/page-builder|Take me to the AI Page Builder}}
 
 **Admin → AI Page Builder**

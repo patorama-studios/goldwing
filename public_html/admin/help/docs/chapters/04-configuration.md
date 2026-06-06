@@ -4,6 +4,8 @@
 
 ### What this is
 
+![Advanced settings (the maintenance-mode and debug toggles live here)](images/04-advanced-settings.png)
+
 Every website has a pile of "settings" — the timezone it runs in, the Stripe keys it uses to take payments, the email address things get sent from, whether maintenance mode is on. On this site those settings live in two very different places:
 
 - **The Settings Hub** (Admin → Settings → …) — almost everything an admin should ever change. Editable from the browser, takes effect immediately, no developer needed.

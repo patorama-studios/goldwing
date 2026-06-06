@@ -30,6 +30,8 @@ If you're a Committee Member without the store role, you can see ticket orders b
 
 ### Where to find it in admin
 
+![Ticket products live in the same Products list](images/27-products-list.png)
+
 {{link:/admin/store/products|Take me to Products}}
 
 To create a ticket product:

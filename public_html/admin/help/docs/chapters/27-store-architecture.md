@@ -32,6 +32,8 @@ If you can't see Store in the admin sidebar, you don't have one of these roles. 
 
 ### Where to find it
 
+![The Store Products list](images/27-products-list.png)
+
 Everything sits under **Admin → Store** in the sidebar:
 
 {{link:/admin/store/orders|Take me to Orders}}

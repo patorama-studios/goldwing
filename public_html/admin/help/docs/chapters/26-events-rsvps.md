@@ -26,6 +26,8 @@ If you don't see the **Create Event** button, your role doesn't have calendar pe
 
 ### Where to find it
 
+![Events settings](images/26-events-settings.png)
+
 Two routes, same calendar:
 
 1. **Admin sidebar → Calendar** — the full list of every event (`/calendar/events.php`).

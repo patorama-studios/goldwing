@@ -22,6 +22,8 @@ The point: upload a file once, then reuse it anywhere on the site without having
 
 ### Where to find it
 
+![Media & Files settings](images/25-media-settings.png)
+
 **Admin → Media** (in the left sidebar).
 
 Settings for the library live separately at **Admin → Settings → Media & Files** — that's where you set the maximum upload size and the allowed file types.

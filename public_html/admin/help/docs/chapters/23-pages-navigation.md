@@ -27,6 +27,8 @@ If you can't see **Pages and Nav** in the sidebar, you're not in one of those ro
 
 ### Where to find it in admin
 
+![The Pages and Nav admin](images/23-navigation.png)
+
 {{link:/admin/navigation.php|Take me to Pages and Nav}}
 
 - **Pages list** — Admin sidebar → **Pages**. Lists every page with its slug, title, access level and when it was last updated.

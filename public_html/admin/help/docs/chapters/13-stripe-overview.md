@@ -28,6 +28,8 @@ If you're not an admin, you won't see the Payments settings page at all.
 
 ### Where to find it in admin
 
+![The Payments (Stripe) settings page](images/13-payments-tab.png)
+
 {{link:/admin/settings/?section=payments|Take me to Payments (Stripe) settings}}
 
 - **Stripe settings** — Admin → Settings Hub → **Payments (Stripe)**
