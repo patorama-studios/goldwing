@@ -80,6 +80,37 @@ function current_user(): ?array
             $_SESSION['user']['roles'] = $normalized;
         }
     }
+
+    // Once per request, sync the cached session name/email from the users
+    // table so admin sidebar, topbar, and user-chip surfaces reflect any
+    // profile rename done in this session (or by another admin) without
+    // requiring a logout/login. PK lookup, so the extra query is cheap.
+    static $synced = false;
+    if (!$synced && !empty($user['id'])) {
+        $synced = true;
+        try {
+            $stmt = db()->prepare('SELECT name, email FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => (int) $user['id']]);
+            $fresh = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($fresh) {
+                $changed = false;
+                if (isset($fresh['name']) && $fresh['name'] !== ($user['name'] ?? null)) {
+                    $user['name'] = $fresh['name'];
+                    $_SESSION['user']['name'] = $fresh['name'];
+                    $changed = true;
+                }
+                if (isset($fresh['email']) && $fresh['email'] !== ($user['email'] ?? null)) {
+                    $user['email'] = $fresh['email'];
+                    $_SESSION['user']['email'] = $fresh['email'];
+                    $changed = true;
+                }
+                unset($changed); // intentional — only for readability above
+            }
+        } catch (Throwable $e) {
+            // best-effort
+        }
+    }
+
     return $user;
 }
 
