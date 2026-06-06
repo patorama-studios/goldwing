@@ -1658,6 +1658,66 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 021 — Grant AGM permissions to admin + agm_manager roles
+//
+// Migration 019 created the agm_manager role and migration 020 seeded the
+// Perth 2026 event, but the actual permission keys (admin.agm.view,
+// admin.agm.manage, admin.agm.settings, admin.agm.refund) were never
+// inserted into role_permissions. Without those rows, current_admin_can()
+// returns false for everyone — so the AGM sidebar entry is filtered out
+// for every user (including the admin role).
+//
+// This migration seeds the rows:
+//   admin       → all four AGM permissions (Webmaster sees everything)
+//   agm_manager → all four AGM permissions (the role's whole purpose)
+//
+// Idempotent via ON DUPLICATE KEY UPDATE.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_021_agm_role_permissions';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 021 — AGM role permissions', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $grants = [
+            'admin'       => ['admin.agm.view', 'admin.agm.manage', 'admin.agm.settings', 'admin.agm.refund'],
+            'agm_manager' => ['admin.agm.view', 'admin.agm.manage', 'admin.agm.settings', 'admin.agm.refund'],
+        ];
+        $stmt = $pdo->prepare(
+            'INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+             SELECT r.id, :perm, 1, NOW(), NOW() FROM roles r WHERE r.name = :role
+             ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
+        );
+        $seeded = 0;
+        $skippedRoles = [];
+        foreach ($grants as $roleName => $perms) {
+            // Confirm the role actually exists; agm_manager is created by 019
+            // but if 019 was skipped on this server we'd silently no-op.
+            $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE name = :name LIMIT 1');
+            $roleStmt->execute(['name' => $roleName]);
+            if (!$roleStmt->fetchColumn()) {
+                $skippedRoles[] = $roleName;
+                continue;
+            }
+            foreach ($perms as $perm) {
+                $stmt->execute(['perm' => $perm, 'role' => $roleName]);
+                $seeded++;
+            }
+        }
+        $note = $seeded . ' role-permission row(s) seeded';
+        if ($skippedRoles) {
+            $note .= '; role(s) missing: ' . implode(', ', $skippedRoles);
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 021 — AGM role permissions', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 021 — AGM role permissions', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
