@@ -152,7 +152,7 @@ The matrix is the **source of truth at the point of charge** — Stripe never se
 
 #### The legacy `stripe.membership_prices` block
 
-`config/app.php` still declares `stripe.membership_prices` (`FULL_1Y`, `FULL_3Y`, `ASSOCIATE_1Y`, `ASSOCIATE_3Y`, `LIFE`), read by `cron/send_renewal_reminders.php` to build "renew now" links. A separate Checkout Session route at `public_html/api/index.php:~753` reads `payments.membership_prices` (`FULL_12`, `FULL_24`, `ASSOCIATE_12`, `ASSOCIATE_24`) from `StripeSettingsService`. Both are **vestigial** for new applications — `/apply` uses PaymentIntent + matrix. The Price IDs only matter for the renewal cron and the fallback Checkout Session. See [13 — Stripe integration overview](view.php?slug=13-stripe-overview).
+`config/app.php` still declares `stripe.membership_prices` (`FULL_1Y`, `FULL_3Y`, `ASSOCIATE_1Y`, `ASSOCIATE_3Y`, `LIFE`), read by `cron/send_renewal_reminders.php` to build "renew now" links. A separate Checkout Session route at `public_html/api/index.php:~753` reads `payments.membership_prices` (`FULL_12`, `FULL_24`, `FULL_36`, `ASSOCIATE_12`, `ASSOCIATE_24`, `ASSOCIATE_36`) from `StripeSettingsService`. Both are **vestigial** for new applications — `/apply` uses PaymentIntent + matrix. The Price IDs only matter for the renewal cron and the fallback Checkout Session. See [13 — Stripe integration overview](view.php?slug=13-stripe-overview). The 36-month term only appears in the public dropdown when at least one of `FULL_36` / `ASSOCIATE_36` is set; otherwise it stays hidden.
 
 ### Where to change it (in code)
 

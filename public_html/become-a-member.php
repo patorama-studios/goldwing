@@ -14,6 +14,7 @@ if (!is_array($prices)) {
 $allowBoth = !empty($stripeSettings['membership_allow_both_types']);
 $defaultTerm = (string) ($stripeSettings['membership_default_term'] ?? '12M');
 $show24 = !empty($prices['FULL_24']) || !empty($prices['ASSOCIATE_24']);
+$show36 = !empty($prices['FULL_36']) || !empty($prices['ASSOCIATE_36']);
 
 $member = null;
 if (!empty($user['member_id'])) {
@@ -74,6 +75,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             <option value="12M" <?= strtoupper($defaultTerm) === '12M' ? 'selected' : '' ?>>12 months</option>
             <?php if ($show24): ?>
               <option value="24M" <?= strtoupper($defaultTerm) === '24M' ? 'selected' : '' ?>>24 months</option>
+            <?php endif; ?>
+            <?php if ($show36): ?>
+              <option value="36M" <?= strtoupper($defaultTerm) === '36M' ? 'selected' : '' ?>>36 months</option>
             <?php endif; ?>
           </select>
         </label>

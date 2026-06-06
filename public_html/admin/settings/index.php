@@ -1140,12 +1140,19 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <label class="text-sm text-slate-600">Associate member 24m
                     <input name="price_associate_24" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_24'] ?? '') ?>">
                   </label>
+                  <label class="text-sm text-slate-600">Full member 36m
+                    <input name="price_full_36" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_36'] ?? '') ?>">
+                  </label>
+                  <label class="text-sm text-slate-600">Associate member 36m
+                    <input name="price_associate_36" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_36'] ?? '') ?>">
+                  </label>
                 </div>
                 <div class="grid gap-4 md:grid-cols-2 pt-2">
                   <label class="text-sm text-slate-600">Default membership term
                     <select name="membership_default_term" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                       <option value="12M" <?= $defaultTerm === '12M' ? 'selected' : '' ?>>12 months</option>
                       <option value="24M" <?= $defaultTerm === '24M' ? 'selected' : '' ?>>24 months</option>
+                      <option value="36M" <?= $defaultTerm === '36M' ? 'selected' : '' ?>>36 months</option>
                     </select>
                   </label>
                   <label class="flex items-center gap-3 text-sm text-slate-600 mt-7">

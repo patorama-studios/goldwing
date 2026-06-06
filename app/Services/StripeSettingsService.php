@@ -275,7 +275,7 @@ class StripeSettingsService
         $generatePdf = !empty($payload['stripe_generate_pdf']) ? 1 : 0;
         $bankTransferInstructions = trim((string) ($payload['bank_transfer_instructions'] ?? ''));
         $defaultTerm = strtoupper(trim((string) ($payload['membership_default_term'] ?? '12M')));
-        if (!in_array($defaultTerm, ['12M', '24M'], true)) {
+        if (!in_array($defaultTerm, ['12M', '24M', '36M'], true)) {
             $defaultTerm = '12M';
         }
 
@@ -331,6 +331,8 @@ class StripeSettingsService
             'ASSOCIATE_12' => trim((string) ($payload['price_associate_12'] ?? '')),
             'FULL_24' => trim((string) ($payload['price_full_24'] ?? '')),
             'ASSOCIATE_24' => trim((string) ($payload['price_associate_24'] ?? '')),
+            'FULL_36' => trim((string) ($payload['price_full_36'] ?? '')),
+            'ASSOCIATE_36' => trim((string) ($payload['price_associate_36'] ?? '')),
             'FULL_1Y' => trim((string) ($payload['price_full_1y'] ?? '')),
             'FULL_3Y' => trim((string) ($payload['price_full_3y'] ?? '')),
             'ASSOCIATE_1Y' => trim((string) ($payload['price_associate_1y'] ?? '')),

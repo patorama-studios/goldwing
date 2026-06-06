@@ -745,17 +745,25 @@ if ($resource === 'stripe') {
         }
 
         $term = strtoupper(trim((string) ($body['membership_term'] ?? ($stripeSettings['membership_default_term'] ?? '12M'))));
-        if (!in_array($term, ['12M', '24M'], true)) {
+        if (!in_array($term, ['12M', '24M', '36M'], true)) {
             $term = '12M';
         }
-        $termLabel = $term === '24M' ? '2Y' : '1Y';
+        $termLabel = $term === '36M' ? '3Y' : ($term === '24M' ? '2Y' : '1Y');
 
         $prices = $stripeSettings['membership_prices'] ?? [];
         if (!is_array($prices)) {
             $prices = [];
         }
-        $fullPriceId = $term === '24M' ? ($prices['FULL_24'] ?? '') : ($prices['FULL_12'] ?? '');
-        $associatePriceId = $term === '24M' ? ($prices['ASSOCIATE_24'] ?? '') : ($prices['ASSOCIATE_12'] ?? '');
+        if ($term === '36M') {
+            $fullPriceId = $prices['FULL_36'] ?? '';
+            $associatePriceId = $prices['ASSOCIATE_36'] ?? '';
+        } elseif ($term === '24M') {
+            $fullPriceId = $prices['FULL_24'] ?? '';
+            $associatePriceId = $prices['ASSOCIATE_24'] ?? '';
+        } else {
+            $fullPriceId = $prices['FULL_12'] ?? '';
+            $associatePriceId = $prices['ASSOCIATE_12'] ?? '';
+        }
         if ($fullSelected && $fullPriceId === '') {
             json_response(['error' => 'Full membership pricing is not configured.'], 422);
         }
@@ -1661,9 +1669,7 @@ if ($resource === 'billing' && count($segments) >= 2 && $segments[1] === 'portal
         json_response(['error' => 'Customer portal is disabled.'], 403);
     }
     $user = require_user_json();
-    $channel = PaymentSettingsService::getChannelByCode('primary');
-    $settings = PaymentSettingsService::getSettingsByChannelId((int) $channel['id']);
-    $secretKey = $settings['secret_key'] ?? '';
+    $secretKey = StripeSettingsService::getActiveSecretKey(StripeSettingsService::ACCOUNT_PRIMARY);
     if ($secretKey === '') {
         json_response(['error' => 'Stripe is not configured.'], 422);
     }
@@ -1831,6 +1837,8 @@ if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'settings
                 'price_associate_12' => array_key_exists('price_associate_12', $body) ? trim((string) ($body['price_associate_12'] ?? '')) : (string) ($prices['ASSOCIATE_12'] ?? ''),
                 'price_full_24' => array_key_exists('price_full_24', $body) ? trim((string) ($body['price_full_24'] ?? '')) : (string) ($prices['FULL_24'] ?? ''),
                 'price_associate_24' => array_key_exists('price_associate_24', $body) ? trim((string) ($body['price_associate_24'] ?? '')) : (string) ($prices['ASSOCIATE_24'] ?? ''),
+                'price_full_36' => array_key_exists('price_full_36', $body) ? trim((string) ($body['price_full_36'] ?? '')) : (string) ($prices['FULL_36'] ?? ''),
+                'price_associate_36' => array_key_exists('price_associate_36', $body) ? trim((string) ($body['price_associate_36'] ?? '')) : (string) ($prices['ASSOCIATE_36'] ?? ''),
                 'price_full_1y' => array_key_exists('price_full_1y', $body) ? trim((string) ($body['price_full_1y'] ?? '')) : (string) ($prices['FULL_1Y'] ?? ''),
                 'price_full_3y' => array_key_exists('price_full_3y', $body) ? trim((string) ($body['price_full_3y'] ?? '')) : (string) ($prices['FULL_3Y'] ?? ''),
                 'price_associate_1y' => array_key_exists('price_associate_1y', $body) ? trim((string) ($body['price_associate_1y'] ?? '')) : (string) ($prices['ASSOCIATE_1Y'] ?? ''),
