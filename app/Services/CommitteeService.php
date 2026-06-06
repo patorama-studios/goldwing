@@ -179,6 +179,91 @@ final class CommitteeService
         self::$cache = []; // any change blows the request-local cache
     }
 
+    /**
+     * Ensure a chapter rep role exists for every active chapter. Idempotent —
+     * safe to call every time a chapter is added/edited.
+     *
+     * For each active chapter:
+     *   - if no committee_roles row exists with that chapter_id, INSERT one
+     *     with a sensible default slug/name/email
+     *   - if a row exists but is_active=0, reactivate it
+     *   - keep the role name in sync with the chapter name
+     *
+     * For each chapter that's been deactivated (is_active=0), the matching
+     * role is also deactivated so it stops appearing in the catalog. Members
+     * already assigned to a deactivated role keep their assignment; an admin
+     * can clean up manually.
+     *
+     * @return array{added:int, updated:int, deactivated:int}
+     */
+    public static function syncChapterRoles(): array
+    {
+        $added = 0; $updated = 0; $deactivated = 0;
+        try {
+            $pdo = db();
+            $chapters = $pdo->query("SELECT id, name, state, is_active FROM chapters")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $existing = [];
+            foreach ($pdo->query("SELECT id, slug, name, chapter_id, is_active FROM committee_roles WHERE category = 'chapter'")->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $row) {
+                if ($row['chapter_id'] !== null) {
+                    $existing[(int) $row['chapter_id']] = $row;
+                }
+            }
+
+            $insert = $pdo->prepare("
+                INSERT INTO committee_roles (slug, name, category, chapter_id, email, phone, sort_order, is_active)
+                VALUES (:slug, :name, 'chapter', :chapter_id, :email, NULL, :sort, 1)
+                ON DUPLICATE KEY UPDATE chapter_id = VALUES(chapter_id), is_active = 1
+            ");
+            $update = $pdo->prepare("UPDATE committee_roles SET name = :name, is_active = 1 WHERE id = :id");
+            $deact  = $pdo->prepare("UPDATE committee_roles SET is_active = 0 WHERE id = :id");
+
+            foreach ($chapters as $ch) {
+                $cid = (int) $ch['id'];
+                $chapterName = trim((string) $ch['name']);
+                // "Brisbane Chapter" → "Brisbane Area Rep"
+                $baseName = preg_replace('/\s+chapter$/i', '', $chapterName);
+                $roleName = $baseName . ' Area Rep';
+                $slugBase = preg_replace('/[^a-z0-9]/', '', strtolower($baseName));
+                $roleSlug = 'ar_' . ($slugBase !== '' ? $slugBase : 'chapter' . $cid);
+                $roleEmail = 'ar.' . $slugBase . '@goldwing.org.au';
+
+                if (!empty($ch['is_active'])) {
+                    if (isset($existing[$cid])) {
+                        $row = $existing[$cid];
+                        if ($row['name'] !== $roleName || (int) $row['is_active'] !== 1) {
+                            $update->execute([':name' => $roleName, ':id' => (int) $row['id']]);
+                            $updated++;
+                        }
+                    } else {
+                        // High sort offset keeps chapter roles below national roles in the catalog.
+                        $insert->execute([
+                            ':slug' => $roleSlug,
+                            ':name' => $roleName,
+                            ':chapter_id' => $cid,
+                            ':email' => $roleEmail,
+                            ':sort' => 1000 + $cid,
+                        ]);
+                        $added++;
+                    }
+                } else {
+                    // Chapter is deactivated — deactivate matching role too.
+                    if (isset($existing[$cid]) && (int) $existing[$cid]['is_active'] === 1) {
+                        $deact->execute([':id' => (int) $existing[$cid]['id']]);
+                        $deactivated++;
+                    }
+                }
+            }
+            // Invalidate caches if anything changed.
+            if ($added || $updated || $deactivated) {
+                self::$cache = [];
+            }
+        } catch (\Throwable $e) {
+            // Sync failures are non-fatal — admin can re-trigger.
+        }
+        return ['added' => $added, 'updated' => $updated, 'deactivated' => $deactivated];
+    }
+
     /** @return list<int> */
     public static function roleIdsForMember(int $memberId): array
     {

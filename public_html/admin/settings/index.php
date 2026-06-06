@@ -573,6 +573,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute($params);
                     }
 
+                    // Keep the chapter rep role catalog in sync with the chapters
+                    // table. Adds a new "<Chapter> Area Rep" role for any chapter
+                    // we just created, renames existing roles when a chapter is
+                    // renamed, and deactivates the role when a chapter is
+                    // marked is_active=0. Idempotent — safe to call every save.
+                    if (class_exists(\App\Services\CommitteeService::class)) {
+                        \App\Services\CommitteeService::syncChapterRoles();
+                    }
+
                     $toast = isset($_POST['reset_defaults']) && $_POST['reset_defaults'] === '1'
                         ? 'Membership pricing reset to defaults.'
                         : 'Membership settings saved.';

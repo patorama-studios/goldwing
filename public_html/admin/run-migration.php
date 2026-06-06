@@ -1718,6 +1718,43 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 018 — Sync chapter rep roles to chapters table
+//
+// Migration 015 seeded a fixed set of 13 chapter rep roles by name LIKE
+// matching. Any chapter added since (or before-015 chapters that weren't on
+// the original public list) had no rep role and so didn't show up in the
+// admin role-picker.
+//
+// CommitteeService::syncChapterRoles() now keeps the catalog tied to the
+// chapters table — each active chapter gets a "<Chapter> Area Rep" role
+// with a sensible default email (ar.<slug>@goldwing.org.au), names follow
+// chapter renames, and roles for deactivated chapters get marked inactive.
+//
+// This migration runs that sync once to backfill, and the same method is
+// called automatically every time the chapter form is saved.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_018_sync_chapter_roles';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 018 — Sync chapter rep roles', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $stats = \App\Services\CommitteeService::syncChapterRoles();
+        $note = sprintf(
+            'added: %d, updated: %d, deactivated: %d',
+            (int) $stats['added'],
+            (int) $stats['updated'],
+            (int) $stats['deactivated']
+        );
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 018 — Sync chapter rep roles', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 018 — Sync chapter rep roles', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
