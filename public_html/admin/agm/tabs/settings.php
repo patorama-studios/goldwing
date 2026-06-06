@@ -1,4 +1,5 @@
 <?php
+use App\Services\AgmEventService;
 use App\Services\Csrf;
 use App\Services\StripeSettingsService;
 
@@ -8,12 +9,34 @@ if (!current_admin_can('admin.agm.settings', $user)) {
 }
 
 $csrf = Csrf::token();
+$featureEnabled = AgmEventService::isFeatureEnabled();
 $agmSettings = StripeSettingsService::getSettings(StripeSettingsService::ACCOUNT_AGM);
 $active = StripeSettingsService::getActiveKeys(StripeSettingsService::ACCOUNT_AGM);
 $mask = fn(string $v) => StripeSettingsService::maskValue($v);
 $webhookUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'example.com') . '/api/stripe_webhook_agm.php';
 ?>
 <div class="space-y-6">
+    <form method="post" action="/admin/agm/actions.php" class="rounded-2xl border <?= $featureEnabled ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50' ?> p-5">
+        <input type="hidden" name="_token" value="<?= e($csrf) ?>">
+        <input type="hidden" name="action" value="toggle_feature">
+        <input type="hidden" name="event_id" value="<?= $selectedEventId ?>">
+        <div class="flex items-start gap-4">
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold <?= $featureEnabled ? 'text-green-900' : 'text-amber-900' ?>"><?= $featureEnabled ? 'AGM feature is LIVE for the public' : 'AGM feature is DISABLED' ?></h3>
+                <p class="text-xs <?= $featureEnabled ? 'text-green-800' : 'text-amber-800' ?> mt-1">
+                    <?php if ($featureEnabled): ?>
+                        The public <code>/agm/</code> landing page and <code>/agm/register.php</code> form are live. The current event's status (Draft / Published) still controls what's actually shown.
+                    <?php else: ?>
+                        The public AGM pages show a "coming soon" placeholder and the registration form is unavailable. Admin pages remain fully usable so the committee can finish setup. Flip this on when you're ready to go live.
+                    <?php endif; ?>
+                </p>
+            </div>
+            <button type="submit" name="enabled" value="<?= $featureEnabled ? '0' : '1' ?>" class="rounded-lg <?= $featureEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700' ?> text-white px-4 py-2 text-sm font-semibold whitespace-nowrap" onclick="return confirm('<?= $featureEnabled ? 'Disable the public AGM pages? Members will see a coming-soon placeholder until you re-enable.' : 'Enable the public AGM pages? They will become visible to anyone who visits /agm/.' ?>')">
+                <?= $featureEnabled ? 'Disable AGM' : 'Enable AGM publicly' ?>
+            </button>
+        </div>
+    </form>
+
     <div class="rounded-2xl border border-blue-200 bg-blue-50 p-4">
         <h3 class="text-sm font-semibold text-blue-900 mb-1">Secondary Stripe account for AGM</h3>
         <p class="text-xs text-blue-800">All AGM registration payments flow through a separate Stripe account, keeping AGM revenue isolated from membership and store revenue. Create the account in Stripe, then paste the test or live keys below. The active mode is currently <strong><?= e($active['mode']) ?></strong>.</p>

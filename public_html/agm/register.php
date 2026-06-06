@@ -9,6 +9,11 @@ use App\Services\MemberRepository;
 use App\Services\StripeService;
 use App\Services\StripeSettingsService;
 
+if (!AgmEventService::isFeatureEnabled()) {
+    header('Location: /agm/');
+    exit;
+}
+
 $event = AgmEventService::getCurrentEvent();
 if (!$event) {
     header('Location: /agm/');

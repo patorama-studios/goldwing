@@ -4,7 +4,8 @@ require_once __DIR__ . '/../../app/bootstrap.php';
 use App\Services\AgmEventService;
 use App\Services\AgmRegistrationService;
 
-$event = AgmEventService::getCurrentEvent();
+$featureEnabled = AgmEventService::isFeatureEnabled();
+$event = $featureEnabled ? AgmEventService::getCurrentEvent() : null;
 
 $pageTitle = $event ? $event['title'] : 'AGM Registration';
 require __DIR__ . '/../../app/Views/partials/header.php';
@@ -12,7 +13,12 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
 ?>
 <main class="site-main">
     <div class="container" style="max-width:960px;margin:0 auto;padding:2rem 1rem;">
-        <?php if (!$event): ?>
+        <?php if (!$featureEnabled): ?>
+            <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:1rem;padding:2rem;text-align:center;">
+                <h1 style="margin-top:0;">Annual General Meeting</h1>
+                <p style="color:#7c2d12;">Details for our next AGM are being finalised by the committee. We'll publish the event, the registration form, and payment details here soon — please check back shortly.</p>
+            </div>
+        <?php elseif (!$event): ?>
             <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:1rem;padding:2rem;text-align:center;">
                 <h1 style="margin-top:0;">No AGM event is currently published</h1>
                 <p style="color:#7c2d12;">Check back soon — the next Annual General Meeting details will be posted here once registration opens.</p>

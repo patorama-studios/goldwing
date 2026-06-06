@@ -7,6 +7,8 @@ use App\Services\StripeSettingsService;
 
 require_permission('admin.agm.view');
 
+$agmFeatureEnabled = AgmEventService::isFeatureEnabled();
+
 $user = current_user();
 $pdo = db();
 
@@ -48,6 +50,8 @@ if (!empty($_GET['msg'])) {
         'reg_refunded' => ['type' => 'success', 'message' => 'Registration refund submitted to Stripe.'],
         'reg_marked_paid' => ['type' => 'success', 'message' => 'Registration marked as paid.'],
         'reg_cancelled' => ['type' => 'success', 'message' => 'Registration cancelled.'],
+        'feature_enabled' => ['type' => 'success', 'message' => 'AGM is now LIVE for the public.'],
+        'feature_disabled' => ['type' => 'success', 'message' => 'AGM is now disabled — public pages show a coming-soon placeholder.'],
     ];
     $flash = $flashMessages[$_GET['msg']] ?? null;
 }
@@ -87,6 +91,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <?php if ($flash): ?>
                 <div class="rounded-2xl border <?= $flash['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700' ?> p-4 text-sm">
                     <?= e($flash['message']) ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!$agmFeatureEnabled): ?>
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-3">
+                    <span class="material-icons-outlined">visibility_off</span>
+                    <div class="flex-1">
+                        <strong>AGM is disabled for the public.</strong>
+                        The <code>/agm/</code> landing page shows a "coming soon" placeholder and the registration form is unavailable. You can still configure everything here.
+                        <a href="?tab=settings<?= $selectedEventId > 0 ? '&event_id=' . $selectedEventId : '' ?>" class="font-semibold underline ml-1">Enable in Settings →</a>
+                    </div>
                 </div>
             <?php endif; ?>
 

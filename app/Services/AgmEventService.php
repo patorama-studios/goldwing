@@ -5,6 +5,25 @@ use PDO;
 
 class AgmEventService
 {
+    /**
+     * Master kill switch for the AGM module. When false, the public /agm/
+     * pages render a "coming soon" placeholder and /agm/register.php
+     * redirects to /agm/. Admin pages stay fully usable for prep.
+     *
+     * Defaults to false so the feature is dark until the AGM coordinator
+     * explicitly enables it from Admin → AGM → Settings.
+     */
+    public static function isFeatureEnabled(): bool
+    {
+        return (bool) SettingsService::getGlobal('agm.feature_enabled', false);
+    }
+
+    public static function setFeatureEnabled(int $actorUserId, bool $enabled): void
+    {
+        SettingsService::setGlobal($actorUserId, 'agm.feature_enabled', $enabled);
+        ActivityLogger::log('admin', null, $actorUserId, 'agm.feature_toggled', ['enabled' => $enabled]);
+    }
+
     public static function getCurrentEvent(): ?array
     {
         $pdo = Database::connection();

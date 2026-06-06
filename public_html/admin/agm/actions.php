@@ -229,6 +229,12 @@ try {
             }
             agm_back('settings', $eventId, 'settings_saved');
 
+        case 'toggle_feature':
+            require_permission('admin.agm.settings');
+            $enabled = !empty($_POST['enabled']);
+            AgmEventService::setFeatureEnabled($userId, $enabled);
+            agm_back('settings', $eventId, $enabled ? 'feature_enabled' : 'feature_disabled');
+
         case 'mark_registration_paid':
             require_permission('admin.agm.manage');
             $regId = (int) ($_POST['registration_id'] ?? 0);
