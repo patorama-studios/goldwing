@@ -61,10 +61,14 @@ if (strlen($bin) > 5 * 1024 * 1024) {
     exit;
 }
 
-$targetDir = realpath(__DIR__ . '/../images');
+// The docs viewer rewrites Markdown image refs (`images/foo.png`) to the
+// absolute URL `/admin/help/docs/images/foo.png`, so screenshots must land
+// in the `docs/images/` subdirectory (not the older `/admin/help/images/`
+// directory used by the tour engine).
+$targetDir = realpath(__DIR__ . '/images');
 if (!$targetDir) {
-    @mkdir(__DIR__ . '/../images', 0775, true);
-    $targetDir = realpath(__DIR__ . '/../images');
+    @mkdir(__DIR__ . '/images', 0775, true);
+    $targetDir = realpath(__DIR__ . '/images');
 }
 $path = $targetDir . '/' . $filename;
 if (file_put_contents($path, $bin) === false) {
