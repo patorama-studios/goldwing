@@ -30,6 +30,8 @@ If buttons are missing or you can't open an order, your role probably doesn't ha
 
 ### Where to find it
 
+![The Store Orders queue (customer names sanitized to 'Member N')](images/15-orders-list.jpg)
+
 Three doors lead to orders:
 
 1. **Admin → Store → Orders** — the master list of every store order, with filters for status, fulfilment, date, and a search box that finds order numbers, customer names, emails, and product codes.

@@ -19,6 +19,8 @@ Both sites live on the association's existing cPanel hosting account. The develo
 
 ### The big areas of the site
 
+![The admin dashboard — names in Recent Logins and Pending Actions sanitized to 'Member N' for the docs](images/01-admin-dashboard.png)
+
 **Member portal** — what a logged-in member sees when they visit `/member/`. Their profile, membership status, renewal button, order history, event RSVPs. Covered in detail from [Chapter 19 — Memberships & renewals](view.php?slug=19-membership-lifecycle) onwards.
 
 **Admin area** — the back office at `/admin/`. Members management, store orders, settings, the audit log, the page builder. This is where you'll spend almost all your time. The sidebar groups things by purpose. See [Chapter 20 — Members admin](view.php?slug=20-members-admin) and [Chapter 31 — Settings architecture](view.php?slug=31-settings-architecture) for the main entry points.

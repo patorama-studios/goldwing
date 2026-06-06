@@ -93,6 +93,8 @@ Next time they log in, the Members admin page will only show them their own chap
 
 ### How chapter-change requests work
 
+![The Notification Hub — chapter-change requests land here under the 'Chapter Change' filter (submitter names sanitized)](images/21-notification-hub.png)
+
 {{tour:admin-notification-hub}}
 
 Members can request a chapter change themselves — they don't need to ring the admin.

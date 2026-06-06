@@ -47,6 +47,8 @@ If you can't see the buttons you expect, ask the site admin to check your role i
 
 ### How to approve an application (step by step)
 
+![The Applications queue (empty here — when a new application lands it shows as a row with Approve / Reject buttons)](images/19-applications.jpg)
+
 {{tour:admin-approve-application}}
 
 1. Go to **Admin → Applications**. New ones show in the **Pending** tab.

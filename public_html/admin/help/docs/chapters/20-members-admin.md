@@ -32,6 +32,8 @@ If you can't see a button you expect to see, it's almost always a role issue —
 
 ### Where to find it in admin
 
+![The Members list (names + emails sanitized for the docs)](images/20-members-list.png)
+
 **Admin → Members.** That's the list. From there you click any member's name to open their detail page.
 
 You'll also land here indirectly from other places — clicking a member name on an order, a refund record, an activity-log row, or the chapter page all bring you to the same member detail view.

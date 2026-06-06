@@ -27,6 +27,8 @@ Only **Admin** can read either log. Committee members and treasurers don't see t
 
 ### Where to find them
 
+![The Security Activity Log — sample rows (names sanitized to 'Member N')](images/08-activity-log.jpg)
+
 - **Activity Log (site-wide)** — Admin → Security Log.
 - **Activity Log (one member only)** — Admin → Members → click the member → **Activity** tab.
 - **Audit Log (settings changes)** — Admin → Settings → **Audit Log** tab.
