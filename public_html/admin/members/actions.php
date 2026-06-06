@@ -560,6 +560,24 @@ switch ($action) {
             }
         }
 
+        // Sidebar / topbar / "Welcome <name>" reads from $_SESSION['user']['name']
+        // which is set once at login from users.name. If the admin just edited
+        // their OWN profile name (first_name or last_name), refresh the session
+        // copy so the change appears immediately without re-logging-in.
+        if ($updated
+            && (array_key_exists('first_name', $payload) || array_key_exists('last_name', $payload))
+            && !empty($targetMember['user_id'])
+            && !empty($user['id'])
+            && (int) $targetMember['user_id'] === (int) $user['id']
+        ) {
+            $newFirst = $payload['first_name'] ?? ($targetMember['first_name'] ?? '');
+            $newLast  = $payload['last_name']  ?? ($targetMember['last_name']  ?? '');
+            $newFull  = trim($newFirst . ' ' . $newLast);
+            if ($newFull !== '' && isset($_SESSION['user'])) {
+                $_SESSION['user']['name'] = $newFull;
+            }
+        }
+
         $changes = [];
         foreach ($payload as $key => $value) {
             $old = $before[$key] ?? null;

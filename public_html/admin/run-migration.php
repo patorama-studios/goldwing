@@ -1755,6 +1755,43 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 019 — Sync users.name with members display name
+//
+// users.name is set once at login from the users table and is read by the
+// admin sidebar ("Welcome <name>"), the user chip at the bottom of the
+// sidebar, the topbar, and the "Recent Logins" panel. If an admin edits
+// members.first_name / last_name, that field used to never get synced —
+// they'd see the old name in the sidebar forever.
+//
+// Going forward MemberRepository::update() syncs users.name automatically
+// whenever a name field changes. This migration runs a one-shot backfill so
+// any drift that already accumulated (e.g. the Pat Lindley case) gets fixed
+// without needing to re-save every profile.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_019_sync_users_name';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 019 — Sync users.name with members', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->query("
+            UPDATE users u
+            JOIN members m ON m.user_id = u.id
+            SET u.name = TRIM(CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')))
+            WHERE TRIM(CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,''))) <> ''
+              AND TRIM(CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,''))) <> u.name
+        ");
+        $count = $stmt->rowCount();
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 019 — Sync users.name with members', 'status' => 'applied', 'note' => "$count user(s) re-synced from member display name"];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 019 — Sync users.name with members', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

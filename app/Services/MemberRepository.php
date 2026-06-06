@@ -338,8 +338,9 @@ class MemberRepository
         $fields[] = 'updated_at = NOW()';
         $sql = 'UPDATE members SET ' . implode(', ', $fields) . ' WHERE id = :id';
         $stmt = Database::connection()->prepare($sql);
+        $success = false;
         try {
-            return $stmt->execute($params);
+            $success = $stmt->execute($params);
         } catch (\PDOException $exception) {
             $message = $exception->getMessage();
             if (stripos($message, 'Unknown column') !== false) {
@@ -359,9 +360,50 @@ class MemberRepository
                 $fields[] = 'updated_at = NOW()';
                 $sql = 'UPDATE members SET ' . implode(', ', $fields) . ' WHERE id = :id';
                 $stmt = Database::connection()->prepare($sql);
-                return $stmt->execute($params);
+                $success = $stmt->execute($params);
+            } else {
+                throw $exception;
             }
-            throw $exception;
+        }
+
+        // Mirror first_name / last_name into users.name so the admin sidebar
+        // header ("Welcome <name>"), the user chip at the bottom, and any
+        // other surface that reads users.name stays consistent with the
+        // member's display name. Only runs when a name field was actually
+        // touched and there's a linked user record.
+        if ($success && (array_key_exists('first_name', $columnValues) || array_key_exists('last_name', $columnValues))) {
+            self::syncLinkedUserName($memberId);
+        }
+
+        return $success;
+    }
+
+    /**
+     * Sync users.name with the linked member's first_name + last_name so the
+     * admin sidebar and other surfaces that read users.name (set once at
+     * login) reflect the latest member display name. No-op if no user_id is
+     * linked.
+     */
+    public static function syncLinkedUserName(int $memberId): void
+    {
+        try {
+            $pdo = Database::connection();
+            $row = $pdo->prepare('SELECT user_id, first_name, last_name FROM members WHERE id = :id LIMIT 1');
+            $row->execute(['id' => $memberId]);
+            $member = $row->fetch(\PDO::FETCH_ASSOC);
+            if (!$member || empty($member['user_id'])) {
+                return;
+            }
+            $fullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+            if ($fullName === '') {
+                return;
+            }
+            $upd = $pdo->prepare('UPDATE users SET name = :name WHERE id = :uid');
+            $upd->execute(['name' => $fullName, 'uid' => (int) $member['user_id']]);
+        } catch (\Throwable $e) {
+            // Sync is best-effort. Members table is the source of truth; if
+            // the users update fails we don't want to roll back the original
+            // edit, the sidebar just stays stale until next login.
         }
     }
 
