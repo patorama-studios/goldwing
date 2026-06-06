@@ -19,6 +19,8 @@ This chapter walks through every section in plain English. You don't need to rea
 
 ### Site Settings
 
+{{link:/admin/settings/?section=site|Take me to Site Settings}}
+
 Everyday brand and contact details for the public site.
 
 - **Site name** — the words in the browser tab and the top of every email. Almost always "Australian Goldwing Association".
@@ -32,6 +34,8 @@ Everyday brand and contact details for the public site.
 - **Privacy URL / Terms URL** — the two legal page links that appear in the footer and at the bottom of emails.
 
 ### Store Settings
+
+{{link:/admin/settings/?section=store|Take me to Store Settings}}
 
 How the storefront behaves at checkout. Pricing of individual items lives on each product, not here.
 
@@ -50,6 +54,8 @@ See [Chapter 27 — Store architecture](view.php?slug=27-store-architecture) and
 
 ### Payments (Stripe)
 
+{{link:/admin/settings/?section=payments|Take me to Payments (Stripe)}}
+
 The connection to Stripe — keys, what payment methods are on, receipts, invoice prefix. Treat this section with extra care: this is real money.
 
 - **Test mode toggle** — when on, the site uses the test keys and no money moves. Turn off only when you're ready to charge real cards.
@@ -67,6 +73,8 @@ Full picture: [Chapter 13 — Stripe integration overview](view.php?slug=13-stri
 
 ### Notifications
 
+{{link:/admin/settings/?section=notifications|Take me to Notifications}}
+
 The catalogue of every email and in-app notification the system sends — subjects, bodies, recipients, on/off toggles.
 
 - **From name** and **From email** — what every system email is signed as. The address has to end in `@goldwing.org.au` or email providers will reject it.
@@ -82,9 +90,13 @@ Full picture: [Chapter 22 — Notifications & email](view.php?slug=22-notificati
 
 ### Accounts & Roles
 
+{{link:/admin/settings/?section=accounts|Take me to Accounts & Roles}}
+
 The settings here are small — just whether new signups need approval and how role changes get logged. The real role work happens on the two standalone pages further down (Admin Role Builder and Access Control). See [Chapter 07 — Roles & permissions](view.php?slug=07-roles-permissions).
 
 ### Security & Authentication
+
+{{link:/admin/settings/?section=security|Take me to Security & Authentication}}
 
 The site's safety policies — password rules, 2FA policy, step-up windows, login lockouts, security alert subscriptions, the File Integrity Monitor. Probably the densest section in the Hub.
 
@@ -100,6 +112,8 @@ Full picture: [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2
 
 ### Integrations
 
+{{link:/admin/settings/?section=integrations|Take me to Integrations}}
+
 Where you wire in outside services — outbound email, video embeds, Zoom, future MYOB sync.
 
 - **Email provider** — `PHP mail()` (default, rarely used), `SMTP` (any provider with credentials), or `Resend` (the API service we use in production).
@@ -113,6 +127,8 @@ For SMTP-specific guidance see [Chapter 22 — Notifications & email](view.php?s
 
 ### Media & Files
 
+{{link:/admin/settings/?section=media|Take me to Media & Files}}
+
 The upload rules for the Media Library.
 
 - **Allowed types** — which file extensions are permitted at upload. Default is the common image and PDF set.
@@ -125,6 +141,8 @@ Full picture: [Chapter 25 — Media library](view.php?slug=25-media-library).
 
 ### Events
 
+{{link:/admin/settings/?section=events|Take me to Events Settings}}
+
 Defaults that get applied when an admin creates a new event. None of these change *existing* events.
 
 - **RSVP default** — whether the RSVP toggle is pre-ticked on new events.
@@ -136,6 +154,8 @@ Defaults that get applied when an admin creates a new event. None of these chang
 Full picture: [Chapter 26 — Events & RSVPs](view.php?slug=26-events-rsvps).
 
 ### AI Settings
+
+{{link:/admin/settings/ai.php|Take me to AI Settings}}
 
 The page builder's connection to AI — model, monthly spend cap, the guardrails prompt.
 
@@ -150,6 +170,8 @@ The actual API key is stored separately (encrypted) and isn't visible in this fo
 
 ### Membership Settings
 
+{{link:/admin/settings/?section=membership_pricing|Take me to Membership Settings}}
+
 The pricing matrix and member number formatting. The pricing matrix is the grid of dollar amounts for each combination of magazine type, membership type, and term — see [Chapter 14 — Membership pricing matrix](view.php?slug=14-membership-pricing) for the full picture.
 
 Other settings here:
@@ -161,9 +183,13 @@ Chapter management (adding, renaming, archiving local chapters) is on the same p
 
 ### Audit Log
 
+{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+
 Read-only. Shows every settings change ever made — who, what, old value, new value, when. No fields to edit. Useful when something has changed and you want to know who and when. Full picture: [Chapter 08 — Activity & audit log](view.php?slug=08-activity-audit) and [Chapter 31 — Settings architecture](view.php?slug=31-settings-architecture).
 
 ### Advanced / Developer
+
+{{link:/admin/settings/?section=advanced|Take me to Advanced / Developer}}
 
 **Handle with care.** Two toggles here can break the public site, and a third controls which experimental features are even visible.
 
@@ -175,11 +201,15 @@ This section also surfaces the system log tail and recent email-log rows, which 
 
 ### Admin Role Builder
 
+{{link:/admin/settings/roles.php|Take me to the Admin Role Builder}}
+
 The grid where you tick which permissions each admin role has. Open it, pick a role from the dropdown, tick or untick permissions, save. Permission required to view: `admin.roles.view`. Permission required to save: `admin.roles.manage`.
 
 This is where you'd give your new Treasurer the refund permission, or let a Newsletter Editor publish blog posts. Full picture: [Chapter 07 — Roles & permissions](view.php?slug=07-roles-permissions).
 
 ### Access Control
+
+{{link:/admin/settings/access-control.php|Take me to Access Control}}
 
 The sister page to the Role Builder — instead of "which permissions does this role have", this is "which admin pages does this role see in the sidebar". Useful for hiding sections an admin shouldn't even know exist, rather than just blocking them at the form level. Full picture: [Chapter 07 — Roles & permissions](view.php?slug=07-roles-permissions).
 

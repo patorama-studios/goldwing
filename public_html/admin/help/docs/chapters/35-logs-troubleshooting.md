@@ -12,6 +12,8 @@ You don't need to memorise it. You need to know which page to open first when a 
 
 #### A member can't log in
 
+{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+
 1. Go to **Admin → Security Log** and search for their email address.
 2. If you see "rate limit exceeded" or "account locked", they've tried too many wrong passwords — see [Chapter 12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout) to clear the lockout.
 3. If they have 2FA on and are stuck on the code, see [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup) — you may need to clear a trusted device or reset their 2FA.
@@ -19,12 +21,16 @@ You don't need to memorise it. You need to know which page to open first when a 
 
 #### A payment didn't go through
 
+{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+
 1. Open the **Stripe Dashboard** first — that's the source of truth for anything money-related. Search for the customer's email or the order number.
 2. If Stripe shows the payment as failed, the reason is in the Stripe event log (usually "card declined" with a sub-reason like insufficient funds or wrong CVC). Pass that wording on to the member.
 3. Then check **Admin → Audit Log** for the order's events to see how our site recorded it.
 4. If Stripe shows it as succeeded but our site shows it as pending, escalate to the developer with the **Stripe payment intent ID** (looks like `pi_3Q4…`).
 
 #### An email didn't arrive
+
+{{link:/admin/settings/?section=integrations|Take me to Integrations settings}}
 
 1. Ask the member to check their **spam / junk folder** — that's the most common cause by far.
 2. In admin, go to **Settings → Integrations → SMTP** and click **Test SMTP connection**. If the test fails, SMTP credentials are broken — flag the developer.
@@ -38,6 +44,8 @@ You don't need to memorise it. You need to know which page to open first when a 
 
 #### A webhook keeps failing
 
+{{link:/admin/settings/?section=payments|Take me to Payments settings}}
+
 1. Go to **Admin → Settings → Payments** and check the **webhook health** indicator.
 2. If it's flashing red or showing repeated failures, flag the developer with:
    - The **webhook signing secret** (or at least which environment it's for — live or test).
@@ -50,6 +58,8 @@ You don't need to memorise it. You need to know which page to open first when a 
 3. If it was expected, **approve** the new baseline. If it wasn't, **escalate** — treat it as a possible intrusion until proven otherwise.
 
 #### A page isn't showing recent changes
+
+{{link:/admin/settings/?section=advanced|Take me to Advanced settings}}
 
 1. Did the developer tell you a deploy needed to happen? Has the **deploy step** been done (see [Chapter 33 — Deployment](view.php?slug=33-deployment))?
 2. If yes — **hard-refresh** your browser (Cmd+Shift+R on Mac, Ctrl+F5 on Windows) to clear cached files.

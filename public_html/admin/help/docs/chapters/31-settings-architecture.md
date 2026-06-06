@@ -34,6 +34,8 @@ If you open the Settings Hub and a section is missing from the dropdown, you don
 
 ### Where to find it in admin
 
+{{link:/admin/settings/|Take me to the Settings Hub}}
+
 **Admin → Settings.** That lands you on the Settings Hub. From there, pick a section from the dropdown (or the sidebar): Site, Store, Payments, Notifications, and so on. Each section has its own form. You can be in only one section at a time.
 
 A couple of sections — AI Settings, Admin Role Builder, Access Control — open as their own pages rather than a dropdown choice, but they all start from the same Settings menu.
@@ -77,6 +79,8 @@ Every settings change writes a row to the audit log with:
 Sensitive values — Stripe secret keys, SMTP passwords, AI provider keys — are encrypted before they hit the audit log too, so an audit dump never leaks a live secret in plaintext. You'll see "encrypted value changed" rather than the secret itself.
 
 ### The audit log
+
+{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
 
 **Admin → Settings → Audit Log.** This is the read-only record of every settings change. You can:
 

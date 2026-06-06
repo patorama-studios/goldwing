@@ -29,11 +29,15 @@ Anyone logged in (members and admins alike) can *see* and *run* tours on pages t
 
 ### Where to find them
 
+{{link:/admin/help/validator.php|Take me to the Tour Validator}}
+
 - **As an end-user (member or admin):** the yellow **?** button in the bottom-right of any page. Click it → pick a tour from the menu → follow the walkthrough.
 - **As an admin to edit text:** Admin → Tour Validator → click **Edit wording** next to a tour.
 - **As an admin to verify after deploy:** Admin → Tour Validator → click **Test now** on each tour you want to check.
 
 ### The Tour Validator workflow
+
+{{link:/admin/help/validator.php|Take me to the Tour Validator}}
 
 The Tour Validator (Admin → Tour Validator) lists every tour in the system with a status badge:
 
@@ -46,6 +50,8 @@ The Tour Validator (Admin → Tour Validator) lists every tour in the system wit
 When the sidebar shows a **number badge** next to "Tour Validator", that's the count of tours needing attention (failing, never tested, or stale). The badge is a gentle nag — it doesn't block anything, but a forgotten tour will eventually nudge somebody to look at it.
 
 ### How to edit a tour's wording
+
+{{link:/admin/help/edit.php|Take me to the Tour wording editor}}
 
 1. Admin → **Tour Validator**.
 2. Click **Edit wording** next to the tour you want to change.
