@@ -120,6 +120,22 @@ function gw_docs_search(array $chapters, string $q): array
 $q = trim((string) ($_GET['q'] ?? ''));
 $results = $q !== '' ? gw_docs_search(gw_docs_flatten($toc), $q) : [];
 
+// Admin-audience tours — surface them in a "Walkthroughs" panel so admins can
+// browse what interactive tours are available without going chapter-by-chapter.
+$tourManifestPath = __DIR__ . '/../../../../config/tour-manifest.json';
+$tourManifest = is_file($tourManifestPath) ? json_decode((string) file_get_contents($tourManifestPath), true) : null;
+$adminTours = [];
+if (is_array($tourManifest) && isset($tourManifest['tours']) && is_array($tourManifest['tours'])) {
+    foreach ($tourManifest['tours'] as $slug => $entry) {
+        if (!is_array($entry)) continue;
+        $audience = (string) ($entry['audience'] ?? 'member');
+        if ($audience !== 'admin') continue;
+        $adminTours[$slug] = $entry;
+    }
+    // Sort by name for predictable ordering
+    uasort($adminTours, fn($a, $b) => strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? '')));
+}
+
 $user = current_user();
 $pageTitle = $q !== '' ? "Search: $q — System Documentation" : 'System Documentation';
 $activePage = 'help-docs';
@@ -153,6 +169,41 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
         </div>
         <p class="text-xs text-gray-500 mt-2">Searches every chapter for all your words (AND match). Hits in chapter titles rank higher.</p>
       </form>
+
+      <?php if ($q === '' && $adminTours): ?>
+        <details class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8 group" open>
+          <summary class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-white cursor-pointer flex items-center gap-2 list-none">
+            <span class="material-icons-outlined text-secondary">play_circle</span>
+            <h2 class="font-display text-lg text-gray-900 flex-1">Interactive walkthroughs for admins</h2>
+            <span class="text-xs text-gray-500"><?= count($adminTours) ?> available</span>
+            <span class="material-icons-outlined text-gray-400 group-open:rotate-180 transition-transform">expand_more</span>
+          </summary>
+          <div class="px-6 py-4">
+            <p class="text-sm text-gray-600 mb-4">
+              These run live against the actual UI. Click any one — we'll send you to the right page and the walkthrough starts automatically. If the tour walks through a detail screen (an order, a product, a member), we'll land you on the list first so you can pick the item.
+            </p>
+            <div class="grid sm:grid-cols-2 gap-3">
+              <?php foreach ($adminTours as $slug => $t):
+                $pageUrl = (string) ($t['page_url'] ?? '/');
+                $sep = (strpos($pageUrl, '?') === false) ? '?' : '&';
+                $href = $pageUrl . $sep . 'tour=' . urlencode($slug);
+              ?>
+                <a href="<?= e($href) ?>"
+                   class="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-secondary hover:bg-emerald-50 transition group/tour">
+                  <span class="material-icons-outlined text-secondary mt-0.5">play_circle</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-gray-900"><?= e($t['name'] ?? $slug) ?></div>
+                    <?php if (!empty($t['blurb'])): ?>
+                      <p class="text-xs text-gray-600 mt-0.5 line-clamp-2"><?= e($t['blurb']) ?></p>
+                    <?php endif; ?>
+                    <div class="text-xs text-gray-400 font-mono mt-1"><?= e($slug) ?></div>
+                  </div>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </details>
+      <?php endif; ?>
 
       <?php if ($q !== ''): ?>
         <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">

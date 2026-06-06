@@ -103,8 +103,10 @@ This is the audit trail for that one person. If you ever need to answer "who cha
 ### Common tasks
 
 {{tour:admin-find-edit-member}}
+{{tour:admin-make-life-member}}
 
 - **Reset a password** — open the member → Settings tab (or Overview) → **Send reset link**. They get an email. If you need to bypass that — e.g. they've lost access to their email — use **Set password** to give them a temporary one and tell them in person.
+- **Make someone a Life Member** — open the member → Orders tab → scroll to **Manual membership order** → set type to **Life**, cost as appropriate, save. The walkthrough above will take you through it.
 - **Update contact details** — Profile tab → edit the fields → Save. The activity log records what changed.
 - **Refund a member** — Refunds tab → fill in amount and reason → Process refund. (See [Chapter 17](view.php?slug=17-refunds).)
 - **Add a vehicle** — Vehicles tab → Add → fill in make / model / year / colour / rego.

@@ -243,34 +243,71 @@
   function tryAutostart() {
     try {
       var params = new URLSearchParams(window.location.search);
-      var slug = params.get('tour');
+      var slugFromUrl = params.get('tour');
+      var slugFromStorage = null;
+      try { slugFromStorage = sessionStorage.getItem('gw_pending_tour'); } catch (e) {}
+      var slug = slugFromUrl || slugFromStorage;
       if (!slug) return;
-      // Strip the param so refreshing or sharing the URL doesn't keep
-      // re-triggering the tour every time.
-      params.delete('tour');
-      var newSearch = params.toString();
-      var clean = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
-      try { window.history.replaceState(null, '', clean); } catch (e) {}
+
+      if (slugFromUrl) {
+        // Strip the param so refreshing or sharing the URL doesn't keep
+        // re-triggering the tour every time.
+        params.delete('tour');
+        var newSearch = params.toString();
+        var clean = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+        try { window.history.replaceState(null, '', clean); } catch (e) {}
+      }
 
       var entry = GT.manifest.tours && GT.manifest.tours[slug];
       if (!entry) {
         console.warn('[GoldwingTours] Autostart: tour not in manifest:', slug);
+        try { sessionStorage.removeItem('gw_pending_tour'); } catch (e) {}
         return;
       }
-      // Quick guard — only run if the tour's page_match (or page_url) loosely
-      // matches the current page, so a stale link doesn't fire a tour on the
-      // wrong page.
+      // Page-match guard — if the tour expects a different page (e.g. it walks
+      // through the order detail screen but the docs button sent us to the
+      // orders list so the admin can pick one), stash the slug in
+      // sessionStorage and run it once we land somewhere matching.
       var match = entry.page_match || entry.page_url || '';
       if (match && window.location.href.indexOf(match) === -1) {
-        console.warn('[GoldwingTours] Autostart: tour', slug, 'does not match current page; refusing to run.');
+        try { sessionStorage.setItem('gw_pending_tour', slug); } catch (e) {}
+        // Tiny inline hint so the admin knows what they're meant to do next.
+        showPendingHint(entry);
         return;
       }
+      // We're on the right page — clear sessionStorage and run.
+      try { sessionStorage.removeItem('gw_pending_tour'); } catch (e) {}
       // Wait a beat for the page to settle (layout, fonts, sidebar) so
       // Driver.js can locate elements reliably.
       setTimeout(function () { GT.run(slug); }, 250);
     } catch (e) {
       console.warn('[GoldwingTours] Autostart error:', e);
     }
+  }
+
+  /** Floating banner shown while a tour is waiting for the admin to navigate
+   *  to the right page. Tour fires automatically once they get there. */
+  function showPendingHint(entry) {
+    if (document.querySelector('[data-gw-tour-hint]')) return; // already shown
+    var hint = document.createElement('div');
+    hint.setAttribute('data-gw-tour-hint', '');
+    hint.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;'
+      + 'background:#2F7D32;color:#fff;padding:14px 18px;border-radius:12px;'
+      + 'box-shadow:0 10px 25px rgba(0,0,0,.18);max-width:340px;font:14px/1.4 system-ui,sans-serif;';
+    var name = (entry && entry.name) ? entry.name : 'walkthrough';
+    var msg = (entry && entry.starthint)
+      || ('Tour ready: <strong>' + name + '</strong>.<br>Pick an item from this list to open it — the tour will start automatically.');
+    hint.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-start">'
+      + '<span style="font-size:18px">▶</span>'
+      + '<div style="flex:1">' + msg + '</div>'
+      + '<button type="button" aria-label="Cancel tour" '
+      + 'style="background:transparent;border:0;color:#fff;cursor:pointer;font-size:18px;line-height:1;padding:0 0 0 6px">×</button>'
+      + '</div>';
+    hint.querySelector('button').addEventListener('click', function () {
+      try { sessionStorage.removeItem('gw_pending_tour'); } catch (e) {}
+      hint.remove();
+    });
+    document.body.appendChild(hint);
   }
   if (document.readyState === 'complete') {
     tryAutostart();

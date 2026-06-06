@@ -2636,7 +2636,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <?php endif; ?>
                     </div>
                     <?php if ($canManualFix): ?>
-                      <div class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+                      <div data-tour="manual-membership-section" class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                           <h3 class="text-sm font-semibold text-gray-900">Manual membership order</h3>
                           <span class="text-xs text-gray-500">Admin only</span>
@@ -2653,7 +2653,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div class="grid gap-3 sm:grid-cols-2">
                             <label class="text-sm font-medium text-gray-700">
                               Membership type
-                              <select name="manual_membership_type_id"
+                              <select data-tour="manual-membership-type" name="manual_membership_type_id"
                                 class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                                 <?php foreach ($membershipTypes as $type): ?>
                                   <option value="<?= e($type['id']) ?>" <?= $currentMembershipTypeId === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
@@ -2662,7 +2662,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                               Cost (AUD)
-                              <input type="number" step="0.01" min="0" name="manual_membership_cost"
+                              <input data-tour="manual-membership-cost" type="number" step="0.01" min="0" name="manual_membership_cost"
                                 value="<?= e($manualMembershipCost) ?>"
                                 class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                             </label>
@@ -2708,7 +2708,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <span class="material-icons-outlined text-base text-secondary">info</span>
                             <p>Manual entries update Payment, Membership Periods, and Activity automatically.</p>
                           </div>
-                          <button type="submit"
+                          <button type="submit" data-tour="manual-membership-save"
                             class="w-full rounded-full bg-primary px-5 py-2 text-xs font-semibold text-gray-900">Save manual
                             order</button>
                         </form>

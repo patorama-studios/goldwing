@@ -284,8 +284,9 @@
       "blurb": "Walk me through listing a new item in the members' store.",
       "audience": "admin",
       "roles": ["admin", "store_manager"],
-      "page_url": "/admin/store/product_form.php",
+      "page_url": "/admin/store/products",
       "page_match": "store/product_form",
+      "starthint": "Tour ready: <strong>How to add a new product</strong>.<br>Click <strong>+ Add product</strong> (or open an existing product) to start the tour.",
       "steps_file": "/assets/js/tours/tours/admin-add-product.js",
       "selectors": [
         "[data-tour=\"admin-add-product-form\"]",
@@ -306,8 +307,9 @@
       "blurb": "Walk me through marking an order as packed and shipped.",
       "audience": "admin",
       "roles": ["admin", "store_manager"],
-      "page_url": "/admin/store/order_view.php",
+      "page_url": "/admin/store/orders",
       "page_match": "store/order_view",
+      "starthint": "Tour ready: <strong>How to process a member's order</strong>.<br>Pick any order from this list (click the order number) to start the tour.",
       "steps_file": "/assets/js/tours/tours/admin-process-order.js",
       "selectors": [
         "[data-tour=\"admin-process-order-summary\"]",
@@ -319,6 +321,28 @@
       "watched_files": [
         "public_html/admin/store/order_view.php",
         "public_html/assets/js/tours/tours/admin-process-order.js"
+      ]
+    },
+    "admin-make-life-member": {
+      "slug": "admin-make-life-member",
+      "name": "How to make a member a Life Member",
+      "blurb": "Walk me through converting a member to a Life Member from their profile.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/members/",
+      "page_match": "admin/members/view.php",
+      "starthint": "Tour ready: <strong>How to make a Life Member</strong>.<br>Open the member you want to convert. Once you're on their profile and the Orders tab is showing, the tour will start.",
+      "steps_file": "/assets/js/tours/tours/admin-make-life-member.js",
+      "selectors": [
+        "[data-tour=\"manual-membership-section\"]",
+        "[data-tour=\"manual-membership-type\"]",
+        "[data-tour=\"manual-membership-cost\"]",
+        "[data-tour=\"manual-membership-save\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/members/view.php",
+        "public_html/admin/members/actions.php",
+        "public_html/assets/js/tours/tours/admin-make-life-member.js"
       ]
     },
     "admin-find-edit-member": {
