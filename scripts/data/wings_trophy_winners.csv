@@ -1,0 +1,131 @@
+year,category_name,member_name,bike_description,notes,source_pdf,source_page,raw_line
+2024,Best Custom Goldwing GL1500,David Dove,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Custom GL1500 | David Dove
+2024,Best Custom Goldwing GL1800,Michael Howard,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Custom GL1800 | Michael Howard
+2024,Best Goldwing Trike,Rowland Wayman,GL1800 2001,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best GoldWing Trike | GL1800 2001 Rowland Wayman
+2024,Best Goldwing and Sidecar,Mick Jones,GL1800 2009,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best GoldWing Sidecar | GL1800 2009 Mick Jones
+2024,Best Goldwing and Trailer,Mark Johannesen,GL1800 2018,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best GoldWing & Trailer | GL1800 2018 Mark Johannesen
+2024,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Rob Anderson,GL1100,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Classic GoldWing | GL1100  Rob Anderson
+2024,Best Original GL1500,Glen Emonson,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Original GL1500 | Glen Emonson
+2024,Best Original GL1800,Mal Allen,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Original GL1800 | Mal Allen
+2024,Best Original GL1800,Robert Watson,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best Original GL1800 | Robert Watson
+2024,Best non-Goldwing,Kev Lane,Harley Davidson,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Best non-GoldWing | Harley Davidson Kev Lane
+2024,Longest Distance Pillion,Donna Veitch,,2112 km,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Long Distance Pillion | Donna Veitch        2112 km
+2024,Longest Distance Travelled by an AGA Member,David Goodchild,GL1800 Trike,Male rider 2674 km,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Long Distance Male Rider | GL1800 Trike David Goodchild   2674 km
+2024,Longest Distance Travelled by an AGA Member,Robyn Strong,,Male rider 993 km,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Long Distance Female Rider | Robyn Strong          993 km
+2024,Longest Distance Travelled by an AGA Member over 65,Lesley Anderson,,Male rider 125 km,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Long Distance Female Rider over 65 | Lesley Anderson     125 km
+2024,Longest Distance Travelled by an AGA Member over 65,Rob Watson,,Male rider 2129 km,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Long Distance Male Rider over 65 | Rob Watson          2129 km
+2024,Member of the Year,Jenny Hicks,,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,Club Person of the Year | Jenny Hicks
+2024,Peoples Choice Award,Colin Underhill,GL1800 Trike,,public_html/uploads/wings/2024/05/05-May-2024-Wings-magazine.pdf,45,People's Choice | GL1800 Trike  Colin Underhill
+2023,"Best Custom Classic Goldwing GL1000, GL1100, GL1200",Glen Emonson,GoldWing,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Custom Classic | GoldWing   Glen Emonson  NSW
+2023,Best Custom Goldwing GL1500,David Dove,,QLD,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Custom GL1500 | David Dove  QLD
+2023,Best Custom Goldwing GL1800,Kevin & Vanessa Lindley,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Custom GL1800 | Kevin & Vanessa Lindley  NSW
+2023,Best Goldwing Trike,Rowland Wayman,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best GoldWing Trike | Rowland Wayman  NSW
+2023,Best Goldwing and Sidecar,David Partridge,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best GoldWing Sidecar | David Partridge  NSW
+2023,Best Goldwing and Trailer,Wayne Gannon,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Bike and Trailer | Wayne Gannon   NSW
+2023,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Colin Strong,GoldWing,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Original Classic | GoldWing   Colin Strong  NSW
+2023,Best Original GL1500,Alan Vesperman,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best Original GL1500 | Alan Vesperman  NSW
+2023,Best Original GL1800,Phil Vincent,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Best OriginalGL1800 | Phil Vincent  NSW
+2023,Longest Distance Pillion,Yvonne Jones,,TAS,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Long Distance Pillion | Yvonne Jones  TAS
+2023,Longest Distance Travelled by an AGA Member,David Goodchild,,Male rider 4123km · WA,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Long Distance Male Rider | (4123km)  David Goodchild  WA
+2023,Longest Distance Travelled by an AGA Member,Lesley Anderson,,Male rider 1781km · SA,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Long Distance Female Rider | (1781km)  Lesley Anderson  SA
+2023,Longest Distance Travelled by an AGA Member over 65,Gary Jones,,1973km · TAS,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Long Distance Rider Over 65 | (1973km)   Gary Jones  TAS
+2023,Member of the Year,Wayne Gannon,,NSW,public_html/uploads/wings/2023/06/06-June-2023-Wings-magazine.pdf,20,Club Person of the Year | Wayne Gannon  NSW
+2019,Longest Distance Travelled by an AGA Member,Barbie Dolls; Best Lights,,,public_html/uploads/wings/2019/11/11-November-2019-Wings.pdf,26,actually Rays) – Trevor; Oldest Pillion and Long Distance | Barbie Dolls; Best Lights
+2018,Longest Distance Travelled by an AGA Member,Ove r 65 trophy,,,public_html/uploads/wings/2018/07/07-July-2018-Wings-mag.pdf,35,Robert Anderson is elated with the Long Distance Rider | Ove r 65 trophy
+2017,Best Custom Goldwing GL1500,Greg Naylor,1997 GL1500SE,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Custom GL1500 | Greg Naylor 1997 GL1500SE
+2017,Best Custom Goldwing GL1800,Tim Loader,2012 GL1800,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Custom GL1800 | Tim Loader 2012 GL1800
+2017,Best Goldwing Trike,Alistair Third,2008 GL1800/CSC conversion,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Trike | Alistair Third 2008 GL1800/CSC conversion
+2017,Best Goldwing and Sidecar,Joe Glanville,2012 GL1800/Champion sidecar,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Sidecar | Joe Glanville 2012 GL1800/Champion sidecar
+2017,Best Goldwing and Trailer,Skippy Ward,2005 GL1800/Classic trailer,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Bike and Trailer | Skippy Ward 2005 GL1800/Classic trailer
+2017,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Les Sorensen,1976 GL1000 LTD,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best GL1000 | Les Sorensen 1976 GL1000 LTD
+2017,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Peter Grant 1984 Interstate,,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best GL1200 | Peter Grant 1984 Interstate
+2017,Best Original GL1500,Michael Bradley,1997 GL1500SE,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Original GL1500 | Michael Bradley 1997 GL1500SE
+2017,Best Original GL1800,David Partridge,2008 GL1800,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Original GL1800 | David Partridge 2008 GL1800
+2017,Best non-Goldwing,Robyn Strong Can-Am Spyder,,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Best Non-GoldWing | Robyn Strong Can-Am Spyder
+2017,Longest Distance Pillion,Michelle Brown Hervey Bay,,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Long Distance Pillion | Michelle Brown Hervey Bay
+2017,Longest Distance Travelled by an AGA Member,Greg Naylor Brisbane,,Male rider,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Long Distance Male Rider | Greg Naylor Brisbane
+2017,Longest Distance Travelled by an AGA Member,Melissa Ward Carroll,,Male rider,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Long Distance Female Rider | Melissa Ward Carroll
+2017,Longest Distance Travelled by an AGA Member over 65,Peter Dew Hervey Bay,,Male rider,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Long Distance Male Rider over 60 | Peter Dew Hervey Bay
+2017,Longest Distance Travelled by an AGA Member over 65,Robyn Strong Young,,Male rider,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Long Distance Female Rider over 60 | Robyn Strong Young
+2017,Member of the Year,Paul Kerr,,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,Club Person of the Year | Paul Kerr
+2017,Peoples Choice Award,Marty Woodward,2012 GL1800,,public_html/uploads/wings/2017/04/04-April-2017-Wings-Mag.pdf,19,People's Choice | Marty Woodward 2012 GL1800
+2016,Best Custom Goldwing GL1500,Kevin Keel,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best custom GL1500 | Kevin Keel
+2016,Best Custom Goldwing GL1800,Tim Loader,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best custom GL1800 | Tim Loader
+2016,Best Goldwing Trike,Graham Anderson (GL1800 CSC,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best trike | Graham Anderson (GL1800 CSC)
+2016,Best Goldwing and Sidecar,David Partridge,1995 GL1500,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best outfit | David Partridge (1995 GL1500)
+2016,Best Goldwing and Trailer,Mark Johannesen,2001 GL1800 + Shadow trailer,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best GoldWing and Trailer | Mark Johannesen  2001 GL1800 + Shadow trailer
+2016,Best Original GL1500,David Dove,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best original GL1500 | David Dove
+2016,Best Original GL1800,Lewis Furner,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best original GL1800 | Lewis Furner
+2016,Best non-Goldwing,Les Sorenson,1997 Honda Valkyrie,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Best non-GoldWing | Les Sorenson   1997 Honda Valkyrie
+2016,Longest Distance Pillion,Gail Laing Walpole,,4796km · WA,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Long distance pillion | Gail Laing   Walpole WA   4796km
+2016,Longest Distance Travelled by an AGA Member,Peter Dew Pasadena,,Male rider 2230km · SA,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Long distance male rider | Peter Dew   Pasadena SA   2230km
+2016,Longest Distance Travelled by an AGA Member,Zoe Swan Muswellbrook,,Male rider 1065km · NSW,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Long distance female rider | Zoe Swan   Muswellbrook NSW 1065km
+2016,Longest Distance Travelled by an AGA Member over 65,Robert Laing Walpole,,Male rider 4796km · WA,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Long distance male rider over 60 | Robert Laing   Walpole WA   4796km
+2016,Longest Distance Travelled by an AGA Member over 65,Robyn Strong Young,,Male rider 1298km · NSW,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Long distance female rider over 60 | Robyn Strong   Young NSW   1298km
+2016,Member of the Year,Kevin Keel,,,public_html/uploads/wings/2016/05/05-May-2016-Wings-mag.pdf,13,Club Person of the Year | Kevin Keel
+2015,Best Custom Goldwing GL1500,David Dove,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Custom GL1500 | David Dove
+2015,Best Custom Goldwing GL1800,Tim Loader,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Custom GL1800 | Tim Loader
+2015,Best Goldwing Trike,Lynne Challinor,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Trike | Lynne Challinor
+2015,Best Goldwing and Sidecar,Deb Cartwright,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Outfit | Deb Cartwright
+2015,Best Goldwing and Trailer,Brian Redding,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Bike and Trailer | Brian Redding
+2015,Best Original GL1500,Greg Swan,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Original GL1500 | Greg Swan
+2015,Best Original GL1800,Wayne Tanner,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Original GL1800 | Wayne Tanner
+2015,Best non-Goldwing,Ian Cochrane,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Best Non-GoldWing | Ian Cochrane
+2015,Longest Distance Pillion,Elke Kerr,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Long Distance Pillion | Elke Kerr
+2015,Longest Distance Travelled by an AGA Member,Allan Kerr,,Male rider,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Long Distance Male Rider | Allan Kerr
+2015,Longest Distance Travelled by an AGA Member,Lynne Challinor,,Male rider,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Long Distance Female Rider | Lynne Challinor
+2015,Longest Distance Travelled by an AGA Member over 65,Ian Cochrane,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Long Distance Rider Over 60yo | Ian Cochrane
+2015,Member of the Year,Christine Merrick,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,Club Person of the Year | Christine Merrick
+2015,Peoples Choice Award,Tim Loader,,,public_html/uploads/wings/2015/05/05-May-2015-Magazine.pdf,17,People's Choice | Tim Loader
+2014,Best Custom Goldwing GL1500,Stewart Winnie,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best Custom GL1500 | Stewart Winnie
+2014,Best Custom Goldwing GL1800,Tim Loader,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Best Custom GL1800 | Tim Loader
+2014,Best Goldwing Trike,Norm Francis,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Best Goldwing Trike | Norm Francis
+2014,Best Goldwing and Sidecar,David Partridge,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Best Goldwing Sidecar | David Partridge
+2014,Best Goldwing and Trailer,Gary Jones,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Best Bike and Trailer | Gary Jones
+2014,"Best Original Classic Goldwing GL1000, GL1100, GL1200",David Cowan,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best GL1200 | David Cowan
+2014,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Frank Milligan,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best GL1100 | Frank Milligan
+2014,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Paul Adams,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best GL1000 | Paul Adams
+2014,Best Original GL1500,Dave Dove,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best Original GL1500 | Dave Dove
+2014,Best Original GL1800,Mark Lord,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,16,Best OriginalGL1800 | Mark Lord
+2014,Best non-Goldwing,David Ellis,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Best Non Goldwing | David Ellis
+2014,Longest Distance Pillion,Rider – Lorraine,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Longest Distance Pillion | Rider – Lorraine
+2014,Longest Distance Travelled by an AGA Member,Debra,,Male rider,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Longest Distance Female Rider | Debra
+2014,Longest Distance Travelled by an AGA Member,Peter Tuia,,Male rider,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Longest Distance Male Rider | Peter Tuia
+2014,Longest Distance Travelled by an AGA Member over 65,Robert Laing,,Male rider,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Longest Distance Male Rider Over 60 – | Robert Laing
+2014,Longest Distance Travelled by an AGA Member over 65,Robyn Strong,,Male rider,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Longest Distance Female Rider over 60 – | Robyn Strong
+2014,Member of the Year,Cecily,,,public_html/uploads/wings/2014/06/06-June-2014-Magazine-Wings.pdf,17,Club Person of the Year | Cecily
+2013,Best Custom Goldwing GL1500,David Dove,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Custom GL 1500 | David Dove
+2013,Best Custom Goldwing GL1800,Marty Woodward,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Custom GL 1800 | Marty Woodward
+2013,Best Goldwing Trike,Peter and Marlene Poole (GL1800 with CSC,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Trike | Peter and Marlene Poole (GL1800 with CSC)
+2013,Best Goldwing Trike,Rowland Wayman,,,public_html/uploads/wings/2013/12/12-December-2013-Wings-Magazine.pdf,29,Best Trike | Rowland Wayman
+2013,Best Goldwing and Sidecar,Andrew Thompson,,,public_html/uploads/wings/2013/12/12-December-2013-Wings-Magazine.pdf,29,Best Outfit | Andrew Thompson
+2013,Best Goldwing and Sidecar,Robert Carmody (GL1800,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Sidecar | Robert Carmody (GL1800)
+2013,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Peter Grant,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Original GL 1200 | Peter Grant
+2013,Best Original GL1500,Kevin Ladewig,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Original GL 1500 | Kevin Ladewig
+2013,Best Original GL1800,Dan Hassle,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Original GL 1800 | Dan Hassle
+2013,Best non-Goldwing,Ian Cochrane (Kawasaki Vulcan,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Best Non-Goldwing | Ian Cochrane (Kawasaki Vulcan)
+2013,Best non-Goldwing,Paul Kerr,,,public_html/uploads/wings/2013/12/12-December-2013-Wings-Magazine.pdf,29,Best Non-Goldwing | Paul Kerr
+2013,Longest Distance Pillion,Cecily Johannesen,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Longest Distance Pillion | Cecily Johannesen
+2013,Longest Distance Travelled by an AGA Member,Peter Murphy,,Male rider,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Longest Distance Male Rider | Peter Murphy
+2013,Longest Distance Travelled by an AGA Member,Zoe Swan,,Male rider,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Longest Distance Female Rider | Zoe Swan
+2013,Longest Distance Travelled by an AGA Member over 65,Peter Murphy,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Longest Distance over 60 rider | Peter Murphy
+2013,Member of the Year,Peter Cherry,,,public_html/uploads/wings/2013/08/08August-2013-Wings-Magazine.pdf,48,Club Person of the Year | Peter Cherry
+2013,Peoples Choice Award,Jeff Bickley,,,public_html/uploads/wings/2013/12/12-December-2013-Wings-Magazine.pdf,29,People's Choice | Jeff Bickley
+2005,"Best Custom Classic Goldwing GL1000, GL1100, GL1200",David Dove Kingston,,TAS,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Custom GL1000 | David Dove Kingston,  Tas"
+2005,"Best Custom Classic Goldwing GL1000, GL1100, GL1200",Keith Plummer Orange,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Custom GL1200 | Keith Plummer Orange, NSW"
+2005,"Best Custom Classic Goldwing GL1000, GL1100, GL1200",Kevin Russell Leeton,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Custom GL1100 | Kevin Russell Leeton, NSW"
+2005,Best Custom Goldwing GL1500,Rod Chidgey Lisarow,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Custom GL1500 | Rod Chidgey Lisarow, NSW"
+2005,Best Custom Goldwing GL1800,Steve Hoger Cambewarra,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Best Custom GL1800 | Steve Hoger Cambewarra, NSW"
+2005,Best Goldwing Trike,"Leigh Dance Allansford, VIC (GL1800 Trike",,,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Best Trike | Leigh Dance Allansford, VIC (GL1800 Trike)"
+2005,Best Goldwing and Sidecar,"David Partridge Kariong, NSW (GL1500 Outfit",,,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Best Bike & Side Car | David Partridge Kariong, NSW (GL1500 Outfit)"
+2005,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Bob Burden Mount Rankin (Bathurst,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Original GL1100 | Bob Burden Mount Rankin (Bathurst,)  NSW"
+2005,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Peter Gebert Warrnambool,,VIC,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Original GL1200 | Peter Gebert Warrnambool, VIC"
+2005,"Best Original Classic Goldwing GL1000, GL1100, GL1200",Terry Wells Devonport,,TAS,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Original GL1000 | Terry Wells Devonport,  Tas"
+2005,Best Original GL1500,Royce Wood Cowra,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,22,"Best Original GL1500 | Royce Wood Cowra, NSW"
+2005,Best Original GL1800,Peter Spillett Wallerawang,,NSW,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Best Original GL1800 | Peter Spillett Wallerawang, NSW"
+2005,Best non-Goldwing,"Kathy Leslie Dickson, ACT (Honda NT650V Deauville",,,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Best non GoldWing | Kathy Leslie Dickson, ACT (Honda NT650V Deauville)"
+2005,Longest Distance Pillion,Ingrid Ladewig … Busselton,,3577km · WA,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Longest Distance Pillion | Ingrid Ladewig … 3577km Busselton, WA"
+2005,Longest Distance Travelled by an AGA Member,Barbara Rivett … Port Augusta,,Male rider 1090km · SA,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Longest Distance Female Rider | Barbara Rivett … 1090km Port Augusta, SA"
+2005,Longest Distance Travelled by an AGA Member,Detlef Ladewig … Busselton,,Male rider 3577km · WA,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Longest Distance Male Rider | Detlef Ladewig … 3577km Busselton, WA"
+2005,Longest Distance Travelled by an AGA Member over 65,Col Schwarz … North Haven,,855km · SA,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"Longest Distance Rider over 60 | Col Schwarz … 855km North Haven, SA"
+2005,Peoples Choice Award,"The Partridge Family Kariong, NSW (GL1500 Outfit",,,public_html/uploads/wings/2005/05/05-May-2005-Wings.pdf,23,"People's Choice | The Partridge Family Kariong, NSW (GL1500 Outfit)"
