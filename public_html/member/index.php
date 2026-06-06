@@ -3806,7 +3806,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 LEFT JOIN members fm ON fm.id = m.full_member_id
                 LEFT JOIN users u ON u.id = m.user_id
                 LEFT JOIN settings_user su ON su.user_id = u.id AND su.key_name = 'avatar_url'
-                WHERE LOWER(m.status) = 'active'
+                WHERE (m.status IS NULL OR LOWER(m.status) NOT IN ('cancelled', 'archived', 'inactive'))
                 $excludeClause
                 ORDER BY COALESCE(fm.last_name, m.last_name) ASC, COALESCE(fm.first_name, m.first_name) ASC, CASE WHEN m.full_member_id IS NULL THEN 0 ELSE 1 END ASC, m.last_name ASC, m.first_name ASC
             ");
