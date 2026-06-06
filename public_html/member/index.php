@@ -3176,7 +3176,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
                       <div class="flex items-center justify-between gap-4">
                         <div>
-                          <p class="text-base font-semibold text-gray-900"><?= e($formattedName) ?></p>
+                          <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>"
+                            class="text-base font-semibold text-gray-900 hover:text-primary hover:underline"><?= e($formattedName) ?></a>
                           <?php if (!empty($entry['member_number'])): ?>
                             <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
                           <?php endif; ?>
@@ -3195,8 +3196,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <span
                             class="text-sm font-semibold text-gray-500"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
                           <?php if (!empty($entry['image_url'])): ?>
-                            <img src="<?= e($entry['image_url']) ?>" alt="Tribute image"
-                              class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+                            <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" class="flex-shrink-0">
+                              <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($formattedName) ?>"
+                                class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+                            </a>
                           <?php endif; ?>
                         </div>
                       </div>

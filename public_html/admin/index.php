@@ -3330,24 +3330,30 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     ?>
                     <li
                       class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 first:border-0 first:pt-0">
-                      <div>
-                        <div class="flex items-center gap-2">
-                          <p class="text-sm text-gray-800 font-medium"><?= e($formattedName) ?></p>
-                          <?php if (!empty($entry['image_url'])): ?>
-                            <span
-                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Img</span>
+                      <div class="flex items-start gap-3 min-w-0">
+                        <?php if (!empty($entry['image_url'])): ?>
+                          <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank"
+                            class="flex-shrink-0">
+                            <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($formattedName) ?>"
+                              class="h-12 w-12 object-cover rounded bg-gray-100">
+                          </a>
+                        <?php endif; ?>
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank"
+                              class="text-sm text-gray-800 font-medium hover:text-primary hover:underline"><?= e($formattedName) ?></a>
+                            <?php if (!empty($entry['pdf_url'])): ?>
+                              <span
+                                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                            <?php endif; ?>
+                          </div>
+                          <?php if (!empty($entry['member_number'])): ?>
+                            <p class="text-xs text-gray-500 mt-0.5">Member #: <?= e($entry['member_number']) ?></p>
                           <?php endif; ?>
-                          <?php if (!empty($entry['pdf_url'])): ?>
-                            <span
-                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                          <?php if (!empty($entry['tribute'])): ?>
+                            <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
                           <?php endif; ?>
                         </div>
-                        <?php if (!empty($entry['member_number'])): ?>
-                          <p class="text-xs text-gray-500 mt-0.5">Member #: <?= e($entry['member_number']) ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($entry['tribute'])): ?>
-                          <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
-                        <?php endif; ?>
                       </div>
                       <div class="flex items-center gap-2 whitespace-nowrap">
                         <span class="text-sm font-semibold text-gray-600"><?= e((string) $entry['year_of_passing']) ?></span>
