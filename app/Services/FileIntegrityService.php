@@ -32,7 +32,7 @@ class FileIntegrityService
     public static function saveBaseline(array $baseline, ?int $approvedByUserId): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE file_integrity_baseline SET baseline_json = :baseline, approved_by_user_id = :user_id, approved_at = NOW(), last_scan_at = NOW(), last_scan_status = \"OK\", last_scan_report_json = NULL WHERE id = 1');
+        $stmt = $pdo->prepare("UPDATE file_integrity_baseline SET baseline_json = :baseline, approved_by_user_id = :user_id, approved_at = NOW(), last_scan_at = NOW(), last_scan_status = 'OK', last_scan_report_json = NULL WHERE id = 1");
         $stmt->execute([
             'baseline' => json_encode($baseline, JSON_UNESCAPED_SLASHES),
             'user_id' => $approvedByUserId,
