@@ -47,8 +47,9 @@ $items = [
     [
         'key' => 'agm',
         'group' => 'Content',
-        'label' => 'AGM',
+        'label' => 'AGM (coming soon)',
         'icon' => 'celebration',
+        'muted' => true,
         'children' => [
             ['key' => 'agm-dashboard', 'label' => 'Dashboard', 'href' => '/admin/agm/?tab=dashboard', 'path' => '/admin/agm/', 'permission' => 'admin.agm.view'],
             ['key' => 'agm-event', 'label' => 'Event Setup', 'href' => '/admin/agm/?tab=event', 'path' => '/admin/agm/', 'permission' => 'admin.agm.manage'],
@@ -197,8 +198,9 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                     }
                 }
               ?>
-              <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
-                <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
+              <?php $isMuted = !empty($item['muted']); ?>
+              <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?> <?= $isMuted ? 'opacity-60' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
+                <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : ($isMuted ? 'text-gray-500 hover:bg-gray-50' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900') ?>">
                   <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
                   <span class="flex-1"><?= e($item['label']) ?></span>
                   <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>

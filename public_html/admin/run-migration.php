@@ -1881,6 +1881,7 @@ if ($alreadyRun) {
                 [140, 'Longest Distance Travelled by an AGA Member',           null,                     null],
                 [150, 'Longest Distance Pillion',                              null,                     'Shirley Ward Trophy'],
                 [160, 'Peoples Choice Award',                                  null,                     "Greg O'Loughlin Memorial Trophy"],
+                [170, 'Member of the Year',                                    null,                     null],
             ];
             $insertCat = $pdo->prepare('INSERT INTO award_categories (sort_order, name, group_label, memorial_trophy_name, is_active) VALUES (:sort_order, :name, :group_label, :memorial, 1)');
             foreach ($seeds as [$sort, $name, $group, $memorial]) {
@@ -1909,6 +1910,74 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 022 — AGM Awards system', 'status' => 'applied', 'note' => implode(' · ', $applied)];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 022 — AGM Awards system', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 023 — Awards role permissions + Member of the Year category
+//
+// Migration 022 added admin.awards.view and admin.awards.manage to the
+// permission registry, but role_permissions wasn't seeded — same blind
+// spot as the AGM migration 021. Without those rows the AGM Awards
+// sidebar entry is filtered out for everyone, including Webmaster.
+//
+// Also adds the existing Member of the Year recognition as award
+// category #17 so it appears on the trophy wall alongside the AGM
+// trophies. Idempotent — skips if a category named "Member of the
+// Year" already exists.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_023_awards_perms_and_moty';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 023 — Awards perms + Member of the Year', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        // 1. Grant awards permissions to admin role.
+        $grants = [
+            'admin' => ['admin.awards.view', 'admin.awards.manage'],
+        ];
+        $grant = $pdo->prepare(
+            'INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+             SELECT r.id, :perm, 1, NOW(), NOW() FROM roles r WHERE r.name = :role
+             ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()'
+        );
+        $seeded = 0;
+        foreach ($grants as $roleName => $perms) {
+            $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE name = :name LIMIT 1');
+            $roleStmt->execute(['name' => $roleName]);
+            if (!$roleStmt->fetchColumn()) {
+                continue;
+            }
+            foreach ($perms as $perm) {
+                $grant->execute(['perm' => $perm, 'role' => $roleName]);
+                $seeded++;
+            }
+        }
+        $applied[] = "$seeded role-permission row(s) granted";
+
+        // 2. Add Member of the Year as award category if not present.
+        $existsStmt = $pdo->prepare("SELECT id FROM award_categories WHERE name = 'Member of the Year' LIMIT 1");
+        $existsStmt->execute();
+        if ($existsStmt->fetchColumn()) {
+            $applied[] = 'Member of the Year category already present';
+        } else {
+            $insertCat = $pdo->prepare('INSERT INTO award_categories (sort_order, name, group_label, memorial_trophy_name, description, is_active) VALUES (:sort_order, :name, NULL, NULL, :description, 1)');
+            $insertCat->execute([
+                'sort_order' => 170,
+                'name'       => 'Member of the Year',
+                'description'=> 'Annual recognition for the member who has best embodied the spirit of the AGA over the past year. Nominated by fellow members.',
+            ]);
+            $applied[] = 'Member of the Year category seeded (sort 170)';
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 023 — Awards perms + Member of the Year', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 023 — Awards perms + Member of the Year', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 

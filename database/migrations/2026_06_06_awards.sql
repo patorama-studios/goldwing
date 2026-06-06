@@ -77,6 +77,7 @@ SELECT * FROM (
   SELECT 130, 'Longest Distance Travelled by an AGA Member over 65',   NULL, 'Harry Gates Memorial Trophy',     NULL UNION ALL
   SELECT 140, 'Longest Distance Travelled by an AGA Member',           NULL, NULL,                              NULL UNION ALL
   SELECT 150, 'Longest Distance Pillion',                              NULL, 'Shirley Ward Trophy',             NULL UNION ALL
-  SELECT 160, 'Peoples Choice Award',                                  NULL, 'Greg O''Loughlin Memorial Trophy',NULL
+  SELECT 160, 'Peoples Choice Award',                                  NULL, 'Greg O''Loughlin Memorial Trophy',NULL UNION ALL
+  SELECT 170, 'Member of the Year',                                    NULL, NULL,                              'Annual recognition for the member who has best embodied the spirit of the AGA over the past year.'
 ) AS seed
 WHERE NOT EXISTS (SELECT 1 FROM award_categories LIMIT 1);
