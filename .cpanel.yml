@@ -2,4 +2,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home2/goldwing/
-    - /bin/true
+    - /bin/rsync -a --exclude='.git/' /home2/goldwing/repositories/goldwing/ /home2/goldwing/
