@@ -3736,7 +3736,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $colCollectMoto  = $dirPrefCols['A'] ?? null;
         $colBedOrTent    = $dirPrefCols['C'] ?? null;
         $colTools        = $dirPrefCols['D'] ?? null;
-        $colExcludeMember = $dirPrefCols['E'] ?? null;  // "Exclude Member Directory" (printed)
         $colExcludeElec   = $dirPrefCols['F'] ?? null;  // "Exclude Electronic Directory" (online)
 
         // Build optional selects for new role columns (added by Migration 003/005).
@@ -3762,16 +3761,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         // Build the directory exclusion clause. A member is hidden from the
         // online directory if ANY of these are true:
         //   - privacy_level = 'F'           (dropdown "Exclude from directory")
-        //   - directory_pref E = 1          ("Exclude Member Directory" — printed)
         //   - directory_pref F = 1          ("Exclude Electronic Directory" — online)
-        // Each branch is only added if the relevant column actually exists, so
-        // older DB layouts degrade gracefully without throwing.
+        // directory_pref E ("Exclude Member Directory") only applies to the
+        // printed/mailed directory — it must NOT hide a member from the
+        // online directory, otherwise legacy members default-excluded from
+        // print disappear here too.
         $excludeParts = [];
         if ($hasPrivacyLevel) {
             $excludeParts[] = "(m.privacy_level IS NULL OR m.privacy_level <> 'F')";
-        }
-        if ($colExcludeMember) {
-            $excludeParts[] = "(m.$colExcludeMember = 0 OR m.$colExcludeMember IS NULL)";
         }
         if ($colExcludeElec) {
             $excludeParts[] = "(m.$colExcludeElec = 0 OR m.$colExcludeElec IS NULL)";
