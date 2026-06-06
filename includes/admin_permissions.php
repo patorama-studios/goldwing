@@ -204,6 +204,21 @@ function current_admin_can(string $permissionKey, ?array $user = null): bool
 
 function admin_render_forbidden(string $message = 'You do not have access to this area.'): void
 {
+    $user = current_user();
+    $hasAnyAdminPermission = false;
+    if ($user) {
+        foreach (admin_permission_keys() as $key) {
+            if (current_admin_can($key, $user)) {
+                $hasAnyAdminPermission = true;
+                break;
+            }
+        }
+    }
+    if (!$hasAnyAdminPermission) {
+        header('Location: /member/index.php');
+        exit;
+    }
+
     http_response_code(403);
     $pageTitle = 'Access denied';
     $activePage = null;
@@ -217,7 +232,7 @@ function admin_render_forbidden(string $message = 'You do not have access to thi
     echo '<div class="rounded-2xl border border-rose-100 bg-rose-50 px-6 py-5 text-rose-700">';
     echo '<h1 class="font-display text-2xl font-bold text-rose-700">Access denied</h1>';
     echo '<p class="mt-2 text-sm">' . e($message) . '</p>';
-    echo '</div></div></main></div>';    
+    echo '</div></div></main></div>';
     echo '</body></html>';
     exit;
 }

@@ -162,7 +162,7 @@ if (current_admin_can('admin.payments.refund')) {
 }
 ```
 
-`require_permission($permissionKey)` — `require_login()` then `current_admin_can()`. On failure renders a 403 page for HTML or returns `{"error":"Forbidden"}` for `/api/*` and JSON. Use at the top of any permission-gated admin page.
+`require_permission($permissionKey)` — `require_login()` then `current_admin_can()`. On failure: `/api/*` and JSON requests get `{"error":"Forbidden"}`; HTML requests go through `admin_render_forbidden()`, which redirects users with **no** admin permissions straight back to `/member/index.php` (so plain members never see the admin shell) and only renders the 403 card for partial-admin roles (e.g. a webmaster hitting a page they don't have). Use at the top of any permission-gated admin page.
 
 `require_role(['admin'])` — in `app/bootstrap.php`. Hard role gate; bypasses the permission registry entirely. Used by older code, by `/admin/help/*` pages (which check `['admin', 'webmaster']`), and as a backstop on the most sensitive pages.
 
