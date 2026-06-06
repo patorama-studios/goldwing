@@ -157,6 +157,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
 <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
 <script src="/assets/js/goldwing-wysiwyg.js" defer></script>
 <script src="/assets/js/password-strength.js" defer></script>
+<script src="/assets/js/backend-nav.js" defer></script>
 <?php if ($loadGoogleMaps): ?>
   <script src="/assets/js/address-autocomplete.js" defer></script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=<?= e($googleMapsApiKey) ?>&libraries=places&callback=goldwingAddressAutocompleteInit"></script>
