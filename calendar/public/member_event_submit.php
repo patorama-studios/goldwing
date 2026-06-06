@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     calendar_csrf_verify();
 
     $title = trim($_POST['title'] ?? '');
-    $description = trim($_POST['description'] ?? '');
+    $description = calendar_sanitize_html(trim($_POST['description'] ?? ''));
     $mediaId = (int) ($_POST['media_id'] ?? 0);
     $scope = $_POST['scope'] ?? 'CHAPTER';
     $chapterId = (int) ($_POST['chapter_id'] ?? 0);
@@ -287,10 +287,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               Event Title
               <input type="text" name="title" value="<?php echo calendar_e($old('title')); ?>" placeholder="e.g. Summer Goldwing Rally 2024" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
             </label>
-            <label class="block text-sm font-medium text-gray-700">
-              Description
-              <textarea name="description" rows="6" placeholder="Describe the event details, itinerary, and requirements..." class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required><?php echo calendar_e($old('description')); ?></textarea>
-            </label>
+            <div>
+              <p class="block text-sm font-medium text-gray-700 mb-2">Description</p>
+              <textarea name="description" data-wysiwyg rows="6" placeholder="Describe the event details, itinerary, and requirements..." required><?php echo calendar_e($old('description')); ?></textarea>
+            </div>
 
             <div>
               <div class="flex items-center justify-between">

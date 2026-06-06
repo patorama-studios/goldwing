@@ -2465,7 +2465,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <form data-tour="send-notice-form" method="post" class="space-y-4" id="notice-create-form">
                 <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                 <input type="hidden" name="action" value="create_notice_admin">
-                <input type="hidden" name="notice_content" id="notice-content-input">
                 <input type="hidden" name="notice_attachment_url" id="notice-attachment-url">
                 <input type="hidden" name="notice_attachment_type" id="notice-attachment-type">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2515,38 +2514,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </select>
                   </label>
                 </div>
-                <div>
+                <div data-tour="send-notice-editor">
                   <p class="text-sm font-medium text-gray-700 mb-2">Description</p>
-                  <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs"
-                    id="notice-toolbar">
-                    <select id="notice-font" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
-                      <option value="">Font</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Times New Roman, serif">Times</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                    </select>
-                    <select id="notice-size" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs">
-                      <option value="2">Small</option>
-                      <option value="3" selected>Normal</option>
-                      <option value="4">Large</option>
-                      <option value="5">XL</option>
-                    </select>
-                    <input type="color" id="notice-color" class="h-7 w-8 border border-gray-200 rounded">
-                    <button type="button" data-command="bold"
-                      class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
-                    <button type="button" data-command="italic"
-                      class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
-                    <button type="button" data-command="underline"
-                      class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
-                    <button type="button" data-command="insertUnorderedList"
-                      class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
-                    <button type="button" id="notice-link"
-                      class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
-                  </div>
-                  <div id="notice-editor" data-tour="send-notice-editor"
-                    class="mt-2 min-h-[160px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none"
-                    contenteditable="true"></div>
+                  <textarea name="notice_content" id="notice-content-input" data-wysiwyg rows="6"
+                    placeholder="Write the notice details…" required></textarea>
                 </div>
                 <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4" id="notice-upload-zone">
                   <div class="flex items-center justify-between gap-3">
@@ -2825,10 +2796,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </select>
                     </label>
                   </div>
-                  <label class="text-sm font-medium text-gray-700 block">Description (HTML)
-                    <textarea name="notice_content" rows="8" required
-                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono"><?= e($notice['content']) ?></textarea>
-                  </label>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700 mb-1">Description</p>
+                    <textarea name="notice_content" data-wysiwyg rows="8"
+                      placeholder="Write the notice details…" required><?= e($notice['content']) ?></textarea>
+                  </div>
 
                   <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-3"
                     data-edit-upload-zone>
@@ -2892,14 +2864,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </section>
         <script>
           (() => {
-            const noticeEditor = document.getElementById('notice-editor');
-            const noticeContentInput = document.getElementById('notice-content-input');
             const noticeForm = document.getElementById('notice-create-form');
-            const noticeToolbar = document.getElementById('notice-toolbar');
-            const fontSelect = document.getElementById('notice-font');
-            const sizeSelect = document.getElementById('notice-size');
-            const colorPicker = document.getElementById('notice-color');
-            const linkBtn = document.getElementById('notice-link');
             const audienceScope = document.getElementById('notice-audience-scope');
             const audienceState = document.getElementById('notice-audience-state');
             const audienceChapter = document.getElementById('notice-audience-chapter');
@@ -2926,46 +2891,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             if (audienceScope) {
               audienceScope.addEventListener('change', updateAudienceFields);
               updateAudienceFields();
-            }
-
-            if (noticeToolbar) {
-              noticeToolbar.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-command]');
-                if (!button) {
-                  return;
-                }
-                document.execCommand(button.dataset.command, false, null);
-              });
-            }
-            if (fontSelect) {
-              fontSelect.addEventListener('change', () => {
-                if (fontSelect.value) {
-                  document.execCommand('fontName', false, fontSelect.value);
-                }
-              });
-            }
-            if (sizeSelect) {
-              sizeSelect.addEventListener('change', () => {
-                document.execCommand('fontSize', false, sizeSelect.value);
-              });
-            }
-            if (colorPicker) {
-              colorPicker.addEventListener('input', () => {
-                document.execCommand('foreColor', false, colorPicker.value);
-              });
-            }
-            if (linkBtn) {
-              linkBtn.addEventListener('click', () => {
-                const url = prompt('Enter URL');
-                if (url) {
-                  document.execCommand('createLink', false, url);
-                }
-              });
-            }
-            if (noticeForm && noticeContentInput && noticeEditor) {
-              noticeForm.addEventListener('submit', () => {
-                noticeContentInput.value = noticeEditor.innerHTML.trim();
-              });
             }
 
             const uploadFile = async (file, context) => {

@@ -172,6 +172,38 @@ function calendar_register_media(array $data): ?int
     return null;
 }
 
+function calendar_sanitize_html(string $html): string
+{
+    // Mirrors calendar_register_media's lazy bootstrap of App\Services classes.
+    if (!class_exists('App\\Services\\DomSnapshotService')) {
+        $path = __DIR__ . '/../../app/Services/DomSnapshotService.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+    }
+    if (class_exists('App\\Services\\DomSnapshotService')) {
+        return App\Services\DomSnapshotService::sanitize($html);
+    }
+    // Fallback: strip script/style if the service is unavailable for some reason.
+    return preg_replace('#<(script|style)\b[^>]*>.*?</\\1>#is', '', $html) ?? $html;
+}
+
+function calendar_render_description(?string $value): string
+{
+    $value = (string) ($value ?? '');
+    if ($value === '') {
+        return '';
+    }
+    // Legacy events were stored as plain text. If there are no tags, preserve
+    // line breaks the way the old nl2br(escape) renderer did.
+    if (strip_tags($value) === $value) {
+        return nl2br(calendar_e($value));
+    }
+    // Newer events store sanitised HTML from the WYSIWYG. Re-sanitise on
+    // output as defence-in-depth.
+    return calendar_sanitize_html($value);
+}
+
 function calendar_table_exists(PDO $pdo, string $table): bool
 {
     $stmt = $pdo->query('SHOW TABLES');

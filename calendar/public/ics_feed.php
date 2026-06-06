@@ -124,7 +124,7 @@ foreach ($items as $item) {
         $lines[] = 'DTEND;TZID=' . $tz . ':' . $end->format('Ymd\THis');
     }
     $lines[] = 'SUMMARY:' . ics_escape((string) $event['title']);
-    $lines[] = 'DESCRIPTION:' . ics_escape((string) ($event['description'] ?? ''));
+    $lines[] = 'DESCRIPTION:' . ics_escape(html_entity_decode(strip_tags((string) ($event['description'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     $lines[] = 'LOCATION:' . ics_escape((string) $location);
     $lines[] = 'STATUS:' . $status;
     if ($url !== '') {

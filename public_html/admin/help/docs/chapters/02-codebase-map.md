@@ -175,7 +175,7 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | `store/` | Storefront: `catalog.php`, `product.php`, `cart.php`, `checkout.php`, `orders.php`. |
 | `api/` | Server-to-server: `stripe_webhook.php`, `ai_settings.php`, `feedback.php`, `pages.php`. |
 | `auth/` | OAuth callbacks: `google.php`, `apple.php`. |
-| `assets/` | `styles.css`, `navigation.js`, `js/` (admin-members-list, address-autocomplete, password-strength, `tours/`), `css/`, `img/`. |
+| `assets/` | `styles.css`, `navigation.js`, `js/` (admin-members-list, address-autocomplete, password-strength, `goldwing-wysiwyg.js` — shared Quill + emoji-picker initialiser for `textarea[data-wysiwyg]`, `tours/`), `css/`, `img/`. |
 | `uploads/` | User media: `library/`, `members/`, `avatars/`, `bikes/`, `notices/`, `store/`, `wings/`, `about/`. `.htaccess` blocks PHP here. |
 
 #### `public_html/admin/`

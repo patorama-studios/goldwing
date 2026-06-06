@@ -19,6 +19,7 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -119,10 +120,42 @@ $loadGoogleMaps = $googleMapsApiKey !== '';
     .stagger-4 {
       animation-delay: 0.32s;
     }
+
+    /* Quill rich-text editor — match the surrounding form controls. */
+    .gw-wysiwyg { position: relative; }
+    .gw-wysiwyg .ql-toolbar.ql-snow {
+      border: 1px solid #e5e7eb;
+      border-bottom: 0;
+      border-radius: 0.5rem 0.5rem 0 0;
+      background: #f9fafb;
+    }
+    .gw-wysiwyg .ql-container.ql-snow {
+      border: 1px solid #e5e7eb;
+      border-radius: 0 0 0.5rem 0.5rem;
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.875rem;
+      min-height: 160px;
+    }
+    .gw-wysiwyg .ql-editor { min-height: 160px; }
+    .gw-wysiwyg .ql-editor:focus { outline: none; }
+    .gw-wysiwyg .gw-emoji-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; line-height: 1;
+    }
+    .gw-emoji-popover {
+      position: absolute; z-index: 50;
+      box-shadow: 0 12px 30px rgba(17, 24, 39, 0.18);
+      border-radius: 0.75rem; overflow: hidden;
+    }
+    .gw-emoji-popover[hidden] { display: none; }
   </style>
 </head>
 <body class="bg-background-light text-gray-800 font-sans transition-colors duration-300">
 
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js" defer></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
+<script src="/assets/js/goldwing-wysiwyg.js" defer></script>
 <script src="/assets/js/password-strength.js" defer></script>
 <?php if ($loadGoogleMaps): ?>
   <script src="/assets/js/address-autocomplete.js" defer></script>

@@ -236,7 +236,7 @@ ob_start();
     </div>
 
     <section class="event-description">
-        <?php echo nl2br(calendar_e($event['description'])); ?>
+        <?php echo calendar_render_description($event['description']); ?>
     </section>
 
     <section class="event-actions">

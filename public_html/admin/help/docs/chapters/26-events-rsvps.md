@@ -133,7 +133,7 @@ Most of what the club does is rides, breakfasts, and meetings, and the website's
 
 `calendar/sql/schema.sql` creates:
 
-- **`calendar_events`** — the modern event table. Columns: `title`, `slug`, `description`, `media_id` (thumbnail), `scope` (`CHAPTER`/`NATIONAL`), `chapter_id`, `event_type` (`in_person`/`online`/`hybrid`), `timezone`, `start_at`, `end_at`, `all_day`, `recurrence_rule` (RRULE), `rsvp_enabled`, `is_paid`, `ticket_product_id`, `capacity`, `sales_close_at`, `map_url`, `map_zoom`, `online_url`, `meeting_point`, `destination`, `status` (`published`/`cancelled`, plus an implicit `pending` for member-submitted events awaiting admin approval), `created_by`, `created_at`.
+- **`calendar_events`** — the modern event table. Columns: `title`, `slug`, `description` (sanitised HTML from the WYSIWYG editor, utf8mb4 so emoji are safe), `media_id` (thumbnail), `scope` (`CHAPTER`/`NATIONAL`), `chapter_id`, `event_type` (`in_person`/`online`/`hybrid`), `timezone`, `start_at`, `end_at`, `all_day`, `recurrence_rule` (RRULE), `rsvp_enabled`, `is_paid`, `ticket_product_id`, `capacity`, `sales_close_at`, `map_url`, `map_zoom`, `online_url`, `meeting_point`, `destination`, `status` (`published`/`cancelled`, plus an implicit `pending` for member-submitted events awaiting admin approval), `created_by`, `created_at`.
 - **`calendar_event_rsvps`** — one row per `(event_id, user_id)` (unique key), `qty`, `notes`, `status` (`going`/`cancelled`).
 - **`calendar_event_tickets`** — paid-event tickets, linked to a `calendar_orders` row + Stripe payment.
 - **`calendar_refund_requests`** — refund queue for paid tickets.
@@ -217,6 +217,7 @@ Reminder/digest behaviour comes from `notifications.event_reminders_enabled` and
 - **RRULE support is partial.** `FREQ=DAILY|WEEKLY|MONTHLY` + `INTERVAL`, `BYDAY`, `UNTIL`. No yearly, no `BYSETPOS` ("last Sunday of the month" doesn't work), no exception dates.
 - **The calendar module has its own session bootstrap and CSRF.** `app/bootstrap.php` does **not** run on `/calendar/` requests. Helpers like `db()`, `current_user()`, `e()` aren't available — use `calendar_db()`, `calendar_current_user()`, `calendar_e()`.
 - **No event-creation broadcast.** Members aren't emailed when a new event is published. Discovery is via the weekly digest and the public calendar. Instant notify-on-publish would need wiring to `App\Services\NotificationService`.
+- **Event descriptions are WYSIWYG HTML, not plain text.** All three forms (`admin_event_create.php`, `admin_event_view.php` edit, `member_event_submit.php`) wire a Quill editor onto `textarea[data-wysiwyg]`. Server sanitises via `calendar_sanitize_html()` (wraps `App\Services\DomSnapshotService::sanitize`) before insert/update. Public render uses `calendar_render_description()` which emits sanitised HTML — but falls back to `nl2br(calendar_e(...))` for legacy plain-text rows. ICS exports (`ics.php`, `ics_feed.php`) `strip_tags` before `ics_escape` so calendar invites stay clean text.
 
 </details>
 

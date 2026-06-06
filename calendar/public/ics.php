@@ -48,7 +48,7 @@ $lines = [
     'DTSTART;TZID=' . $tz . ':' . $dtStart,
     'DTEND;TZID=' . $tz . ':' . $dtEnd,
     'SUMMARY:' . ics_escape($event['title']),
-    'DESCRIPTION:' . ics_escape($event['description']),
+    'DESCRIPTION:' . ics_escape(html_entity_decode(strip_tags((string) $event['description']), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
     'LOCATION:' . ics_escape((string) $location),
     'END:VEVENT',
     'END:VCALENDAR',
