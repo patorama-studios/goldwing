@@ -44,6 +44,23 @@
   </div>
 </section>
 
+<!-- ── Membership showcase video ──────────────────────────────── -->
+<section class="membership-video">
+  <div class="container membership-video__header">
+    <p class="membership-video__eyebrow">See the member experience</p>
+    <h2 class="membership-video__title">Inside the A.G.A. member portal</h2>
+  </div>
+  <div class="membership-video__stage">
+    <video class="membership-video__player"
+           controls
+           preload="metadata"
+           playsinline
+           poster="/assets/img/membership-video-poster.jpg">
+      <source src="/assets/videos/goldwing-membership-showcase.mp4" type="video/mp4">
+    </video>
+  </div>
+</section>
+
 <section class="membership-pricing" id="pricing">
   <div class="container">
     <div class="membership-pricing__intro">
