@@ -1792,6 +1792,127 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 022 — AGM Awards system (categories + winners + photos)
+// Creates the trophy catalog, annual winners join table, and the per-winner
+// photo gallery. Seeds the 16 trophy categories from the AGM master list,
+// including the 5 memorial trophy names. Idempotent — re-running after seed
+// is a no-op because the seed INSERT is gated on an empty award_categories.
+//
+// Feature toggle lives separately in settings_global (awards.feature_status).
+// Default is "coming_soon" so the member-facing page renders a teaser until
+// data is in place; admin flips to "live" via the Awards admin landing.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_022_awards_system';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 022 — AGM Awards system', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS award_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sort_order INT NOT NULL DEFAULT 0,
+            name VARCHAR(180) NOT NULL,
+            group_label VARCHAR(120) NULL,
+            memorial_trophy_name VARCHAR(180) NULL,
+            description VARCHAR(500) NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_award_categories_sort (sort_order),
+            INDEX idx_award_categories_group (group_label)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $applied[] = 'award_categories table ready';
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS award_winners (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category_id INT NOT NULL,
+            year SMALLINT NOT NULL,
+            member_id INT NULL,
+            member_name_override VARCHAR(200) NULL,
+            bike_description VARCHAR(255) NULL,
+            notes VARCHAR(500) NULL,
+            awarded_at DATE NULL,
+            created_by_user_id INT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_award_winner_category_year (category_id, year),
+            INDEX idx_award_winners_year (year),
+            INDEX idx_award_winners_member (member_id),
+            CONSTRAINT fk_award_winners_category FOREIGN KEY (category_id) REFERENCES award_categories(id) ON DELETE CASCADE,
+            CONSTRAINT fk_award_winners_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $applied[] = 'award_winners table ready';
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS award_winner_photos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            winner_id INT NOT NULL,
+            media_path VARCHAR(512) NOT NULL,
+            caption VARCHAR(255) NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_primary TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_award_winner_photos_winner (winner_id),
+            CONSTRAINT fk_award_winner_photos_winner FOREIGN KEY (winner_id) REFERENCES award_winners(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $applied[] = 'award_winner_photos table ready';
+
+        // Seed 16 categories ONLY if the table is empty so admin reorders survive
+        // re-runs. apostrophe in "Greg O'Loughlin" needs SQL-style doubling.
+        $countCats = (int) $pdo->query('SELECT COUNT(*) FROM award_categories')->fetchColumn();
+        if ($countCats === 0) {
+            $seeds = [
+                [ 10, 'Best Original Classic Goldwing GL1000, GL1100, GL1200', 'Best Original Goldwing', null],
+                [ 20, 'Best Original GL1500',                                  'Best Original Goldwing', null],
+                [ 30, 'Best Original GL1800',                                  'Best Original Goldwing', null],
+                [ 40, 'Best Original F6B',                                     'Best Original Goldwing', null],
+                [ 50, 'Best Custom Classic Goldwing GL1000, GL1100, GL1200',   'Best Custom Goldwing',   null],
+                [ 60, 'Best Custom Goldwing GL1500',                           'Best Custom Goldwing',   null],
+                [ 70, 'Best Custom Goldwing GL1800',                           'Best Custom Goldwing',   null],
+                [ 80, 'Best Custom F6B',                                       'Best Custom Goldwing',   null],
+                [ 90, 'Best Goldwing and Trailer',                             null,                     'Burden Memorial Trophy'],
+                [100, 'Best Goldwing Trike',                                   null,                     null],
+                [110, 'Best Goldwing and Sidecar',                             null,                     'Harry Ward Memorial Trophy'],
+                [120, 'Best non-Goldwing',                                     null,                     null],
+                [130, 'Longest Distance Travelled by an AGA Member over 65',   null,                     'Harry Gates Memorial Trophy'],
+                [140, 'Longest Distance Travelled by an AGA Member',           null,                     null],
+                [150, 'Longest Distance Pillion',                              null,                     'Shirley Ward Trophy'],
+                [160, 'Peoples Choice Award',                                  null,                     "Greg O'Loughlin Memorial Trophy"],
+            ];
+            $insertCat = $pdo->prepare('INSERT INTO award_categories (sort_order, name, group_label, memorial_trophy_name, is_active) VALUES (:sort_order, :name, :group_label, :memorial, 1)');
+            foreach ($seeds as [$sort, $name, $group, $memorial]) {
+                $insertCat->execute([
+                    'sort_order' => $sort,
+                    'name'       => $name,
+                    'group_label'=> $group,
+                    'memorial'   => $memorial,
+                ]);
+            }
+            $applied[] = count($seeds) . ' trophy categories seeded';
+        } else {
+            $applied[] = "$countCats existing categories left untouched";
+        }
+
+        // Default feature toggle to coming_soon if not set yet.
+        $existingStatus = SettingsService::getGlobal('awards.feature_status', null);
+        if ($existingStatus === null) {
+            SettingsService::setGlobal((int) $user['id'], 'awards.feature_status', 'coming_soon');
+            $applied[] = 'feature toggle defaulted to coming_soon';
+        } else {
+            $applied[] = "feature toggle already set ($existingStatus)";
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 022 — AGM Awards system', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 022 — AGM Awards system', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

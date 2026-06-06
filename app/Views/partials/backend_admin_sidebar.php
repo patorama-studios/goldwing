@@ -67,6 +67,7 @@ $items = [
 
     // RECOGNITION
     ['key' => 'member-of-year', 'group' => 'Recognition', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/admin/member-of-the-year', 'permission' => 'admin.member_of_year.view'],
+    ['key' => 'awards', 'group' => 'Recognition', 'label' => 'AGM Awards', 'icon' => 'workspace_premium', 'href' => '/admin/awards/', 'permission' => 'admin.awards.view'],
     ['key' => 'fallen-wings', 'group' => 'Recognition', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/admin/index.php?page=fallen-wings', 'permission' => 'admin.pages.view'],
 
     // STORE

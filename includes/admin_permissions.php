@@ -53,6 +53,10 @@ function admin_permission_registry(): array
             ['key' => 'admin.member_of_year.manage', 'label' => 'Manage Member of the Year submissions'],
             ['key' => 'admin.forms.export', 'label' => 'Export form submissions'],
         ],
+        'Awards' => [
+            ['key' => 'admin.awards.view', 'label' => 'View AGM awards and winners'],
+            ['key' => 'admin.awards.manage', 'label' => 'Manage AGM awards, winners, and feature toggle'],
+        ],
         'Notification Hub' => [
             ['key' => 'admin.requests.view', 'label' => 'View pending requests'],
             ['key' => 'admin.requests.action', 'label' => 'Approve / deny / send feedback on requests'],
@@ -130,6 +134,8 @@ function admin_default_role_permissions(): array
             'admin.members.view',
             'admin.member_of_year.view',
             'admin.member_of_year.manage',
+            'admin.awards.view',
+            'admin.awards.manage',
             'admin.events.manage',
             'admin.calendar.view',
             'admin.calendar.manage',
