@@ -3,3 +3,6 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home2/goldwing/
     - /bin/rsync -a --exclude='.git/' /home2/goldwing/repositories/goldwing/ /home2/goldwing/
+    - /bin/chmod 711 /home2/goldwing
+    - /usr/bin/find /home2/goldwing/public_html -type d -exec /bin/chmod 755 {} +
+    - /usr/bin/find /home2/goldwing/public_html -type f -exec /bin/chmod 644 {} +
