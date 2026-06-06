@@ -1260,6 +1260,404 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 019 — AGM Registration system schema
+//
+// Creates the six tables backing the AGM module:
+//   agm_events, agm_products, agm_form_fields,
+//   agm_registrations, agm_registration_items, agm_registration_motorcycles
+//
+// Also ensures the 'agm' row exists in payment_channels (so the secondary
+// Stripe account has an invoice counter + webhook health tracking), adds a
+// matching settings_payments row, and seeds the agm_manager role.
+//
+// All CREATEs are IF NOT EXISTS and all INSERTs are ON DUPLICATE KEY UPDATE
+// / INSERT IGNORE, so this migration is safe to re-run.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_019_agm_schema';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 019 — AGM schema', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_events (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              year INT NOT NULL,
+              slug VARCHAR(100) NOT NULL,
+              title VARCHAR(200) NOT NULL,
+              subtitle VARCHAR(200) NULL,
+              hosting_chapter VARCHAR(150) NULL,
+              venue_name VARCHAR(200) NULL,
+              venue_address VARCHAR(255) NULL,
+              venue_phone VARCHAR(40) NULL,
+              start_date DATE NULL,
+              end_date DATE NULL,
+              registration_opens_at DATETIME NULL,
+              registration_closes_at DATETIME NULL,
+              late_fee_starts_at DATETIME NULL,
+              description_html MEDIUMTEXT NULL,
+              cover_image_path VARCHAR(255) NULL,
+              contact_name VARCHAR(150) NULL,
+              contact_phone VARCHAR(40) NULL,
+              contact_email VARCHAR(150) NULL,
+              bank_transfer_instructions MEDIUMTEXT NULL,
+              allow_bank_transfer TINYINT(1) NOT NULL DEFAULT 1,
+              allow_stripe TINYINT(1) NOT NULL DEFAULT 1,
+              status ENUM('draft','published','closed','archived') NOT NULL DEFAULT 'draft',
+              is_current TINYINT(1) NOT NULL DEFAULT 0,
+              stripe_account_key VARCHAR(40) NOT NULL DEFAULT 'agm',
+              created_by_user_id INT NULL,
+              created_at DATETIME NOT NULL,
+              updated_at DATETIME NULL,
+              UNIQUE KEY uniq_agm_events_year_slug (year, slug),
+              INDEX idx_agm_events_year (year),
+              INDEX idx_agm_events_status (status),
+              INDEX idx_agm_events_is_current (is_current)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_events ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_products (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              agm_event_id INT NOT NULL,
+              category ENUM('registration','merchandise','meal','custom') NOT NULL DEFAULT 'custom',
+              name VARCHAR(200) NOT NULL,
+              description TEXT NULL,
+              early_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+              late_price DECIMAL(10,2) NULL,
+              member_only TINYINT(1) NOT NULL DEFAULT 0,
+              non_member_only TINYINT(1) NOT NULL DEFAULT 0,
+              requires_choice TINYINT(1) NOT NULL DEFAULT 0,
+              choices_json TEXT NULL,
+              quantity_limit INT NULL,
+              per_registration_limit INT NULL,
+              sort_order INT NOT NULL DEFAULT 0,
+              is_active TINYINT(1) NOT NULL DEFAULT 1,
+              created_at DATETIME NOT NULL,
+              updated_at DATETIME NULL,
+              INDEX idx_agm_products_event (agm_event_id, category, sort_order),
+              CONSTRAINT fk_agm_products_event FOREIGN KEY (agm_event_id) REFERENCES agm_events(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_products ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_form_fields (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              agm_event_id INT NOT NULL,
+              field_key VARCHAR(80) NOT NULL,
+              label VARCHAR(200) NOT NULL,
+              helper_text VARCHAR(255) NULL,
+              field_group ENUM('personal','bike','emergency','other') NOT NULL DEFAULT 'other',
+              field_type ENUM('text','number','checkbox','select','textarea') NOT NULL DEFAULT 'text',
+              options_json TEXT NULL,
+              is_required TINYINT(1) NOT NULL DEFAULT 0,
+              sort_order INT NOT NULL DEFAULT 0,
+              is_active TINYINT(1) NOT NULL DEFAULT 1,
+              created_at DATETIME NOT NULL,
+              updated_at DATETIME NULL,
+              UNIQUE KEY uniq_agm_form_field_key (agm_event_id, field_key),
+              INDEX idx_agm_form_fields_event (agm_event_id, sort_order),
+              CONSTRAINT fk_agm_form_fields_event FOREIGN KEY (agm_event_id) REFERENCES agm_events(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_form_fields ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_registrations (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              agm_event_id INT NOT NULL,
+              registration_number VARCHAR(40) NOT NULL,
+              member_id INT NULL,
+              user_id INT NULL,
+              submitted_by_user_id INT NULL,
+              attendee1_name VARCHAR(150) NOT NULL,
+              attendee1_member_number VARCHAR(40) NULL,
+              attendee1_is_over_65 TINYINT(1) NOT NULL DEFAULT 0,
+              attendee2_name VARCHAR(150) NULL,
+              attendee2_member_number VARCHAR(40) NULL,
+              attendee2_is_over_65 TINYINT(1) NOT NULL DEFAULT 0,
+              children_text TEXT NULL,
+              contact_phone_1 VARCHAR(40) NULL,
+              contact_phone_2 VARCHAR(40) NULL,
+              address VARCHAR(255) NULL,
+              postcode VARCHAR(20) NULL,
+              email VARCHAR(150) NOT NULL,
+              chapter VARCHAR(120) NULL,
+              emergency_1_name VARCHAR(150) NULL,
+              emergency_1_phone VARCHAR(40) NULL,
+              emergency_2_name VARCHAR(150) NULL,
+              emergency_2_phone VARCHAR(40) NULL,
+              dietary_requirements TEXT NULL,
+              custom_fields_json TEXT NULL,
+              pricing_tier ENUM('early','late') NOT NULL DEFAULT 'early',
+              subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+              total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+              payment_method ENUM('stripe','bank_transfer','manual','comp') NOT NULL DEFAULT 'stripe',
+              payment_status ENUM('pending','awaiting_bank_transfer','paid','refunded','cancelled') NOT NULL DEFAULT 'pending',
+              stripe_session_id VARCHAR(120) NULL,
+              stripe_payment_intent_id VARCHAR(120) NULL,
+              paid_at DATETIME NULL,
+              refunded_at DATETIME NULL,
+              cancelled_at DATETIME NULL,
+              admin_notes TEXT NULL,
+              ip_address VARCHAR(64) NULL,
+              user_agent VARCHAR(255) NULL,
+              created_at DATETIME NOT NULL,
+              updated_at DATETIME NULL,
+              UNIQUE KEY uniq_agm_registration_number (registration_number),
+              INDEX idx_agm_registrations_event (agm_event_id, payment_status, created_at),
+              INDEX idx_agm_registrations_member (member_id),
+              INDEX idx_agm_registrations_email (email),
+              INDEX idx_agm_registrations_stripe_session (stripe_session_id),
+              INDEX idx_agm_registrations_stripe_intent (stripe_payment_intent_id),
+              CONSTRAINT fk_agm_registrations_event FOREIGN KEY (agm_event_id) REFERENCES agm_events(id) ON DELETE RESTRICT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_registrations ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_registration_items (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              agm_registration_id INT NOT NULL,
+              agm_product_id INT NULL,
+              category VARCHAR(40) NOT NULL,
+              name_snapshot VARCHAR(200) NOT NULL,
+              choice_label_snapshot VARCHAR(200) NULL,
+              unit_price DECIMAL(10,2) NOT NULL,
+              pricing_tier_snapshot ENUM('early','late') NOT NULL DEFAULT 'early',
+              quantity INT NOT NULL DEFAULT 1,
+              line_total DECIMAL(10,2) NOT NULL,
+              created_at DATETIME NOT NULL,
+              INDEX idx_agm_registration_items_reg (agm_registration_id),
+              CONSTRAINT fk_agm_items_reg FOREIGN KEY (agm_registration_id) REFERENCES agm_registrations(id) ON DELETE CASCADE,
+              CONSTRAINT fk_agm_items_product FOREIGN KEY (agm_product_id) REFERENCES agm_products(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_registration_items ready';
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS agm_registration_motorcycles (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              agm_registration_id INT NOT NULL,
+              position TINYINT NOT NULL DEFAULT 1,
+              owner_name VARCHAR(150) NULL,
+              make VARCHAR(80) NULL,
+              model VARCHAR(80) NULL,
+              year_built SMALLINT NULL,
+              registration_plate VARCHAR(40) NULL,
+              is_trike TINYINT(1) NOT NULL DEFAULT 0,
+              is_sidecar TINYINT(1) NOT NULL DEFAULT 0,
+              has_trailer TINYINT(1) NOT NULL DEFAULT 0,
+              created_at DATETIME NOT NULL,
+              INDEX idx_agm_motos_reg (agm_registration_id, position),
+              CONSTRAINT fk_agm_motos_reg FOREIGN KEY (agm_registration_id) REFERENCES agm_registrations(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $applied[] = 'agm_registration_motorcycles ready';
+
+        // Ensure the 'agm' payment channel exists (idempotent — seeded by
+        // payments_module.sql on fresh installs, but older databases may not
+        // have it yet).
+        $pdo->exec("
+            INSERT INTO payment_channels (code, label, is_active, created_at)
+            VALUES ('agm', 'AGM', 0, NOW())
+            ON DUPLICATE KEY UPDATE label = VALUES(label)
+        ");
+        $applied[] = 'agm payment channel ensured';
+
+        $pdo->exec("
+            INSERT INTO settings_payments (channel_id, mode, invoice_prefix, created_at)
+            SELECT pc.id, 'test', 'AGM', NOW()
+            FROM payment_channels pc
+            WHERE pc.code = 'agm'
+            ON DUPLICATE KEY UPDATE invoice_prefix = VALUES(invoice_prefix)
+        ");
+        $applied[] = 'agm settings_payments row ensured';
+
+        // Seed the agm_manager role so the AGM coordinator can be granted
+        // access without seeing membership or store finances. Permissions for
+        // this role are registered in includes/admin_permissions.php.
+        $pdo->exec("INSERT IGNORE INTO roles (name) VALUES ('agm_manager')");
+        $applied[] = 'agm_manager role ensured';
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 019 — AGM schema', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 019 — AGM schema', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 020 — Seed Perth AGM 2026 event + product catalogue
+//
+// Source: 2026 AGM Rego Form v5.pdf — Friday 1 May – Sunday 3 May 2026 at
+// Discovery Park Caversham, hosted by Perth Chapter. Registration closes
+// 16 March 2026; late pricing kicks in 17 March 2026.
+//
+// Event is inserted in 'draft' status; publish it from
+// /admin/agm/?tab=event when ready.
+//
+// Idempotent in two ways:
+//   - the agm_events row uses ON DUPLICATE KEY UPDATE on (year, slug)
+//   - the agm_products rows only seed when the event has zero products yet,
+//     so a re-run won't blow away admin edits made after the first seed.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_020_seed_perth_2026';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 020 — Perth AGM 2026 seed', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $eventYear = 2026;
+        $eventSlug = 'perth-2026';
+        $bankInstructions = "Account Name: Australian GoldWing Association Inc.\n"
+            . "Financial Institution: Bendigo Bank\n"
+            . "BSB: 633-000\n"
+            . "Account: 158 060 657\n"
+            . "Reference: Surname and Member #\n\n"
+            . "Postal address for posted registrations: 10 Thaxter Rd, Landsdale WA 6065";
+
+        $upsertEvent = $pdo->prepare("
+            INSERT INTO agm_events (
+              year, slug, title, subtitle, hosting_chapter,
+              venue_name, venue_address, venue_phone,
+              start_date, end_date,
+              registration_opens_at, registration_closes_at, late_fee_starts_at,
+              contact_name, contact_phone, contact_email,
+              bank_transfer_instructions, allow_bank_transfer, allow_stripe,
+              status, is_current, stripe_account_key, created_at
+            ) VALUES (
+              :year, :slug, :title, :subtitle, :hosting_chapter,
+              :venue_name, :venue_address, :venue_phone,
+              :start_date, :end_date,
+              NULL, :registration_closes_at, :late_fee_starts_at,
+              :contact_name, :contact_phone, :contact_email,
+              :bank_transfer_instructions, 1, 1,
+              'draft', 0, 'agm', NOW()
+            )
+            ON DUPLICATE KEY UPDATE
+              title = VALUES(title),
+              subtitle = VALUES(subtitle),
+              hosting_chapter = VALUES(hosting_chapter),
+              venue_name = VALUES(venue_name),
+              venue_address = VALUES(venue_address),
+              venue_phone = VALUES(venue_phone),
+              start_date = VALUES(start_date),
+              end_date = VALUES(end_date),
+              registration_closes_at = VALUES(registration_closes_at),
+              late_fee_starts_at = VALUES(late_fee_starts_at),
+              contact_name = VALUES(contact_name),
+              contact_phone = VALUES(contact_phone),
+              contact_email = VALUES(contact_email),
+              bank_transfer_instructions = VALUES(bank_transfer_instructions),
+              updated_at = NOW()
+        ");
+        $upsertEvent->execute([
+            'year' => $eventYear,
+            'slug' => $eventSlug,
+            'title' => 'Perth AGM 2026',
+            'subtitle' => 'Friday 1st May to Sunday 3rd May 2026',
+            'hosting_chapter' => 'Perth Chapter',
+            'venue_name' => 'Discovery Park Caversham',
+            'venue_address' => '91 Benara Rd, Caversham WA',
+            'venue_phone' => '08 9279 6700',
+            'start_date' => '2026-05-01',
+            'end_date' => '2026-05-03',
+            'registration_closes_at' => '2026-03-16 23:59:00',
+            'late_fee_starts_at' => '2026-03-17 00:00:00',
+            'contact_name' => 'David Goodchild',
+            'contact_phone' => '0417 987 742',
+            'contact_email' => 'arnoldschraven@yahoo.com',
+            'bank_transfer_instructions' => $bankInstructions,
+        ]);
+        $applied[] = 'event upserted';
+
+        $eventIdStmt = $pdo->prepare("SELECT id FROM agm_events WHERE year = :year AND slug = :slug LIMIT 1");
+        $eventIdStmt->execute(['year' => $eventYear, 'slug' => $eventSlug]);
+        $eventId = (int) $eventIdStmt->fetchColumn();
+        if ($eventId <= 0) {
+            throw new RuntimeException('Could not resolve Perth 2026 event id.');
+        }
+
+        // Only seed products on the first run for this event — preserves
+        // admin edits if migration is re-run later.
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM agm_products WHERE agm_event_id = :id");
+        $countStmt->execute(['id' => $eventId]);
+        $existingProductCount = (int) $countStmt->fetchColumn();
+
+        if ($existingProductCount > 0) {
+            $applied[] = "products already present (skipped seed; $existingProductCount rows kept)";
+        } else {
+            $fridayDinnerChoices = json_encode([
+                'Lasagna',
+                'Spaghetti Bolognese',
+                'Tortellini Carbonara',
+                'Italian Meatballs',
+                'Vegetarian pasta bake',
+            ]);
+            $products = [
+                // [category, name, description, early, late, member_only, non_member_only, requires_choice, choices_json, sort_order]
+                ['registration', 'Member — Full registration', 'AGM dinner, patch & badge', 74.00, 89.00, 1, 0, 0, null, 10],
+                ['registration', 'Non-member — Full registration', 'AGM dinner, patch & badge', 89.00, 104.00, 0, 1, 0, null, 20],
+                ['registration', 'Member — Registration only', 'Patch & badge (no dinner)', 45.00, 60.00, 1, 0, 0, null, 30],
+                ['registration', 'Non-member — Registration only', 'Patch & badge (no dinner)', 55.00, 70.00, 0, 1, 0, null, 40],
+                ['merchandise', 'Cloth patch', null, 4.00, null, 0, 0, 0, null, 110],
+                ['merchandise', 'Metal badge', null, 4.00, null, 0, 0, 0, null, 120],
+                ['meal', 'Thursday night — sausage sanga & salad roll', 'Subsidised by Perth Chapter', 10.00, null, 0, 0, 0, null, 210],
+                ['meal', 'Friday breakfast — bacon & egg roll', null, 12.00, null, 0, 0, 0, null, 220],
+                ['meal', 'Friday dinner', 'Choose a main. Comes with dinner rolls & 3 salads.', 24.00, null, 0, 0, 1, $fridayDinnerChoices, 230],
+                ['meal', 'Saturday breakfast — bacon & egg roll', null, 12.00, null, 0, 0, 0, null, 240],
+                ['meal', 'Sunday breakfast — bacon & egg roll', null, 12.00, null, 0, 0, 0, null, 250],
+            ];
+            $insertProduct = $pdo->prepare("
+                INSERT INTO agm_products
+                    (agm_event_id, category, name, description, early_price, late_price,
+                     member_only, non_member_only, requires_choice, choices_json,
+                     per_registration_limit, sort_order, is_active, created_at)
+                VALUES
+                    (:event_id, :category, :name, :description, :early_price, :late_price,
+                     :member_only, :non_member_only, :requires_choice, :choices_json,
+                     :per_registration_limit, :sort_order, 1, NOW())
+            ");
+            foreach ($products as $p) {
+                [$category, $name, $description, $early, $late, $memberOnly, $nonMemberOnly, $requiresChoice, $choicesJson, $sortOrder] = $p;
+                $perRegLimit = $category === 'registration' ? 2 : null;
+                $insertProduct->execute([
+                    'event_id' => $eventId,
+                    'category' => $category,
+                    'name' => $name,
+                    'description' => $description,
+                    'early_price' => $early,
+                    'late_price' => $late,
+                    'member_only' => $memberOnly,
+                    'non_member_only' => $nonMemberOnly,
+                    'requires_choice' => $requiresChoice,
+                    'choices_json' => $choicesJson,
+                    'per_registration_limit' => $perRegLimit,
+                    'sort_order' => $sortOrder,
+                ]);
+            }
+            $applied[] = count($products) . ' products seeded';
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 020 — Perth AGM 2026 seed', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 020 — Perth AGM 2026 seed', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
