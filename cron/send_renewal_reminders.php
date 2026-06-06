@@ -25,7 +25,7 @@ foreach ($intervals as $days) {
             continue;
         }
         $nextStart = date('Y-m-d', strtotime($period['end_date'] . ' +1 day'));
-        $existing = $pdo->prepare('SELECT id FROM membership_periods WHERE member_id = :member_id AND start_date = :start_date AND status = \"PENDING_PAYMENT\"');
+        $existing = $pdo->prepare("SELECT id FROM membership_periods WHERE member_id = :member_id AND start_date = :start_date AND status = 'PENDING_PAYMENT'");
         $existing->execute(['member_id' => $period['member_id'], 'start_date' => $nextStart]);
         $nextPeriod = $existing->fetch();
         $nextPeriodId = $nextPeriod['id'] ?? MembershipService::createMembershipPeriod((int) $period['member_id'], '1Y', $nextStart);
@@ -44,7 +44,7 @@ foreach ($intervals as $days) {
         $subject = 'Membership renewal reminder';
         $body = '<p>Hi ' . e($period['first_name']) . ',</p>'
             . '<p>Your membership expires on ' . e($period['end_date']) . '. Please renew to stay active.</p>'
-            . '<p><a href=\"' . e($paymentLink) . '\">Renew now</a></p>';
+            . '<p><a href="' . e($paymentLink) . '">Renew now</a></p>';
         EmailService::send($period['email'], $subject, $body);
         if ($period['phone']) {
             SmsService::send($period['phone'], 'Membership expires on ' . $period['end_date'] . '. Renew: ' . $paymentLink);
@@ -58,5 +58,5 @@ foreach ($intervals as $days) {
     }
 }
 
-$stmt = $pdo->prepare('INSERT INTO system_settings (setting_key, setting_value) VALUES (\"last_renewal_reminder_run\", NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()');
+$stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('last_renewal_reminder_run', NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()");
 $stmt->execute();

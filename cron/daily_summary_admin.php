@@ -23,5 +23,5 @@ $body = '<p>Daily summary:</p>'
 
 EmailService::send($admin['email'], 'Goldwing Admin Daily Summary', $body);
 
-$stmt = $pdo->prepare('INSERT INTO system_settings (setting_key, setting_value) VALUES (\"last_daily_summary_run\", NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()');
+$stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('last_daily_summary_run', NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()");
 $stmt->execute();

@@ -15,5 +15,5 @@ foreach ($periods as $period) {
     $updateMember->execute(['member_id' => $period['member_id']]);
 }
 
-$stmt = $pdo->prepare('INSERT INTO system_settings (setting_key, setting_value) VALUES (\"last_expire_run\", NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()');
+$stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('last_expire_run', NOW()) ON DUPLICATE KEY UPDATE setting_value = NOW()");
 $stmt->execute();
