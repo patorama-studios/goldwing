@@ -434,6 +434,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $manualMigrationEnabled = isset($_POST['manual_migration_enabled']);
                 $manualMigrationExpiryDays = (int) ($_POST['manual_migration_expiry_days'] ?? 14);
 
+                $upgradeMode = trim((string) ($_POST['upgrade_mode'] ?? 'standard'));
+                if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
+                    $upgradeMode = 'standard';
+                }
+                $upgradeCustomFeeRaw = trim((string) ($_POST['upgrade_custom_fee'] ?? ''));
+                $upgradeCustomFeeCents = 0;
+                if ($upgradeCustomFeeRaw !== '') {
+                    $parsedFee = (float) str_replace(['$', ','], '', $upgradeCustomFeeRaw);
+                    if ($parsedFee < 0) {
+                        $idFieldErrors['upgrade_custom_fee'] = 'Upgrade fee cannot be negative.';
+                    } else {
+                        $upgradeCustomFeeCents = (int) round($parsedFee * 100);
+                    }
+                }
+                if ($upgradeMode === 'custom' && $upgradeCustomFeeCents <= 0) {
+                    $idFieldErrors['upgrade_custom_fee'] = 'Enter an amount greater than $0 for the custom upgrade fee.';
+                }
+
                 $pdo = db();
                 $hasChapterAbbreviation = ChapterRepository::hasColumn($pdo, 'abbreviation');
                 $hasChapterState = ChapterRepository::hasColumn($pdo, 'state');
@@ -531,6 +549,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_suffix_padding', $memberNumberSuffixPadding);
                     SettingsService::setGlobal((int) $user['id'], 'membership.manual_migration_enabled', $manualMigrationEnabled);
                     SettingsService::setGlobal((int) $user['id'], 'membership.manual_migration_expiry_days', $manualMigrationExpiryDays);
+                    SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_mode', $upgradeMode);
+                    SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_custom_fee_cents', $upgradeCustomFeeCents);
 
                     foreach ($chapterUpdates as $chapterUpdate) {
                         $updateColumns = ['name = :name'];
@@ -1912,6 +1932,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $memberNumberSuffixPadding = (int) SettingsService::getGlobal('membership.member_number_suffix_padding', 0);
               $manualMigrationEnabled = (bool) SettingsService::getGlobal('membership.manual_migration_enabled', true);
               $manualMigrationExpiryDays = (int) SettingsService::getGlobal('membership.manual_migration_expiry_days', 14);
+              $upgradeMode = (string) SettingsService::getGlobal('membership.upgrade_mode', 'standard');
+              if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
+                  $upgradeMode = 'standard';
+              }
+              $upgradeCustomFeeCents = (int) SettingsService::getGlobal('membership.upgrade_custom_fee_cents', 0);
+              $upgradeCustomFeeDisplay = number_format($upgradeCustomFeeCents / 100, 2, '.', '');
               $chaptersPdo = db();
               $chaptersHasAbbreviation = ChapterRepository::hasColumn($chaptersPdo, 'abbreviation');
               $chaptersHasState = ChapterRepository::hasColumn($chaptersPdo, 'state');
@@ -2045,6 +2071,43 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['manual_migration_expiry_days']) ?></div>
                   <?php endif; ?>
                 </label>
+              </div>
+
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                <div>
+                  <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
+                  <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
+                </div>
+                <div class="space-y-3">
+                  <label class="flex items-start gap-3 text-sm text-slate-700">
+                    <input type="radio" name="upgrade_mode" value="standard" class="mt-1" <?= $upgradeMode === 'standard' ? 'checked' : '' ?>>
+                    <span>
+                      <span class="font-medium">Standard full-member price</span>
+                      <span class="block text-xs text-slate-500">Charges the 1-year Full member price from the pricing matrix above (Printed or PDF based on the member's Wings preference).</span>
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-3 text-sm text-slate-700">
+                    <input type="radio" name="upgrade_mode" value="custom" class="mt-1" <?= $upgradeMode === 'custom' ? 'checked' : '' ?>>
+                    <span class="flex-1">
+                      <span class="font-medium">Custom upgrade fee</span>
+                      <span class="block text-xs text-slate-500">Charge a flat amount for the upgrade regardless of magazine preference.</span>
+                      <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                        <span class="text-slate-500">$</span>
+                        <input
+                          name="upgrade_custom_fee"
+                          type="text"
+                          inputmode="decimal"
+                          class="w-32 rounded-lg border <?= isset($idFieldErrors['upgrade_custom_fee']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                          value="<?= e($upgradeCustomFeeDisplay) ?>"
+                          placeholder="0.00"
+                        >
+                      </label>
+                      <?php if (isset($idFieldErrors['upgrade_custom_fee'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['upgrade_custom_fee']) ?></div>
+                      <?php endif; ?>
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">

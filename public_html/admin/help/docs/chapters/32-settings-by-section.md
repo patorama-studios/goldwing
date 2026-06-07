@@ -472,7 +472,7 @@ The actual API key is stored separately in `ai_provider_keys` (encrypted) via `A
 
 #### Membership Settings
 
-What it controls: the pricing matrix (magazine type × membership type × period), member-number formatting, manual migration link, chapters CRUD. Saved via `MembershipPricingService::updateMembershipPricing()`. Deep dive: [Ch 14 — Membership pricing matrix](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+What it controls: the pricing matrix (magazine type × membership type × period), member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateMembershipPricing()`. Deep dive: [Ch 14 — Membership pricing matrix](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
@@ -485,6 +485,8 @@ What it controls: the pricing matrix (magazine type × membership type × period
 | `membership.member_number_suffix_padding` | int (0–12) | 0 | Zero-pad width for `{suffix_padded}`. |
 | `membership.manual_migration_enabled` | bool | false | Show the manual migration link on join form. |
 | `membership.manual_migration_expiry_days` | int (1–60) | 14 | Migration link lifetime. |
+| `membership.upgrade_mode` | string ("standard"\|"custom") | "standard" | How an Associate is charged when upgrading to Full from their profile. "standard" reads the 1-year FULL price from the matrix (PRINTED or PDF based on `wings_preference`). "custom" uses a flat fee. See `MembershipUpgradeService::getUpgradePriceCents()`. |
+| `membership.upgrade_custom_fee_cents` | int (cents) | 0 | Flat fee charged on upgrade when `upgrade_mode` is "custom". Ignored otherwise. |
 
 Chapter rows are written directly into the `chapters` table, not into `settings_global`.
 

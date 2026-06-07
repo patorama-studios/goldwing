@@ -632,6 +632,15 @@ class PaymentWebhookService
                 'period_id' => $periodId,
             ]);
             if ($activated) {
+                // Associate → Full upgrade: if the order's internal_notes
+                // declared this was an upgrade purchase, flip the member
+                // type, allocate a new base number, drop the suffix and
+                // link to the primary member.
+                $internal = json_decode((string) ($order['internal_notes'] ?? ''), true);
+                if (is_array($internal) && !empty($internal['upgrade'])) {
+                    MembershipUpgradeService::convertAssociateToFull($memberId);
+                }
+
                 $stmt = Database::connection()->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
                 $stmt->execute(['id' => $memberId]);
                 $member = $stmt->fetch();

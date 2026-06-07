@@ -10,6 +10,7 @@ use App\Services\ChapterRepository;
 use App\Services\StripeService;
 use App\Services\PaymentSettingsService;
 use App\Services\PendingRequestsService;
+use App\Services\MembershipUpgradeService;
 use App\Services\SettingsService;
 use App\Services\BaseUrlService;
 use App\Services\DomSnapshotService;
@@ -783,6 +784,19 @@ if ($user && $user['member_id']) {
               }
             }
           }
+        }
+      } elseif ($_POST['action'] === 'upgrade_membership') {
+        if (!$member) {
+          $profileError = 'Unable to start the upgrade.';
+        } elseif (strtoupper((string) ($member['member_type'] ?? '')) !== 'ASSOCIATE') {
+          $profileError = 'Only Associate members can upgrade to Full membership.';
+        } else {
+          $result = MembershipUpgradeService::startCheckout($member);
+          if (!empty($result['ok']) && !empty($result['redirect_url'])) {
+            header('Location: ' . $result['redirect_url']);
+            exit;
+          }
+          $profileError = $result['error'] ?? 'Unable to start the upgrade checkout.';
         }
       } elseif ($_POST['action'] === 'create_notice') {
         $title = trim($_POST['notice_title'] ?? '');
@@ -2255,6 +2269,40 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <p class="text-sm text-gray-500"><?= e($profilePaymentMethodLabel) ?></p>
                     </div>
                   </div>
+                  <?php
+                    $isOwnProfile = (int) $profileMemberId === (int) $member['id'];
+                    $isAssociate = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'ASSOCIATE';
+                    $upgradePriceCents = ($isOwnProfile && $isAssociate)
+                      ? MembershipUpgradeService::getUpgradePriceCents($profileMember) : null;
+                    $showUpgradeButton = $isOwnProfile && $isAssociate;
+                  ?>
+                  <?php if ($showUpgradeButton): ?>
+                    <div class="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+                      <div class="flex items-start gap-3">
+                        <span class="material-icons-outlined text-primary">upgrade</span>
+                        <div class="flex-1">
+                          <p class="text-sm font-semibold text-gray-900">Upgrade to Full Membership</p>
+                          <p class="text-xs text-gray-600">
+                            Become a Full member in your own right. You'll be issued a new member number and your link to the primary member's household will be removed.
+                            <?php if ($upgradePriceCents !== null): ?>
+                              The current upgrade fee is <strong>A$<?= e(number_format($upgradePriceCents / 100, 2)) ?></strong>.
+                            <?php else: ?>
+                              <span class="text-amber-700">(Upgrade pricing not yet configured — please contact the administrator.)</span>
+                            <?php endif; ?>
+                          </p>
+                        </div>
+                      </div>
+                      <?php if ($upgradePriceCents !== null): ?>
+                        <form method="post" class="flex justify-end">
+                          <input type="hidden" name="action" value="upgrade_membership">
+                          <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink hover:bg-primary/90">
+                            <span class="material-icons-outlined text-base">shopping_cart_checkout</span>
+                            Upgrade now (A$<?= e(number_format($upgradePriceCents / 100, 2)) ?>)
+                          </button>
+                        </form>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
                   <div class="pt-4">
                     <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">Primary bike</p>
                     <div class="grid grid-cols-2 gap-3 text-sm">
@@ -3674,6 +3722,38 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </form>
             </div>
           </div>
+          <div data-saved-cards class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-amber-100 rounded-lg text-amber-700">
+                <span class="material-icons-outlined">credit_card</span>
+              </div>
+              <div class="flex-1">
+                <h3 class="font-display text-lg font-bold text-gray-900">Saved cards</h3>
+                <p class="text-sm text-gray-500">Securely save a card on file via Stripe for faster checkout. Card details are stored by Stripe — never on our servers.</p>
+              </div>
+              <button id="saved-cards-add" type="button"
+                class="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold">
+                <span class="material-icons-outlined text-base">add</span>Add card
+              </button>
+            </div>
+            <div id="saved-cards-message" class="hidden rounded-lg px-4 py-2 text-sm"></div>
+            <div id="saved-cards-list" class="space-y-2">
+              <p class="text-sm text-gray-500" data-saved-cards-loading>Loading saved cards…</p>
+            </div>
+            <div id="saved-cards-form" class="hidden rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+              <div>
+                <label class="block text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Card details</label>
+                <div id="saved-cards-element" class="rounded-lg border border-gray-200 px-3 py-3"></div>
+                <div id="saved-cards-form-error" class="hidden mt-2 text-sm text-red-600"></div>
+              </div>
+              <div class="flex items-center justify-end gap-2">
+                <button id="saved-cards-cancel" type="button"
+                  class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Cancel</button>
+                <button id="saved-cards-save" type="button"
+                  class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold disabled:opacity-60">Save card</button>
+              </div>
+            </div>
+          </div>
           <div data-tour="pay-fees-history" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">
               <div>
@@ -3768,6 +3848,222 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             }
           </script>
         <?php endif; ?>
+        <script>
+          (function () {
+            const csrfToken = <?= json_encode(Csrf::token()) ?>;
+            const listEl = document.getElementById('saved-cards-list');
+            const messageEl = document.getElementById('saved-cards-message');
+            const addButton = document.getElementById('saved-cards-add');
+            const formEl = document.getElementById('saved-cards-form');
+            const cancelButton = document.getElementById('saved-cards-cancel');
+            const saveButton = document.getElementById('saved-cards-save');
+            const elementContainer = document.getElementById('saved-cards-element');
+            const formErrorEl = document.getElementById('saved-cards-form-error');
+            if (!listEl) return;
+
+            let stripe = null;
+            let elements = null;
+            let cardElement = null;
+            let publishableKey = '';
+
+            const showMessage = (text, type) => {
+              if (!messageEl) return;
+              messageEl.textContent = text || '';
+              messageEl.classList.toggle('hidden', !text);
+              messageEl.classList.remove('bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700');
+              if (type === 'success') {
+                messageEl.classList.add('bg-green-50', 'text-green-700');
+              } else if (type === 'error') {
+                messageEl.classList.add('bg-red-50', 'text-red-700');
+              }
+            };
+
+            const showFormError = (text) => {
+              if (!formErrorEl) return;
+              formErrorEl.textContent = text || '';
+              formErrorEl.classList.toggle('hidden', !text);
+            };
+
+            const brandLabel = (brand) => {
+              if (!brand) return 'Card';
+              const map = { visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express', discover: 'Discover', jcb: 'JCB', diners: 'Diners', unionpay: 'UnionPay' };
+              return map[String(brand).toLowerCase()] || (brand.charAt(0).toUpperCase() + brand.slice(1));
+            };
+
+            const renderCards = (methods) => {
+              listEl.innerHTML = '';
+              if (!methods || methods.length === 0) {
+                listEl.innerHTML = '<p class="text-sm text-gray-500">No cards saved yet. Add one to enable faster checkout.</p>';
+                return;
+              }
+              methods.forEach((pm) => {
+                const row = document.createElement('div');
+                row.className = 'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3';
+                const monthLabel = pm.exp_month ? String(pm.exp_month).padStart(2, '0') : '--';
+                const yearLabel = pm.exp_year ? String(pm.exp_year).slice(-2) : '--';
+                row.innerHTML = `
+                  <div class="flex items-center gap-3">
+                    <span class="material-icons-outlined text-gray-500">credit_card</span>
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900">${brandLabel(pm.brand)} •••• ${pm.last4 || '----'}</div>
+                      <div class="text-xs text-gray-500">Expires ${monthLabel}/${yearLabel}${pm.is_default ? ' · Default' : ''}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    ${pm.is_default ? '' : `<button type="button" data-default="${pm.id}" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50">Set default</button>`}
+                    <button type="button" data-remove="${pm.id}" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button>
+                  </div>
+                `;
+                listEl.appendChild(row);
+              });
+            };
+
+            const loadCards = async () => {
+              try {
+                const response = await fetch('/api/billing/payment-methods', { credentials: 'include' });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to load saved cards.');
+                renderCards(data.payment_methods || []);
+              } catch (err) {
+                listEl.innerHTML = `<p class="text-sm text-red-600">${err.message || 'Unable to load saved cards.'}</p>`;
+              }
+            };
+
+            const loadStripeJs = () => new Promise((resolve, reject) => {
+              if (window.Stripe) { resolve(); return; }
+              const script = document.createElement('script');
+              script.src = 'https://js.stripe.com/v3/';
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error('Unable to load Stripe.'));
+              document.head.appendChild(script);
+            });
+
+            const ensureStripe = async () => {
+              if (!publishableKey) {
+                const response = await fetch('/api/stripe/config');
+                const data = await response.json();
+                if (!response.ok || !data.publishableKey) throw new Error(data.error || 'Stripe is not configured.');
+                publishableKey = data.publishableKey;
+              }
+              await loadStripeJs();
+              if (!stripe) stripe = window.Stripe(publishableKey);
+              if (!elements) elements = stripe.elements();
+              if (!cardElement) {
+                cardElement = elements.create('card', { hidePostalCode: false });
+                cardElement.mount(elementContainer);
+                cardElement.on('change', (event) => showFormError(event.error ? event.error.message : ''));
+              }
+            };
+
+            const openForm = async () => {
+              showMessage('', null);
+              showFormError('');
+              try {
+                hadCardsBeforeSave = listEl.querySelector('button[data-remove]') !== null;
+                await ensureStripe();
+                formEl.classList.remove('hidden');
+                addButton.disabled = true;
+              } catch (err) {
+                showMessage(err.message || 'Unable to open card form.', 'error');
+              }
+            };
+
+            const closeForm = () => {
+              formEl.classList.add('hidden');
+              addButton.disabled = false;
+              showFormError('');
+              if (cardElement) cardElement.clear();
+            };
+
+            let hadCardsBeforeSave = false;
+            const saveCard = async () => {
+              showFormError('');
+              saveButton.disabled = true;
+              try {
+                const intentRes = await fetch('/api/billing/setup-intent', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                  credentials: 'include',
+                  body: JSON.stringify({}),
+                });
+                const intentData = await intentRes.json();
+                if (!intentRes.ok || !intentData.client_secret) {
+                  throw new Error(intentData.error || 'Unable to start card setup.');
+                }
+                const result = await stripe.confirmCardSetup(intentData.client_secret, {
+                  payment_method: { card: cardElement },
+                });
+                if (result.error) throw new Error(result.error.message || 'Card could not be saved.');
+                const newPmId = result.setupIntent && result.setupIntent.payment_method;
+                if (!hadCardsBeforeSave && newPmId) {
+                  // First card on the account — promote to default so future
+                  // charges (renewals, store) know which card to use.
+                  await fetch(`/api/billing/payment-methods/${encodeURIComponent(newPmId)}/default`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    credentials: 'include',
+                    body: JSON.stringify({}),
+                  }).catch(() => {});
+                }
+                showMessage('Card saved.', 'success');
+                closeForm();
+                await loadCards();
+              } catch (err) {
+                showFormError(err.message || 'Card could not be saved.');
+              } finally {
+                saveButton.disabled = false;
+              }
+            };
+
+            const setDefault = async (id) => {
+              showMessage('', null);
+              try {
+                const response = await fetch(`/api/billing/payment-methods/${encodeURIComponent(id)}/default`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                  credentials: 'include',
+                  body: JSON.stringify({}),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to set default card.');
+                showMessage('Default card updated.', 'success');
+                await loadCards();
+              } catch (err) {
+                showMessage(err.message || 'Unable to set default card.', 'error');
+              }
+            };
+
+            const removeCard = async (id) => {
+              if (!window.confirm('Remove this card?')) return;
+              showMessage('', null);
+              try {
+                const response = await fetch(`/api/billing/payment-methods/${encodeURIComponent(id)}`, {
+                  method: 'DELETE',
+                  headers: { 'X-CSRF-Token': csrfToken },
+                  credentials: 'include',
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to remove card.');
+                showMessage('Card removed.', 'success');
+                await loadCards();
+              } catch (err) {
+                showMessage(err.message || 'Unable to remove card.', 'error');
+              }
+            };
+
+            addButton && addButton.addEventListener('click', openForm);
+            cancelButton && cancelButton.addEventListener('click', closeForm);
+            saveButton && saveButton.addEventListener('click', saveCard);
+            listEl.addEventListener('click', (event) => {
+              const setBtn = event.target.closest('button[data-default]');
+              if (setBtn) { setDefault(setBtn.getAttribute('data-default')); return; }
+              const rmBtn = event.target.closest('button[data-remove]');
+              if (rmBtn) { removeCard(rmBtn.getAttribute('data-remove')); }
+            });
+
+            loadCards();
+          })();
+        </script>
       <?php elseif ($page === 'history'): ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <h2 class="font-display text-2xl font-bold text-gray-900 mb-4">Membership History</h2>
