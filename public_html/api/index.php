@@ -1914,8 +1914,21 @@ if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'refunds'
         json_response(['error' => 'Order is not paid.'], 422);
     }
 
-    $settings = PaymentSettingsService::getSettingsByChannelId((int) $order['channel_id']);
-    $secretKey = $settings['secret_key'] ?? '';
+    /* The legacy PaymentSettingsService::getSettingsByChannelId()['secret_key']
+     * path is empty after the key migration. Read from the new
+     * StripeSettingsService location. AGM-channel orders are refunded against
+     * the AGM Stripe account; everything else against primary. */
+    $channelCode = 'primary';
+    if (!empty($order['channel_id'])) {
+        $stmt = db()->prepare('SELECT code FROM payment_channels WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => (int) $order['channel_id']]);
+        $code = $stmt->fetchColumn();
+        if ($code) {
+            $channelCode = (string) $code;
+        }
+    }
+    $accountKey = $channelCode === 'agm' ? StripeSettingsService::ACCOUNT_AGM : StripeSettingsService::ACCOUNT_PRIMARY;
+    $secretKey = StripeSettingsService::getActiveSecretKey($accountKey);
     if ($secretKey === '') {
         json_response(['error' => 'Stripe is not configured.'], 422);
     }
