@@ -1,4 +1,7 @@
 <?php
+header('Location: /checkout');
+exit;
+
 use App\Services\Csrf;
 use App\Services\OrderService;
 use App\Services\PaymentSettingsService;
