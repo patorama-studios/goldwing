@@ -122,7 +122,11 @@ for sheet_name in wb.sheetnames:
         postcode    = clean(get(row, c_postcode))
         chapter     = clean(get(row, c_chapter)) or sheet_name
         dir_info    = clean(get(row, c_dir_info))
-        edir        = bool_flag(get(row, c_edir))
+        # Source `eDirectory` column means "INCLUDE in electronic directory"
+        # (True = show me). Our DB column `exclude_electronic` is the opposite
+        # (1 = hide me). Invert so the polarity is right.
+        edir_in     = bool_flag(get(row, c_edir))  # 1 = wants to be IN
+        edir        = '0' if edir_in == '1' else '1'  # → exclude_electronic value
 
         # privacy_level: take the first letter from Directory Info (e.g. "A", "B — Name + Address")
         privacy = dir_info[:1].upper() if dir_info else 'A'

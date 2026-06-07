@@ -1982,6 +1982,77 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 024 — Un-invert exclude_electronic on legacy-imported members
+//
+// scripts/data/generate_import_csvs.py wrote the source spreadsheet's
+// "eDirectory" column (True = "include me in the eDirectory") straight into
+// our `exclude_electronic` column without inverting it. So every legacy row
+// has its electronic-directory opt-out flipped:
+//
+//   eDirectory=True  → exclude_electronic=1  (wrongly hidden — should show)
+//   eDirectory=False → exclude_electronic=0  (wrongly visible — should hide)
+//
+// This is why the online directory shows ~40 out of 242 active members.
+//
+// Fix: flip exclude_electronic (and the parallel new column
+// directory_pref_f_exclude_electronic_directory, if present) for every
+// member. Cap the flip to members imported before this migration date —
+// any rows created later were entered through the correct UI and are
+// already correct.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_024_fix_inverted_exclude_electronic';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 024 — Fix inverted exclude_electronic', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        // Helper: does a column exist on members?
+        $hasCol = static function (string $col) use ($pdo): bool {
+            $s = $pdo->prepare("SHOW COLUMNS FROM members LIKE :c");
+            $s->execute(['c' => $col]);
+            return (bool) $s->fetch();
+        };
+
+        // Only flip rows that existed before this migration was written
+        // (any later rows came through the corrected UI / import).
+        $cutoff = '2026-06-07 23:59:59';
+
+        if ($hasCol('exclude_electronic')) {
+            $stmt = $pdo->prepare(
+                "UPDATE members
+                 SET exclude_electronic = 1 - COALESCE(exclude_electronic, 0),
+                     updated_at = NOW()
+                 WHERE created_at <= :cutoff"
+            );
+            $stmt->execute(['cutoff' => $cutoff]);
+            $applied[] = $stmt->rowCount() . ' row(s) flipped on `exclude_electronic`';
+        } else {
+            $applied[] = '`exclude_electronic` column not present — skipped';
+        }
+
+        if ($hasCol('directory_pref_f_exclude_electronic_directory')) {
+            $stmt = $pdo->prepare(
+                "UPDATE members
+                 SET directory_pref_f_exclude_electronic_directory = 1 - COALESCE(directory_pref_f_exclude_electronic_directory, 0),
+                     updated_at = NOW()
+                 WHERE created_at <= :cutoff"
+            );
+            $stmt->execute(['cutoff' => $cutoff]);
+            $applied[] = $stmt->rowCount() . ' row(s) flipped on `directory_pref_f_exclude_electronic_directory`';
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 024 — Fix inverted exclude_electronic', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 024 — Fix inverted exclude_electronic', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
