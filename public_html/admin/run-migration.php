@@ -2163,6 +2163,115 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 027 — Stripe error logging table
+// Adds `stripe_errors` so silent Stripe API failures and webhook silent-skips
+// land somewhere queryable. Written by App\Services\StripeErrorLogger; read
+// by admin diagnostics and manual SQL. See:
+//   database/migrations/2026_06_07_stripe_errors.sql
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_027_stripe_errors';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 027 — Stripe error logging table', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $pdo->exec("CREATE TABLE IF NOT EXISTS stripe_errors (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            occurred_at DATETIME NOT NULL,
+            source VARCHAR(80) NOT NULL,
+            operation VARCHAR(80) NULL,
+            stripe_account VARCHAR(40) NULL,
+            error_code VARCHAR(80) NULL,
+            error_message TEXT NULL,
+            context_json MEDIUMTEXT NULL,
+            related_order_id INT NULL,
+            related_store_order_id INT NULL,
+            related_stripe_session_id VARCHAR(120) NULL,
+            related_stripe_pi_id VARCHAR(120) NULL,
+            webhook_event_id INT NULL,
+            INDEX idx_stripe_errors_occurred (occurred_at),
+            INDEX idx_stripe_errors_source (source),
+            INDEX idx_stripe_errors_order (related_order_id),
+            INDEX idx_stripe_errors_store_order (related_store_order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 027 — Stripe error logging table', 'status' => 'applied', 'note' => 'stripe_errors table created.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 027 — Stripe error logging table', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 028 — Backfill orders.order_number for legacy store orders
+//
+// OrderService::createOrder() historically omitted `order_number` from its
+// INSERT, so every store-checkout `orders` row had NULL order_number even
+// though the matching `store_orders` row carries the GW-… number. The
+// create-path is fixed in the same commit as this migration.
+//
+// Backfill pulls the GW number out of `shipping_address_json.store_order_number`
+// (the convention written at api/index.php:623, 1575 and store/checkout.php:236)
+// and writes it into `orders.order_number`. Guarded against the UNIQUE
+// constraint via a LEFT JOIN anti-pattern, so a retried checkout that produced
+// two `orders` rows for one store_order doesn't blow up the UPDATE — the
+// second row is left NULL for manual review.
+//
+// Idempotent: rerunning is a no-op (WHERE filters on order_number IS NULL).
+// Affects only order_type = 'store' — membership rows use a separate path.
+// See: database/migrations/2026_06_07_orders_order_number_backfill.sql
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_028_orders_order_number_backfill';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 028 — Backfill orders.order_number', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // Count candidates before so the run note is meaningful.
+        $candidates = (int) $pdo->query("
+            SELECT COUNT(*) FROM orders
+            WHERE order_type = 'store'
+              AND order_number IS NULL
+              AND shipping_address_json IS NOT NULL
+        ")->fetchColumn();
+
+        $stmt = $pdo->prepare("
+            UPDATE orders o
+            LEFT JOIN orders dup
+              ON dup.order_number = JSON_UNQUOTE(JSON_EXTRACT(o.shipping_address_json, '$.store_order_number'))
+            SET o.order_number = JSON_UNQUOTE(JSON_EXTRACT(o.shipping_address_json, '$.store_order_number'))
+            WHERE o.order_type = 'store'
+              AND o.order_number IS NULL
+              AND o.shipping_address_json IS NOT NULL
+              AND JSON_EXTRACT(o.shipping_address_json, '$.store_order_number') IS NOT NULL
+              AND JSON_UNQUOTE(JSON_EXTRACT(o.shipping_address_json, '$.store_order_number')) <> ''
+              AND dup.id IS NULL
+        ");
+        $stmt->execute();
+        $updated = $stmt->rowCount();
+
+        $remainingNull = (int) $pdo->query("
+            SELECT COUNT(*) FROM orders
+            WHERE order_type = 'store' AND order_number IS NULL
+        ")->fetchColumn();
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $note = "{$updated} of {$candidates} store rows backfilled";
+        if ($remainingNull > 0) {
+            $note .= "; {$remainingNull} still NULL (no shipping_address_json, missing key, or UNIQUE collision — inspect manually)";
+        }
+        $results[] = ['label' => 'Migration 028 — Backfill orders.order_number', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 028 — Backfill orders.order_number', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
