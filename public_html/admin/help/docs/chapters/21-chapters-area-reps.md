@@ -64,6 +64,7 @@ Admins only. You'll do this rarely — usually only when the national committee 
 3. Click **Add chapter**.
 4. Fill in:
     - **Name** (e.g. "Riverina Chapter")
+    - **Abbreviation** (optional, e.g. "FCC" for Fraser Coast Chapter). When set, the chapter name renders as `(FCC) Fraser Coast Chapter` everywhere it appears — ride listings, member directory, profiles, dropdowns. Leave blank if you don't want a prefix.
     - **State** (NSW, VIC, etc. — used to group chapters on the public site)
     - **Sort order** (lower numbers appear first in dropdowns)
     - **Active** — leave ticked. Untick only if the chapter has been formally retired.

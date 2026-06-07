@@ -91,7 +91,7 @@ class MemberRepository
         $membershipTypeSelect = $membershipTypeAvailable ? 'mt.name AS membership_type_name' : 'NULL AS membership_type_name';
         $membershipTypeJoin = $membershipTypeAvailable ? 'LEFT JOIN membership_types mt ON mt.id = m.membership_type_id ' : '';
 
-        $base = 'SELECT m.*, c.name AS chapter_name, c.state AS chapter_state, ' . $membershipTypeSelect . ', ' . $memberAuthSelect . ', '
+        $base = 'SELECT m.*, ' . ChapterRepository::displayNameSql($pdo) . ' AS chapter_name, c.state AS chapter_state, ' . $membershipTypeSelect . ', ' . $memberAuthSelect . ', '
             . 'u.id AS user_id, u.email AS user_email, u2.enabled_at AS twofa_enabled_at, uo.twofa_override, '
             . '(SELECT GROUP_CONCAT(r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id) AS user_roles_csv, '
             . '(SELECT CONCAT(pm.first_name, \' \', pm.last_name) FROM members pm WHERE pm.id = m.full_member_id) AS primary_member_name, '
@@ -215,7 +215,7 @@ class MemberRepository
         $membershipTypeAvailable = self::hasMemberColumn($pdo, 'membership_type_id');
         $membershipTypeSelect = $membershipTypeAvailable ? 'mt.name AS membership_type_name' : 'NULL AS membership_type_name';
         $membershipTypeJoin = $membershipTypeAvailable ? 'LEFT JOIN membership_types mt ON mt.id = m.membership_type_id ' : '';
-        $stmt = $pdo->prepare('SELECT m.*, c.name AS chapter_name, ' . $membershipTypeSelect . ', '
+        $stmt = $pdo->prepare('SELECT m.*, ' . ChapterRepository::displayNameSql($pdo) . ' AS chapter_name, ' . $membershipTypeSelect . ', '
             . $memberAuthSelect
             . ', u.id AS user_id, u.email AS user_email, u2.enabled_at AS twofa_enabled_at, uo.twofa_override, '
             . '(SELECT GROUP_CONCAT(r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id) AS user_roles_csv '

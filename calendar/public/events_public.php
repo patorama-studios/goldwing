@@ -16,7 +16,7 @@ $filters = [
 
 $chapters = [];
 try {
-    $chapters = $pdo->query('SELECT id, name FROM chapters ORDER BY name')->fetchAll();
+    $chapters = calendar_list_chapters_for_dropdown($pdo);
 } catch (Throwable $e) {
     $chapters = [];
 }
@@ -527,7 +527,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                             <option value="">All</option>
                             <?php foreach ($chapters as $chapter): ?>
                                 <option value="<?php echo (int) $chapter['id']; ?>" <?php echo ($filters['chapter_id'] == $chapter['id']) ? 'selected' : ''; ?>>
-                                    <?php echo calendar_e($chapter['name']); ?>
+                                    <?php echo calendar_e($chapter['display_label'] ?? $chapter['name']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

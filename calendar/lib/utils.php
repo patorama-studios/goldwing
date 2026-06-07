@@ -211,6 +211,62 @@ function calendar_table_exists(PDO $pdo, string $table): bool
     return in_array($table, $tables, true);
 }
 
+function calendar_chapters_has_abbreviation(PDO $pdo): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM chapters LIKE 'abbreviation'");
+        $cached = (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        $cached = false;
+    }
+    return $cached;
+}
+
+function calendar_chapter_name_sql(PDO $pdo, string $alias = 'c'): string
+{
+    if (calendar_chapters_has_abbreviation($pdo)) {
+        return "CASE WHEN {$alias}.abbreviation IS NOT NULL AND {$alias}.abbreviation <> '' "
+            . "THEN CONCAT('(', {$alias}.abbreviation, ') ', {$alias}.name) "
+            . "ELSE {$alias}.name END";
+    }
+    return "{$alias}.name";
+}
+
+function calendar_format_chapter_label(?string $name, ?string $abbreviation = null): string
+{
+    $name = trim((string) $name);
+    $abbreviation = trim((string) $abbreviation);
+    if ($name === '') {
+        return '';
+    }
+    if ($abbreviation === '') {
+        return $name;
+    }
+    return '(' . $abbreviation . ') ' . $name;
+}
+
+function calendar_list_chapters_for_dropdown(PDO $pdo): array
+{
+    $hasAbbr = calendar_chapters_has_abbreviation($pdo);
+    $sql = $hasAbbr
+        ? "SELECT id, name, COALESCE(abbreviation, '') AS abbreviation FROM chapters ORDER BY name"
+        : 'SELECT id, name FROM chapters ORDER BY name';
+    try {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return [];
+    }
+    foreach ($rows as &$row) {
+        $row['display_label'] = calendar_format_chapter_label($row['name'] ?? '', $row['abbreviation'] ?? null);
+    }
+    unset($row);
+    return $rows;
+}
+
 function calendar_require_tables(PDO $pdo, array $tables): void
 {
     foreach ($tables as $table) {

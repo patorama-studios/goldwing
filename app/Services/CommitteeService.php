@@ -85,7 +85,7 @@ final class CommitteeService
         try {
             $stmt = db()->prepare("
                 SELECT r.id AS role_id, r.slug, r.name, r.category, r.sort_order,
-                       c.name AS chapter_name, c.state AS chapter_state
+                       " . ChapterRepository::displayNameSql(db()) . " AS chapter_name, c.state AS chapter_state
                 FROM member_committee_assignments a
                 JOIN committee_roles r ON r.id = a.role_id
                 LEFT JOIN chapters c ON c.id = r.chapter_id
@@ -114,7 +114,7 @@ final class CommitteeService
         try {
             $rows = db()->query("
                 SELECT r.id, r.slug, r.name, r.category, r.sort_order,
-                       r.chapter_id, c.name AS chapter_name, c.state AS chapter_state,
+                       r.chapter_id, " . ChapterRepository::displayNameSql(db()) . " AS chapter_name, c.state AS chapter_state,
                        r.email, r.phone
                 FROM committee_roles r
                 LEFT JOIN chapters c ON c.id = r.chapter_id
@@ -309,7 +309,7 @@ final class CommitteeService
                 SELECT
                     r.id AS role_id, r.slug, r.name, r.category,
                     r.email, r.phone, r.sort_order, r.chapter_id,
-                    c.name AS chapter_name, c.state AS chapter_state,
+                    " . ChapterRepository::displayNameSql(db()) . " AS chapter_name, c.state AS chapter_state,
                     a.member_id,
                     m.first_name, m.last_name, m.email AS member_email, m.phone AS member_phone,
                     $privateSelect,

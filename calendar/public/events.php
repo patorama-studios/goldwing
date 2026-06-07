@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $pdo->query('SELECT e.*, c.name AS chapter_name FROM calendar_events e LEFT JOIN chapters c ON c.id = e.chapter_id ORDER BY e.start_at DESC');
+$stmt = $pdo->query('SELECT e.*, ' . calendar_chapter_name_sql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN chapters c ON c.id = e.chapter_id ORDER BY e.start_at DESC');
 $events = $stmt->fetchAll();
 
 $pageTitle = 'Calendar Events';

@@ -6,6 +6,7 @@ CREATE TABLE roles (
 CREATE TABLE chapters (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
+  abbreviation VARCHAR(16) NULL,
   region VARCHAR(150) NULL,
   state VARCHAR(150) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -42,6 +43,7 @@ CREATE TABLE members (
   exclude_electronic TINYINT(1) NOT NULL DEFAULT 0,
   avatar_url VARCHAR(512) NULL,
   created_at DATETIME NOT NULL,
+  join_date DATE NULL,
   updated_at DATETIME NULL,
   FOREIGN KEY (full_member_id) REFERENCES members(id),
   FOREIGN KEY (chapter_id) REFERENCES chapters(id),
@@ -459,6 +461,24 @@ CREATE TABLE chapter_change_requests (
   approved_at DATETIME NULL,
   FOREIGN KEY (member_id) REFERENCES members(id),
   FOREIGN KEY (requested_chapter_id) REFERENCES chapters(id),
+  FOREIGN KEY (approved_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE member_profile_change_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_id INT NOT NULL,
+  field_name VARCHAR(64) NOT NULL,
+  current_value TEXT NULL,
+  requested_value TEXT NULL,
+  status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+  rejection_reason TEXT NULL,
+  feedback_message TEXT NULL,
+  requested_at DATETIME NOT NULL,
+  approved_by INT NULL,
+  approved_at DATETIME NULL,
+  INDEX idx_mpcr_status_member (status, member_id),
+  INDEX idx_mpcr_requested_at (requested_at),
+  FOREIGN KEY (member_id) REFERENCES members(id),
   FOREIGN KEY (approved_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

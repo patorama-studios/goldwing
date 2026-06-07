@@ -435,6 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $manualMigrationExpiryDays = (int) ($_POST['manual_migration_expiry_days'] ?? 14);
 
                 $pdo = db();
+                $hasChapterAbbreviation = ChapterRepository::hasColumn($pdo, 'abbreviation');
                 $hasChapterState = ChapterRepository::hasColumn($pdo, 'state');
                 $hasChapterActive = ChapterRepository::hasColumn($pdo, 'is_active');
                 $hasChapterSortOrder = ChapterRepository::hasColumn($pdo, 'sort_order');
@@ -449,6 +450,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $position++;
                         $name = normalize_text($chapterData['name'] ?? '');
+                        $abbreviation = normalize_text($chapterData['abbreviation'] ?? '');
                         $state = normalize_text($chapterData['state'] ?? '');
                         $sortOrder = (int) ($chapterData['sort_order'] ?? ($position * 10));
                         $isActive = isset($chapterData['is_active']) ? 1 : 0;
@@ -461,9 +463,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $chapterFieldErrors[$chapterId]['sort_order'] = 'Order must be 0 or greater.';
                             continue;
                         }
+                        if ($hasChapterAbbreviation && mb_strlen($abbreviation) > 16) {
+                            $chapterFieldErrors[$chapterId]['abbreviation'] = 'Max 16 characters.';
+                            continue;
+                        }
                         $chapterUpdates[] = [
                             'id' => (int) $chapterId,
                             'name' => $name,
+                            'abbreviation' => $abbreviation,
                             'state' => $state,
                             'sort_order' => $sortOrder,
                             'is_active' => $isActive,
@@ -472,6 +479,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 $newChapterName = normalize_text($_POST['new_chapter_name'] ?? '');
+                $newChapterAbbreviation = normalize_text($_POST['new_chapter_abbreviation'] ?? '');
                 $newChapterState = normalize_text($_POST['new_chapter_state'] ?? '');
                 $newChapterSortOrder = (int) ($_POST['new_chapter_sort_order'] ?? 0);
                 $newChapterActive = isset($_POST['new_chapter_active']) ? 1 : 0;
@@ -530,6 +538,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'id' => $chapterUpdate['id'],
                             'name' => $chapterUpdate['name'],
                         ];
+                        if ($hasChapterAbbreviation) {
+                            $updateColumns[] = 'abbreviation = :abbreviation';
+                            $params['abbreviation'] = $chapterUpdate['abbreviation'] !== '' ? $chapterUpdate['abbreviation'] : null;
+                        }
                         if ($hasChapterState) {
                             $updateColumns[] = 'state = :state';
                             $params['state'] = $chapterUpdate['state'] !== '' ? $chapterUpdate['state'] : null;
@@ -550,6 +562,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $columns = ['name'];
                         $placeholders = [':name'];
                         $params = ['name' => $newChapterName];
+                        if ($hasChapterAbbreviation) {
+                            $columns[] = 'abbreviation';
+                            $placeholders[] = ':abbreviation';
+                            $params['abbreviation'] = $newChapterAbbreviation !== '' ? $newChapterAbbreviation : null;
+                        }
                         if ($hasChapterState) {
                             $columns[] = 'state';
                             $placeholders[] = ':state';
@@ -1896,6 +1913,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $manualMigrationEnabled = (bool) SettingsService::getGlobal('membership.manual_migration_enabled', true);
               $manualMigrationExpiryDays = (int) SettingsService::getGlobal('membership.manual_migration_expiry_days', 14);
               $chaptersPdo = db();
+              $chaptersHasAbbreviation = ChapterRepository::hasColumn($chaptersPdo, 'abbreviation');
               $chaptersHasState = ChapterRepository::hasColumn($chaptersPdo, 'state');
               $chaptersHasActive = ChapterRepository::hasColumn($chaptersPdo, 'is_active');
               $chaptersHasSortOrder = ChapterRepository::hasColumn($chaptersPdo, 'sort_order');
@@ -2042,6 +2060,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <th class="py-2 pr-3">Order</th>
                         <?php endif; ?>
                         <th class="py-2 pr-3">Name</th>
+                        <?php if ($chaptersHasAbbreviation): ?>
+                          <th class="py-2 pr-3">Abbreviation</th>
+                        <?php endif; ?>
                         <?php if ($chaptersHasState): ?>
                           <th class="py-2 pr-3">State / Region</th>
                         <?php endif; ?>
@@ -2079,6 +2100,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['name']) ?></div>
                             <?php endif; ?>
                           </td>
+                          <?php if ($chaptersHasAbbreviation): ?>
+                            <td class="py-3 pr-3">
+                              <input
+                                type="text"
+                                name="chapters[<?= e((string) $chapter['id']) ?>][abbreviation]"
+                                class="w-24 rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['abbreviation']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                                value="<?= e((string) ($chapter['abbreviation'] ?? '')) ?>"
+                                maxlength="16"
+                                placeholder="e.g. FCC"
+                              >
+                              <?php if (isset($chapterFieldErrors[$chapter['id']]['abbreviation'])): ?>
+                                <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['abbreviation']) ?></div>
+                              <?php endif; ?>
+                            </td>
+                          <?php endif; ?>
                           <?php if ($chaptersHasState): ?>
                             <td class="py-3 pr-3">
                               <input
@@ -2124,6 +2160,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors['new']['name']) ?></div>
                           <?php endif; ?>
                         </td>
+                        <?php if ($chaptersHasAbbreviation): ?>
+                          <td class="py-3 pr-3">
+                            <input
+                              type="text"
+                              name="new_chapter_abbreviation"
+                              class="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
+                              placeholder="e.g. FCC"
+                              maxlength="16"
+                            >
+                          </td>
+                        <?php endif; ?>
                         <?php if ($chaptersHasState): ?>
                           <td class="py-3 pr-3">
                             <input

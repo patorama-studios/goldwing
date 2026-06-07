@@ -90,14 +90,17 @@ function fetchChapterDisplay(\PDO $pdo, ?int $chapterId): string
     if (!$chapterId) {
         return 'Unassigned';
     }
-    $stmt = $pdo->prepare('SELECT name, state FROM chapters WHERE id = :id LIMIT 1');
+    $hasAbbreviation = \App\Services\ChapterRepository::hasColumn($pdo, 'abbreviation');
+    $columns = $hasAbbreviation ? 'name, abbreviation, state' : 'name, state';
+    $stmt = $pdo->prepare('SELECT ' . $columns . ' FROM chapters WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $chapterId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         return 'Unassigned';
     }
+    $name = \App\Services\ChapterRepository::formatLabel($row['name'] ?? '', $row['abbreviation'] ?? null);
     $state = trim($row['state'] ?? '');
-    $label = trim(($row['name'] ?? '') . ($state ? ' (' . $state . ')' : ''));
+    $label = trim($name . ($state ? ' (' . $state . ')' : ''));
     return $label !== '' ? $label : 'Unassigned';
 }
 

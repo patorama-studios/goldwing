@@ -604,7 +604,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                     <option value="">Select chapter</option>
                     <?php foreach ($chapters as $chapter): ?>
                       <?php
-                      $chapterLabel = $chapter['name'];
+                      $chapterLabel = $chapter['display_label'] ?? $chapter['name'];
                       if (!empty($chapter['state'])) {
                         $chapterLabel .= ' (' . $chapter['state'] . ')';
                       }

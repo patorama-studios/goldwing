@@ -333,7 +333,7 @@ if ($profileMemberNumber === '') {
 $profileMembershipTypeLabel = $profileMember['membership_type_name'] ?? ucfirst(strtolower((string) ($profileMember['member_type'] ?? 'Member')));
 $profileStatusLabel = ucfirst(strtolower((string) ($profileMember['status'] ?? 'pending')));
 $profileChapterLabel = $profileMember['chapter_name'] ?? 'Unassigned';
-$profileJoinedLabel = formatDate($profileMember['created_at'] ?? null);
+$profileJoinedLabel = formatDate($profileMember['join_date'] ?? $profileMember['created_at'] ?? null);
 
 $chapterRequests = [];
 $chapterRequestHasReason = false;
@@ -746,7 +746,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <span
                       class="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Joined</span>
                     <span
-                      class="text-sm font-bold text-gray-900 leading-tight"><?= e(formatDate($member['created_at'])) ?></span>
+                      class="text-sm font-bold text-gray-900 leading-tight"><?= e(formatDate($member['join_date'] ?? $member['created_at'] ?? null)) ?></span>
                   </div>
                 </div>
                 <?php if (!empty($member['is_historic'])): ?>
@@ -858,7 +858,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           </div>
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Joined Date</h4>
-                            <p class="text-sm font-medium text-gray-900"><?= e(formatDate($member['created_at'])) ?></p>
+                            <p class="text-sm font-medium text-gray-900"><?= e(formatDate($member['join_date'] ?? $member['created_at'] ?? null)) ?></p>
                           </div>
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Renewal Date</h4>
@@ -1636,7 +1636,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <option value="">Select chapter</option>
                         <?php foreach ($chapters as $chapter): ?>
                           <?php
-                          $chapterLabel = $chapter['name'];
+                          $chapterLabel = $chapter['display_label'] ?? $chapter['name'];
                           if (!empty($chapter['state'])) {
                             $chapterLabel .= ' (' . $chapter['state'] . ')';
                           }
@@ -2179,7 +2179,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <?= $canEditFullProfile ? '' : 'disabled' ?>>
                         <option value="">Unassigned</option>
                         <?php foreach ($chapters as $chapter): ?>
-                          <option value="<?= e($chapter['id']) ?>" <?= (int) $chapter['id'] === (int) ($member['chapter_id'] ?? 0) ? 'selected' : '' ?>><?= e($chapter['name'] . ' (' . $chapter['state'] . ')') ?></option>
+                          <option value="<?= e($chapter['id']) ?>" <?= (int) $chapter['id'] === (int) ($member['chapter_id'] ?? 0) ? 'selected' : '' ?>><?= e(($chapter['display_label'] ?? $chapter['name']) . ' (' . $chapter['state'] . ')') ?></option>
                         <?php endforeach; ?>
                       </select>
                     </div>

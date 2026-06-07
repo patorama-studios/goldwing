@@ -31,12 +31,12 @@ try {
 
 $chapters = [];
 try {
-    $chapters = $pdo->query('SELECT id, name FROM chapters ORDER BY name')->fetchAll();
+    $chapters = calendar_list_chapters_for_dropdown($pdo);
 } catch (Throwable $e) {
     $chapters = [];
 }
 
-$stmt = $pdo->prepare('SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, c.name AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.id = :id');
+$stmt = $pdo->prepare('SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, ' . calendar_chapter_name_sql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.id = :id');
 $stmt->execute(['id' => $eventId]);
 $event = $stmt->fetch();
 if (!$event) {
@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $stmt = $pdo->prepare('SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, c.name AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.id = :id');
+    $stmt = $pdo->prepare('SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, ' . calendar_chapter_name_sql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.id = :id');
     $stmt->execute(['id' => $eventId]);
     $event = $stmt->fetch();
 }
@@ -421,7 +421,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <select name="chapter_id" form="event-edit-form" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                 <option value="">Select chapter</option>
                 <?php foreach ($chapters as $chapter) : ?>
-                  <option value="<?php echo (int) $chapter['id']; ?>" <?php echo (int) $event['chapter_id'] === (int) $chapter['id'] ? 'selected' : ''; ?>><?php echo calendar_e($chapter['name']); ?></option>
+                  <option value="<?php echo (int) $chapter['id']; ?>" <?php echo (int) $event['chapter_id'] === (int) $chapter['id'] ? 'selected' : ''; ?>><?php echo calendar_e($chapter['display_label'] ?? $chapter['name']); ?></option>
                 <?php endforeach; ?>
               </select>
             </label>

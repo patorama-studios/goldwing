@@ -9,6 +9,7 @@ use App\Services\MembershipPricingService;
 use App\Services\ChapterRepository;
 use App\Services\StripeService;
 use App\Services\PaymentSettingsService;
+use App\Services\PendingRequestsService;
 use App\Services\SettingsService;
 use App\Services\BaseUrlService;
 use App\Services\DomSnapshotService;
@@ -200,7 +201,7 @@ function orders_payment_status_column(\PDO $pdo): string
 
 
 if ($user && $user['member_id']) {
-  $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
+  $stmt = $pdo->prepare('SELECT m.*, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
   $stmt->execute(['id' => $user['member_id']]);
   $member = $stmt->fetch();
 
@@ -290,9 +291,12 @@ if ($user && $user['member_id']) {
           $profileMessage = 'Chapter change request submitted.';
 
           try {
-            $stmtChapter = $pdo->prepare('SELECT name FROM chapters WHERE id = :id');
+            $stmtChapter = $pdo->prepare('SELECT name, abbreviation FROM chapters WHERE id = :id');
             $stmtChapter->execute(['id' => $requestedChapter]);
-            $requestedChapterName = $stmtChapter->fetchColumn() ?: 'Unknown Chapter';
+            $chapterRow = $stmtChapter->fetch(PDO::FETCH_ASSOC);
+            $requestedChapterName = $chapterRow
+                ? \App\Services\ChapterRepository::formatLabel($chapterRow['name'] ?? '', $chapterRow['abbreviation'] ?? null)
+                : 'Unknown Chapter';
             
             $memberFullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
             $memberNumberObj = App\Services\MembershipService::displayMembershipNumber((int) ($member['member_number_base'] ?? 0), (int) ($member['member_number_suffix'] ?? 0));
@@ -321,6 +325,57 @@ if ($user && $user['member_id']) {
             }
           } catch (Throwable $e) {
             // Silently fail email sending so it doesn't break the user request.
+          }
+        }
+      } elseif ($_POST['action'] === 'request_profile_change') {
+        $field = (string) ($_POST['field_name'] ?? '');
+        $requested = (string) ($_POST['requested_value'] ?? '');
+        if (!isset(\App\Services\PendingRequestsService::PROFILE_FIELDS[$field])) {
+          $profileError = 'Unknown profile field.';
+        } else {
+          $existing = \App\Services\PendingRequestsService::latestPendingProfileChange((int) $member['id'], $field);
+          if ($existing) {
+            $profileError = 'A change request for this field is already pending review.';
+          } else {
+            $newRequestId = \App\Services\PendingRequestsService::submitProfileChange(
+              (int) $member['id'],
+              $field,
+              $requested
+            );
+            if ($newRequestId === null) {
+              $profileError = 'That value was not valid for the selected field.';
+            } else {
+              $profileMessage = (\App\Services\PendingRequestsService::PROFILE_FIELDS[$field]['label'] ?? 'Profile')
+                . ' change request submitted for review.';
+              try {
+                $memberFullName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+                $fieldLabel = \App\Services\PendingRequestsService::PROFILE_FIELDS[$field]['label'] ?? $field;
+                $newDisplay = \App\Services\PendingRequestsService::formatProfileValue($requested);
+                $adminEmails = [];
+                $stmtEmails = $pdo->query('SELECT u.email FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name IN ("admin", "committee") AND u.is_active = 1');
+                foreach ($stmtEmails->fetchAll() as $row) {
+                  if (!empty($row['email'])) {
+                    $adminEmails[] = $row['email'];
+                  }
+                }
+                $adminEmails = array_values(array_unique($adminEmails));
+                if ($adminEmails) {
+                  $subject = 'Profile Change Request: ' . $memberFullName;
+                  $body = '<p>A member has requested a profile change.</p>'
+                    . '<ul>'
+                    . '<li><strong>Member:</strong> ' . htmlspecialchars($memberFullName) . '</li>'
+                    . '<li><strong>Field:</strong> ' . htmlspecialchars($fieldLabel) . '</li>'
+                    . '<li><strong>Requested Value:</strong> ' . htmlspecialchars($newDisplay) . '</li>'
+                    . '</ul>'
+                    . '<p>Review and approve or reject this request in the Notification Hub.</p>';
+                  foreach ($adminEmails as $email) {
+                    EmailService::send($email, $subject, $body, ['is_transactional' => true]);
+                  }
+                }
+              } catch (Throwable $e) {
+                // Don't let email failures block the request submission.
+              }
+            }
           }
         }
       } elseif ($_POST['action'] === 'add_bike') {
@@ -997,7 +1052,7 @@ if ($user && $user['member_id']) {
         header('Location: ' . $redirectUrl);
         exit;
       }
-      $stmt = $pdo->prepare('SELECT m.*, c.name as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
+      $stmt = $pdo->prepare('SELECT m.*, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
       $stmt->execute(['id' => $user['member_id']]);
       $member = $stmt->fetch();
     }
@@ -1075,7 +1130,7 @@ if ($user && $user['member_id']) {
     $calendarEvents = [];
     try {
       if (calendar_table_exists($pdo, 'calendar_events')) {
-        $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, c.name AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published" AND (e.scope = "NATIONAL"';
+        $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published" AND (e.scope = "NATIONAL"';
         $eventsParams = [];
         if (!empty($memberChapterId)) {
           $eventsSql .= ' OR e.chapter_id = :chapter_id';
@@ -1328,8 +1383,7 @@ if ($user && $user['member_id']) {
 
     $noticeStates = $australianStates;
 
-    $stmt = $pdo->query('SELECT id, name, state FROM chapters WHERE is_active = 1 ORDER BY name ASC');
-    $noticeChapters = $stmt->fetchAll();
+    $noticeChapters = ChapterRepository::listForSelection($pdo, true);
 
     $fallenWings = [];
     $fallenYears = [];
@@ -1802,7 +1856,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $profileStatusClasses = status_badge_classes($profileMembershipStatusKey);
         $currentStatusLabel = strtoupper((string) ($profileMember['status'] ?? 'pending'));
         $profileChapterName = $profileMember['chapter_name'] ?? 'Unassigned';
-        $joinedLabel = format_date($profileMember['created_at'] ?? null);
+        $joinedLabel = format_date($profileMember['join_date'] ?? $profileMember['created_at'] ?? null);
+        $joinDateValue = !empty($profileMember['join_date'])
+          ? substr((string) $profileMember['join_date'], 0, 10)
+          : (!empty($profileMember['created_at']) ? substr((string) $profileMember['created_at'], 0, 10) : '');
+        $pendingJoinDateRequest = \App\Services\PendingRequestsService::latestPendingProfileChange((int) $profileMemberId, 'join_date');
         $twofaStatusLabel = $twofaEnabled ? 'Enabled' : 'Not enabled';
         $twofaActionHref = $twofaEnabled ? '/member/2fa_verify.php' : '/member/2fa_enroll.php';
         $twofaActionLabel = $twofaEnabled ? 'Manage 2FA' : 'Setup 2FA';
@@ -2161,6 +2219,28 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <div>
                       <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Joined</p>
                       <p class="text-sm font-medium text-gray-900"><?= e($joinedLabel) ?></p>
+                      <?php if ($profileMemberId === (int) $member['id']): ?>
+                        <?php if ($pendingJoinDateRequest): ?>
+                          <p class="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2 py-1">
+                            Pending review:
+                            <?= e(\App\Services\PendingRequestsService::formatProfileValue($pendingJoinDateRequest['requested_value'] ?? null)) ?>
+                          </p>
+                        <?php else: ?>
+                          <details class="mt-1 text-xs">
+                            <summary class="cursor-pointer text-primary hover:underline">Request correction</summary>
+                            <form method="post" class="mt-2 flex flex-wrap items-center gap-2">
+                              <input type="hidden" name="action" value="request_profile_change">
+                              <input type="hidden" name="field_name" value="join_date">
+                              <input type="date" name="requested_value" value="<?= e($joinDateValue) ?>"
+                                class="rounded-md border border-gray-200 px-2 py-1 text-xs">
+                              <button type="submit" class="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-ink hover:bg-primary/90">
+                                Submit
+                              </button>
+                            </form>
+                            <p class="mt-1 text-[11px] text-gray-500">An admin reviews your request before the date changes.</p>
+                          </details>
+                        <?php endif; ?>
+                      <?php endif; ?>
                     </div>
                     <div>
                       <p class="text-xs uppercase tracking-[0.3em] text-gray-400 mb-1">Renewal date</p>
@@ -2307,7 +2387,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <option value="">Select chapter</option>
                         <?php foreach (ChapterRepository::listForSelection($pdo, true) as $chapter): ?>
                           <?php
-                          $chapterLabel = $chapter['name'];
+                          $chapterLabel = $chapter['display_label'] ?? $chapter['name'];
                           if (!empty($chapter['state'])) {
                             $chapterLabel .= ' (' . $chapter['state'] . ')';
                           }
@@ -2992,7 +3072,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <option value="">Select chapter</option>
                       <?php foreach ($noticeChapters as $chapter): ?>
                         <option value="<?= e((string) $chapter['id']) ?>">
-                          <?= e($chapter['name']) ?>
+                          <?= e($chapter['display_label'] ?? $chapter['name']) ?>
                           <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
                         </option>
                       <?php endforeach; ?>
@@ -3789,7 +3869,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $colBedOrTent   ? "m.$colBedOrTent"   : null,
             $colTools       ? "m.$colTools"        : null,
             'm.full_member_id',
-            'c.name AS chapter_name', 'c.state AS chapter_state',
+            \App\Services\ChapterRepository::displayNameSql($pdo) . ' AS chapter_name', 'c.state AS chapter_state',
             'CONCAT(fm.first_name, \' \', fm.last_name) AS full_member_name',
             'fm.member_number_base AS full_member_number_base',
             'fm.member_number_suffix AS full_member_number_suffix',

@@ -2056,6 +2056,113 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 025 — Chapter abbreviation
+// Adds an optional `abbreviation` column to the `chapters` table so that
+// admins can supply a short code (e.g. FCC) that is rendered in front of
+// each chapter name as "(FCC) Fraser Coast Chapter". Idempotent.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_025_chapter_abbreviation';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 025 — Chapter abbreviation', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $hasAbbreviation = (bool) $pdo->query("SHOW COLUMNS FROM chapters LIKE 'abbreviation'")->fetchColumn();
+        if ($hasAbbreviation) {
+            $applied[] = '`abbreviation` column already present';
+        } else {
+            try {
+                $pdo->exec("ALTER TABLE chapters ADD COLUMN abbreviation VARCHAR(16) NULL AFTER name");
+                $applied[] = '`abbreviation` column added';
+            } catch (Throwable $e) {
+                // Tolerate duplicate-column races so the migration is idempotent.
+                if (stripos($e->getMessage(), 'duplicate') === false) {
+                    throw $e;
+                }
+                $applied[] = '`abbreviation` column already present (caught duplicate)';
+            }
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 025 — Chapter abbreviation', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 025 — Chapter abbreviation', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration 026 — Profile change requests + members.join_date
+// Adds an optional `join_date` column to `members` (separate from
+// `created_at`, which is the row-insert timestamp and wrong for migrated
+// members) plus a `member_profile_change_requests` table so members can
+// request edits to selected fields and admins approve via the
+// notification hub. Idempotent.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_026_profile_change_requests';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 026 — Profile change requests', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        // 1. Add members.join_date if missing.
+        $hasJoinDate = (bool) $pdo->query("SHOW COLUMNS FROM members LIKE 'join_date'")->fetchColumn();
+        if ($hasJoinDate) {
+            $applied[] = '`members.join_date` already present';
+        } else {
+            try {
+                $pdo->exec("ALTER TABLE members ADD COLUMN join_date DATE NULL AFTER created_at");
+                $applied[] = '`members.join_date` column added';
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false) {
+                    throw $e;
+                }
+                $applied[] = '`members.join_date` already present (caught duplicate)';
+            }
+        }
+
+        // 2. Create member_profile_change_requests if missing.
+        $hasTable = (bool) $pdo->query("SHOW TABLES LIKE 'member_profile_change_requests'")->fetchColumn();
+        if ($hasTable) {
+            $applied[] = '`member_profile_change_requests` table already present';
+        } else {
+            $pdo->exec(
+                "CREATE TABLE member_profile_change_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    member_id INT NOT NULL,
+                    field_name VARCHAR(64) NOT NULL,
+                    current_value TEXT NULL,
+                    requested_value TEXT NULL,
+                    status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+                    rejection_reason TEXT NULL,
+                    feedback_message TEXT NULL,
+                    requested_at DATETIME NOT NULL,
+                    approved_by INT NULL,
+                    approved_at DATETIME NULL,
+                    INDEX idx_mpcr_status_member (status, member_id),
+                    INDEX idx_mpcr_requested_at (requested_at),
+                    FOREIGN KEY (member_id) REFERENCES members(id),
+                    FOREIGN KEY (approved_by) REFERENCES users(id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+            $applied[] = '`member_profile_change_requests` table created';
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 026 — Profile change requests', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 026 — Profile change requests', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

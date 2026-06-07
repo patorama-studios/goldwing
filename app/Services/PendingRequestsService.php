@@ -17,9 +17,22 @@ class PendingRequestsService
     public const TYPE_MEMBER_OF_YEAR      = 'member_of_year';
     public const TYPE_FALLEN_WINGS        = 'fallen_wings';
     public const TYPE_CHAPTER_CHANGE      = 'chapter_change';
+    public const TYPE_PROFILE_CHANGE      = 'profile_change';
     public const TYPE_STORE_ORDER         = 'store_order';
     public const TYPE_MEMBERSHIP          = 'membership_application';
     public const TYPE_FEEDBACK            = 'feedback';
+
+    /**
+     * Profile fields a member may request changes to via the notification
+     * hub. Keys are the column name on `members`; values describe how the
+     * field is presented and validated.
+     */
+    public const PROFILE_FIELDS = [
+        'join_date' => [
+            'label' => 'Join date',
+            'input_type' => 'date',
+        ],
+    ];
 
     public static function types(): array
     {
@@ -30,6 +43,7 @@ class PendingRequestsService
             self::TYPE_MEMBER_OF_YEAR      => ['label' => 'Member of the Year',     'icon' => 'emoji_events'],
             self::TYPE_FALLEN_WINGS        => ['label' => 'Fallen Wings',           'icon' => 'military_tech'],
             self::TYPE_CHAPTER_CHANGE      => ['label' => 'Chapter Change',         'icon' => 'swap_horiz'],
+            self::TYPE_PROFILE_CHANGE      => ['label' => 'Profile Change',         'icon' => 'edit_note'],
             self::TYPE_STORE_ORDER         => ['label' => 'Store Order',            'icon' => 'storefront'],
             self::TYPE_MEMBERSHIP          => ['label' => 'Membership Application', 'icon' => 'how_to_reg'],
         ];
@@ -55,6 +69,7 @@ class PendingRequestsService
             self::TYPE_MEMBER_OF_YEAR => 'fetchMemberOfYear',
             self::TYPE_FALLEN_WINGS   => 'fetchFallenWings',
             self::TYPE_CHAPTER_CHANGE => 'fetchChapterChange',
+            self::TYPE_PROFILE_CHANGE => 'fetchProfileChange',
             self::TYPE_STORE_ORDER    => 'fetchStoreOrders',
             self::TYPE_MEMBERSHIP     => 'fetchMembershipApplications',
         ];
@@ -225,7 +240,7 @@ class PendingRequestsService
                         "SELECT ccr.id, ccr.member_id, ccr.requested_chapter_id, ccr.status, ccr.requested_at,
                                 ccr.feedback_message, ccr.rejection_reason,
                                 m.first_name, m.last_name, m.email,
-                                c.name AS chapter_name, c.state AS chapter_state
+                                " . ChapterRepository::displayNameSql($pdo) . " AS chapter_name, c.state AS chapter_state
                          FROM chapter_change_requests ccr
                          LEFT JOIN members m ON m.id = ccr.member_id
                          LEFT JOIN chapters c ON c.id = ccr.requested_chapter_id
@@ -240,6 +255,26 @@ class PendingRequestsService
                         $submitter, $r['email'] ?? null,
                         'Requested chapter: ' . ($r['chapter_name'] ?? 'n/a') . ' (' . ($r['chapter_state'] ?? '') . ')',
                         $r);
+
+                case self::TYPE_PROFILE_CHANGE:
+                    $stmt = $pdo->prepare(
+                        "SELECT mpr.id, mpr.member_id, mpr.field_name, mpr.current_value, mpr.requested_value,
+                                mpr.status, mpr.requested_at, mpr.feedback_message, mpr.rejection_reason,
+                                m.first_name, m.last_name, m.email
+                         FROM member_profile_change_requests mpr
+                         LEFT JOIN members m ON m.id = mpr.member_id
+                         WHERE mpr.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                    $fieldLabel = self::PROFILE_FIELDS[$r['field_name']]['label'] ?? $r['field_name'];
+                    $title = $submitter . ' → ' . $fieldLabel;
+                    $summary = $fieldLabel . ': ' . self::formatProfileValue($r['current_value'])
+                        . ' → ' . self::formatProfileValue($r['requested_value']);
+                    return self::row(self::TYPE_PROFILE_CHANGE, $r['id'], $title, strtolower((string) $r['status']),
+                        $r['requested_at'], $submitter, $r['email'] ?? null, $summary, $r);
 
                 case self::TYPE_STORE_ORDER:
                     $stmt = $pdo->prepare(
@@ -370,7 +405,7 @@ class PendingRequestsService
         try {
             $stmt = $pdo->prepare(
                 "SELECT ccr.id, ccr.status, ccr.requested_at, ccr.feedback_message,
-                        c.name AS chapter_name
+                        " . ChapterRepository::displayNameSql($pdo) . " AS chapter_name
                  FROM chapter_change_requests ccr
                  LEFT JOIN chapters c ON c.id = ccr.requested_chapter_id
                  WHERE ccr.member_id = :mid ORDER BY ccr.requested_at DESC LIMIT 20"
@@ -395,6 +430,26 @@ class PendingRequestsService
                 $items[] = self::row(self::TYPE_MEMBERSHIP, $r['id'], 'Membership application',
                     strtolower((string) $r['status']), $r['created_at'], null, null,
                     'Type: ' . $r['member_type'], $r);
+            }
+        } catch (Throwable $e) {}
+
+        // member_profile_change_requests — linked by member_id
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT mpr.id, mpr.field_name, mpr.current_value, mpr.requested_value,
+                        mpr.status, mpr.requested_at, mpr.feedback_message, mpr.rejection_reason
+                 FROM member_profile_change_requests mpr
+                 WHERE mpr.member_id = :mid ORDER BY mpr.requested_at DESC LIMIT 20"
+            );
+            $stmt->execute(['mid' => $memberId]);
+            foreach ($stmt->fetchAll() ?: [] as $r) {
+                $fieldLabel = self::PROFILE_FIELDS[$r['field_name']]['label'] ?? $r['field_name'];
+                $summary = $fieldLabel . ': ' . self::formatProfileValue($r['current_value'])
+                    . ' → ' . self::formatProfileValue($r['requested_value']);
+                $items[] = self::row(self::TYPE_PROFILE_CHANGE, $r['id'],
+                    'Profile change → ' . $fieldLabel,
+                    strtolower((string) $r['status']), $r['requested_at'], null, null,
+                    $summary, $r);
             }
         } catch (Throwable $e) {}
 
@@ -450,6 +505,7 @@ class PendingRequestsService
                 self::TYPE_EVENT          => ['table' => 'calendar_events',          'status_open' => 'pending', 'enum' => 'lower'],
                 self::TYPE_FALLEN_WINGS   => ['table' => 'fallen_wings',             'status_open' => 'PENDING', 'enum' => 'upper'],
                 self::TYPE_CHAPTER_CHANGE => ['table' => 'chapter_change_requests',  'status_open' => 'PENDING', 'enum' => 'upper'],
+                self::TYPE_PROFILE_CHANGE => ['table' => 'member_profile_change_requests', 'status_open' => 'PENDING', 'enum' => 'upper'],
                 self::TYPE_MEMBERSHIP     => ['table' => 'membership_applications',  'status_open' => 'PENDING', 'enum' => 'upper'],
             ];
             if (!isset($tableMap[$type])) return;
@@ -561,7 +617,7 @@ class PendingRequestsService
         $sql = "SELECT ccr.id, ccr.member_id, ccr.requested_chapter_id, ccr.status, ccr.requested_at,
                        ccr.feedback_message, ccr.rejection_reason,
                        m.first_name, m.last_name, m.email,
-                       c.name AS chapter_name, c.state AS chapter_state
+                       " . ChapterRepository::displayNameSql($pdo) . " AS chapter_name, c.state AS chapter_state
                 FROM chapter_change_requests ccr
                 LEFT JOIN members m ON m.id = ccr.member_id
                 LEFT JOIN chapters c ON c.id = ccr.requested_chapter_id
@@ -576,6 +632,30 @@ class PendingRequestsService
                 $submitter, $r['email'] ?? null,
                 'Requested chapter: ' . ($r['chapter_name'] ?? 'n/a') . ' (' . ($r['chapter_state'] ?? '') . ')',
                 $r);
+        }, $rows);
+    }
+
+    private static function fetchProfileChange(string $statusFilter): array
+    {
+        $pdo = Database::connection();
+        $where = self::statusWhereUpper($statusFilter, 'mpr.status');
+        $sql = "SELECT mpr.id, mpr.member_id, mpr.field_name, mpr.current_value, mpr.requested_value,
+                       mpr.status, mpr.requested_at, mpr.feedback_message, mpr.rejection_reason,
+                       m.first_name, m.last_name, m.email
+                FROM member_profile_change_requests mpr
+                LEFT JOIN members m ON m.id = mpr.member_id
+                WHERE 1=1 $where
+                ORDER BY mpr.requested_at DESC";
+        $stmt = $pdo->query($sql);
+        $rows = $stmt->fetchAll() ?: [];
+        return array_map(function ($r) {
+            $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+            $fieldLabel = self::PROFILE_FIELDS[$r['field_name']]['label'] ?? $r['field_name'];
+            $title = $submitter . ' → ' . $fieldLabel;
+            $summary = $fieldLabel . ': ' . self::formatProfileValue($r['current_value'])
+                . ' → ' . self::formatProfileValue($r['requested_value']);
+            return self::row(self::TYPE_PROFILE_CHANGE, $r['id'], $title, strtolower((string) $r['status']),
+                $r['requested_at'], $submitter, $r['email'] ?? null, $summary, $r);
         }, $rows);
     }
 
@@ -731,6 +811,7 @@ class PendingRequestsService
             self::TYPE_EVENT          => ['table' => 'calendar_events',             'pk' => 'id', 'enum' => 'lower'],
             self::TYPE_FALLEN_WINGS   => ['table' => 'fallen_wings',                'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_CHAPTER_CHANGE => ['table' => 'chapter_change_requests',     'pk' => 'id', 'enum' => 'upper'],
+            self::TYPE_PROFILE_CHANGE => ['table' => 'member_profile_change_requests', 'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_MEMBERSHIP     => ['table' => 'membership_applications',     'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_MEMBER_OF_YEAR => ['table' => 'member_of_year_nominations',  'pk' => 'id', 'enum' => 'moy'],
             self::TYPE_STORE_ORDER    => ['table' => 'store_orders',                'pk' => 'id', 'enum' => 'store'],
@@ -832,6 +913,29 @@ class PendingRequestsService
                 ]);
                 return;
             }
+            if ($table === 'member_profile_change_requests') {
+                // Side effect: on approval, write the requested value back to
+                // the member's row before flipping the request status.
+                if ($newStatus === 'approved') {
+                    $reqStmt = $pdo->prepare("SELECT member_id, field_name, requested_value FROM $table WHERE id = :id LIMIT 1");
+                    $reqStmt->execute(['id' => $id]);
+                    $req = $reqStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($req && isset(self::PROFILE_FIELDS[$req['field_name']])) {
+                        $col = $req['field_name'];
+                        $stored = self::sanitizeProfileValue($col, $req['requested_value']);
+                        $upd = $pdo->prepare("UPDATE members SET $col = :v, updated_at = NOW() WHERE id = :mid");
+                        $upd->execute(['v' => $stored, 'mid' => (int) $req['member_id']]);
+                    }
+                }
+                $sql = "UPDATE $table SET status = :s, approved_by = :r, approved_at = NOW(), feedback_message = :msg, rejection_reason = :rr WHERE id = :id";
+                $pdo->prepare($sql)->execute([
+                    's' => $upper, 'r' => $reviewerUserId,
+                    'msg' => $message !== '' ? $message : null,
+                    'rr' => $newStatus === 'rejected' ? $message : null,
+                    'id' => $id,
+                ]);
+                return;
+            }
         }
 
         if ($enum === 'moy') {
@@ -890,5 +994,117 @@ class PendingRequestsService
             return;
         }
         $pdo->prepare($sql)->execute(['msg' => $message, 'id' => $id]);
+    }
+
+    // ─── profile change request helpers ────────────────────────────────────
+
+    /**
+     * Create a new profile-change request for a member. Returns the new
+     * request id, or null if the inputs are invalid / the table is missing.
+     */
+    public static function submitProfileChange(int $memberId, string $fieldName, ?string $requestedValue): ?int
+    {
+        if ($memberId <= 0 || !isset(self::PROFILE_FIELDS[$fieldName])) {
+            return null;
+        }
+        $sanitized = self::sanitizeProfileValue($fieldName, $requestedValue);
+        if ($sanitized === null) {
+            return null;
+        }
+        try {
+            $pdo = Database::connection();
+            // Capture the current value for audit / comparison.
+            $current = null;
+            try {
+                $col = $fieldName; // keys are whitelisted in PROFILE_FIELDS
+                $cur = $pdo->prepare("SELECT $col FROM members WHERE id = :id LIMIT 1");
+                $cur->execute(['id' => $memberId]);
+                $current = $cur->fetchColumn();
+                if ($current === false) {
+                    $current = null;
+                }
+            } catch (Throwable $e) {}
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO member_profile_change_requests (member_id, field_name, current_value, requested_value, status, requested_at)
+                 VALUES (:member_id, :field_name, :current_value, :requested_value, "PENDING", NOW())'
+            );
+            $stmt->execute([
+                'member_id' => $memberId,
+                'field_name' => $fieldName,
+                'current_value' => $current !== null ? (string) $current : null,
+                'requested_value' => $sanitized,
+            ]);
+            return (int) $pdo->lastInsertId();
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Return the most recent pending profile-change request for a given
+     * member and field, if any. Used to surface the in-flight request on
+     * the member's profile UI.
+     */
+    public static function latestPendingProfileChange(int $memberId, string $fieldName): ?array
+    {
+        if ($memberId <= 0 || $fieldName === '') {
+            return null;
+        }
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare(
+                'SELECT id, member_id, field_name, current_value, requested_value, status, requested_at
+                 FROM member_profile_change_requests
+                 WHERE member_id = :mid AND field_name = :fn AND status = "PENDING"
+                 ORDER BY requested_at DESC LIMIT 1'
+            );
+            $stmt->execute(['mid' => $memberId, 'fn' => $fieldName]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Normalise a requested profile value before storing or applying it.
+     * Returns null if the value is invalid for the field, or '' to mean
+     * "clear the field".
+     */
+    private static function sanitizeProfileValue(string $fieldName, ?string $raw): ?string
+    {
+        if (!isset(self::PROFILE_FIELDS[$fieldName])) {
+            return null;
+        }
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+        $type = self::PROFILE_FIELDS[$fieldName]['input_type'] ?? 'text';
+        if ($type === 'date') {
+            // Accept YYYY-MM-DD only; reject anything else.
+            $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $raw);
+            if (!$dt || $dt->format('Y-m-d') !== $raw) {
+                return null;
+            }
+            return $dt->format('Y-m-d');
+        }
+        return $raw;
+    }
+
+    /** Render a stored profile value for display in admin / member UIs. */
+    public static function formatProfileValue(?string $raw): string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return '—';
+        }
+        // Format common date-only values nicely; fall back to raw.
+        $dt = \DateTimeImmutable::createFromFormat('Y-m-d', substr($raw, 0, 10));
+        if ($dt && $dt->format('Y-m-d') === substr($raw, 0, 10)) {
+            return $dt->format('j M Y');
+        }
+        return $raw;
     }
 }

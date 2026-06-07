@@ -12,7 +12,7 @@ calendar_require_tables($pdo, ['calendar_events']);
 
 $chapters = [];
 try {
-    $chapters = $pdo->query('SELECT id, name FROM chapters ORDER BY name')->fetchAll();
+    $chapters = calendar_list_chapters_for_dropdown($pdo);
 } catch (Throwable $e) {
     $chapters = [];
 }
@@ -375,7 +375,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <select name="chapter_id" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                 <option value="">Select chapter</option>
                 <?php foreach ($chapters as $chapter) : ?>
-                  <option value="<?php echo (int) $chapter['id']; ?>" <?php echo $old('chapter_id') == $chapter['id'] ? 'selected' : ''; ?>><?php echo calendar_e($chapter['name']); ?></option>
+                  <option value="<?php echo (int) $chapter['id']; ?>" <?php echo $old('chapter_id') == $chapter['id'] ? 'selected' : ''; ?>><?php echo calendar_e($chapter['display_label'] ?? $chapter['name']); ?></option>
                 <?php endforeach; ?>
               </select>
             </label>

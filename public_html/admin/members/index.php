@@ -108,7 +108,7 @@ $availableRoles = $roleStmt->fetchAll(PDO::FETCH_ASSOC);
 $directoryPrefs = MemberRepository::directoryPreferences();
 $chapterSelectOptions = array_map(fn($chapter) => [
     'id' => (int) ($chapter['id'] ?? 0),
-    'label' => trim(($chapter['name'] ?? '') . (($chapter['state'] ?? '') ? ' (' . $chapter['state'] . ')' : '')),
+    'label' => trim(($chapter['display_label'] ?? $chapter['name'] ?? '') . (($chapter['state'] ?? '') ? ' (' . $chapter['state'] . ')' : '')),
 ], $availableChapters);
 $statusOptions = ['pending', 'active', 'expired', 'cancelled', 'suspended'];
 
@@ -392,7 +392,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <select name="chapter_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" <?= $chapterRestriction !== null ? 'disabled' : '' ?>>
                 <option value="">All chapters</option>
                 <?php foreach ($availableChapters as $chapter): ?>
-                  <option value="<?= e($chapter['id']) ?>" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === (int) $chapter['id'] ? 'selected' : '' ?>><?= e($chapter['name']) ?> (<?= e($chapter['state']) ?>)</option>
+                  <option value="<?= e($chapter['id']) ?>" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === (int) $chapter['id'] ? 'selected' : '' ?>><?= e($chapter['display_label'] ?? $chapter['name']) ?> (<?= e($chapter['state']) ?>)</option>
                 <?php endforeach; ?>
               </select>
             </label>
@@ -669,7 +669,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <?php foreach ($availableChapters as $chapter): ?>
                                 <?php $chapterState2 = $chapter['state'] ?? ''; ?>
                                 <option value="<?= e($chapter['id']) ?>" <?= (int) ($member['chapter_id'] ?? 0) === (int) $chapter['id'] ? 'selected' : '' ?>>
-                                  <?= e($chapter['name'] . ($chapterState2 ? ' (' . $chapterState2 . ')' : '')) ?>
+                                  <?= e(($chapter['display_label'] ?? $chapter['name']) . ($chapterState2 ? ' (' . $chapterState2 . ')' : '')) ?>
                                 </option>
                               <?php endforeach; ?>
                             </select>

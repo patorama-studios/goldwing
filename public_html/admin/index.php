@@ -1871,7 +1871,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $statusCounts[$status] = (int) $row['total'];
           }
         }
-        $stmt = $pdo->prepare('SELECT a.*, m.first_name, m.last_name, m.email, m.phone, m.chapter_id, c.name as chapter_name, c.state as chapter_state FROM membership_applications a JOIN members m ON m.id = a.member_id LEFT JOIN chapters c ON c.id = m.chapter_id WHERE a.status = :status ORDER BY a.created_at ASC');
+        $stmt = $pdo->prepare('SELECT a.*, m.first_name, m.last_name, m.email, m.phone, m.chapter_id, ' . ChapterRepository::displayNameSql($pdo) . ' as chapter_name, c.state as chapter_state FROM membership_applications a JOIN members m ON m.id = a.member_id LEFT JOIN chapters c ON c.id = m.chapter_id WHERE a.status = :status ORDER BY a.created_at ASC');
         $stmt->execute(['status' => $statusFilter]);
         $applications = $stmt->fetchAll();
         $chapters = ChapterRepository::listForSelection($pdo, false);
@@ -1988,7 +1988,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   if ($requestedChapterId) {
                     foreach ($chapters as $chapter) {
                       if ((int) $chapter['id'] === (int) $requestedChapterId) {
-                        $requestedChapterName = $chapter['name'];
+                        $requestedChapterName = $chapter['display_label'] ?? $chapter['name'];
                         break;
                       }
                     }
@@ -2026,7 +2026,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700">
                           <option value="">Assign chapter</option>
                           <?php foreach ($chapters as $chapter): ?>
-                            <option value="<?= e((string) $chapter['id']) ?>" <?= (int) $chapter['id'] === (int) $application['chapter_id'] ? 'selected' : '' ?>><?= e($chapter['name']) ?></option>
+                            <option value="<?= e((string) $chapter['id']) ?>" <?= (int) $chapter['id'] === (int) $application['chapter_id'] ? 'selected' : '' ?>><?= e($chapter['display_label'] ?? $chapter['name']) ?></option>
                           <?php endforeach; ?>
                         </select>
                         <button
@@ -2420,7 +2420,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           ['code' => 'WA', 'label' => 'Western Australia'],
         ];
         $noticeStates = $australianStates;
-        $noticeChapters = $pdo->query('SELECT id, name, state FROM chapters WHERE is_active = 1 ORDER BY name ASC')->fetchAll();
+        $noticeChapters = ChapterRepository::listForSelection($pdo, true);
         $noticeFormState = $_POST['notice_audience_state'] ?? '';
 
         if ($noticeHasPublishedAt) {
@@ -2507,7 +2507,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <option value="">Select chapter</option>
                       <?php foreach ($noticeChapters as $chapter): ?>
                         <option value="<?= e((string) $chapter['id']) ?>">
-                          <?= e($chapter['name']) ?>
+                          <?= e($chapter['display_label'] ?? $chapter['name']) ?>
                           <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
                         </option>
                       <?php endforeach; ?>
@@ -2789,7 +2789,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <option value="">Select chapter</option>
                         <?php foreach ($noticeChapters as $chapter): ?>
                           <option value="<?= e((string) $chapter['id']) ?>" <?= $editChapter === (int) $chapter['id'] ? 'selected' : '' ?>>
-                            <?= e($chapter['name']) ?>
+                            <?= e($chapter['display_label'] ?? $chapter['name']) ?>
                             <?= !empty($chapter['state']) ? ' (' . e($chapter['state']) . ')' : '' ?>
                           </option>
                         <?php endforeach; ?>

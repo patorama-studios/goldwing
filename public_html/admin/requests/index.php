@@ -72,6 +72,7 @@ function reqStatusPill(array $item): array {
         'feedback'       => ['label' => 'Requires Triage',       'dot' => 'bg-blue-500',  'text' => 'text-blue-700',  'bg' => 'bg-blue-50'],
         'store_order'    => ['label' => 'Action Required',        'dot' => 'bg-rose-500',  'text' => 'text-rose-700',  'bg' => 'bg-rose-50'],
         'chapter_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
+        'profile_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
         default          => ['label' => 'Pending Review',         'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
     };
 }
@@ -94,6 +95,7 @@ function reqActionButtons(array $item): string {
         'feedback'       => $sec('Reply') . $dark('Mark Resolved'),
         'store_order'    => $sec('Track Order') . $orange('Resolve Conflict'),
         'chapter_change' => $sec('View History') . $green('Approve Change'),
+        'profile_change' => $sec('View Details') . $green('Approve Change'),
         default          => $sec('View Details') . $green('Approve'),
     };
 }

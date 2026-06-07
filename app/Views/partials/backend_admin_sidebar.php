@@ -80,6 +80,7 @@ $items = [
         'children' => [
             ['key' => 'store-orders', 'label' => 'Orders', 'href' => '/admin/store/orders', 'path' => '/admin/store/orders', 'permission' => 'admin.orders.view'],
             ['key' => 'store-products', 'label' => 'Products (Inventory)', 'href' => '/admin/store/products', 'path' => '/admin/store/products', 'permission' => 'admin.products.manage'],
+            ['key' => 'store-front', 'label' => 'View Store (member view)', 'href' => '/store', 'path' => '/store'],
         ],
     ],
 

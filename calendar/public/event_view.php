@@ -17,7 +17,7 @@ if ($slug === '') {
 $embed = ($_GET['embed'] ?? '') === '1';
 
 $sql = 'SELECT e.*, m.path AS thumbnail_url, m.title AS thumbnail_name, '
-    . ($hasChapterId ? 'c.name AS chapter_name' : 'NULL AS chapter_name')
+    . ($hasChapterId ? calendar_chapter_name_sql($pdo) . ' AS chapter_name' : 'NULL AS chapter_name')
     . ' FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id ';
 if ($hasChapterId) {
     $sql .= 'LEFT JOIN chapters c ON c.id = e.chapter_id ';
