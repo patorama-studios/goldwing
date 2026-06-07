@@ -703,10 +703,11 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Unable to start checkout.'], 500);
         }
 
-        $stmt = $pdo->prepare('UPDATE store_orders SET stripe_payment_intent_id = :payment_intent_id WHERE id = :id');
-        $stmt->execute(['payment_intent_id' => $session['payment_intent'] ?? '', 'id' => $storeOrderId]);
-        $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :payment_intent_id, payment_method = "stripe", payment_status = "pending", updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['payment_intent_id' => $session['payment_intent'] ?? '', 'id' => $orderId]);
+        $stmt = $pdo->prepare('UPDATE store_orders SET stripe_session_id = :session_id WHERE id = :id');
+        $stmt->execute(['session_id' => $session['id'], 'id' => $storeOrderId]);
+        OrderService::updateStripeSession($orderId, $session['id']);
+        $stmt = $pdo->prepare('UPDATE orders SET payment_method = "stripe", payment_status = "pending", updated_at = NOW() WHERE id = :id');
+        $stmt->execute(['id' => $orderId]);
         
         $stmt = $pdo->prepare('UPDATE store_carts SET status = "converted", updated_at = NOW() WHERE id = :id');
         $stmt->execute(['id' => $cart['id']]);
