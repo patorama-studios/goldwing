@@ -2011,10 +2011,12 @@ if ($alreadyRun) {
         $applied = [];
 
         // Helper: does a column exist on members?
+        // SHOW COLUMNS does not accept native-protocol placeholders, so
+        // we inline the (whitelisted, hardcoded) column name directly.
         $hasCol = static function (string $col) use ($pdo): bool {
-            $s = $pdo->prepare("SHOW COLUMNS FROM members LIKE :c");
-            $s->execute(['c' => $col]);
-            return (bool) $s->fetch();
+            $safe = preg_replace('/[^a-z0-9_]/i', '', $col);
+            $s = $pdo->query("SHOW COLUMNS FROM members LIKE '$safe'");
+            return $s && (bool) $s->fetch();
         };
 
         // Only flip rows that existed before this migration was written
