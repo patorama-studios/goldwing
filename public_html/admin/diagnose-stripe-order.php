@@ -33,9 +33,14 @@ echo "Account key:        " . ($active['account_key'] ?? '?') . "\n";
 echo "Webhook secret set: " . (StripeSettingsService::getWebhookSecret() !== '' ? 'yes' : 'NO') . "\n\n";
 
 /* --------------------------------------------------------------------------
- * 2) Order row
+ * 2) Order row — check BOTH the unified `orders` table (membership + payment
+ *    tracking) and `store_orders` (store fulfillment). A store purchase often
+ *    has a row in both with the SAME order_number.
  * ------------------------------------------------------------------------ */
-echo "--- 2. orders row ---\n";
+$order = null;     // orders table row
+$storeOrder = null; // store_orders table row
+
+echo "--- 2a. orders row ---\n";
 $stmt = $pdo->prepare("
     SELECT o.*,
            u.email   AS user_email,
@@ -52,23 +57,89 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([':n' => $orderNumber]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
-
 if (!$order) {
-    echo "(no order found with that number)\n";
+    echo "(not in `orders` table)\n\n";
+} else {
+    foreach ($order as $k => $v) {
+        if (in_array($k, ['shipping_address_json', 'admin_notes', 'internal_notes'], true)) continue;
+        echo str_pad($k, 30) . ': ' . (is_null($v) ? '(null)' : (string) $v) . "\n";
+    }
+    echo "\n";
+}
+
+echo "--- 2b. store_orders row ---\n";
+$stmt = $pdo->prepare("
+    SELECT so.*,
+           u.email   AS user_email,
+           u.name    AS user_name,
+           m.email   AS member_email,
+           m.first_name AS member_first_name,
+           m.last_name  AS member_last_name,
+           m.stripe_customer_id AS member_stripe_customer_id
+    FROM store_orders so
+    LEFT JOIN users   u ON u.id = so.user_id
+    LEFT JOIN members m ON m.id = so.member_id
+    WHERE so.order_number = :n
+    LIMIT 1
+");
+$stmt->execute([':n' => $orderNumber]);
+$storeOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$storeOrder) {
+    echo "(not in `store_orders` table)\n\n";
+} else {
+    foreach ($storeOrder as $k => $v) {
+        if (in_array($k, ['admin_notes'], true)) continue;
+        echo str_pad($k, 30) . ': ' . (is_null($v) ? '(null)' : (string) $v) . "\n";
+    }
+    echo "\n";
+
+    /* Also dump store line items */
+    echo "--- 2c. store_order_items ---\n";
+    try {
+        $stmt = $pdo->prepare("SELECT id, product_id, product_title, variant_label, quantity, unit_price, line_total FROM store_order_items WHERE order_id = :id");
+        $stmt->execute([':id' => $storeOrder['id']]);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!$items) {
+            echo "(no items)\n";
+        } else {
+            foreach ($items as $it) echo "  " . json_encode($it, JSON_UNESCAPED_SLASHES) . "\n";
+        }
+    } catch (\Throwable $e) {
+        echo "  ERROR: " . $e->getMessage() . "\n";
+    }
+    echo "\n";
+}
+
+if (!$order && !$storeOrder) {
+    echo "(no order found in either table with that number)\n";
     exit;
 }
 
-foreach ($order as $k => $v) {
-    if (in_array($k, ['shipping_address_json', 'admin_notes', 'internal_notes'], true)) continue;
-    echo str_pad($k, 30) . ': ' . (is_null($v) ? '(null)' : (string) $v) . "\n";
-}
-echo "\n";
+/* Prefer orders-table identifiers; fall back to store_orders if it's a
+ * store order that wasn't dual-written. */
+$src           = $order ?: $storeOrder;
+$sessionId     = $src['stripe_session_id'] ?? null;
+$piId          = $src['stripe_payment_intent_id'] ?? null;
+$chargeId      = $src['stripe_charge_id'] ?? null;
+$customerEmail = $src['member_email'] ?? $src['user_email'] ?? ($src['customer_email'] ?? null);
+$stripeCustId  = $src['member_stripe_customer_id'] ?? null;
 
-$sessionId     = $order['stripe_session_id'] ?? null;
-$piId          = $order['stripe_payment_intent_id'] ?? null;
-$chargeId      = $order['stripe_charge_id'] ?? null;
-$customerEmail = $order['member_email'] ?? $order['user_email'] ?? null;
-$stripeCustId  = $order['member_stripe_customer_id'] ?? null;
+/* Cross-check: if both tables exist, do their Stripe IDs agree? */
+if ($order && $storeOrder) {
+    echo "--- 2d. orders ↔ store_orders cross-check ---\n";
+    $mismatch = false;
+    foreach (['stripe_session_id', 'stripe_payment_intent_id'] as $f) {
+        $a = $order[$f] ?? null;
+        $b = $storeOrder[$f] ?? null;
+        if ((string)$a !== (string)$b) {
+            echo "  MISMATCH {$f}: orders=" . ($a ?: '(null)') . "  store_orders=" . ($b ?: '(null)') . "\n";
+            $mismatch = true;
+        }
+    }
+    if (!$mismatch) echo "  Stripe IDs agree across both tables.\n";
+    echo "  orders.status={$order['status']}  payment_status={$order['payment_status']}  paid_at=" . ($order['paid_at'] ?: '(null)') . "\n";
+    echo "  store_orders.status={$storeOrder['status']}  paid_at=" . ($storeOrder['paid_at'] ?: '(null)') . "\n\n";
+}
 
 /* --------------------------------------------------------------------------
  * 3) payments rows linked by order_reference
@@ -178,9 +249,10 @@ try {
         $meta = is_object($s->metadata) ? $s->metadata->toArray() : (array) $s->metadata;
         $email = $s->customer_email ?? ($s->customer_details->email ?? '');
         $hitMeta  = isset($meta['order_number']) && $meta['order_number'] === $orderNumber;
-        $hitOrder = isset($meta['order_id']) && (string) $meta['order_id'] === (string) ($order['id'] ?? '');
+        $hitOrder = isset($meta['order_id']) && (string) $meta['order_id'] === (string) ($src['id'] ?? '');
+        $hitStoreOrder = isset($meta['store_order_id']) && $storeOrder && (string) $meta['store_order_id'] === (string) ($storeOrder['id'] ?? '');
         $hitEmail = $customerEmail && strcasecmp((string) $email, (string) $customerEmail) === 0;
-        if ($hitMeta || $hitOrder || $hitEmail) {
+        if ($hitMeta || $hitOrder || $hitStoreOrder || $hitEmail) {
             $matches++;
             echo "  session={$s->id} status={$s->status} payment_status={$s->payment_status} amount_total={$s->amount_total} email={$email} created=" . date('c', $s->created) . " metadata=" . json_encode($meta) . "\n";
         }
