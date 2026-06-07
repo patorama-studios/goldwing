@@ -2019,30 +2019,31 @@ if ($alreadyRun) {
 
         // Only flip rows that existed before this migration was written
         // (any later rows came through the corrected UI / import).
-        $cutoff = '2026-06-07 23:59:59';
+        // Hardcoded cutoff — no user input — so exec() with the literal
+        // is safe and avoids the server's ATTR_EMULATE_PREPARES=false
+        // prepared-statement parser quirks around compound expressions.
+        $cutoff = "'2026-06-07 23:59:59'";
 
         if ($hasCol('exclude_electronic')) {
-            $stmt = $pdo->prepare(
+            $affected = $pdo->exec(
                 "UPDATE members
-                 SET exclude_electronic = 1 - COALESCE(exclude_electronic, 0),
+                 SET exclude_electronic = CASE WHEN COALESCE(exclude_electronic, 0) = 1 THEN 0 ELSE 1 END,
                      updated_at = NOW()
-                 WHERE created_at <= :cutoff"
+                 WHERE created_at <= $cutoff"
             );
-            $stmt->execute(['cutoff' => $cutoff]);
-            $applied[] = $stmt->rowCount() . ' row(s) flipped on `exclude_electronic`';
+            $applied[] = (int) $affected . ' row(s) flipped on `exclude_electronic`';
         } else {
             $applied[] = '`exclude_electronic` column not present — skipped';
         }
 
         if ($hasCol('directory_pref_f_exclude_electronic_directory')) {
-            $stmt = $pdo->prepare(
+            $affected = $pdo->exec(
                 "UPDATE members
-                 SET directory_pref_f_exclude_electronic_directory = 1 - COALESCE(directory_pref_f_exclude_electronic_directory, 0),
+                 SET directory_pref_f_exclude_electronic_directory = CASE WHEN COALESCE(directory_pref_f_exclude_electronic_directory, 0) = 1 THEN 0 ELSE 1 END,
                      updated_at = NOW()
-                 WHERE created_at <= :cutoff"
+                 WHERE created_at <= $cutoff"
             );
-            $stmt->execute(['cutoff' => $cutoff]);
-            $applied[] = $stmt->rowCount() . ' row(s) flipped on `directory_pref_f_exclude_electronic_directory`';
+            $applied[] = (int) $affected . ' row(s) flipped on `directory_pref_f_exclude_electronic_directory`';
         }
 
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
