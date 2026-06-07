@@ -20,6 +20,12 @@ use App\Services\NotificationPreferenceService;
 
 require_permission('admin.members.view');
 
+$backUrl = '/admin/members/index.php';
+$returnToCandidate = (string) ($_GET['return_to'] ?? '');
+if ($returnToCandidate !== '' && str_starts_with($returnToCandidate, '/admin/members/index.php')) {
+    $backUrl = $returnToCandidate;
+}
+
 function orders_member_column(\PDO $pdo): string
 {
   static $column = null;
@@ -677,7 +683,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div>
               <a class="text-xs font-bold tracking-widest text-gray-400 uppercase inline-flex items-center gap-2 mb-3 hover:text-gray-500 transition-colors"
-                href="/admin/members/index.php">
+                href="<?= e($backUrl) ?>">
                 <span class="material-icons-outlined text-[16px]">arrow_back</span>
                 Member Profile
               </a>

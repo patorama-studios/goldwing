@@ -44,6 +44,8 @@ The list view is the screen you land on first. Each row is one member. A stats p
 
 **To search**, type into the search box at the top — it matches name, email, and member number. To narrow further use the filter chips: chapter, status, membership type, role, directory preferences (the A–F flags), vehicle type, signup date range.
 
+When you click into a member from a filtered list, the **Member Profile** back-arrow on their detail page returns you to the exact same filtered list — so you don't have to re-apply the chapter/status/etc. each time you bounce in and out. (The filter URL is carried via a `return_to` query param on the member link.)
+
 **Each column means:**
 
 - **Member #** — the unique reference for this person (e.g. `M1234` or `M1234.2` for an associate).

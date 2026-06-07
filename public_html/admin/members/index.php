@@ -164,6 +164,10 @@ function buildQuery(array $overrides = []): string
     return http_build_query($params);
 }
 
+$currentListQuery = (string) ($_SERVER['QUERY_STRING'] ?? '');
+$currentListUrl = '/admin/members/index.php' . ($currentListQuery !== '' ? '?' . $currentListQuery : '');
+$returnToParam = '&return_to=' . rawurlencode($currentListUrl);
+
 function normalizeMemberStatus(string $status): string
 {
     $clean = strtolower(trim($status));
@@ -635,7 +639,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <?php endif; ?>
                         <!-- Name + number -->
                         <div class="min-w-0">
-                          <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                          <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?><?= $returnToParam ?>"
                              class="text-sm font-semibold truncate <?= $isLifeMember ? 'text-yellow-900 hover:text-yellow-700' : ($isAssociate ? 'text-purple-900 hover:text-purple-700' : 'text-gray-900 hover:text-primary') ?>">
                             <?= e($fullName !== '' ? $fullName : 'Member') ?>
                           </a>
@@ -729,7 +733,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
                     <!-- Actions -->
                     <td class="px-3 py-2.5 text-right">
-                      <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                      <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?><?= $returnToParam ?>"
                          class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors">
                         View
                         <span class="material-icons-outlined text-xs">chevron_right</span>
@@ -812,7 +816,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                 </div>
                               <?php endif; ?>
                               <div>
-                                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?><?= $returnToParam ?>"
                                    class="text-sm font-medium text-gray-900 hover:text-primary">
                                   <?= e($fullName !== '' ? $fullName : 'Member') ?>
                                 </a>
@@ -843,7 +847,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold <?= statusBadgeClasses($member['status']) ?>"><?= e($statusLabelText) ?></span>
                           </td>
                           <td class="px-3 py-2.5 text-right pr-5">
-                            <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                            <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?><?= $returnToParam ?>"
                                class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:border-gray-300 transition-colors">
                               View <span class="material-icons-outlined text-xs">chevron_right</span>
                             </a>
@@ -886,7 +890,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $colorPalette = ['bg-slate-200 text-slate-700','bg-blue-100 text-blue-700','bg-teal-100 text-teal-700','bg-violet-100 text-violet-700','bg-rose-100 text-rose-700','bg-orange-100 text-orange-700','bg-cyan-100 text-cyan-700'];
                   $colorClass = $isLifeMember ? 'bg-yellow-200 text-yellow-800' : ($isAssociate ? 'bg-purple-100 text-purple-700' : $colorPalette[crc32($fullName) % count($colorPalette)]);
                 ?>
-                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?>"
+                <a href="/admin/members/view.php?id=<?= e((int) $member['id']) ?><?= $returnToParam ?>"
                    class="group flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm hover:border-primary/30 hover:shadow-md transition-all">
                   <!-- Avatar -->
                   <div class="relative mb-3">
