@@ -218,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $paymentOrderId = OrderService::createOrder([
+              'order_number' => $orderNumber,
               'user_id' => $user['id'],
               'status' => 'pending',
               'order_type' => 'store',

@@ -6,8 +6,9 @@ class OrderService
     public static function createOrder(array $order, array $items): int
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO orders (user_id, status, order_type, currency, subtotal, tax_total, shipping_total, total, stripe_session_id, stripe_payment_intent_id, stripe_charge_id, channel_id, shipping_required, shipping_address_json, created_at) VALUES (:user_id, :status, :order_type, :currency, :subtotal, :tax_total, :shipping_total, :total, :stripe_session_id, :stripe_payment_intent_id, :stripe_charge_id, :channel_id, :shipping_required, :shipping_address_json, NOW())');
+        $stmt = $pdo->prepare('INSERT INTO orders (order_number, user_id, status, order_type, currency, subtotal, tax_total, shipping_total, total, stripe_session_id, stripe_payment_intent_id, stripe_charge_id, channel_id, shipping_required, shipping_address_json, created_at) VALUES (:order_number, :user_id, :status, :order_type, :currency, :subtotal, :tax_total, :shipping_total, :total, :stripe_session_id, :stripe_payment_intent_id, :stripe_charge_id, :channel_id, :shipping_required, :shipping_address_json, NOW())');
         $stmt->execute([
+            'order_number' => $order['order_number'] ?? null,
             'user_id' => $order['user_id'],
             'status' => $order['status'] ?? 'pending',
             'order_type' => $order['order_type'],

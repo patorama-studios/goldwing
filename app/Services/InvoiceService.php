@@ -6,10 +6,10 @@ class InvoiceService
     public static function createForOrder(array $order): ?array
     {
         $pdo = Database::connection();
-        $settings = PaymentSettingsService::getSettingsByChannelId((int) $order['channel_id']);
-        if (!$settings) {
-            return null;
-        }
+        $settings = [
+            'generate_pdf' => SettingsService::getGlobal('payments.stripe.generate_pdf', true) ? 1 : 0,
+            'invoice_email_template' => (string) SettingsService::getGlobal('payments.stripe.invoice_email_template', ''),
+        ];
 
         $invoiceNumber = PaymentSettingsService::nextInvoiceNumber((int) $order['channel_id']);
         if ($invoiceNumber === '') {

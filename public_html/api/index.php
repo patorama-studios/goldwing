@@ -605,6 +605,7 @@ if ($resource === 'stripe') {
         }
 
         $orderId = OrderService::createOrder([
+            'order_number' => $orderNumber,
             'user_id' => $user['id'] ?? null,
             'status' => 'pending',
             'order_type' => 'store',
@@ -1304,8 +1305,8 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
 
     $channelCode = (string) ($body['channel_code'] ?? 'primary');
     $channel = PaymentSettingsService::getChannelByCode($channelCode);
-    $settings = PaymentSettingsService::getSettingsByChannelId((int) $channel['id']);
-    $secretKey = $settings['secret_key'] ?? '';
+    $accountKey = $channelCode === 'agm' ? StripeSettingsService::ACCOUNT_AGM : StripeSettingsService::ACCOUNT_PRIMARY;
+    $secretKey = StripeSettingsService::getActiveSecretKey($accountKey);
     if ($secretKey === '') {
         json_response(['error' => 'Stripe is not configured.'], 422);
     }
@@ -1557,6 +1558,7 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
         }
 
         $orderId = OrderService::createOrder([
+            'order_number' => $orderNumber,
             'user_id' => $user['id'],
             'status' => 'pending',
             'order_type' => 'store',
