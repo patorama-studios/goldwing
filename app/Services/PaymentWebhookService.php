@@ -674,21 +674,71 @@ class PaymentWebhookService
             ]);
         }
 
+        /* Defence-in-depth: only escalate the user to the 'member' role if
+         * the order row really is paid in the DB. The webhook signature is
+         * already verified upstream, but a replayed event or a stale row
+         * shouldn't be able to flip a user's role. Re-read the order fresh
+         * to avoid acting on a stale snapshot from earlier in this handler. */
+        $orderId = (int) ($order['id'] ?? 0);
+        $userId  = (int) ($order['user_id'] ?? 0);
+        if ($orderId <= 0 || $userId <= 0) {
+            return;
+        }
+        $stmt = $pdo->prepare('SELECT status, payment_status, order_type FROM orders WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $orderId]);
+        $fresh = $stmt->fetch();
+        if (!$fresh || ($fresh['status'] ?? '') !== 'paid' || ($fresh['payment_status'] ?? '') !== 'accepted') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'role escalation refused: order not paid/accepted at escalate time', [
+                'related_order_id' => $orderId,
+                'user_id' => $userId,
+                'order_status' => $fresh['status'] ?? null,
+                'order_payment_status' => $fresh['payment_status'] ?? null,
+            ]);
+            return;
+        }
+        if (($fresh['order_type'] ?? '') !== 'membership') {
+            /* Only membership orders should grant the member role. A store
+             * purchase reaching this code path is a bug elsewhere. */
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'role escalation refused: order_type is not membership', [
+                'related_order_id' => $orderId,
+                'user_id' => $userId,
+                'order_type' => $fresh['order_type'] ?? null,
+            ]);
+            return;
+        }
+
         $stmt = $pdo->prepare('SELECT id FROM roles WHERE name = "member" LIMIT 1');
         $stmt->execute();
         $role = $stmt->fetch();
         if ($role) {
             $stmt = $pdo->prepare('SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id');
-            $stmt->execute(['user_id' => $order['user_id'], 'role_id' => $role['id']]);
+            $stmt->execute(['user_id' => $userId, 'role_id' => $role['id']]);
             if (!$stmt->fetch()) {
                 $stmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)');
-                $stmt->execute(['user_id' => $order['user_id'], 'role_id' => $role['id']]);
-                ActivityLogger::log('system', null, null, 'security.role_escalation', [
-                    'user_id' => $order['user_id'],
+                $stmt->execute(['user_id' => $userId, 'role_id' => $role['id']]);
+                /* Audit: subject_user_id populated, plus full order/payment
+                 * context so the trail is enough to reconstruct what
+                 * happened without joining other tables. */
+                ActivityLogger::log('system', $userId, (int) ($order['member_id'] ?? 0) ?: null, 'security.role_escalation', [
+                    'subject_user_id' => $userId,
                     'role' => 'member',
+                    'role_id' => (int) $role['id'],
+                    'order_id' => $orderId,
+                    'order_number' => $order['order_number'] ?? null,
+                    'order_type' => $fresh['order_type'],
+                    'stripe_payment_intent_id' => $order['stripe_payment_intent_id'] ?? null,
+                    'stripe_invoice_id' => $order['stripe_invoice_id'] ?? null,
+                    'stripe_subscription_id' => $order['stripe_subscription_id'] ?? null,
+                    'granted_via' => 'webhook.invoice.paid',
                 ]);
-                $safeUserId = htmlspecialchars((string) $order['user_id'], ENT_QUOTES, 'UTF-8');
-                SecurityAlertService::send('role_escalation', 'Security alert: role escalation', '<p>User ID ' . $safeUserId . ' assigned role member via webhook.</p>');
+                $safeUserId = htmlspecialchars((string) $userId, ENT_QUOTES, 'UTF-8');
+                $safeOrderNum = htmlspecialchars((string) ($order['order_number'] ?? '(unknown)'), ENT_QUOTES, 'UTF-8');
+                SecurityAlertService::send(
+                    'role_escalation',
+                    'Security alert: role escalation',
+                    '<p>User ID ' . $safeUserId . ' assigned role <strong>member</strong> via webhook.</p>'
+                    . '<p>Triggered by paid membership order ' . $safeOrderNum . ' (id=' . $orderId . ').</p>'
+                );
             }
         }
     }

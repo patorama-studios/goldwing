@@ -78,6 +78,8 @@ class OrderRepository
             'stripe_charge_id',
             'created_at',
             'updated_at',
+            'voided_at',
+            'voided_reason',
         ];
         $selectColumns = [];
         foreach ($desired as $column) {

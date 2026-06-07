@@ -91,6 +91,8 @@ Every purchase the member has ever made — membership renewals and storefront o
 - Manually fix a stuck order (e.g. payment came in by bank transfer and the order needs to be marked paid).
 - Resync an order against Stripe (re-fetch the payment status — useful if you suspect a webhook missed).
 - For pending memberships: accept, reject, or resend the payment link.
+- **Void** an order — soft-delete, hides it from default lists, still shows here struck-through with a "Voided" badge. Reversible via the "Restore" button.
+- **Delete** an order permanently — removes the order + its items, events, refunds, and shipments. A typed `DELETE` confirmation is required. Stripe-side payments are NOT cancelled; refund first if money actually moved.
 
 #### Refunds
 

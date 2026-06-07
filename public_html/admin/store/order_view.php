@@ -2,6 +2,7 @@
 if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 use App\Services\Csrf;
 use App\Services\NotificationService;
+use App\Services\OrderAdminService;
 use App\Services\OrderRepository;
 use App\Services\RefundService;
 
@@ -207,6 +208,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alerts[] = ['type' => 'success', 'message' => 'Order cancelled.'];
             }
         }
+
+        if ($action === 'void_order') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to void orders.'];
+            } else {
+                $reason = trim((string) ($_POST['void_reason'] ?? ''));
+                OrderAdminService::voidStoreOrder((int) $order['id'], (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+                $alerts[] = ['type' => 'success', 'message' => 'Order voided. It is hidden from default lists but kept on file.'];
+            }
+        }
+
+        if ($action === 'unvoid_order') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to manage orders.'];
+            } else {
+                OrderAdminService::unvoidStoreOrder((int) $order['id'], (int) ($user['id'] ?? 0));
+                $alerts[] = ['type' => 'success', 'message' => 'Order restored.'];
+            }
+        }
+
+        if ($action === 'delete_order') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to delete orders.'];
+            } else {
+                require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/store/orders');
+                $confirm = strtoupper(trim((string) ($_POST['delete_confirm'] ?? '')));
+                if ($confirm !== 'DELETE') {
+                    $alerts[] = ['type' => 'error', 'message' => 'Type DELETE to confirm permanent removal.'];
+                } else {
+                    $orderNumber = (string) ($order['order_number'] ?? $order['id']);
+                    OrderAdminService::deleteStoreOrder((int) $order['id']);
+                    header('Location: /admin/store/orders?deleted=' . urlencode($orderNumber));
+                    exit;
+                }
+            }
+        }
     }
 
     $stmt = $pdo->prepare('SELECT o.*, m.first_name, m.last_name, m.email as member_email FROM store_orders o LEFT JOIN members m ON m.id = o.member_id WHERE o.id = :id');
@@ -258,7 +295,16 @@ if (store_table_exists($pdo, 'store_refunds')) {
 }
 
 $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
+$isVoided = !empty($order['voided_at']);
+$isPaidOrRefunded = in_array((string) ($order['payment_status'] ?? ''), ['paid', 'partial_refund', 'refunded'], true);
 ?>
+<?php if ($isVoided): ?>
+  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <strong>Voided</strong> on <?= e((string) $order['voided_at']) ?>
+    <?php if (!empty($order['voided_reason'])): ?> &middot; <?= e((string) $order['voided_reason']) ?><?php endif; ?>
+    &middot; this order is hidden from the default order list.
+  </div>
+<?php endif; ?>
 <section class="grid gap-6 lg:grid-cols-[2fr_1fr]">
   <div class="space-y-6">
     <div data-tour="admin-process-order-summary" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -485,7 +531,44 @@ $pageSubtitle = 'Order ' . ($order['order_number'] ?? $order['id']);
         <input type="hidden" name="action" value="resend_tickets">
         <button class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium" <?= $canManage ? '' : 'disabled' ?>>Resend ticket email</button>
       </form>
+
+      <div class="border-t border-gray-100 pt-3 mt-3 space-y-3">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Database hygiene</p>
+        <?php if ($isVoided): ?>
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+            <input type="hidden" name="action" value="unvoid_order">
+            <button class="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium" <?= $canManage ? '' : 'disabled' ?>>Restore order (un-void)</button>
+          </form>
+        <?php else: ?>
+          <form method="post" class="space-y-2">
+            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+            <input type="hidden" name="action" value="void_order">
+            <input name="void_reason" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="Reason (optional)">
+            <button class="w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700" type="submit" <?= $canManage ? '' : 'disabled' ?> onclick="return confirm('Void this order? It will be hidden from default lists but kept on file.');">Void order</button>
+          </form>
+        <?php endif; ?>
+        <form method="post" class="space-y-2" onsubmit="return confirmDelete(this);">
+          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="delete_order">
+          <input name="delete_confirm" class="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm" placeholder='Type "DELETE" to confirm'>
+          <?php if ($isPaidOrRefunded): ?>
+            <p class="text-xs text-red-600">Warning: this order has been paid/refunded. Stripe records will NOT be affected.</p>
+          <?php endif; ?>
+          <button class="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" type="submit" <?= $canManage ? '' : 'disabled' ?>>Permanently delete order</button>
+        </form>
+      </div>
     </div>
+    <script>
+      function confirmDelete(form) {
+        var value = (form.delete_confirm.value || '').trim().toUpperCase();
+        if (value !== 'DELETE') {
+          alert('Type DELETE (in capitals) to confirm permanent removal.');
+          return false;
+        }
+        return confirm('This will permanently delete the order, its items, events, refunds, and shipments. Continue?');
+      }
+    </script>
 
     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Internal notes</h3>

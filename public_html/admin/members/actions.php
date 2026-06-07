@@ -15,6 +15,7 @@ use App\Services\OrderRepository;
 use App\Services\PasswordPolicyService;
 use App\Services\RefundService;
 use App\Services\NotificationService;
+use App\Services\OrderAdminService;
 use App\Services\SecurityPolicyService;
 use App\Services\SettingsService;
 use App\Services\LogViewerService;
@@ -342,7 +343,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -1558,6 +1559,162 @@ switch ($action) {
             'actor_roles' => $user['roles'] ?? [],
         ]);
         redirectWithFlash($memberId, $tab, 'Order note saved.');
+        break;
+
+    case 'membership_order_void':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Voiding orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $reason = trim((string) ($_POST['void_reason'] ?? ''));
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        OrderAdminService::voidMembershipOrder($orderId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_voided', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'reason' => $reason !== '' ? $reason : null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Order voided.');
+        break;
+
+    case 'membership_order_unvoid':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Restoring orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        OrderAdminService::unvoidMembershipOrder($orderId);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_unvoided', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Order restored.');
+        break;
+
+    case 'membership_order_delete':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Deleting orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $confirm = strtoupper(trim((string) ($_POST['delete_confirm'] ?? '')));
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        if ($confirm !== 'DELETE') {
+            redirectWithFlash($memberId, $tab, 'Type DELETE to confirm permanent removal.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        OrderAdminService::deleteMembershipOrder($orderId);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_deleted', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Order permanently deleted.');
+        break;
+
+    case 'store_order_void':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Voiding orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $reason = trim((string) ($_POST['void_reason'] ?? ''));
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM store_orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Store order not found.', 'error');
+        }
+        OrderAdminService::voidStoreOrder($orderId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'store.order_voided', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'reason' => $reason !== '' ? $reason : null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Store order voided.');
+        break;
+
+    case 'store_order_unvoid':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Restoring orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM store_orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Store order not found.', 'error');
+        }
+        OrderAdminService::unvoidStoreOrder($orderId, (int) ($user['id'] ?? 0));
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'store.order_unvoided', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Store order restored.');
+        break;
+
+    case 'store_order_delete':
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Deleting orders is restricted.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $confirm = strtoupper(trim((string) ($_POST['delete_confirm'] ?? '')));
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        if ($confirm !== 'DELETE') {
+            redirectWithFlash($memberId, $tab, 'Type DELETE to confirm permanent removal.', 'error');
+        }
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, order_number FROM store_orders WHERE id = :id AND member_id = :member_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'member_id' => $memberId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Store order not found.', 'error');
+        }
+        OrderAdminService::deleteStoreOrder($orderId);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'store.order_deleted', [
+            'order_id' => $orderId,
+            'order_number' => $order['order_number'] ?? null,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, 'Store order permanently deleted.');
         break;
 
     case 'roles_update':

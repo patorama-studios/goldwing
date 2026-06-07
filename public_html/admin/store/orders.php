@@ -1,6 +1,7 @@
 <?php
 if (!defined('IN_STORE_ADMIN')) exit('No direct access allowed');
 use App\Services\Csrf;
+use App\Services\OrderAdminService;
 
 $canView = store_user_can($user, 'store_orders_view');
 $canManage = store_user_can($user, 'store_orders_manage');
@@ -10,6 +11,10 @@ if (!$canView) {
     return;
 }
 
+if (!empty($_GET['deleted'])) {
+    $alerts[] = ['type' => 'success', 'message' => 'Order ' . (string) $_GET['deleted'] . ' permanently deleted.'];
+}
+
 $statusFilter = trim((string) ($_GET['order_status'] ?? ''));
 $paymentFilter = trim((string) ($_GET['payment_status'] ?? ''));
 $fulfillmentFilter = trim((string) ($_GET['fulfillment_status'] ?? ''));
@@ -17,6 +22,11 @@ $shippingFilter = trim((string) ($_GET['shipping_method'] ?? ''));
 $dateFrom = trim((string) ($_GET['date_from'] ?? ''));
 $dateTo = trim((string) ($_GET['date_to'] ?? ''));
 $search = trim((string) ($_GET['search'] ?? ''));
+// voided view: 'hide' (default), 'show', 'only'
+$voidedView = (string) ($_GET['voided'] ?? 'hide');
+if (!in_array($voidedView, ['hide', 'show', 'only'], true)) {
+    $voidedView = 'hide';
+}
 
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 25;
@@ -53,6 +63,11 @@ if ($search !== '') {
     $conditions[] = '(o.order_number LIKE :search OR o.customer_name LIKE :search OR o.customer_email LIKE :search OR m.first_name LIKE :search OR m.last_name LIKE :search OR m.email LIKE :search OR oi.sku_snapshot LIKE :search OR oi.title_snapshot LIKE :search)';
     $params['search'] = '%' . $search . '%';
 }
+if ($voidedView === 'hide') {
+    $conditions[] = 'o.voided_at IS NULL';
+} elseif ($voidedView === 'only') {
+    $conditions[] = 'o.voided_at IS NOT NULL';
+}
 
 $joins = ' LEFT JOIN members m ON m.id = o.member_id
     LEFT JOIN store_order_items oi ON oi.order_id = o.id
@@ -66,6 +81,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $action = $_POST['bulk_action'] ?? '';
         $orderIds = array_values(array_unique(array_filter(array_map('intval', $_POST['order_ids'] ?? []))));
+
+        if ($action === 'void_orders') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to void orders.'];
+            } elseif (!$orderIds) {
+                $alerts[] = ['type' => 'error', 'message' => 'Select at least one order to void.'];
+            } else {
+                foreach ($orderIds as $orderId) {
+                    OrderAdminService::voidStoreOrder((int) $orderId, (int) ($user['id'] ?? 0), null);
+                }
+                $alerts[] = ['type' => 'success', 'message' => count($orderIds) . ' order(s) voided.'];
+            }
+        }
+
+        if ($action === 'unvoid_orders') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to manage orders.'];
+            } elseif (!$orderIds) {
+                $alerts[] = ['type' => 'error', 'message' => 'Select at least one order to restore.'];
+            } else {
+                foreach ($orderIds as $orderId) {
+                    OrderAdminService::unvoidStoreOrder((int) $orderId, (int) ($user['id'] ?? 0));
+                }
+                $alerts[] = ['type' => 'success', 'message' => count($orderIds) . ' order(s) restored.'];
+            }
+        }
+
+        if ($action === 'delete_orders') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to delete orders.'];
+            } elseif (!$orderIds) {
+                $alerts[] = ['type' => 'error', 'message' => 'Select at least one order to delete.'];
+            } else {
+                require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/store/orders');
+                $confirm = strtoupper(trim((string) ($_POST['bulk_delete_confirm'] ?? '')));
+                if ($confirm !== 'DELETE') {
+                    $alerts[] = ['type' => 'error', 'message' => 'Type DELETE in the confirmation field to permanently delete selected orders.'];
+                } else {
+                    foreach ($orderIds as $orderId) {
+                        OrderAdminService::deleteStoreOrder((int) $orderId);
+                    }
+                    $alerts[] = ['type' => 'success', 'message' => count($orderIds) . ' order(s) permanently deleted.'];
+                }
+            }
+        }
 
         if (in_array($action, ['status_processing', 'status_packed', 'status_shipped'], true)) {
             if (!$canManage) {
@@ -251,6 +311,14 @@ $pageSubtitle = 'Review and manage store orders.';
         <label class="text-xs uppercase tracking-[0.2em] text-slate-500">To</label>
         <input type="date" name="date_to" class="mt-2 rounded-lg border border-gray-200 bg-white px-3 py-2" value="<?= e($dateTo) ?>">
       </div>
+      <div>
+        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Voided</label>
+        <select name="voided" class="mt-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <option value="hide" <?= $voidedView === 'hide' ? 'selected' : '' ?>>Hide voided</option>
+          <option value="show" <?= $voidedView === 'show' ? 'selected' : '' ?>>Include voided</option>
+          <option value="only" <?= $voidedView === 'only' ? 'selected' : '' ?>>Only voided</option>
+        </select>
+      </div>
       <div class="flex-1 min-w-[200px]">
         <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Search</label>
         <input type="search" name="search" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2" placeholder="Order #, member, SKU" value="<?= e($search) ?>">
@@ -263,15 +331,19 @@ $pageSubtitle = 'Review and manage store orders.';
     <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2">
-        <select name="bulk_action" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+        <select name="bulk_action" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" data-bulk-select>
           <option value="">Bulk actions</option>
           <option value="status_processing" <?= $canManage ? '' : 'disabled' ?>>Mark processing</option>
           <option value="status_packed" <?= $canManage ? '' : 'disabled' ?>>Mark packed</option>
           <option value="status_shipped" <?= $canManage ? '' : 'disabled' ?>>Mark shipped</option>
           <option value="export_csv">Export CSV</option>
           <option value="print_packing_slips">Print packing slips</option>
+          <option value="void_orders" <?= $canManage ? '' : 'disabled' ?>>Void selected</option>
+          <option value="unvoid_orders" <?= $canManage ? '' : 'disabled' ?>>Restore voided</option>
+          <option value="delete_orders" <?= $canManage ? '' : 'disabled' ?>>Delete permanently</option>
         </select>
-        <button class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium">Apply</button>
+        <input name="bulk_delete_confirm" placeholder='Type DELETE to confirm' class="hidden rounded-lg border border-red-200 px-3 py-2 text-sm" data-bulk-delete-confirm>
+        <button class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium" data-bulk-submit>Apply</button>
       </div>
       <div class="text-xs text-slate-500">
         <?= e((string) $totalOrders) ?> orders
@@ -321,7 +393,9 @@ $pageSubtitle = 'Review and manage store orders.';
               <td class="py-2 pr-3 text-gray-600"><?= e(ucfirst((string) ($order['fulfillment_method'] ?? 'shipping'))) ?></td>
               <td class="py-2 pr-3 text-gray-600"><?= e((string) ($order['item_count'] ?? 0)) ?></td>
               <td class="py-2 pr-3">
-                <?php if ($needsAttention): ?>
+                <?php if (!empty($order['voided_at'])): ?>
+                  <span class="inline-flex items-center rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700" title="Voided <?= e((string) $order['voided_at']) ?>">Voided</span>
+                <?php elseif ($needsAttention): ?>
                   <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">Needs attention</span>
                 <?php else: ?>
                   <span class="text-xs text-slate-400">—</span>
@@ -365,6 +439,36 @@ $pageSubtitle = 'Review and manage store orders.';
       bulkItems.forEach(item => {
         item.checked = bulkToggle.checked;
       });
+    });
+  }
+
+  const bulkSelect = document.querySelector('[data-bulk-select]');
+  const bulkDeleteConfirm = document.querySelector('[data-bulk-delete-confirm]');
+  const bulkSubmit = document.querySelector('[data-bulk-submit]');
+  if (bulkSelect && bulkDeleteConfirm) {
+    const syncDeleteField = () => {
+      if (bulkSelect.value === 'delete_orders') {
+        bulkDeleteConfirm.classList.remove('hidden');
+      } else {
+        bulkDeleteConfirm.classList.add('hidden');
+        bulkDeleteConfirm.value = '';
+      }
+    };
+    bulkSelect.addEventListener('change', syncDeleteField);
+    syncDeleteField();
+  }
+  if (bulkSubmit && bulkSelect) {
+    bulkSubmit.addEventListener('click', (event) => {
+      const action = bulkSelect.value;
+      if (action === 'delete_orders') {
+        if (!confirm('Permanently delete the selected orders, their items, events, refunds, and shipments? This cannot be undone.')) {
+          event.preventDefault();
+        }
+      } else if (action === 'void_orders') {
+        if (!confirm('Void the selected orders? They will be hidden from default lists.')) {
+          event.preventDefault();
+        }
+      }
     });
   }
 </script>

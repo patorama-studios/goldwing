@@ -162,7 +162,7 @@ If `store.members_only` is on and Stripe `allow_guest_checkout` is off (the defa
 - **`products.php` / `product_form.php`** — catalogue editor (options + variants, images, categories, tags).
 - **`categories.php`, `tags.php`** — taxonomy CRUD.
 - **`discounts.php`** — coupon CRUD ([Ch 29](view.php?slug=29-discounts-shipping)).
-- **`orders.php` / `order_view.php`** — list + detail (fulfilment, refunds, notes). See [Ch 15](view.php?slug=15-orders-checkout), [Ch 17](view.php?slug=17-refunds).
+- **`orders.php` / `order_view.php`** — list + detail (fulfilment, refunds, notes). See [Ch 15](view.php?slug=15-orders-checkout), [Ch 17](view.php?slug=17-refunds). The list has a **Voided** filter (hide / include / only) and bulk **Void selected** / **Restore voided** / **Delete permanently** actions; the detail page has a **Database hygiene** sidebar panel with the same per-order Void / Restore / Delete controls. Delete cascades to items, events, refunds, shipments and tickets — it does NOT cancel Stripe-side payments, so refund first if money actually moved. Void/delete columns (`voided_at`, `voided_by_user_id`, `voided_reason`) were added by migration `2026_06_07_orders_voided.sql`.
 - **`low-stock.php`** — products/variants at or below their threshold (only when `track_inventory = 1`).
 - **`settings.php`** — store-specific settings (mirrors `/admin/settings/?section=store`).
 - **`merge.php`** — fold one product into another, preserving order history.

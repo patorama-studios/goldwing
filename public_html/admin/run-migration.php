@@ -2272,6 +2272,73 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 029 — Voided columns for orders + store_orders
+//
+// Adds voided_at / voided_by_user_id / voided_reason to both order tables so
+// admins can soft-delete (void) orders from the UI. Voided orders are hidden
+// from default admin lists; hard delete remains available as a separate action.
+// See: database/migrations/2026_06_07_orders_voided.sql
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_029_orders_voided';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 029 — Voided columns on orders', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $addColumnIfMissing = function (string $table, string $column, string $ddl) use ($pdo, &$applied) {
+            $exists = (bool) $pdo->query("SHOW COLUMNS FROM {$table} LIKE " . $pdo->quote($column))->fetchColumn();
+            if ($exists) {
+                $applied[] = "`{$table}.{$column}` already present";
+                return;
+            }
+            try {
+                $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$ddl}");
+                $applied[] = "`{$table}.{$column}` added";
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false) {
+                    throw $e;
+                }
+                $applied[] = "`{$table}.{$column}` already present (caught duplicate)";
+            }
+        };
+
+        $addIndexIfMissing = function (string $table, string $index, string $ddl) use ($pdo, &$applied) {
+            $exists = (bool) $pdo->query("SHOW INDEX FROM {$table} WHERE Key_name = " . $pdo->quote($index))->fetchColumn();
+            if ($exists) {
+                $applied[] = "`{$table}.{$index}` index already present";
+                return;
+            }
+            try {
+                $pdo->exec("ALTER TABLE {$table} ADD INDEX {$index} {$ddl}");
+                $applied[] = "`{$table}.{$index}` index added";
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false && stripos($e->getMessage(), 'exists') === false) {
+                    throw $e;
+                }
+                $applied[] = "`{$table}.{$index}` index already present (caught duplicate)";
+            }
+        };
+
+        foreach (['orders', 'store_orders'] as $table) {
+            $addColumnIfMissing($table, 'voided_at', 'DATETIME NULL');
+            $addColumnIfMissing($table, 'voided_by_user_id', 'INT NULL');
+            $addColumnIfMissing($table, 'voided_reason', 'VARCHAR(255) NULL');
+        }
+        $addIndexIfMissing('orders', 'idx_orders_voided_at', '(voided_at)');
+        $addIndexIfMissing('store_orders', 'idx_store_orders_voided_at', '(voided_at)');
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 029 — Voided columns on orders', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 029 — Voided columns on orders', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

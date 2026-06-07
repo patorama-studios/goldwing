@@ -2453,9 +2453,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               $paymentMethodLabel = $paymentMethod !== '' ? ucwords(str_replace('_', ' ', $paymentMethod)) : '—';
                               $paymentStatus = strtolower((string) ($order['payment_status'] ?? 'pending'));
                               $orderNumber = $order['order_number'] ?? ('M-' . $order['id']);
+                              $isVoided = !empty($order['voided_at']);
+                              $isPaidish = in_array($paymentStatus, ['accepted', 'refunded'], true);
+                              $rowClass = $isVoided ? 'bg-slate-50 text-slate-400 line-through opacity-70' : ($paymentStatus === 'pending' ? 'bg-yellow-50/40' : '');
                               ?>
-                              <tr class="<?= $paymentStatus === 'pending' ? 'bg-yellow-50/40' : '' ?>">
-                                <td class="px-3 py-2 text-gray-600"><?= e($orderNumber) ?></td>
+                              <tr class="<?= $rowClass ?>">
+                                <td class="px-3 py-2 text-gray-600">
+                                  <?= e($orderNumber) ?>
+                                  <?php if ($isVoided): ?>
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 no-underline" title="Voided <?= e((string) $order['voided_at']) ?><?= !empty($order['voided_reason']) ? ' — ' . e((string) $order['voided_reason']) : '' ?>">Voided</span>
+                                  <?php endif; ?>
+                                </td>
                                 <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'] ?? null)) ?></td>
                                 <td class="px-3 py-2 text-gray-600">
                                   <?php if ($orderItems): ?>
@@ -2516,6 +2524,39 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                         <button
                                           class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700"
                                           type="submit">Reject</button>
+                                      </form>
+                                    <?php endif; ?>
+                                    <?php if ($canManualFix): ?>
+                                      <?php if ($isVoided): ?>
+                                        <form method="post" action="/admin/members/actions.php">
+                                          <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                          <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                          <input type="hidden" name="tab" value="orders">
+                                          <input type="hidden" name="orders_section" value="membership">
+                                          <input type="hidden" name="action" value="membership_order_unvoid">
+                                          <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                          <button class="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700" type="submit">Restore</button>
+                                        </form>
+                                      <?php else: ?>
+                                        <form method="post" action="/admin/members/actions.php" onsubmit="return confirm('Void this order? It will be hidden from default lists.');">
+                                          <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                          <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                          <input type="hidden" name="tab" value="orders">
+                                          <input type="hidden" name="orders_section" value="membership">
+                                          <input type="hidden" name="action" value="membership_order_void">
+                                          <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                          <button class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700" type="submit">Void</button>
+                                        </form>
+                                      <?php endif; ?>
+                                      <form method="post" action="/admin/members/actions.php" onsubmit="return confirmMembershipOrderDelete(this, <?= $isPaidish ? 'true' : 'false' ?>);">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="membership">
+                                        <input type="hidden" name="action" value="membership_order_delete">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <input type="hidden" name="delete_confirm" value="">
+                                        <button class="inline-flex items-center rounded-full border border-red-300 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700" type="submit">Delete</button>
                                       </form>
                                     <?php endif; ?>
                                   </div>
@@ -2744,15 +2785,24 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         </thead>
                         <tbody class="divide-y">
                           <?php foreach ($orders as $order): ?>
-                            <tr>
-                              <td class="px-3 py-2 text-gray-600"><?= e($order['order_number'] ?? 'ORD_' . $order['id']) ?>
+                            <?php
+                              $storeVoided = !empty($order['voided_at']);
+                              $storePaymentStatus = (string) ($order['payment_status'] ?? 'unpaid');
+                              $storePaidish = in_array($storePaymentStatus, ['paid', 'partial_refund', 'refunded'], true);
+                            ?>
+                            <tr class="<?= $storeVoided ? 'bg-slate-50 text-slate-400 line-through opacity-70' : '' ?>">
+                              <td class="px-3 py-2 text-gray-600">
+                                <?= e($order['order_number'] ?? 'ORD_' . $order['id']) ?>
+                                <?php if ($storeVoided): ?>
+                                  <span class="ml-1 inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 no-underline" title="Voided <?= e((string) $order['voided_at']) ?>">Voided</span>
+                                <?php endif; ?>
                               </td>
                               <td class="px-3 py-2">
                                 <span
                                   class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($order['order_status'] ?? '') ?>"><?= ucfirst($order['order_status'] ?? 'Unknown') ?></span>
                               </td>
                               <td class="px-3 py-2 text-gray-600">
-                                <?= e(ucwords(str_replace('_', ' ', (string) ($order['payment_status'] ?? 'unpaid')))) ?>
+                                <?= e(ucwords(str_replace('_', ' ', $storePaymentStatus))) ?>
                               </td>
                               <td class="px-3 py-2 text-gray-600">
                                 <?= e(ucfirst((string) ($order['fulfillment_status'] ?? 'unfulfilled'))) ?>
@@ -2760,14 +2810,49 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <td class="px-3 py-2 text-gray-600"><?= e(formatCurrency($order['total_cents'] ?? 0)) ?></td>
                               <td class="px-3 py-2 text-gray-600"><?= e(formatDate($order['created_at'])) ?></td>
                               <td class="px-3 py-2 text-gray-600">
-                                <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700"
-                                  href="/admin/store/orders/<?= e($order['id']) ?>" target="_blank">View</a>
+                                <div class="flex flex-wrap gap-2">
+                                  <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700"
+                                    href="/admin/store/orders/<?= e($order['id']) ?>" target="_blank">View</a>
+                                  <?php if ($canManualFix): ?>
+                                    <?php if ($storeVoided): ?>
+                                      <form method="post" action="/admin/members/actions.php">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="store">
+                                        <input type="hidden" name="action" value="store_order_unvoid">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <button class="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700" type="submit">Restore</button>
+                                      </form>
+                                    <?php else: ?>
+                                      <form method="post" action="/admin/members/actions.php" onsubmit="return confirm('Void this store order? It will be hidden from default lists.');">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                        <input type="hidden" name="tab" value="orders">
+                                        <input type="hidden" name="orders_section" value="store">
+                                        <input type="hidden" name="action" value="store_order_void">
+                                        <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                        <button class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700" type="submit">Void</button>
+                                      </form>
+                                    <?php endif; ?>
+                                    <form method="post" action="/admin/members/actions.php" onsubmit="return confirmMembershipOrderDelete(this, <?= $storePaidish ? 'true' : 'false' ?>);">
+                                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                      <input type="hidden" name="tab" value="orders">
+                                      <input type="hidden" name="orders_section" value="store">
+                                      <input type="hidden" name="action" value="store_order_delete">
+                                      <input type="hidden" name="order_id" value="<?= e($order['id']) ?>">
+                                      <input type="hidden" name="delete_confirm" value="">
+                                      <button class="inline-flex items-center rounded-full border border-red-300 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700" type="submit">Delete</button>
+                                    </form>
+                                  <?php endif; ?>
+                                </div>
                               </td>
                             </tr>
                           <?php endforeach; ?>
                           <?php if (empty($orders)): ?>
                             <tr>
-                              <td colspan="6" class="px-3 py-4 text-center text-gray-500">No store orders found.</td>
+                              <td colspan="7" class="px-3 py-4 text-center text-gray-500">No store orders found.</td>
                             </tr>
                           <?php endif; ?>
                         </tbody>
@@ -2841,6 +2926,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               <?php endif; ?>
             </div>
+            <script>
+              function confirmMembershipOrderDelete(form, isPaidish) {
+                var warn = isPaidish
+                  ? 'This order shows as paid/refunded. Stripe records will NOT be affected. Continue deleting locally?'
+                  : 'Permanently delete this order and its line items?';
+                if (!confirm(warn)) return false;
+                var typed = (window.prompt('Type DELETE to confirm permanent removal.') || '').trim().toUpperCase();
+                if (typed !== 'DELETE') { alert('Cancelled — confirmation not matched.'); return false; }
+                form.delete_confirm.value = 'DELETE';
+                return true;
+              }
+            </script>
           <?php elseif ($tab === 'refunds'): ?>
           <?php elseif ($tab === 'refunds'): ?>
             <div class="space-y-6">
