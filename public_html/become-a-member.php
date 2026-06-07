@@ -181,11 +181,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       </section>
 
       <section class="form-section">
-        <h3>Primary bike details</h3>
-        <p class="form-helper">Add bikes, trikes, sidecars, or trailers. Rego (Registration Number) fields are optional
-          but recommended.</p>
+        <h3>Primary bike details <span class="form-helper">(optional)</span></h3>
+        <p class="form-helper">Optional — add bikes, trikes, sidecars, or trailers if you have any. You can sign up
+          without a vehicle and add one later from your member profile. Rego (Registration Number) fields are optional.</p>
         <div class="vehicle-list" data-vehicle-list="full"></div>
-        <button class="form-button secondary" type="button" data-add-vehicle="full">Add another vehicle</button>
+        <button class="form-button secondary" type="button" data-add-vehicle="full">Add a vehicle</button>
       </section>
 
       <section class="form-section" data-associate-section hidden>
@@ -205,9 +205,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           <input class="form-input" type="email" name="associate_email">
         </label>
 
-        <h4>Associate bike details</h4>
+        <h4>Associate bike details <span class="form-helper">(optional)</span></h4>
+        <p class="form-helper">Optional — only add if the associate has their own vehicle.</p>
         <div class="vehicle-list" data-vehicle-list="associate"></div>
-        <button class="form-button secondary" type="button" data-add-vehicle="associate">Add another vehicle</button>
+        <button class="form-button secondary" type="button" data-add-vehicle="associate">Add a vehicle</button>
       </section>
 
       <section class="form-section">
@@ -381,6 +382,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           card.remove();
           updateVehicleIndices(list);
           syncVehiclePayloads();
+          if (typeof updateAddVehicleLabels === 'function') {
+            updateAddVehicleLabels();
+          }
         });
       }
       list.appendChild(fragment);
@@ -388,17 +392,24 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       syncVehiclePayloads();
     };
 
+    const updateAddVehicleLabels = () => {
+      document.querySelectorAll('[data-add-vehicle]').forEach((button) => {
+        const list = vehicleLists[button.dataset.addVehicle];
+        if (!list) {
+          return;
+        }
+        button.textContent = list.children.length === 0 ? 'Add a vehicle' : 'Add another vehicle';
+      });
+    };
+
     document.querySelectorAll('[data-add-vehicle]').forEach((button) => {
       button.addEventListener('click', () => {
         addVehicleCard(button.dataset.addVehicle);
+        updateAddVehicleLabels();
       });
     });
 
-    Object.keys(vehicleLists).forEach((key) => {
-      if (vehicleLists[key] && vehicleLists[key].children.length === 0) {
-        addVehicleCard(key);
-      }
-    });
+    updateAddVehicleLabels();
 
     const updateAssociateVisibility = () => {
       const associateSelected = form.querySelector('input[name="membership_associate"]')?.checked;
