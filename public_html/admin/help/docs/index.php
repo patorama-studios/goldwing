@@ -170,6 +170,20 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
         <p class="text-xs text-gray-500 mt-2">Searches every chapter for all your words (AND match). Hits in chapter titles rank higher.</p>
       </form>
 
+      <?php if ($q === ''): ?>
+        <a href="/admin/help/brand-style.php" target="_blank" rel="noopener"
+           class="block bg-white rounded-2xl border border-gray-200 shadow-sm hover:border-primary hover:shadow-md transition mb-8 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 via-white to-emerald-50 flex items-center gap-3">
+            <span class="material-icons-outlined text-primary">palette</span>
+            <div class="flex-1">
+              <h2 class="font-display text-lg text-gray-900">Brand &amp; visual reference</h2>
+              <p class="text-sm text-gray-600 mt-0.5">Live in-browser style guide — colours, type, buttons, cards, alerts. Renders with the real site CSS.</p>
+            </div>
+            <span class="material-icons-outlined text-gray-400">open_in_new</span>
+          </div>
+        </a>
+      <?php endif; ?>
+
       <?php if ($q === '' && $adminTours): ?>
         <details class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8 group" open>
           <summary class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-white cursor-pointer flex items-center gap-2 list-none">
