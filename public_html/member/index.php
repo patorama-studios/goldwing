@@ -1828,6 +1828,32 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           return (string) ($m['member_number'] ?? '—');
         };
         $typeLabelsPanel = ['FULL' => 'Full Member', 'ASSOCIATE' => 'Associate', 'LIFE' => 'Life Member'];
+        // Resolve avatar for any household member from THEIR own user settings,
+        // not the logged-in user's. Falls back to legacy members.avatar_url and,
+        // for associates, to the linked full member's associate_avatar_url.
+        $panelAvatarFor = static function(array $m, ?array $owner): string {
+          $userId = (int) ($m['user_id'] ?? 0);
+          $type = strtoupper((string) ($m['member_type'] ?? 'FULL'));
+          if ($type === 'ASSOCIATE') {
+            if ($userId > 0) {
+              $url = (string) SettingsService::getUser($userId, 'associate_avatar_url', '');
+              if ($url === '') {
+                $url = (string) SettingsService::getUser($userId, 'avatar_url', '');
+              }
+              if ($url !== '') return $url;
+            }
+            if ($owner && !empty($owner['user_id'])) {
+              $url = (string) SettingsService::getUser((int) $owner['user_id'], 'associate_avatar_url', '');
+              if ($url !== '') return $url;
+            }
+          } else {
+            if ($userId > 0) {
+              $url = (string) SettingsService::getUser($userId, 'avatar_url', '');
+              if ($url !== '') return $url;
+            }
+          }
+          return (string) ($m['avatar_url'] ?? '');
+        };
         ?>
         <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div class="border-b border-gray-100 px-8 py-6">
@@ -1845,7 +1871,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $panelType = strtoupper((string) ($panelMember['member_type'] ?? 'FULL'));
                   $panelIsLife = $panelType === 'LIFE';
                   $panelIsAssoc = $panelType === 'ASSOCIATE';
-                  $panelAvatar = (!$panelIsAssoc) ? $avatarUrl : $associateAvatarUrl;
+                  $panelAvatar = $panelAvatarFor($panelMember, $panelIsAssoc ? $householdMain : null);
                   $panelName = trim(($panelMember['first_name'] ?? '') . ' ' . ($panelMember['last_name'] ?? ''));
                   $panelNumber = $memberNumberForPanel($panelMember);
                   $panelTypeLabel = $typeLabelsPanel[$panelType] ?? ucfirst(strtolower($panelType));
@@ -1901,11 +1927,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </div>
                 <?php endforeach; ?>
               </div>
-            <?php else: ?>
+            <?php else:
+              $profileAvatar = $panelAvatarFor($profileMember, $fullMember);
+            ?>
               <div class="flex items-center gap-4 mb-6">
                 <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden">
-                  <?php if (!empty($avatarUrl)): ?>
-                    <img src="<?= e($avatarUrl) ?>" alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>" class="h-full w-full object-cover">
+                  <?php if (!empty($profileAvatar)): ?>
+                    <img src="<?= e($profileAvatar) ?>" alt="<?= e($profileMember['first_name'] . ' ' . $profileMember['last_name']) ?>" class="h-full w-full object-cover">
                   <?php else: ?>
                     <span class="flex h-full w-full items-center justify-center text-gray-400 font-semibold text-lg">
                       <?= e(substr($profileMember['first_name'] ?? '', 0, 1) . substr($profileMember['last_name'] ?? '', 0, 1)) ?>
