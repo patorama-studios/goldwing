@@ -47,6 +47,12 @@ class PaymentWebhookService
         $metadata = $session['metadata'] ?? [];
         $orderId = isset($metadata['order_id']) ? (int) $metadata['order_id'] : 0;
         if ($orderId <= 0) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'metadata.order_id missing', [
+                'event_id' => $event['id'] ?? null,
+                'metadata' => $metadata,
+                'related_stripe_session_id' => $session['id'] ?? null,
+                'related_stripe_pi_id' => $session['payment_intent'] ?? null,
+            ]);
             return null;
         }
 
@@ -56,6 +62,13 @@ class PaymentWebhookService
             $order = self::getOrderForUpdate($orderId);
             if (!$order) {
                 $pdo->rollBack();
+                StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by id ' . $orderId, [
+                    'event_id' => $event['id'] ?? null,
+                    'related_order_id' => $orderId,
+                    'metadata' => $metadata,
+                    'related_stripe_session_id' => $session['id'] ?? null,
+                    'related_stripe_pi_id' => $session['payment_intent'] ?? null,
+                ]);
                 return null;
             }
             if (($order['status'] ?? '') === 'paid') {
@@ -106,6 +119,9 @@ class PaymentWebhookService
         $paymentIntentId = $charge['payment_intent'] ?? '';
         $chargeId = $charge['id'] ?? '';
         if ($paymentIntentId === '' && $chargeId === '') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'PI id missing on charge and no charge id', [
+                'event_id' => $event['id'] ?? null,
+            ]);
             return;
         }
         $pdo = Database::connection();
@@ -121,6 +137,11 @@ class PaymentWebhookService
             $order = $stmt->fetch();
         }
         if (!$order) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by PI or charge id', [
+                'event_id' => $event['id'] ?? null,
+                'related_stripe_pi_id' => $paymentIntentId !== '' ? $paymentIntentId : null,
+                'stripe_charge_id' => $chargeId !== '' ? $chargeId : null,
+            ]);
             return;
         }
         if (($order['status'] ?? '') === 'refunded') {
@@ -166,6 +187,10 @@ class PaymentWebhookService
         }
         $paymentIntentId = $intent['id'] ?? '';
         if ($paymentIntentId === '') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'payment_intent_id empty', [
+                'event_id' => $event['id'] ?? null,
+                'metadata' => $intent['metadata'] ?? null,
+            ]);
             return;
         }
         $pdo = Database::connection();
@@ -173,6 +198,11 @@ class PaymentWebhookService
         $stmt->execute(['payment_intent_id' => $paymentIntentId]);
         $order = $stmt->fetch();
         if (!$order) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by PI ' . $paymentIntentId, [
+                'event_id' => $event['id'] ?? null,
+                'related_stripe_pi_id' => $paymentIntentId,
+                'metadata' => $intent['metadata'] ?? null,
+            ]);
             return;
         }
         $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "failed", updated_at = NOW() WHERE id = :id');
@@ -211,6 +241,11 @@ class PaymentWebhookService
         $metadata = $intent['metadata'] ?? [];
         $orderId = isset($metadata['order_id']) ? (int) $metadata['order_id'] : 0;
         if ($orderId <= 0) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'metadata.order_id missing', [
+                'event_id' => $event['id'] ?? null,
+                'metadata' => $metadata,
+                'related_stripe_pi_id' => $paymentIntentId,
+            ]);
             return;
         }
 
@@ -220,6 +255,12 @@ class PaymentWebhookService
             $order = self::getOrderForUpdate($orderId);
             if (!$order) {
                 $pdo->rollBack();
+                StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by id ' . $orderId, [
+                    'event_id' => $event['id'] ?? null,
+                    'related_order_id' => $orderId,
+                    'related_stripe_pi_id' => $paymentIntentId,
+                    'metadata' => $metadata,
+                ]);
                 return;
             }
             if (($order['status'] ?? '') !== 'paid') {
@@ -259,6 +300,10 @@ class PaymentWebhookService
         $subscriptionId = $invoice['subscription'] ?? '';
         $paymentIntentId = $invoice['payment_intent'] ?? '';
         if ($invoiceId === '' && $subscriptionId === '') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'invoice id and subscription id both missing', [
+                'event_id' => $event['id'] ?? null,
+                'metadata' => $invoice['metadata'] ?? null,
+            ]);
             return;
         }
 
@@ -280,6 +325,13 @@ class PaymentWebhookService
             $order = $stmt->fetch();
         }
         if (!$order) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by invoice, subscription, or metadata.order_id', [
+                'event_id' => $event['id'] ?? null,
+                'stripe_invoice_id' => $invoiceId !== '' ? $invoiceId : null,
+                'stripe_subscription_id' => $subscriptionId !== '' ? $subscriptionId : null,
+                'related_stripe_pi_id' => $paymentIntentId !== '' ? $paymentIntentId : null,
+                'metadata' => $invoice['metadata'] ?? null,
+            ]);
             return;
         }
 
@@ -325,6 +377,10 @@ class PaymentWebhookService
         $invoiceId = $invoice['id'] ?? '';
         $subscriptionId = $invoice['subscription'] ?? '';
         if ($invoiceId === '' && $subscriptionId === '') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'invoice id and subscription id both missing', [
+                'event_id' => $event['id'] ?? null,
+                'metadata' => $invoice['metadata'] ?? null,
+            ]);
             return;
         }
 
@@ -346,6 +402,12 @@ class PaymentWebhookService
             $order = $stmt->fetch();
         }
         if (!$order) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by invoice, subscription, or metadata.order_id', [
+                'event_id' => $event['id'] ?? null,
+                'stripe_invoice_id' => $invoiceId !== '' ? $invoiceId : null,
+                'stripe_subscription_id' => $subscriptionId !== '' ? $subscriptionId : null,
+                'metadata' => $invoice['metadata'] ?? null,
+            ]);
             return;
         }
 
@@ -362,6 +424,10 @@ class PaymentWebhookService
         $subscription = $event['data']['object'] ?? [];
         $subscriptionId = $subscription['id'] ?? '';
         if ($subscriptionId === '') {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'subscription id missing', [
+                'event_id' => $event['id'] ?? null,
+                'subscription_status' => $subscription['status'] ?? null,
+            ]);
             return;
         }
 
@@ -370,6 +436,11 @@ class PaymentWebhookService
         $stmt->execute(['subscription_id' => $subscriptionId]);
         $order = $stmt->fetch();
         if (!$order) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by subscription id ' . $subscriptionId, [
+                'event_id' => $event['id'] ?? null,
+                'stripe_subscription_id' => $subscriptionId,
+                'subscription_status' => $subscription['status'] ?? null,
+            ]);
             return;
         }
 

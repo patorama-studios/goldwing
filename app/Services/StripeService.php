@@ -47,6 +47,12 @@ class StripeService
                 'metadata' => $metadata,
             ]);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'checkout_session.create', $e, [
+                'account_key' => null,
+                'price_id' => $priceId,
+                'customer_email' => $customerEmail,
+                'metadata' => $metadata,
+            ]);
             return null;
         }
 
@@ -75,6 +81,12 @@ class StripeService
                 'metadata' => $metadata,
             ]);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'checkout_session.create', $e, [
+                'account_key' => null,
+                'price_id' => $priceId,
+                'customer_email' => $customerEmail,
+                'metadata' => $metadata,
+            ]);
             return null;
         }
 
@@ -113,6 +125,12 @@ class StripeService
                 'metadata' => $metadata,
             ]);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'checkout_session.create', $e, [
+                'account_key' => $accountKey,
+                'customer_email' => $customerEmail,
+                'line_item_count' => count($normalized),
+                'metadata' => $metadata,
+            ]);
             return null;
         }
 
@@ -142,6 +160,7 @@ class StripeService
         try {
             $account = self::client($secretKey)->accounts->retrieve();
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'account.retrieve', $e, []);
             return null;
         }
         return $account->toArray();
@@ -168,6 +187,11 @@ class StripeService
         try {
             $refund = self::client($secret)->refunds->create($payload);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'refund.create', $e, [
+                'account_key' => $accountKey,
+                'related_stripe_pi_id' => $paymentIntentId,
+                'amount_cents' => $amountCents,
+            ]);
             return null;
         }
 
@@ -184,6 +208,10 @@ class StripeService
         try {
             $intent = self::client($secret)->paymentIntents->retrieve($paymentIntentId);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'payment_intent.retrieve', $e, [
+                'account_key' => $accountKey,
+                'related_stripe_pi_id' => $paymentIntentId,
+            ]);
             return null;
         }
 
@@ -218,6 +246,14 @@ class StripeService
         try {
             $intent = self::client($secret)->paymentIntents->create($payload, $options);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'payment_intent.create', $e, [
+                'account_key' => null,
+                'amount' => $payload['amount'] ?? null,
+                'currency' => $payload['currency'] ?? null,
+                'customer' => $payload['customer'] ?? null,
+                'metadata' => $payload['metadata'] ?? null,
+                'idempotency_key' => $idempotencyKey,
+            ]);
             return null;
         }
         return $intent->toArray();
@@ -232,6 +268,11 @@ class StripeService
         try {
             $subscription = self::client($secret)->subscriptions->create($payload);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'subscription.create', $e, [
+                'account_key' => null,
+                'customer' => $payload['customer'] ?? null,
+                'metadata' => $payload['metadata'] ?? null,
+            ]);
             return null;
         }
         return $subscription->toArray();
@@ -253,6 +294,10 @@ class StripeService
                 'limit' => 1,
             ]);
         } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'customer.search', $e, [
+                'account_key' => null,
+                'customer_email' => $email,
+            ]);
             return null;
         }
         $data = $results->data ?? [];
@@ -270,8 +315,15 @@ class StripeService
         try {
             $event = Webhook::constructEvent($payload, $signature, $secret);
         } catch (SignatureVerificationException $e) {
+            StripeErrorLogger::log(__METHOD__, 'webhook.signature_invalid', $e, [
+                'payload_bytes' => strlen($payload),
+                'signature_present' => $signature !== '',
+            ]);
             return null;
         } catch (\UnexpectedValueException $e) {
+            StripeErrorLogger::log(__METHOD__, 'webhook.payload_invalid', $e, [
+                'payload_bytes' => strlen($payload),
+            ]);
             return null;
         }
         return $event->toArray();
