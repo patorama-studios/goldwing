@@ -4,53 +4,53 @@
 
 ### What this is
 
-Every sensitive thing the admin team does on this site is written down — who did it, when they did it, what they touched, from which device. Two separate logs do this work, sitting side by side. Between them they answer one question: **"Who did what, when, to whom?"**
+Every sensitive thing the admin team does on this site is written down — who did it, when they did it, what they touched, from which device. They all land in one place: the **Audit Hub**. One screen, one filter bar, every type of event. **"Who did what, when, to whom?"** — start here.
 
 You can't edit a log entry. You can't delete one either. That's the whole point — if it could be quietly changed, it wouldn't be evidence.
 
-### The two logs in plain English
+### Three sources, one timeline
 
-- **Activity Log** — admin actions that affect a **member**. A refund got issued, a password got reset, a profile got edited, a vehicle was added to someone's garage, someone's account got locked. One row per action, with the member it happened to.
-- **Audit Log** — **settings** changes. Someone bumped the membership price. Someone changed the Stripe key. Someone turned on maintenance mode. Someone edited the welcome email template. The audit log shows the value before and the value after, side by side.
+The Audit Hub merges three underlying sources so you don't have to remember which page to open:
 
-Different logs because they answer different questions. The activity log is "what happened to Jane Smith's account?" The audit log is "who changed the membership fee from $80 to $90?"
+- **Settings** — settings changes. Someone bumped the membership price. Someone changed the Stripe key. Someone turned on maintenance mode. Shows the value before and the value after.
+- **Admin** — admin actions outside the settings hub. Application approvals, chapter assignments, notice CRUD, Page Builder saves.
+- **Activity** — security and member-touching events. Refunds, password resets, role assignments, failed logins, webhook outcomes, member exports/imports.
+
+Each row is tagged with a coloured **Source** badge so you can see at a glance whether you're looking at a settings tweak, an admin action, or a security event.
 
 ### What you can use this for
 
-- **Figure out what happened.** A member rings up saying "someone reset my password but it wasn't me." Open the activity log, search their name, you'll see who, when, and from which IP.
-- **Show an auditor.** During an audit you can hand over a date-filtered export proving every refund, every role change, every settings tweak.
-- **Back up "I didn't do that" with evidence.** Both logs record who was logged in. If a treasurer says "I didn't change the Stripe key," the audit log will show whether they did or not.
+- **Figure out what happened.** A member rings up saying "someone reset my password but it wasn't me." Open the Audit Hub, search their name, you'll see who, when, and from which IP.
+- **Show an auditor.** During an audit you can filter to a date range and walk through every refund, every role change, every settings tweak — side by side.
+- **Back up "I didn't do that" with evidence.** Every row records who was logged in. If a treasurer says "I didn't change the Stripe key," the hub will show whether they did or not.
 
 ### Who's allowed to view
 
-Only **Admin** can read either log. Committee members and treasurers don't see the security log links in the side menu. This is deliberate — the logs include IP addresses, browser strings, and the names of admin staff. Keep the audience small.
+Only roles with `admin.logs.view` can read the Audit Hub. Committee members and treasurers don't see the link in the side menu. This is deliberate — the logs include IP addresses, browser strings, and the names of admin staff. Keep the audience small.
 
-### Where to find them
+### Where to find it
 
-![The Security Activity Log — sample rows (names sanitized to 'Member N')](images/08-activity-log.jpg)
+- **Audit Hub (everything site-wide)** — Admin → **Audit Hub** in the side menu, or via Settings → Audit Hub.
+- **Per-member activity** — Admin → Members → click the member → **Activity** tab. (Same data, filtered to that one member.)
 
-- **Activity Log (site-wide)** — Admin → Security Log.
-- **Activity Log (one member only)** — Admin → Members → click the member → **Activity** tab.
-- **Audit Log (settings changes)** — Admin → Settings → **Audit Log** tab.
-
-Three doors, three views, but the activity log views are reading the same underlying table — just with different filters.
-
-{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+{{link:/admin/audit/|Take me to the Audit Hub}}
 {{link:/admin/members/|Take me to Members}}
-{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
 
-### How to search the activity log
+### How to search
 
-{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+The filter bar at the top of the Audit Hub lets you narrow by:
 
-The filter bar at the top of Admin → Security Log lets you narrow by:
+- **Search** — free-text across actor name, action, and payload. Type `refund` to see every refund-shaped row across all three sources.
+- **Source** — Settings / Admin / Activity, or All. The cards at the very top are clickable shortcuts.
+- **Action** — pick a specific action name from the dropdown.
+- **Actor** — name or email contains.
+- **From / To** — date range.
 
-- **Member** — type a name or ID to see everything done to that one person.
-- **Action type** — e.g. `refund.processed`, `security.password_reset`, `admin_role.updated`. You can type just `refund` to see every refund-shaped row.
-- **Date range** — start and end date. Default is the last week.
-- **IP address** — useful if you're chasing a suspicious login.
+Results are sorted newest first. Page size is configurable; pagination at the bottom lets you walk further back than the visible page.
 
-Results are sorted newest first and capped at 200 rows. If you've got a busy week, narrow the date range rather than expecting to scroll past 200.
+### Reading the Details column
+
+Each row's **Details** column shows a friendly summary instead of raw JSON. Settings changes appear as `Field name: old → new`. Activity rows show their metadata (amount, target, reason, etc.) as plain labels. Need the underlying payload? Each row has a **Show raw** toggle that expands the pretty-printed JSON for the developer-flavoured view.
 
 ### What gets recorded
 
@@ -63,7 +63,7 @@ For every sensitive action — refunds, password resets, role changes, profile e
 - **IP address** — the network address the action came from.
 - **Browser** — the user agent string (e.g. "Chrome on macOS").
 
-For settings changes, the audit log also shows a **before/after diff** — the old value and the new value side by side. Click "View" on a row to expand it.
+For settings changes, the Details column shows a **before/after diff** — the old value and the new value side by side. Click **Show raw** on a row to expand the underlying JSON.
 
 ### What's NOT in here
 
@@ -80,10 +80,10 @@ For settings changes, the audit log also shows a **before/after diff** — the o
 
 ### Good practice
 
-- **Review the audit log monthly.** Pop in once a month and skim recent settings changes. Anything unexpected — a price bump nobody mentioned, a payment key rotated outside a known window — is worth a quick "hey, was this you?" Slack message.
+- **Review the Audit Hub monthly.** Pop in once a month, filter by the Settings source, and skim recent changes. Anything unexpected — a price bump nobody mentioned, a payment key rotated outside a known window — is worth a quick "hey, was this you?" Slack message.
 - **ALWAYS type a reason when prompted.** Refund reasons, password-reset reasons, role-change reasons — they all land in the log. A reason of "see ticket #842" is infinitely better than blank, even if the ticket lives elsewhere.
 - **Never delete log rows.** There's no UI to do it, and there shouldn't be. If somebody ever asks you to "clean up" a log entry, that's a flag — say no.
-- **Keep the activity log audience small.** Don't screenshare the security log on a public call. It includes staff IPs and sometimes member identifiers.
+- **Keep the Audit Hub audience small.** Don't screenshare it on a public call. It includes staff IPs and sometimes member identifiers.
 
 ### Who to ask if you can't find something
 
@@ -166,11 +166,22 @@ Every write through `SettingsService::setGlobal()` calls the private `writeAudit
 
 ### Where to view it
 
+- **Audit Hub (site-wide, all three sources)** — `/admin/audit/`. Requires `admin.logs.view`. Backed by `App\Services\AuditHubService`, which UNIONs `audit_log`, `audit_logs`, and `activity_log` at read time and projects them into a single normalized row shape (`source`, `created_at`, `actor_*`, `action`, `target_*`, `details_text`, `metadata_json`, `ip_address`). Filters: free-text search, source, action, actor (name/email contains), date range. Paginated.
 - **Per-member activity** — `/admin/members/view.php?id=<id>` → Activity tab. Backed by `ActivityRepository::listByMember()`. Filter by actor type, action substring, date range.
-- **Site-wide security activity** — `/admin/security/activity_log.php`. Requires `admin.logs.view`. Filter by user ID, action, IP, target type, date range. Most recent 200 rows.
-- **Settings audit** — `/admin/settings/index.php?section=audit`. Filter by action and actor name. Most recent 100 rows. Each row has a collapsible "View" with the pretty-printed `diff_json`.
+- **Legacy URLs** — `/admin/security/activity_log.php`, `/admin/settings/index.php?section=audit`, and `/admin/index.php?page=audit` are now 302 redirects to `/admin/audit/` with the appropriate `source` and filter pre-selected. The redirect handlers preserve the most common filter params (action, date range, search). The old per-page views in `admin/index.php` and the `'audit'` branch in `settings/index.php` have been removed.
 
-There is **no CSV export** on any of the three views. For bulk pulls, run a `SELECT … INTO OUTFILE` from MySQL.
+There is **no CSV export** in the Audit Hub. For bulk pulls, run a `SELECT … INTO OUTFILE` from MySQL.
+
+### About `AuditHubService`
+
+The service is read-only and defensive: it inspects which of the three tables exist (`SHOW TABLES`) and which optional columns exist on `activity_log` (`target_type`, `target_id`) before composing the UNION, so a partially-migrated database still renders. The `friendlyMetadata()` helper handles two payload shapes:
+
+1. **Settings diffs** with `{before, after}` keys — emits one `Field name: old → new` line per changed field.
+2. **Activity-style metadata** — flattens one level into `Key: value` pairs, prettifying snake_case keys and converting booleans / nulls to human strings.
+
+The raw JSON is always available behind a `<details>` toggle on the row.
+
+The three writer services (`AuditService`, `ActivityLogger`, `SettingsService::writeAudit`) are unchanged — this is purely a UI consolidation.
 
 ### Settings
 
@@ -192,16 +203,16 @@ This chapter doesn't define its own settings, but it consumes the alert toggles 
 - **No rotation.** Neither table has a TTL, partitioning, or scheduled trim — they grow forever. The `idx_activity_created` index keeps date-range queries cheap, but expect these to become the largest tables in the database within a few years. The fix when it bites is a cron that archives rows older than N months to a cold table — never a `DELETE`, because we want immutability.
 - **`ActivityLogger` silently no-ops on failure.** The `try/catch` in `ActivityLogger::log()` only writes to `error_log` if the INSERT throws. If the `activity_log` table is missing (e.g. a fresh database that hasn't run `2025_01_20_security.sql`), every call is dropped without an admin-visible error. Confirm the table exists after any migration.
 - **The tables look identical at a glance.** When debugging, `grep`-ing for "audit" or "activity" can mislead. `SettingsService` → `audit_log`. `ActivityLogger` → `activity_log`. `AuditService::log()` → `audit_logs` (plural, legacy). Three tables, one concept.
-- **Hard row caps.** `activity_log` views show 200 rows max; the settings audit shows 100. The cap is a `LIMIT`, not pagination — narrow the date filter if your window is denser.
+- **Audit Hub is paginated, but legacy URLs aren't.** The per-member Activity tab still uses a 100-row `LIMIT`, not pagination — narrow the date filter for dense windows.
 - **Member-export and member-import alerts are fired from the page, not from a service.** See `public_html/admin/members/export.php` and `import.php` for the call sites.
 
 </details>
 
-<!-- SCREENSHOT: /admin/security/activity_log.php showing the filter bar and a table of recent rows. Capture on goldwing.org.au as admin. Save as 08-activity-log.png. -->
-<!-- ![Activity log](../images/08-activity-log.png) -->
+<!-- SCREENSHOT: /admin/audit/ showing the stats cards, filter bar and a table of recent rows across all three sources. Capture on goldwing.org.au as admin. Save as 08-audit-hub.png. -->
+<!-- ![Audit Hub](../images/08-audit-hub.png) -->
 
-<!-- SCREENSHOT: /admin/settings/index.php?section=audit showing the audit table with a diff "View" expanded. Save as 08-audit-log.png. -->
-<!-- ![Audit log](../images/08-audit-log.png) -->
+<!-- SCREENSHOT: /admin/audit/?source=settings with a row's "Show raw" expanded to demonstrate the friendly diff vs raw JSON view. Save as 08-audit-hub-diff.png. -->
+<!-- ![Audit Hub — settings diff](../images/08-audit-hub-diff.png) -->
 
 ## Related chapters
 

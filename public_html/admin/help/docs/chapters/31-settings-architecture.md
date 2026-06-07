@@ -82,9 +82,9 @@ Sensitive values — Stripe secret keys, SMTP passwords, AI provider keys — ar
 
 ### The audit log
 
-{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+{{link:/admin/audit/?source=settings|Take me to the Audit Hub}}
 
-**Admin → Settings → Audit Log.** This is the read-only record of every settings change. You can:
+**Admin → Audit Hub** (filter by the **Settings** source). This is the read-only record of every settings change. You can:
 
 - See the full timeline, newest first.
 - Filter by who made the change.
@@ -235,7 +235,7 @@ SettingsService::ensureDefaults((int) $user['id']);
 | Events | `?section=events` | `admin.events.manage` |
 | AI Settings | `/admin/settings/ai.php` | `admin.settings.general.manage` |
 | Membership Pricing | `?section=membership_pricing` | `admin.membership_types.manage` |
-| Audit Log | `?section=audit` | `admin.logs.view` |
+| Audit Hub | `/admin/audit/` (folded out of settings) | `admin.logs.view` |
 | Advanced / Developer | `?section=advanced` | `admin.settings.general.manage` |
 | Admin Role Builder | `/admin/settings/roles.php` | `admin.roles.view` |
 | Access Control | `/admin/settings/access-control.php` | `admin.roles.manage` |
@@ -292,7 +292,7 @@ This chapter doesn't define settings — it defines how settings *work*. For the
 <!-- SCREENSHOT: The Settings Hub landing page at /admin/settings/index.php showing the section tiles. Capture on goldwing.org.au logged in as a full admin so all sections are visible. Save to public_html/admin/help/images/31-settings-hub-landing.png and uncomment below. -->
 <!-- ![Settings Hub landing](../images/31-settings-hub-landing.png) -->
 
-<!-- SCREENSHOT: The Audit section at /admin/settings/index.php?section=audit, with the diff view expanded on a single settings.update row so the before/after JSON is visible. Save as 31-settings-audit-diff.png. -->
+<!-- SCREENSHOT: /admin/audit/?source=settings with a row's Show raw expanded on a single settings.update row so the before/after JSON is visible. Save as 31-settings-audit-diff.png. -->
 <!-- ![Settings audit diff](../images/31-settings-audit-diff.png) -->
 
 ## Related chapters

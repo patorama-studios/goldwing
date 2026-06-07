@@ -155,9 +155,10 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | File | Job |
 |---|---|
 | `SettingsService.php` | Settings Hub: `getGlobal/setGlobal`, JSON values. |
-| `AuditService.php` | Stamps changes into `audit_log`. |
-| `ActivityLogger.php`, `ActivityRepository.php` | Admin action audit. |
-| `LogViewerService.php` | Backs `/admin/security/activity_log.php`. |
+| `AuditService.php` | Stamps changes into `audit_logs` (admin actions). |
+| `ActivityLogger.php`, `ActivityRepository.php` | Security & member-touching events → `activity_log`. |
+| `AuditHubService.php` | Read-only UNION of `audit_log` / `audit_logs` / `activity_log` for the unified Audit Hub. |
+| `LogViewerService.php` | Tails the PHP system log for the Advanced settings panel. |
 | `Database.php`, `DbSessionHandler.php`, `Env.php` | DB connection, MySQL sessions, `.env` loader. |
 | `BaseUrlService.php` | Resolves `https://…` across CLI + web. |
 | `Validator.php` | Tiny input-validation helpers. |
@@ -188,7 +189,8 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | `members/` | List/view/actions, import, export, `merge_suburbs.php`, `backfill_member_baseline.php`. |
 | `store/` | Products, `product_form.php`, categories, tags, discounts, orders, low-stock, import, merge, settings. |
 | `settings/` | Settings Hub (`index.php` by `?section=`), `roles.php`, `access-control.php`, `ai.php`, `*-save.php` handlers. |
-| `security/` | `activity_log.php`. |
+| `security/` | `activity_log.php` (302 redirect into the Audit Hub). |
+| `audit/` | Unified Audit Hub — settings diffs, admin actions, and security events in one timeline. |
 | `page-builder/` | `index.php` (UI), `api.php` (JSON), `preview.php`. |
 | `pages/` | `builder.php`, `editor.php` — shims into page-builder. |
 | `requests/` | Pending-requests queue: `index.php`, `view.php`, `actions.php`. |

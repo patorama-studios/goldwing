@@ -28,7 +28,6 @@ $sections = [
     'media' => ['label' => 'Media & Files', 'permission' => 'admin.media_library.manage'],
     'events' => ['label' => 'Events', 'permission' => 'admin.events.manage'],
     'membership_pricing' => ['label' => 'Membership Settings', 'permission' => 'admin.membership_types.manage'],
-    'audit' => ['label' => 'Audit Log', 'permission' => 'admin.logs.view'],
     'advanced' => ['label' => 'Advanced / Developer', 'permission' => 'admin.settings.general.manage'],
 ];
 
@@ -40,6 +39,12 @@ function can_access_section(string $permission, array $user): bool
 $section = $_GET['section'] ?? 'hub';
 if ($section !== 'hub' && !isset($sections[$section])) {
     $section = 'hub';
+}
+
+// The Audit Log section has been folded into the unified Audit Hub.
+if ($section === 'audit') {
+    header('Location: /admin/audit/?source=settings');
+    exit;
 }
 
 if ($section !== 'hub' && !can_access_section($sections[$section]['permission'], $user)) {
@@ -707,7 +712,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </p>
               </div>
-              <?php if (!in_array($section, ['audit', 'hub'], true)): ?>
+              <?php if ($section !== 'hub'): ?>
                 <div class="text-xs text-slate-500 text-right">
                   <?php
                     $sectionKeys = [
@@ -771,10 +776,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   ['label' => 'Integrations', 'icon' => 'link', 'desc' => 'Email provider, YouTube, third-party keys.', 'href' => '/admin/settings/index.php?section=integrations', 'permission' => 'admin.integrations.manage'],
                 ],
                 'Logs & Diagnostics' => [
-                  ['label' => 'Audit Log', 'icon' => 'receipt_long', 'desc' => 'History of settings changes.', 'href' => '/admin/settings/index.php?section=audit', 'permission' => 'admin.logs.view'],
-                  ['label' => 'Security Log', 'icon' => 'gpp_good', 'desc' => 'Login attempts and security events.', 'href' => '/admin/security/activity_log.php', 'permission' => 'admin.logs.view'],
-                  ['label' => 'Reports', 'icon' => 'assessment', 'desc' => 'Activity and usage reports.', 'href' => '/admin/index.php?page=reports', 'permission' => 'admin.logs.view'],
-                  ['label' => 'Audit', 'icon' => 'fact_check', 'desc' => 'Audit dashboard.', 'href' => '/admin/index.php?page=audit', 'permission' => 'admin.logs.view'],
+                  ['label' => 'Audit Hub', 'icon' => 'receipt_long', 'desc' => 'Unified log of settings changes, admin actions, and security events.', 'href' => '/admin/audit/', 'permission' => 'admin.logs.view'],
                 ],
                 'Advanced' => [
                   ['label' => 'AI Settings', 'icon' => 'smart_toy', 'desc' => 'AI keys, models, feature flags.', 'href' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
@@ -2353,69 +2355,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 });
               })();
             </script>
-          <?php elseif ($section === 'audit'): ?>
-            <?php
-              $actionFilter = normalize_text($_GET['action'] ?? '');
-              $actorFilter = normalize_text($_GET['actor'] ?? '');
-              $params = [];
-              $sql = 'SELECT a.*, u.name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_user_id';
-              $conditions = [];
-              if ($actionFilter !== '') {
-                  $conditions[] = 'a.action = :action';
-                  $params['action'] = $actionFilter;
-              }
-              if ($actorFilter !== '') {
-                  $conditions[] = 'u.name LIKE :actor';
-                  $params['actor'] = '%' . $actorFilter . '%';
-              }
-              if ($conditions) {
-                  $sql .= ' WHERE ' . implode(' AND ', $conditions);
-              }
-              $sql .= ' ORDER BY a.created_at DESC LIMIT 100';
-              $stmt = $pdo->prepare($sql);
-              $stmt->execute($params);
-              $auditRows = $stmt->fetchAll();
-            ?>
-            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-              <form method="get" class="flex flex-wrap gap-3">
-                <input type="hidden" name="section" value="audit">
-                <input name="action" placeholder="Action" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($actionFilter) ?>">
-                <input name="actor" placeholder="Actor" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($actorFilter) ?>">
-                <button class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink" type="submit">Filter</button>
-              </form>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead class="text-left text-xs uppercase text-slate-500 border-b">
-                    <tr>
-                      <th class="py-2 pr-3">Time</th>
-                      <th class="py-2 pr-3">Actor</th>
-                      <th class="py-2 pr-3">Action</th>
-                      <th class="py-2 pr-3">Entity</th>
-                      <th class="py-2">Diff</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y">
-                    <?php foreach ($auditRows as $row): ?>
-                      <tr>
-                        <td class="py-2 pr-3 text-slate-600"><?= e($row['created_at']) ?></td>
-                        <td class="py-2 pr-3 text-slate-900"><?= e($row['name'] ?? 'System') ?></td>
-                        <td class="py-2 pr-3 text-slate-600"><?= e($row['action']) ?></td>
-                        <td class="py-2 pr-3 text-slate-600"><?= e($row['entity_type']) ?> #<?= e((string) ($row['entity_id'] ?? '')) ?></td>
-                        <td class="py-2">
-                          <details class="text-xs text-slate-600">
-                            <summary class="cursor-pointer">View</summary>
-                            <pre class="mt-2 whitespace-pre-wrap"><?= e(json_encode(json_decode($row['diff_json'] ?? 'null', true), JSON_PRETTY_PRINT)) ?></pre>
-                          </details>
-                        </td>
-                      </tr>
-                    <?php endforeach; ?>
-                    <?php if (!$auditRows): ?>
-                      <tr><td colspan="5" class="py-4 text-center text-slate-500">No audit entries found.</td></tr>
-                    <?php endif; ?>
-                  </tbody>
-                </table>
-              </div>
-            </div>
           <?php elseif ($section === 'advanced'): ?>
             <?php $flags = SettingsService::getGlobal('advanced.feature_flags', []); ?>
             <form method="post" class="space-y-6">

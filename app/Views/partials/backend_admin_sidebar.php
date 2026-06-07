@@ -86,6 +86,7 @@ $items = [
 
     // SYSTEM
     ['key' => 'settings', 'group' => 'System', 'label' => 'Settings', 'icon' => 'settings', 'href' => '/admin/settings/index.php', 'permission_any' => $settingsPermissions],
+    ['key' => 'audit-hub', 'group' => 'System', 'label' => 'Audit Hub', 'icon' => 'receipt_long', 'href' => '/admin/audit/', 'permission' => 'admin.logs.view'],
     ['key' => 'ai-editor', 'group' => 'System', 'label' => 'AI Page Builder', 'icon' => 'smart_toy', 'href' => '/admin/page-builder', 'permission' => 'admin.ai_page_builder.access'],
     ['key' => 'help-validator', 'group' => 'System', 'label' => 'Tour Validator', 'icon' => 'fact_check', 'href' => '/admin/help/validator.php', 'badge' => $tourAttentionCount],
     ['key' => 'help-docs', 'group' => 'System', 'label' => 'System Docs', 'icon' => 'menu_book', 'href' => '/admin/help/docs/'],
@@ -132,7 +133,7 @@ if (function_exists('current_admin_can')) {
     $items = $filteredItems;
 }
 $activePage = $activePage ?? 'dashboard';
-$settingsActiveKeys = ['settings', 'security-log', 'reports', 'audit', 'settings-ai'];
+$settingsActiveKeys = ['settings', 'settings-ai'];
 $isSettingsActive = in_array($activePage, $settingsActiveKeys, true);
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
 if (!$isSettingsActive && $currentPath && strpos($currentPath, '/admin/settings/') === 0) {

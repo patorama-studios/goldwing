@@ -12,20 +12,20 @@ You don't need to memorise it. You need to know which page to open first when a 
 
 #### A member can't log in
 
-{{link:/admin/security/activity_log.php|Take me to the Security Log}}
+{{link:/admin/audit/?source=activity|Take me to the Audit Hub}}
 
-1. Go to **Admin → Security Log** and search for their email address.
+1. Go to **Admin → Audit Hub**, pick the **Activity** source, and search for their email address.
 2. If you see "rate limit exceeded" or "account locked", they've tried too many wrong passwords — see [Chapter 12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout) to clear the lockout.
 3. If they have 2FA on and are stuck on the code, see [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup) — you may need to clear a trusted device or reset their 2FA.
 4. If none of the above, offer them a **password reset** — see [Chapter 05 — Password reset & lost device](view.php?slug=05-password-reset).
 
 #### A payment didn't go through
 
-{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+{{link:/admin/audit/|Take me to the Audit Hub}}
 
 1. Open the **Stripe Dashboard** first — that's the source of truth for anything money-related. Search for the customer's email or the order number.
 2. If Stripe shows the payment as failed, the reason is in the Stripe event log (usually "card declined" with a sub-reason like insufficient funds or wrong CVC). Pass that wording on to the member.
-3. Then check **Admin → Audit Log** for the order's events to see how our site recorded it.
+3. Then check **Admin → Audit Hub** for the order's events to see how our site recorded it.
 4. If Stripe shows it as succeeded but our site shows it as pending, escalate to the developer with the **Stripe payment intent ID** (looks like `pi_3Q4…`).
 
 #### An email didn't arrive
@@ -76,7 +76,7 @@ You don't need to memorise it. You need to know which page to open first when a 
 - **Copy the EXACT error message** when escalating. Not a paraphrase — the literal text. A single wrong word can send the developer hunting in the wrong place.
 - **Note the time** it happened (and roughly what timezone you're in). Logs are timestamped, and "around 2pm" is much easier to grep than "earlier today".
 - **Check whether other people have the same issue** before assuming it's a site-wide outage. If one member can't log in, that's a user problem. If five members in five minutes can't log in, that's a site problem.
-- **Check the Audit Log to rule out recent settings changes.** If something started misbehaving today, ask "did someone change a setting today?" — the Audit Log answers that in 30 seconds.
+- **Check the Audit Hub to rule out recent settings changes.** If something started misbehaving today, ask "did someone change a setting today?" — filter by the Settings source and the Audit Hub answers that in 30 seconds.
 
 ### Who to ask if stuck
 

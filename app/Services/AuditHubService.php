@@ -301,6 +301,9 @@ class AuditHubService
             return null;
         }
 
+        // Each leg is parenthesised so the UNION parser keeps the SELECTs
+        // independent; the outer wrapper exists so we can apply WHERE / ORDER
+        // BY / LIMIT once across the combined result.
         $union = '(' . implode(') UNION ALL (', $parts) . ')';
 
         // Outer filter wrapper (so filters apply uniformly across sources).
@@ -331,7 +334,7 @@ class AuditHubService
             $params['__end'] = $end . ' 23:59:59';
         }
 
-        $sql = 'SELECT * FROM ' . $union . ' AS audit_union';
+        $sql = 'SELECT * FROM (' . $union . ') AS audit_union';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }

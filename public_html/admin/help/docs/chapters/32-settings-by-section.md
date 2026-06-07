@@ -183,11 +183,11 @@ Other settings here:
 
 Chapter management (adding, renaming, archiving local chapters) is on the same page and writes to the `chapters` table directly. See [Chapter 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 
-### Audit Log
+### Audit Hub
 
-{{link:/admin/settings/?section=audit|Take me to the Audit Log}}
+{{link:/admin/audit/|Take me to the Audit Hub}}
 
-Read-only. Shows every settings change ever made — who, what, old value, new value, when. No fields to edit. Useful when something has changed and you want to know who and when. Full picture: [Chapter 08 — Activity & audit log](view.php?slug=08-activity-audit) and [Chapter 31 — Settings architecture](view.php?slug=31-settings-architecture).
+Read-only. Folded out of Settings into its own page at **/admin/audit/**. Shows every settings change, every admin action, and every security event in one timeline — who, what, old value, new value, when. Pick the **Settings** source to scope to settings changes only. No fields to edit. Full picture: [Chapter 08 — Activity & audit log](view.php?slug=08-activity-audit) and [Chapter 31 — Settings architecture](view.php?slug=31-settings-architecture).
 
 ### Advanced / Developer
 
@@ -263,7 +263,7 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 | Events | `/admin/settings/index.php?section=events` | `admin.events.manage` |
 | AI Settings | `/admin/settings/ai.php` | `admin.settings.general.manage` |
 | Membership Settings | `/admin/settings/index.php?section=membership_pricing` | `admin.membership_types.manage` |
-| Audit Log | `/admin/settings/index.php?section=audit` | `admin.logs.view` |
+| Audit Hub | `/admin/audit/` (folded out of settings) | `admin.logs.view` |
 | Advanced / Developer | `/admin/settings/index.php?section=advanced` | `admin.settings.general.manage` |
 | Admin Role Builder | `/admin/settings/roles.php` | `admin.roles.view` (view) / `admin.roles.manage` (edit) |
 | Access Control | `/admin/settings/access-control.php` | `admin.roles.manage` |
@@ -490,9 +490,9 @@ What it controls: the pricing matrix (magazine type × membership type × period
 
 Chapter rows are written directly into the `chapters` table, not into `settings_global`.
 
-#### Audit Log
+#### Audit Hub
 
-Read-only — no settings keys of its own. Renders the global audit log filtered to settings changes; the data comes from `audit_log` populated by `AuditService::log()` and `SettingsService::setGlobal()`. Deep dive: [Ch 08 — Activity & audit log](view.php?slug=08-activity-audit).
+Read-only — no settings keys of its own. Lives at `/admin/audit/` (no longer part of the settings dispatcher). Renders a unified view across `audit_log` (settings diffs), `audit_logs` (admin actions), and `activity_log` (security events) via `App\Services\AuditHubService`. Deep dive: [Ch 08 — Activity & audit log](view.php?slug=08-activity-audit).
 
 #### Advanced / Developer
 
