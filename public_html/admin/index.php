@@ -131,6 +131,11 @@ if ($page === 'ai-editor') {
   header('Location: /admin/page-builder');
   exit;
 }
+if ($page === 'audit' || $page === 'reports') {
+  // Both folded into the unified Audit Hub at /admin/audit/.
+  header('Location: /admin/audit/');
+  exit;
+}
 
 $alerts = [];
 $baseUrlError = BaseUrlService::validationError();
@@ -1521,7 +1526,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $totalUsers = $pdo->query("SELECT COUNT(*) as c FROM users")->fetch()['c'] ?? 0;
         $recentPayments = $pdo->query("SELECT * FROM payments ORDER BY created_at DESC LIMIT 5")->fetchAll();
         $recentLogins = $pdo->query("SELECT u.name, ul.created_at FROM user_logins ul JOIN users u ON u.id = ul.user_id ORDER BY ul.created_at DESC LIMIT 5")->fetchAll();
-        $events = $pdo->query("SELECT * FROM events WHERE event_date >= CURDATE() ORDER BY event_date ASC LIMIT 5")->fetchAll();
+        $events = $pdo->query("SELECT id, title, start_at, scope, chapter_id FROM calendar_events WHERE status = 'published' AND start_at >= NOW() ORDER BY start_at ASC LIMIT 5")->fetchAll();
         $notices = $pdo->query("SELECT * FROM notices ORDER BY created_at DESC LIMIT 5")->fetchAll();
         $failedLogins24h = (int) ($pdo->query("SELECT COUNT(*) FROM activity_log WHERE action = 'security.login_failed' AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)")->fetchColumn() ?? 0);
         $newAdminDevices24h = (int) ($pdo->query("SELECT COUNT(*) FROM activity_log WHERE action = 'security.admin_new_device' AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)")->fetchColumn() ?? 0);
@@ -1683,14 +1688,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php else: ?>
               <ul class="space-y-3 flex-1">
                 <?php foreach ($events as $ev):
-                  $evDate = new DateTime($ev['event_date']);
+                  $evDate = new DateTime($ev['start_at']);
                   $evMonth = strtoupper($evDate->format('M'));
                   $evDay = $evDate->format('j');
-                  $evTime = (strlen($ev['event_date']) > 10) ? substr($ev['event_date'], 11, 5) : '';
-                  $evTimeLabel = ($evTime && $evTime !== '00:00') ? $evTime . ' Departure' : '';
+                  $evTime = $evDate->format('H:i');
+                  $evTimeLabel = ($evTime !== '00:00') ? $evTime . ' Departure' : '';
                 ?>
                   <li>
-                    <a href="/admin/index.php?page=events" class="flex items-center gap-3 p-3 rounded-xl bg-amber-50 hover:bg-amber-100 transition group">
+                    <a href="/calendar/admin_event_view.php?id=<?= (int) $ev['id'] ?>" class="flex items-center gap-3 p-3 rounded-xl bg-amber-50 hover:bg-amber-100 transition group">
                       <div class="shrink-0 w-12 h-12 rounded-xl bg-amber-400 flex flex-col items-center justify-center text-white leading-none">
                         <span class="text-[10px] font-bold uppercase tracking-wide"><?= e($evMonth) ?></span>
                         <span class="text-xl font-bold"><?= e($evDay) ?></span>
@@ -1705,7 +1710,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <?php endforeach; ?>
               </ul>
             <?php endif; ?>
-            <a href="/admin/index.php?page=events" class="mt-4 text-xs text-center text-blue-600 hover:underline">View all events</a>
+            <a href="/calendar/events.php" class="mt-4 text-xs text-center text-blue-600 hover:underline">View all events</a>
           </div>
 
         </section>
@@ -3082,138 +3087,80 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         }
         if ($fallenTableExists) {
           $pendingMemorials = $pdo->query('SELECT * FROM fallen_wings WHERE status = "PENDING" ORDER BY created_at DESC')->fetchAll();
-          $approvedMemorials = $pdo->query('SELECT *, SUBSTRING_INDEX(full_name, " ", -1) AS last_name FROM fallen_wings WHERE status = "APPROVED" ORDER BY last_name ASC, full_name ASC')->fetchAll();
+          $approvedMemorials = $pdo->query('SELECT *, SUBSTRING_INDEX(full_name, " ", -1) AS last_name FROM fallen_wings WHERE status = "APPROVED" ORDER BY year_of_passing DESC, last_name ASC, full_name ASC')->fetchAll();
         }
+
+        $editFallenId = (int) ($_GET['edit_fallen'] ?? 0);
+        $addFallen = !empty($_GET['add_fallen']);
+        $editEntry = null;
+        if ($editFallenId > 0) {
+          foreach ($approvedMemorials as $m) {
+            if ((int) $m['id'] === $editFallenId) { $editEntry = $m; break; }
+          }
+          if (!$editEntry) {
+            foreach ($pendingMemorials as $m) {
+              if ((int) $m['id'] === $editFallenId) { $editEntry = $m; break; }
+            }
+          }
+        }
+
+        $approvedByYear = [];
+        foreach ($approvedMemorials as $m) {
+          $yr = (int) ($m['year_of_passing'] ?? 0);
+          $approvedByYear[$yr][] = $m;
+        }
+        krsort($approvedByYear);
+        $approvedYears = array_keys($approvedByYear);
+        $totalHonored = count($approvedMemorials);
         ?>
-        <section data-tour="approve-fallen-panel" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
-          <div>
-            <h1 class="font-display text-2xl font-bold text-gray-900">Fallen Wings Memorials</h1>
-            <p class="text-sm text-gray-500">Approve , reject, or edit memorial submissions.</p>
-          </div>
+        <section data-tour="approve-fallen-panel" class="space-y-6">
           <?php if (!$fallenTableExists): ?>
             <div class="rounded-lg bg-amber-50 text-amber-700 px-4 py-2 text-sm">
               Fallen Wings table not found. Run the migration to enable memorial approvals.
             </div>
           <?php endif; ?>
 
-          <?php
-          $editFallenId = (int) ($_GET['edit_fallen'] ?? 0);
-          $addFallen = !empty($_GET['add_fallen']);
-          ?>
-
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-lg font-semibold text-gray-900">Memorial entries</h2>
-            <?php if (!$addFallen): ?>
-              <a href="?page=fallen-wings&add_fallen=1"
-                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800">
-                <span class="material-icons-outlined text-[16px]">add</span> Add new memorial
-              </a>
-            <?php else: ?>
-              <a href="?page=fallen-wings" class="text-xs text-gray-500 hover:text-gray-900">Close form</a>
-            <?php endif; ?>
-          </div>
-
-          <?php if ($addFallen): ?>
-            <form method="post" enctype="multipart/form-data"
-                  class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
-              <h3 class="text-sm font-semibold text-gray-900">Add new memorial</h3>
-              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-              <input type="hidden" name="action" value="add_fallen_wings">
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
-                  <input type="text" name="full_name"
-                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Year of Passing</label>
-                  <input type="number" name="year_of_passing"
-                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                         min="1900" max="<?= date('Y') ?>" required>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Member Number</label>
-                  <input type="text" name="member_number"
-                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                         pattern="[A-Za-z0-9.\-]+">
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-                  <select name="status"
-                          class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                    <option value="APPROVED" selected>Approved (publish immediately)</option>
-                    <option value="PENDING">Pending (queue for review)</option>
-                  </select>
-                </div>
-              </div>
-
+          <div data-tour="approve-fallen-section" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between gap-3 mb-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute Text</label>
-                <textarea name="tribute" rows="4"
-                          class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"></textarea>
+                <h2 class="font-display text-lg font-bold text-gray-900">Pending Submissions</h2>
+                <p class="text-sm text-gray-500">Approve, reject, or edit before publishing.</p>
               </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Image (optional)</label>
-                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
-                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute PDF (optional)</label>
-                  <input type="file" name="tribute_pdf" accept=".pdf"
-                         class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                </div>
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2">
-                <a href="?page=fallen-wings"
-                   class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</a>
-                <button type="submit"
-                        class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">Save memorial</button>
-              </div>
-            </form>
-          <?php endif; ?>
-
-          <div data-tour="approve-fallen-section" class="space-y-4">
-            <h2 class="text-lg font-semibold text-gray-900">Pending submissions</h2>
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+                <?= count($pendingMemorials) ?> waiting
+              </span>
+            </div>
             <?php if ($pendingMemorials): ?>
+            <div class="space-y-3">
               <?php $pendingFallenIndex = 0; ?>
               <?php foreach ($pendingMemorials as $entry): ?>
                 <?php $isFirstPendingFallen = ($pendingFallenIndex === 0); $pendingFallenIndex++; ?>
                 <div <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-entry"' : '' ?>
                   class="border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <div class="flex items-center gap-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
                       <p class="text-base font-semibold text-gray-900"><?= e($entry['full_name']) ?>
-                        (<?= e((string) $entry['year_of_passing']) ?>)</p>
+                        <span class="text-gray-500 font-normal">(<?= e((string) $entry['year_of_passing']) ?>)</span></p>
                       <?php if (!empty($entry['image_url'])): ?>
-                        <span
-                          class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Image</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase tracking-wide">Image</span>
                       <?php endif; ?>
                       <?php if (!empty($entry['pdf_url'])): ?>
-                        <span
-                          class="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
                       <?php endif; ?>
                     </div>
                     <?php if (!empty($entry['member_number'])): ?>
-                      <p class="text-xs text-gray-500 mt-1">Member #: <?= e($entry['member_number']) ?></p>
+                      <p class="text-xs text-gray-500 mt-1">Member ID: <?= e($entry['member_number']) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($entry['tribute'])): ?>
-                      <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
+                      <p class="text-sm text-gray-600 mt-1 line-clamp-2"><?= e($entry['tribute']) ?></p>
                     <?php endif; ?>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <form method="post">
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                       <input type="hidden" name="action" value="approve_fallen">
                       <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                      <button
-                        <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-approve"' : '' ?>
+                      <button <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-approve"' : '' ?>
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-primary text-gray-900 text-xs font-semibold"
                         type="submit">Approve</button>
                     </form>
@@ -3221,8 +3168,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                       <input type="hidden" name="action" value="reject_fallen">
                       <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                      <button
-                        <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-reject"' : '' ?>
+                      <button <?= $isFirstPendingFallen ? 'data-tour="approve-fallen-reject"' : '' ?>
                         class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
                         type="submit">Reject</button>
                     </form>
@@ -3238,144 +3184,277 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </div>
                 </div>
               <?php endforeach; ?>
+            </div>
             <?php else: ?>
               <p class="text-sm text-gray-500">No pending submissions.</p>
             <?php endif; ?>
           </div>
-          <div class="space-y-4">
-            <h2 class="text-lg font-semibold text-gray-900">Approved memorials</h2>
-            <?php if ($approvedMemorials): ?>
-              <ul class="divide-y space-y-4">
-                <?php foreach ($approvedMemorials as $entry): ?>
-                  <?php if ($editFallenId === (int) $entry['id']): ?>
-                    <li class="pt-4 border-t border-gray-100 first:border-0 first:pt-0">
-                      <form method="post" enctype="multipart/form-data"
-                        class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
-                        <div class="flex items-center justify-between mb-2">
-                          <h3 class="text-sm font-semibold text-gray-900">Edit Memorial</h3>
-                          <a href="?page=fallen-wings" class="text-xs text-gray-500 hover:text-gray-900">Cancel</a>
-                        </div>
-                        <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                        <input type="hidden" name="action" value="edit_fallen_wings">
-                        <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
-                            <input type="text" name="full_name" value="<?= e($entry['full_name']) ?>"
-                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                          </div>
-                          <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Year of Passing</label>
-                            <input type="number" name="year_of_passing" value="<?= e((string) $entry['year_of_passing']) ?>"
-                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900"
-                              max="<?= date('Y') ?>" required>
-                          </div>
-                        </div>
+          <div class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 pb-5 border-b border-gray-200">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Registry Archive</p>
+                <h1 class="font-display text-3xl font-bold text-gray-900 mt-1">Memorial Roll</h1>
+              </div>
+              <span class="inline-flex items-center self-start px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+                Total Honored: <?= e((string) $totalHonored) ?>
+              </span>
+            </div>
 
-                        <div>
-                          <label class="block text-xs font-semibold text-gray-700 mb-1">Member Number</label>
-                          <input type="text" name="member_number" value="<?= e($entry['member_number'] ?? '') ?>"
-                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                            pattern="[A-Za-z0-9.\-]+">
-                        </div>
-
-                        <div>
-                          <label class="block text-xs font-semibold text-gray-700 mb-1">Tribute Text</label>
-                          <textarea name="tribute" rows="4"
-                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e($entry['tribute'] ?? '') ?></textarea>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Replace Image</label>
-                            <?php if (!empty($entry['image_url'])): ?>
-                              <div class="mb-2">
-                                <img src="<?= e($entry['image_url']) ?>" class="h-12 w-auto object-contain rounded"
-                                  alt="Current Image">
-                              </div>
-                            <?php endif; ?>
-                            <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
-                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                          </div>
-                          <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Replace PDF</label>
-                            <?php if (!empty($entry['pdf_url'])): ?>
-                              <div class="mb-2 text-xs">
-                                <a href="<?= e($entry['pdf_url']) ?>" target="_blank" class="text-primary hover:underline">View
-                                  Current PDF</a>
-                              </div>
-                            <?php endif; ?>
-                            <input type="file" name="tribute_pdf" accept=".pdf"
-                              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                          </div>
-                        </div>
-
-                        <div class="flex justify-end pt-2">
-                          <button type="submit"
-                            class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">Save
-                            Changes</button>
-                        </div>
-                      </form>
-                    </li>
-                  <?php else: ?>
-                    <?php
-                    $parts = explode(' ', trim($entry['full_name'] ?? ''));
-                    if (count($parts) > 1) {
-                        $last = array_pop($parts);
-                        $formattedName = $last . ', ' . implode(' ', $parts);
-                    } else {
-                        $formattedName = $entry['full_name'] ?? '';
-                    }
-                    ?>
-                    <li
-                      class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100 first:border-0 first:pt-0">
-                      <div class="flex items-start gap-3 min-w-0">
-                        <?php if (!empty($entry['image_url'])): ?>
-                          <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank"
-                            class="flex-shrink-0">
-                            <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($formattedName) ?>"
-                              class="h-12 w-12 object-cover rounded bg-gray-100">
-                          </a>
-                        <?php endif; ?>
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2 flex-wrap">
-                            <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank"
-                              class="text-sm text-gray-800 font-medium hover:text-primary hover:underline"><?= e($formattedName) ?></a>
-                            <?php if (!empty($entry['pdf_url'])): ?>
-                              <span
-                                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
-                            <?php endif; ?>
-                          </div>
-                          <?php if (!empty($entry['member_number'])): ?>
-                            <p class="text-xs text-gray-500 mt-0.5">Member #: <?= e($entry['member_number']) ?></p>
-                          <?php endif; ?>
-                          <?php if (!empty($entry['tribute'])): ?>
-                            <p class="text-xs text-gray-600 mt-1 line-clamp-1"><?= e($entry['tribute']) ?></p>
-                          <?php endif; ?>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-2 whitespace-nowrap">
-                        <span class="text-sm font-semibold text-gray-600"><?= e((string) $entry['year_of_passing']) ?></span>
-                        <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
-                          class="text-xs font-semibold text-gray-500 hover:text-gray-900 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200">Edit</a>
-                        <form method="post" onsubmit="return confirm('Delete this memorial entry? This cannot be undone.');">
-                          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                          <input type="hidden" name="action" value="delete_fallen_wings">
-                          <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
-                          <button type="submit"
-                            class="text-xs font-semibold text-rose-700 hover:bg-rose-50 bg-white px-3 py-1.5 rounded-md border border-rose-200">Delete</button>
-                        </form>
-                      </div>
-                    </li>
-                  <?php endif; ?>
+            <div class="mt-6 rounded-xl bg-slate-50 border border-slate-100 p-3 flex flex-col md:flex-row gap-3">
+              <div class="relative flex-1">
+                <span class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                <input id="admin-fallen-search"
+                  class="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                  placeholder="Search by name..." type="search">
+              </div>
+              <select id="admin-fallen-year" class="py-2.5 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white md:w-56">
+                <option value="all">Filter by year</option>
+                <?php foreach ($approvedYears as $yr): ?>
+                  <option value="<?= e((string) $yr) ?>"><?= e((string) $yr) ?></option>
                 <?php endforeach; ?>
-              </ul>
+              </select>
+              <button type="button" data-fallen-open="add"
+                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">
+                <span class="material-icons-outlined text-base">add</span>
+                Add Memorial
+              </button>
+            </div>
+
+            <?php if ($approvedByYear): ?>
+              <div class="mt-6 space-y-8" id="admin-fallen-year-groups">
+                <?php foreach ($approvedByYear as $yearGroup => $entries): ?>
+                  <div class="admin-fallen-year-block" data-year-group="<?= e((string) $yearGroup) ?>">
+                    <div class="flex items-center gap-3 mb-2">
+                      <span class="inline-block w-1 h-5 bg-amber-400 rounded-sm"></span>
+                      <h3 class="font-display text-lg font-bold text-gray-900">Final Rides in <?= e((string) $yearGroup) ?></h3>
+                    </div>
+                    <ul class="divide-y divide-gray-100">
+                      <?php foreach ($entries as $entry): ?>
+                        <?php $displayName = $entry['full_name'] ?? ''; ?>
+                        <li class="py-4 admin-fallen-card"
+                            data-name="<?= e(strtolower($displayName)) ?>"
+                            data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
+                          <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-4 min-w-0">
+                              <?php if (!empty($entry['image_url'])): ?>
+                                <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank" class="flex-shrink-0">
+                                  <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($displayName) ?>"
+                                    class="w-11 h-11 object-cover rounded-full bg-slate-100">
+                                </a>
+                              <?php else: ?>
+                                <div class="w-11 h-11 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
+                                  <span class="material-icons-outlined text-lg">person</span>
+                                </div>
+                              <?php endif; ?>
+                              <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                  <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" target="_blank"
+                                    class="text-base font-semibold text-gray-900 hover:text-primary hover:underline"><?= e($displayName) ?></a>
+                                  <?php if (!empty($entry['pdf_url'])): ?>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 uppercase tracking-wide">PDF</span>
+                                  <?php endif; ?>
+                                </div>
+                                <?php if (!empty($entry['member_number'])): ?>
+                                  <p class="text-xs text-gray-500">Member ID: <?= e($entry['member_number']) ?></p>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                              <span class="text-sm text-gray-500 whitespace-nowrap mr-2"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
+                              <a href="?page=fallen-wings&edit_fallen=<?= e((string) $entry['id']) ?>"
+                                class="inline-flex items-center px-3 py-1.5 rounded-md border border-gray-200 text-[11px] font-semibold uppercase tracking-wide text-gray-700 hover:bg-gray-50">Edit</a>
+                              <form method="post" onsubmit="return confirm('Delete this memorial entry? This cannot be undone.');">
+                                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                                <input type="hidden" name="action" value="delete_fallen_wings">
+                                <input type="hidden" name="fallen_id" value="<?= e((string) $entry['id']) ?>">
+                                <button type="submit"
+                                  class="inline-flex items-center px-3 py-1.5 rounded-md border border-rose-200 text-[11px] font-semibold uppercase tracking-wide text-rose-700 hover:bg-rose-50">Delete</button>
+                              </form>
+                            </div>
+                          </div>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <p id="admin-fallen-empty" class="hidden text-sm text-gray-500 mt-6">No memorial entries match those filters.</p>
+              <script>
+                (() => {
+                  const searchInput = document.getElementById('admin-fallen-search');
+                  const yearSelect = document.getElementById('admin-fallen-year');
+                  const cards = document.querySelectorAll('.admin-fallen-card');
+                  const yearBlocks = document.querySelectorAll('.admin-fallen-year-block');
+                  const emptyState = document.getElementById('admin-fallen-empty');
+                  if (!searchInput || !yearSelect || !cards.length) return;
+                  const applyFilters = () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    const yearValue = yearSelect.value;
+                    let visibleCount = 0;
+                    cards.forEach((card) => {
+                      const name = card.dataset.name || '';
+                      const cardYear = card.dataset.year || '';
+                      const matchesTerm = term === '' || name.includes(term);
+                      const matchesYear = yearValue === 'all' || cardYear === yearValue;
+                      const isVisible = matchesTerm && matchesYear;
+                      card.classList.toggle('hidden', !isVisible);
+                      if (isVisible) visibleCount += 1;
+                    });
+                    yearBlocks.forEach((block) => {
+                      const anyVisible = block.querySelectorAll('.admin-fallen-card:not(.hidden)').length > 0;
+                      block.classList.toggle('hidden', !anyVisible);
+                    });
+                    if (emptyState) emptyState.classList.toggle('hidden', visibleCount !== 0);
+                  };
+                  searchInput.addEventListener('input', applyFilters);
+                  yearSelect.addEventListener('change', applyFilters);
+                })();
+              </script>
             <?php else: ?>
-              <p class="text-sm text-gray-500">No approved memorials yet.</p>
+              <p class="text-sm text-gray-500 mt-6">No approved memorials yet.</p>
             <?php endif; ?>
           </div>
         </section>
+
+        <?php
+        $modalOpen = $addFallen || $editEntry !== null;
+        $isEdit = $editEntry !== null;
+        ?>
+        <div id="fallen-admin-modal"
+          class="fixed inset-0 z-50 <?= $modalOpen ? 'flex' : 'hidden' ?> items-center justify-center bg-black/50 p-4"
+          data-fallen-admin-modal>
+          <div class="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  <?= $isEdit ? 'Edit Memorial' : 'Add Memorial' ?>
+                </p>
+                <h3 class="font-display text-2xl font-bold text-gray-900 mt-1">
+                  <?= $isEdit ? e($editEntry['full_name'] ?? 'Edit Memorial') : 'New Memorial Entry' ?>
+                </h3>
+                <p class="text-sm text-gray-500 mt-1">
+                  <?= $isEdit ? 'Update the details below and save changes.' : 'Add a new memorial entry to the registry.' ?>
+                </p>
+              </div>
+              <a href="?page=fallen-wings" class="text-gray-400 hover:text-gray-600 -mt-1" data-fallen-admin-close>
+                <span class="material-icons-outlined">close</span>
+              </a>
+            </div>
+            <form method="post" enctype="multipart/form-data" class="px-6 py-5 space-y-4">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="<?= $isEdit ? 'edit_fallen_wings' : 'add_fallen_wings' ?>">
+              <?php if ($isEdit): ?>
+                <input type="hidden" name="fallen_id" value="<?= e((string) $editEntry['id']) ?>">
+              <?php endif; ?>
+
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Full Name</label>
+                <input type="text" name="full_name"
+                  value="<?= e($editEntry['full_name'] ?? '') ?>"
+                  class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm" required>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Year of Passing</label>
+                  <input type="number" name="year_of_passing"
+                    value="<?= e((string) ($editEntry['year_of_passing'] ?? '')) ?>"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm"
+                    min="1900" max="<?= date('Y') ?>" required>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">
+                    Member Number <span class="text-gray-400 italic normal-case font-normal lowercase">(optional)</span>
+                  </label>
+                  <input type="text" name="member_number"
+                    value="<?= e($editEntry['member_number'] ?? '') ?>"
+                    placeholder="e.g. GW-000000"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm"
+                    pattern="[A-Za-z0-9.\-]+">
+                </div>
+              </div>
+
+              <?php if (!$isEdit): ?>
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Status</label>
+                  <select name="status"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm">
+                    <option value="APPROVED" selected>Approved (publish immediately)</option>
+                    <option value="PENDING">Pending (queue for review)</option>
+                  </select>
+                </div>
+              <?php endif; ?>
+
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Tribute Text</label>
+                <textarea name="tribute" rows="4"
+                  placeholder="Share a brief memory or tribute..."
+                  class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm"><?= e($editEntry['tribute'] ?? '') ?></textarea>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">
+                    <?= $isEdit ? 'Replace Image' : 'Memorial Photo' ?>
+                  </label>
+                  <?php if ($isEdit && !empty($editEntry['image_url'])): ?>
+                    <div class="mb-2">
+                      <img src="<?= e($editEntry['image_url']) ?>" class="h-14 w-14 rounded-lg object-cover bg-slate-100" alt="Current Image">
+                    </div>
+                  <?php endif; ?>
+                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">
+                    <?= $isEdit ? 'Replace PDF' : 'Tribute PDF' ?> <span class="text-gray-400 italic normal-case font-normal lowercase">(optional)</span>
+                  </label>
+                  <?php if ($isEdit && !empty($editEntry['pdf_url'])): ?>
+                    <div class="mb-2 text-xs">
+                      <a href="<?= e($editEntry['pdf_url']) ?>" target="_blank" class="text-primary hover:underline">View current PDF</a>
+                    </div>
+                  <?php endif; ?>
+                  <input type="file" name="tribute_pdf" accept=".pdf"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm">
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2">
+                <a href="?page=fallen-wings"
+                  class="inline-flex items-center px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</a>
+                <button type="submit"
+                  class="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">
+                  <?= $isEdit ? 'Save Changes' : 'Save Memorial' ?>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <script>
+          (() => {
+            const modal = document.getElementById('fallen-admin-modal');
+            if (!modal) return;
+            const closeFn = (e) => {
+              if (e) e.preventDefault();
+              const url = new URL(window.location.href);
+              url.searchParams.delete('add_fallen');
+              url.searchParams.delete('edit_fallen');
+              window.location.href = url.toString();
+            };
+            document.querySelectorAll('[data-fallen-open="add"]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('add_fallen', '1');
+                url.searchParams.delete('edit_fallen');
+                window.location.href = url.toString();
+              });
+            });
+            modal.querySelectorAll('[data-fallen-admin-close]').forEach((btn) => btn.addEventListener('click', closeFn));
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeFn(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeFn(); });
+          })();
+        </script>
       <?php elseif ($page === 'media'): ?>
         <?php
         $search = trim($_GET['search'] ?? '');
@@ -4417,44 +4496,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <p class="text-sm text-gray-500 mb-4">Open the interactive page builder to edit front-facing pages.</p>
           <a class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
             href="/admin/page-builder">Open AI Page Builder</a>
-        </section>
-      <?php elseif ($page === 'audit'): ?>
-        <?php $audit = $pdo->query('SELECT a.*, u.name FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 50')->fetchAll(); ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Audit Log</h1>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th class="py-2 pr-3">User</th>
-                  <th class="py-2 pr-3">Action</th>
-                  <th class="py-2 pr-3">Details</th>
-                  <th class="py-2">Date</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <?php foreach ($audit as $row): ?>
-                  <tr>
-                    <td class="py-2 pr-3 text-gray-900"><?= e($row['name'] ?? 'System') ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($row['action']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($row['details']) ?></td>
-                    <td class="py-2 text-gray-600"><?= e($row['created_at']) ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      <?php elseif ($page === 'reports'): ?>
-        <?php $counts = $pdo->query("SELECT status, COUNT(*) as c FROM members GROUP BY status")->fetchAll(); ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h1 class="font-display text-2xl font-bold text-gray-900 mb-4">Reports & Exports</h1>
-          <p class="text-sm text-gray-500">Export tools can be added here. Current member status counts:</p>
-          <ul class="mt-3 space-y-2 text-sm text-gray-700">
-            <?php foreach ($counts as $row): ?>
-              <li><?= e($row['status']) ?>: <?= e((string) $row['c']) ?></li>
-            <?php endforeach; ?>
-          </ul>
         </section>
       <?php else: ?>
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">

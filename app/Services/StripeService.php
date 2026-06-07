@@ -307,6 +307,65 @@ class StripeService
         return $data[0]->toArray();
     }
 
+    public static function retrieveCustomer(string $secretKey, string $customerId): ?array
+    {
+        try {
+            $customer = self::client($secretKey)->customers->retrieve($customerId);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'customer.retrieve', $e, [
+                'customer' => $customerId,
+            ]);
+            return null;
+        }
+        return $customer->toArray();
+    }
+
+    public static function createSetupIntent(string $secretKey, array $payload): ?array
+    {
+        try {
+            $intent = self::client($secretKey)->setupIntents->create($payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'setup_intent.create', $e, [
+                'customer' => $payload['customer'] ?? null,
+            ]);
+            return null;
+        }
+        return $intent->toArray();
+    }
+
+    public static function listPaymentMethods(string $secretKey, string $customerId, string $type = 'card'): array
+    {
+        try {
+            $methods = self::client($secretKey)->customers->allPaymentMethods($customerId, [
+                'type' => $type,
+                'limit' => 20,
+            ]);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'payment_method.list', $e, [
+                'customer' => $customerId,
+            ]);
+            return [];
+        }
+        $out = [];
+        foreach (($methods->data ?? []) as $pm) {
+            $out[] = $pm->toArray();
+        }
+        return $out;
+    }
+
+    public static function detachPaymentMethod(string $secretKey, string $paymentMethodId): bool
+    {
+        try {
+            self::client($secretKey)->paymentMethods->detach($paymentMethodId);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'payment_method.detach', $e, [
+                'payment_method' => $paymentMethodId,
+            ]);
+            return false;
+        }
+        return true;
+    }
+
     public static function constructEvent(string $payload, string $signature, string $secret): ?array
     {
         if ($secret === '') {

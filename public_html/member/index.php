@@ -3272,28 +3272,17 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
       <?php elseif ($page === 'fallen-wings'): ?>
+        <?php
+        $fallenByYear = [];
+        foreach (($fallenWings ?? []) as $entry) {
+            $yr = (int) ($entry['year_of_passing'] ?? 0);
+            $fallenByYear[$yr][] = $entry;
+        }
+        krsort($fallenByYear);
+        $totalHonored = is_array($fallenWings ?? null) ? count($fallenWings) : 0;
+        $hasOpenError = !empty($fallenError);
+        ?>
         <section class="space-y-6">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 class="font-display text-2xl font-bold text-gray-900">Fallen Wings</h2>
-              <p class="text-sm text-gray-500">Remembering members who have taken their final ride.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-              <div class="relative">
-                <span
-                  class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
-                <input id="fallen-search"
-                  class="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white w-full md:w-auto"
-                  placeholder="Search members..." type="search">
-              </div>
-              <select id="fallen-year" class="py-2 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white">
-                <option value="all">All years</option>
-                <?php foreach ($fallenYears as $yearOption): ?>
-                  <option value="<?= e((string) $yearOption) ?>"><?= e((string) $yearOption) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-          </div>
           <?php if ($fallenMessage): ?>
             <div class="rounded-lg bg-green-50 text-green-700 px-4 py-2 text-sm"><?= e($fallenMessage) ?></div>
           <?php endif; ?>
@@ -3305,152 +3294,227 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               Fallen Wings table not found. Run the migration to enable memorial submissions.
             </div>
           <?php endif; ?>
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div class="flex items-center gap-3 mb-6">
-                <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                  <span class="material-icons-outlined">military_tech</span>
-                </div>
-                <div>
-                  <h3 class="font-display text-xl font-bold text-gray-900">Memorial Roll</h3>
-                  <p class="text-sm text-gray-500">Alphabetical by default, filter by year to narrow the list.</p>
-                </div>
+
+          <div class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 pb-5 border-b border-gray-200">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Registry Archive</p>
+                <h2 class="font-display text-3xl font-bold text-gray-900 mt-1">Memorial Roll</h2>
               </div>
-              <?php if ($fallenWings): ?>
-                <ul class="divide-y">
-                  <?php foreach ($fallenWings as $entry): ?>
-                    <?php
-                    $parts = explode(' ', trim($entry['full_name'] ?? ''));
-                    if (count($parts) > 1) {
-                        $last = array_pop($parts);
-                        $formattedName = $last . ', ' . implode(' ', $parts);
-                    } else {
-                        $formattedName = $entry['full_name'] ?? '';
-                    }
-                    ?>
-                    <li class="py-4 fallen-wing-card" data-name="<?= e(strtolower($formattedName)) ?>"
-                      data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
-                      <div class="flex items-center justify-between gap-4">
-                        <div>
-                          <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>"
-                            class="text-base font-semibold text-gray-900 hover:text-primary hover:underline"><?= e($formattedName) ?></a>
-                          <?php if (!empty($entry['member_number'])): ?>
-                            <p class="text-xs text-gray-500">Member #: <?= e($entry['member_number']) ?></p>
-                          <?php endif; ?>
-                          <?php if (!empty($entry['tribute'])): ?>
-                            <p class="text-sm text-gray-600 mt-1"><?= e($entry['tribute']) ?></p>
-                          <?php endif; ?>
-                          <?php if (!empty($entry['pdf_url'])): ?>
-                            <a href="<?= e($entry['pdf_url']) ?>" target="_blank"
-                              class="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:text-primary-dark">
-                              <span class="material-icons-outlined text-sm">picture_as_pdf</span>
-                              View Document
-                            </a>
-                          <?php endif; ?>
-                        </div>
-                        <div class="flex items-center gap-4 text-right">
-                          <span
-                            class="text-sm font-semibold text-gray-500"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
-                          <?php if (!empty($entry['image_url'])): ?>
-                            <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" class="flex-shrink-0">
-                              <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($formattedName) ?>"
-                                class="w-16 h-16 object-cover rounded-lg bg-gray-100">
-                            </a>
-                          <?php endif; ?>
-                        </div>
-                      </div>
-                    </li>
-                  <?php endforeach; ?>
-                </ul>
-                <p id="fallen-empty" class="hidden text-sm text-gray-500 mt-4">No memorial entries match those filters.</p>
-                <script>
-                  (() => {
-                    const searchInput = document.getElementById('fallen-search');
-                    const yearSelect = document.getElementById('fallen-year');
-                    const cards = document.querySelectorAll('.fallen-wing-card');
-                    const emptyState = document.getElementById('fallen-empty');
-
-                    if (!searchInput || !yearSelect || !cards.length) {
-                      return;
-                    }
-
-                    const applyFilters = () => {
-                      const term = searchInput.value.trim().toLowerCase();
-                      const yearValue = yearSelect.value;
-                      let visibleCount = 0;
-
-                      cards.forEach((card) => {
-                        const name = card.dataset.name || '';
-                        const cardYear = card.dataset.year || '';
-                        const matchesTerm = term === '' || name.includes(term);
-                        const matchesYear = yearValue === 'all' || cardYear === yearValue;
-                        const isVisible = matchesTerm && matchesYear;
-
-                        card.classList.toggle('hidden', !isVisible);
-                        if (isVisible) {
-                          visibleCount += 1;
-                        }
-                      });
-
-                      if (emptyState) {
-                        emptyState.classList.toggle('hidden', visibleCount !== 0);
-                      }
-                    };
-
-                    searchInput.addEventListener('input', applyFilters);
-                    yearSelect.addEventListener('change', applyFilters);
-                  })();
-                </script>
-              <?php else: ?>
-                <p class="text-sm text-gray-500">No memorial entries found.</p>
-              <?php endif; ?>
+              <span class="inline-flex items-center self-start px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+                Total Honored: <?= e((string) $totalHonored) ?>
+              </span>
             </div>
-            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div class="flex items-center gap-3 mb-4">
-                <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                  <span class="material-icons-outlined">add_circle</span>
-                </div>
-                <div>
-                  <h3 class="font-display text-lg font-bold text-gray-900">Submit a Memorial</h3>
-                  <p class="text-sm text-gray-500">Requests are reviewed by committee.</p>
-                </div>
+
+            <div class="mt-6 rounded-xl bg-slate-50 border border-slate-100 p-3 flex flex-col md:flex-row gap-3">
+              <div class="relative flex-1">
+                <span class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                <input id="fallen-search"
+                  class="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                  placeholder="Search by name..." type="search">
               </div>
-              <form method="post" enctype="multipart/form-data" class="space-y-3" autocomplete="off">
-                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                <input type="hidden" name="action" value="submit_fallen_wings">
-                <input type="text" name="fallen_name" placeholder="Member full name"
-                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_name'] ?? '') : '') ?>"
-                  autocomplete="off"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
-                <input type="date" name="fallen_date"
-                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_date'] ?? '') : '') ?>"
-                  autocomplete="off"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" min="1900-01-01"
-                  max="<?= e(date('Y-m-d')) ?>" required>
-                <input type="text" name="fallen_member_number" maxlength="120" placeholder="Member number (optional)"
-                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_member_number'] ?? '') : '') ?>"
-                  autocomplete="off" data-1p-ignore data-lpignore="true"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" pattern="[A-Za-z0-9.\\-]+">
-                <textarea name="fallen_tribute" rows="4" placeholder="Optional tribute or note"
-                  autocomplete="off"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(empty($fallenMessage) ? ($_POST['fallen_tribute'] ?? '') : '') ?></textarea>
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Photograph</label>
-                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-gray-700 mb-1">Optional Document (PDF)</label>
-                  <input type="file" name="tribute_pdf" accept=".pdf"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                </div>
-                <button
-                  class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                  type="submit">Submit request</button>
-              </form>
+              <select id="fallen-year" class="py-2.5 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white md:w-56">
+                <option value="all">Filter by year</option>
+                <?php foreach ($fallenYears as $yearOption): ?>
+                  <option value="<?= e((string) $yearOption) ?>"><?= e((string) $yearOption) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button type="button" data-fallen-open="member"
+                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">
+                <span class="material-icons-outlined text-base">add</span>
+                Submit a Memorial
+              </button>
             </div>
+
+            <?php if ($fallenByYear): ?>
+              <div class="mt-6 space-y-8" id="fallen-year-groups">
+                <?php foreach ($fallenByYear as $yearGroup => $entries): ?>
+                  <div class="fallen-year-block" data-year-group="<?= e((string) $yearGroup) ?>">
+                    <div class="flex items-center gap-3 mb-2">
+                      <span class="inline-block w-1 h-5 bg-amber-400 rounded-sm"></span>
+                      <h3 class="font-display text-lg font-bold text-gray-900">Final Rides in <?= e((string) $yearGroup) ?></h3>
+                    </div>
+                    <ul class="divide-y divide-gray-100">
+                      <?php foreach ($entries as $entry): ?>
+                        <?php
+                        $parts = explode(' ', trim($entry['full_name'] ?? ''));
+                        $displayName = $entry['full_name'] ?? '';
+                        ?>
+                        <li class="py-4 fallen-wing-card"
+                            data-name="<?= e(strtolower($displayName)) ?>"
+                            data-year="<?= e((string) ($entry['year_of_passing'] ?? '')) ?>">
+                          <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-4 min-w-0">
+                              <?php if (!empty($entry['image_url'])): ?>
+                                <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>" class="flex-shrink-0">
+                                  <img src="<?= e($entry['image_url']) ?>" alt="Tribute image for <?= e($displayName) ?>"
+                                    class="w-11 h-11 object-cover rounded-full bg-slate-100">
+                                </a>
+                              <?php else: ?>
+                                <div class="w-11 h-11 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
+                                  <span class="material-icons-outlined text-lg">person</span>
+                                </div>
+                              <?php endif; ?>
+                              <div class="min-w-0">
+                                <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>"
+                                  class="text-base font-semibold text-gray-900 hover:text-primary hover:underline block truncate"><?= e($displayName) ?></a>
+                                <?php if (!empty($entry['member_number'])): ?>
+                                  <p class="text-xs text-gray-500">Member ID: <?= e($entry['member_number']) ?></p>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                            <div class="flex items-center gap-4 text-right flex-shrink-0">
+                              <span class="text-sm text-gray-500 whitespace-nowrap"><?= e((string) ($entry['year_of_passing'] ?? '')) ?></span>
+                              <?php if (!empty($entry['tribute']) || !empty($entry['pdf_url']) || !empty($entry['image_url'])): ?>
+                                <a href="/fallen-wings.php?id=<?= e((string) $entry['id']) ?>"
+                                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-200 text-[11px] font-semibold uppercase tracking-wide text-gray-700 hover:bg-gray-50">
+                                  Read Tribute
+                                  <span class="material-icons-outlined text-[14px]">north_east</span>
+                                </a>
+                              <?php else: ?>
+                                <span class="text-xs italic text-gray-400">No Tribute Provided</span>
+                              <?php endif; ?>
+                            </div>
+                          </div>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <p id="fallen-empty" class="hidden text-sm text-gray-500 mt-6">No memorial entries match those filters.</p>
+              <script>
+                (() => {
+                  const searchInput = document.getElementById('fallen-search');
+                  const yearSelect = document.getElementById('fallen-year');
+                  const cards = document.querySelectorAll('.fallen-wing-card');
+                  const yearBlocks = document.querySelectorAll('.fallen-year-block');
+                  const emptyState = document.getElementById('fallen-empty');
+                  if (!searchInput || !yearSelect || !cards.length) return;
+
+                  const applyFilters = () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    const yearValue = yearSelect.value;
+                    let visibleCount = 0;
+                    cards.forEach((card) => {
+                      const name = card.dataset.name || '';
+                      const cardYear = card.dataset.year || '';
+                      const matchesTerm = term === '' || name.includes(term);
+                      const matchesYear = yearValue === 'all' || cardYear === yearValue;
+                      const isVisible = matchesTerm && matchesYear;
+                      card.classList.toggle('hidden', !isVisible);
+                      if (isVisible) visibleCount += 1;
+                    });
+                    yearBlocks.forEach((block) => {
+                      const anyVisible = block.querySelectorAll('.fallen-wing-card:not(.hidden)').length > 0;
+                      block.classList.toggle('hidden', !anyVisible);
+                    });
+                    if (emptyState) emptyState.classList.toggle('hidden', visibleCount !== 0);
+                  };
+                  searchInput.addEventListener('input', applyFilters);
+                  yearSelect.addEventListener('change', applyFilters);
+                })();
+              </script>
+            <?php else: ?>
+              <p class="text-sm text-gray-500 mt-6">No memorial entries found.</p>
+            <?php endif; ?>
           </div>
         </section>
+
+        <div id="fallen-submit-modal"
+          class="fixed inset-0 z-50 <?= $hasOpenError ? 'flex' : 'hidden' ?> items-center justify-center bg-black/50 p-4"
+          data-fallen-modal>
+          <div class="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Contribution Portal</p>
+                <h3 class="font-display text-2xl font-bold text-gray-900 mt-1">Submit a Memorial</h3>
+                <p class="text-sm text-gray-500 mt-1">Honoring our fallen wings with dignity. Please provide accurate details for the registry.</p>
+              </div>
+              <button type="button" class="text-gray-400 hover:text-gray-600 -mt-1" data-fallen-close>
+                <span class="material-icons-outlined">close</span>
+              </button>
+            </div>
+            <form method="post" enctype="multipart/form-data" class="px-6 py-5 space-y-4" autocomplete="off">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="submit_fallen_wings">
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Member Full Name</label>
+                <input type="text" name="fallen_name" placeholder="First and Last Name"
+                  value="<?= e(empty($fallenMessage) ? ($_POST['fallen_name'] ?? '') : '') ?>"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm" required>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Date of Passing</label>
+                  <input type="date" name="fallen_date"
+                    value="<?= e(empty($fallenMessage) ? ($_POST['fallen_date'] ?? '') : '') ?>"
+                    autocomplete="off"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm"
+                    min="1900-01-01" max="<?= e(date('Y-m-d')) ?>" required>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">
+                    Member Number <span class="text-gray-400 italic normal-case font-normal lowercase">(optional)</span>
+                  </label>
+                  <input type="text" name="fallen_member_number" maxlength="120" placeholder="e.g. GW-000000"
+                    value="<?= e(empty($fallenMessage) ? ($_POST['fallen_member_number'] ?? '') : '') ?>"
+                    autocomplete="off" data-1p-ignore data-lpignore="true"
+                    class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm" pattern="[A-Za-z0-9.\\-]+">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Tribute or Note</label>
+                <textarea name="fallen_tribute" rows="4" placeholder="Share a brief memory or tribute..."
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm"><?= e(empty($fallenMessage) ? ($_POST['fallen_tribute'] ?? '') : '') ?></textarea>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Memorial Photo</label>
+                <label class="block rounded-xl border-2 border-dashed border-gray-200 bg-slate-50/50 px-4 py-8 text-center cursor-pointer hover:border-gray-300">
+                  <span class="material-icons-outlined text-3xl text-gray-400">cloud_upload</span>
+                  <p class="text-sm font-semibold text-gray-700 mt-1" data-fallen-file-label>Click to upload or drag and drop</p>
+                  <p class="text-xs text-gray-400 mt-1">Maximum file size 5MB (JPG, PNG)</p>
+                  <input type="file" name="tribute_image" accept=".jpg,.jpeg,.png,.webp" class="hidden" data-fallen-file-input>
+                </label>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-700 mb-1.5">Tribute Document <span class="text-gray-400 italic normal-case font-normal lowercase">(optional PDF)</span></label>
+                <input type="file" name="tribute_pdf" accept=".pdf"
+                  class="w-full rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm">
+              </div>
+              <div class="pt-2">
+                <button type="submit"
+                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800">
+                  <span class="material-icons-outlined text-base">file_upload</span>
+                  Submit to Registry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <script>
+          (() => {
+            const modal = document.getElementById('fallen-submit-modal');
+            if (!modal) return;
+            const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+            const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+            document.querySelectorAll('[data-fallen-open="member"]').forEach((btn) => btn.addEventListener('click', open));
+            modal.querySelectorAll('[data-fallen-close]').forEach((btn) => btn.addEventListener('click', close));
+            modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+            const fileInput = modal.querySelector('[data-fallen-file-input]');
+            const fileLabel = modal.querySelector('[data-fallen-file-label]');
+            if (fileInput && fileLabel) {
+              fileInput.addEventListener('change', () => {
+                fileLabel.textContent = fileInput.files && fileInput.files[0]
+                  ? fileInput.files[0].name
+                  : 'Click to upload or drag and drop';
+              });
+            }
+          })();
+        </script>
       <?php elseif ($page === 'dealers'): ?>
         <?php
         $stmt = $pdo->query("SELECT * FROM honda_dealers ORDER BY state ASC, name ASC");

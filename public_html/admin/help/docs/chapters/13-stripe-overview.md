@@ -11,6 +11,7 @@ There is **one Stripe account** behind everything — memberships, store, and ev
 ### What it lets you do
 
 - Take real card payments for memberships, store orders and event tickets
+- Let members save a **card on file** with Stripe for faster future checkout (Member portal → Billing & Payments → Saved cards)
 - Switch the whole site into **test mode** to try checkout without moving real money
 - Switch back to **live mode** when you're ready to take real payments
 - Rotate (replace) the connection keys if one is leaked or a staff member leaves
@@ -165,6 +166,19 @@ Stripe POSTs every payment event to `/api/stripe_webhook.php`, which:
 4. Dispatches `checkout.session.completed`, `payment_intent.*`, `charge.refunded`, `invoice.*`, and `customer.subscription.*` to handlers in `PaymentWebhookService`.
 
 Deep-dive: [Chapter 16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
+
+#### Saved cards (card-on-file)
+
+Members can save a card via Stripe Elements on `/member/index.php?page=billing`. Implementation:
+
+- Front-end: a "Saved cards" panel mounts Stripe Elements inline, asks `/api/billing/setup-intent` for a SetupIntent `client_secret`, then calls `stripe.confirmCardSetup()`. Card data goes Stripe → Stripe — never touches our server.
+- Back-end: four routes under `/api/billing/` in `public_html/api/index.php`:
+  - `POST /api/billing/setup-intent` — creates/links `members.stripe_customer_id` (same lazy-create as `/api/billing/portal`), then `StripeService::createSetupIntent` with `usage => off_session`.
+  - `GET /api/billing/payment-methods` — `StripeService::listPaymentMethods($customerId, 'card')` + `retrieveCustomer` to flag `invoice_settings.default_payment_method`.
+  - `POST /api/billing/payment-methods/{id}/default` — `updateCustomer` with `invoice_settings.default_payment_method`.
+  - `DELETE /api/billing/payment-methods/{id}` — `detachPaymentMethod`. If the deleted PM was the default, the handler promotes the next remaining card so we never leave a dangling default pointer.
+- First card added is auto-promoted to default client-side, so the customer always has a valid default once they save at least one.
+- Independent of `payments.stripe.customer_portal_enabled` — the portal toggle controls the Stripe-hosted portal button; saved cards are always available when Stripe is configured.
 
 #### What's NOT in Stripe: subscriptions
 

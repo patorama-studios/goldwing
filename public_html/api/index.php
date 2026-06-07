@@ -1664,6 +1664,143 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
     }
 }
 
+if ($resource === 'billing' && count($segments) >= 2 && in_array($segments[1], ['setup-intent', 'payment-methods'], true)) {
+    $user = require_user_json();
+    $pdo = db();
+    $memberId = $user['member_id'] ?? null;
+    if (!$memberId) {
+        json_response(['error' => 'Members only.'], 403);
+    }
+
+    $secretKey = StripeSettingsService::getActiveSecretKey(StripeSettingsService::ACCOUNT_PRIMARY);
+    if ($secretKey === '') {
+        json_response(['error' => 'Stripe is not configured.'], 422);
+    }
+
+    $resolveCustomerId = static function (\PDO $pdo, int $memberId, array $user, string $secretKey): ?string {
+        $stmt = $pdo->prepare('SELECT stripe_customer_id FROM members WHERE id = :id');
+        $stmt->execute(['id' => $memberId]);
+        $row = $stmt->fetch();
+        $customerId = $row['stripe_customer_id'] ?? null;
+        if ($customerId) {
+            return (string) $customerId;
+        }
+        $customer = StripeService::createCustomer($secretKey, [
+            'email' => $user['email'] ?? null,
+            'name' => $user['name'] ?? null,
+            'metadata' => ['user_id' => (string) ($user['id'] ?? '')],
+        ]);
+        $customerId = $customer['id'] ?? null;
+        if ($customerId) {
+            $stmt = $pdo->prepare('UPDATE members SET stripe_customer_id = :customer_id WHERE id = :id');
+            $stmt->execute(['customer_id' => $customerId, 'id' => $memberId]);
+        }
+        return $customerId ?: null;
+    };
+
+    if ($segments[1] === 'setup-intent') {
+        if ($method !== 'POST') {
+            json_response(['error' => 'Method not allowed.'], 405);
+        }
+        require_csrf_json($body);
+        $customerId = $resolveCustomerId($pdo, (int) $memberId, $user, $secretKey);
+        if (!$customerId) {
+            json_response(['error' => 'Unable to create Stripe customer.'], 500);
+        }
+        $intent = StripeService::createSetupIntent($secretKey, [
+            'customer' => $customerId,
+            'payment_method_types' => ['card'],
+            'usage' => 'off_session',
+            'metadata' => [
+                'member_id' => (string) $memberId,
+                'user_id' => (string) ($user['id'] ?? ''),
+            ],
+        ]);
+        if (!$intent || empty($intent['client_secret'])) {
+            json_response(['error' => 'Unable to start card setup.'], 500);
+        }
+        json_response(['client_secret' => $intent['client_secret']]);
+    }
+
+    // payment-methods collection / item routes
+    $stmt = $pdo->prepare('SELECT stripe_customer_id FROM members WHERE id = :id');
+    $stmt->execute(['id' => $memberId]);
+    $row = $stmt->fetch();
+    $customerId = $row['stripe_customer_id'] ?? null;
+
+    if ($method === 'GET' && count($segments) === 2) {
+        if (!$customerId) {
+            json_response(['payment_methods' => [], 'default_payment_method' => null]);
+        }
+        $customer = StripeService::retrieveCustomer($secretKey, (string) $customerId);
+        $defaultPm = $customer['invoice_settings']['default_payment_method'] ?? null;
+        $methods = StripeService::listPaymentMethods($secretKey, (string) $customerId, 'card');
+        $out = [];
+        foreach ($methods as $pm) {
+            $card = $pm['card'] ?? [];
+            $out[] = [
+                'id' => $pm['id'] ?? '',
+                'brand' => $card['brand'] ?? '',
+                'last4' => $card['last4'] ?? '',
+                'exp_month' => $card['exp_month'] ?? null,
+                'exp_year' => $card['exp_year'] ?? null,
+                'is_default' => $defaultPm && $defaultPm === ($pm['id'] ?? ''),
+            ];
+        }
+        json_response(['payment_methods' => $out, 'default_payment_method' => $defaultPm]);
+    }
+
+    if ($method === 'POST' && count($segments) === 4 && $segments[3] === 'default') {
+        require_csrf_json($body);
+        if (!$customerId) {
+            json_response(['error' => 'No saved cards.'], 404);
+        }
+        $pmId = trim((string) $segments[2]);
+        if ($pmId === '') {
+            json_response(['error' => 'Payment method required.'], 422);
+        }
+        StripeService::updateCustomer($secretKey, (string) $customerId, [
+            'invoice_settings' => ['default_payment_method' => $pmId],
+        ]);
+        json_response(['ok' => true]);
+    }
+
+    if ($method === 'DELETE' && count($segments) === 3) {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!Csrf::verify($token)) {
+            json_response(['error' => 'Invalid CSRF token.'], 403);
+        }
+        if (!$customerId) {
+            json_response(['error' => 'No saved cards.'], 404);
+        }
+        $pmId = trim((string) $segments[2]);
+        if ($pmId === '') {
+            json_response(['error' => 'Payment method required.'], 422);
+        }
+        // If the removed card was the customer's default, promote the next
+        // remaining card so they never end up with a dangling default pointer.
+        $wasDefault = false;
+        $customer = StripeService::retrieveCustomer($secretKey, (string) $customerId);
+        if ($customer) {
+            $wasDefault = (($customer['invoice_settings']['default_payment_method'] ?? null) === $pmId);
+        }
+        $ok = StripeService::detachPaymentMethod($secretKey, $pmId);
+        if (!$ok) {
+            json_response(['error' => 'Unable to remove card.'], 500);
+        }
+        if ($wasDefault) {
+            $remaining = StripeService::listPaymentMethods($secretKey, (string) $customerId, 'card');
+            $nextDefault = $remaining[0]['id'] ?? null;
+            StripeService::updateCustomer($secretKey, (string) $customerId, [
+                'invoice_settings' => ['default_payment_method' => $nextDefault],
+            ]);
+        }
+        json_response(['ok' => true]);
+    }
+
+    json_response(['error' => 'Method not allowed.'], 405);
+}
+
 if ($resource === 'billing' && count($segments) >= 2 && $segments[1] === 'portal') {
     if ($method !== 'GET') {
         json_response(['error' => 'Method not allowed.'], 405);
