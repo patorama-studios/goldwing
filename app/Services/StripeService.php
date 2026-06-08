@@ -93,50 +93,6 @@ class StripeService
         return $session->toArray();
     }
 
-    public static function createCheckoutSessionForPrices(array $priceIds, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata): ?array
-    {
-        $secret = self::activeSecretKey();
-        if ($secret === '') {
-            return null;
-        }
-
-        $lineItems = [];
-        foreach ($priceIds as $priceId) {
-            $priceId = (string) $priceId;
-            if ($priceId === '') {
-                continue;
-            }
-            $lineItems[] = [
-                'price' => $priceId,
-                'quantity' => 1,
-            ];
-        }
-        if (!$lineItems) {
-            return null;
-        }
-
-        try {
-            $session = self::client($secret)->checkout->sessions->create([
-                'mode' => 'payment',
-                'success_url' => $successUrl,
-                'cancel_url' => $cancelUrl,
-                'customer_email' => $customerEmail,
-                'line_items' => $lineItems,
-                'metadata' => $metadata,
-            ]);
-        } catch (ApiErrorException $e) {
-            StripeErrorLogger::log(__METHOD__, 'checkout_session.create', $e, [
-                'account_key' => null,
-                'price_ids' => $priceIds,
-                'customer_email' => $customerEmail,
-                'metadata' => $metadata,
-            ]);
-            return null;
-        }
-
-        return $session->toArray();
-    }
-
     public static function createCheckoutSessionWithLineItems(array $lineItems, string $customerEmail, string $successUrl, string $cancelUrl, array $metadata = [], ?string $accountKey = null): ?array
     {
         $secret = self::activeSecretKey($accountKey);

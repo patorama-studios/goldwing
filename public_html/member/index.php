@@ -119,24 +119,6 @@ function status_badge_classes(string $status): string
   };
 }
 
-function membership_stripe_price_id(array $prices, string $memberTypeKey, string $termMonths): string
-{
-  // Admin pricing UI saves keys as FULL_12 / FULL_24 / FULL_36 / ASSOCIATE_*.
-  $primary = $memberTypeKey . '_' . $termMonths;
-  if (!empty($prices[$primary])) {
-    return (string) $prices[$primary];
-  }
-  // Legacy format (FULL_1Y / FULL_3Y / ASSOCIATE_1Y / ASSOCIATE_3Y) — fallback only.
-  static $legacyMonthsToTerm = ['12' => '1Y', '36' => '3Y'];
-  if (isset($legacyMonthsToTerm[$termMonths])) {
-    $legacy = $memberTypeKey . '_' . $legacyMonthsToTerm[$termMonths];
-    if (!empty($prices[$legacy])) {
-      return (string) $prices[$legacy];
-    }
-  }
-  return '';
-}
-
 function membership_renewal_amount_cents(string $magazineType, string $memberTypeKey, string $termMonths): int
 {
   // 24-month renewal has no dedicated row in the pricing matrix, so derive
@@ -795,29 +777,24 @@ if ($user && $user['member_id']) {
               $renewers[] = ['member' => $partner, 'role' => 'partner'];
             }
 
-            $prices = SettingsService::getGlobal('payments.membership_prices', []);
-            if (!is_array($prices)) {
-              $prices = [];
-            }
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
             $startDate = date('Y-m-d');
-            $stripePriceIds = [];
+            $lineItems = [];
             $createdOrderIds = [];
             $createdPeriodIds = [];
             $renewError = null;
+            $termYearsLabel = $termMonths === '36' ? '3 years' : ($termMonths === '24' ? '2 years' : '1 year');
 
             foreach ($renewers as $r) {
               $rMember = $r['member'];
               $rTypeKey = strtoupper((string) ($rMember['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
               $rMagazine = strtolower((string) ($rMember['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
 
-              $priceId = membership_stripe_price_id($prices, $rTypeKey, $termMonths);
-              if ($priceId === '') {
-                $renewError = 'Membership pricing is not configured for ' . ucfirst(strtolower($rTypeKey)) . ' ' . $termMonths . '-month renewal. Please contact support.';
+              $amountCents = membership_renewal_amount_cents($rMagazine, $rTypeKey, $termMonths);
+              if ($amountCents <= 0) {
+                $renewError = 'Membership pricing is not configured for ' . ucfirst(strtolower($rTypeKey)) . ' ' . $termMonths . '-month renewal. Please set it in Admin → Settings → Membership pricing.';
                 break;
               }
-
-              $amountCents = membership_renewal_amount_cents($rMagazine, $rTypeKey, $termMonths);
               $amount = round($amountCents / 100, 2);
 
               $periodId = MembershipService::createMembershipPeriod((int) $rMember['id'], $termCode, $startDate);
@@ -827,12 +804,13 @@ if ($user && $user['member_id']) {
               }
               $createdPeriodIds[] = $periodId;
 
+              $itemLabel = ucfirst(strtolower($rTypeKey)) . ' membership renewal (' . $termYearsLabel . ')';
               $order = MembershipOrderService::createMembershipOrder((int) $rMember['id'], $periodId, $amount, [
                 'payment_method' => 'stripe',
                 'payment_status' => 'pending',
                 'fulfillment_status' => 'pending',
                 'currency' => $pricingCurrency,
-                'item_name' => 'Membership renewal ' . $termMonths . 'M (' . $rTypeKey . ')',
+                'item_name' => $itemLabel,
                 'term' => $termCode,
               ]);
               if (!$order) {
@@ -840,7 +818,12 @@ if ($user && $user['member_id']) {
                 break;
               }
               $createdOrderIds[] = (int) ($order['id'] ?? 0);
-              $stripePriceIds[] = $priceId;
+              $lineItems[] = [
+                'name' => $itemLabel,
+                'unit_amount' => $amountCents,
+                'quantity' => 1,
+                'currency' => strtolower($pricingCurrency),
+              ];
             }
 
             if ($renewError) {
@@ -856,11 +839,7 @@ if ($user && $user['member_id']) {
                 'term' => $termCode,
                 'includes_partner' => $partner ? '1' : '0',
               ];
-              if (count($stripePriceIds) === 1) {
-                $session = StripeService::createCheckoutSessionForPrice($stripePriceIds[0], $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
-              } else {
-                $session = StripeService::createCheckoutSessionForPrices($stripePriceIds, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
-              }
+              $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
               if (!$session || empty($session['id'])) {
                 $billingError = 'Unable to start renewal payment.';
               } else {
@@ -4809,22 +4788,19 @@ if ($renewModalEligible) {
   $renewTerms = ['12' => '1 year', '24' => '2 years', '36' => '3 years'];
   $renewOptions = [];
   foreach ($renewTerms as $months => $label) {
-    $selfPriceId = membership_stripe_price_id($renewPrices, $renewMemberType, $months);
     $selfCents = membership_renewal_amount_cents($renewMagazine, $renewMemberType, $months);
-    $partnerPriceId = '';
     $partnerCents = 0;
     if ($renewPartnerMember) {
       $partnerType = strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
       $partnerMagazine = strtolower((string) ($renewPartnerMember['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
-      $partnerPriceId = membership_stripe_price_id($renewPrices, $partnerType, $months);
       $partnerCents = membership_renewal_amount_cents($partnerMagazine, $partnerType, $months);
     }
     $renewOptions[$months] = [
       'months' => $months,
       'label' => $label,
-      'self_available' => $selfPriceId !== '',
+      'self_available' => $selfCents > 0,
       'self_amount' => $selfCents / 100,
-      'partner_available' => $renewPartnerMember ? ($partnerPriceId !== '') : false,
+      'partner_available' => $renewPartnerMember ? ($partnerCents > 0) : false,
       'partner_amount' => $partnerCents / 100,
     ];
   }
