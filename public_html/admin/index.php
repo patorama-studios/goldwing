@@ -1638,7 +1638,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <li class="text-sm text-gray-400">No recent logins.</li>
               <?php endif; ?>
             </ul>
-            <a href="/admin/security/activity_log.php" class="mt-5 text-xs text-center text-blue-600 hover:underline">View Login Audit Log</a>
+            <a href="/admin/audit/?source=activity" class="mt-5 text-xs text-center text-blue-600 hover:underline">View Login Audit Log</a>
           </div>
 
           <?php /* Recent Payments */ ?>

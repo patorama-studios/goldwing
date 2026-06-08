@@ -13,8 +13,7 @@
     <?php if (current_admin_can('admin.wings_magazine.manage', $user)): ?><a href="/admin/index.php?page=wings">Wings</a><?php endif; ?>
     <?php if (current_admin_can('admin.media_library.manage', $user)): ?><a href="/admin/index.php?page=media">Media</a><?php endif; ?>
     <?php if (current_admin_can('admin.ai_page_builder.access', $user)): ?><a href="/admin/page-builder">AI Page Builder</a><?php endif; ?>
-    <?php if (current_admin_can('admin.logs.view', $user)): ?><a href="/admin/index.php?page=audit">Audit</a><?php endif; ?>
-    <?php if (current_admin_can('admin.logs.view', $user)): ?><a href="/admin/index.php?page=reports">Reports</a><?php endif; ?>
+    <?php if (current_admin_can('admin.logs.view', $user)): ?><a href="/admin/audit/">Audit Hub</a><?php endif; ?>
     <a class="cta" href="/logout.php">Logout</a>
   </div>
 </nav>

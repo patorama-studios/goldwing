@@ -139,23 +139,39 @@ class AuditHubService
     // ---------------------------------------------------------------------
 
     /**
-     * Returns a list of "friendly" key/value pairs for the metadata column.
-     * Falls back to the raw payload (which the UI shows behind a "Show raw"
-     * toggle) when there is no payload to project.
+     * Returns a list of "friendly" key/value pairs for the metadata column
+     * of an Audit Hub row (where metadata is still JSON-encoded). Falls back
+     * to the raw payload (which the UI shows behind a "Show raw" toggle)
+     * when there is no payload to project.
      */
     public static function friendlyMetadata(array $row): array
     {
-        $raw = self::decodeRawPayload($row);
+        return self::formatPayload(
+            self::decodeRawPayload($row),
+            $row['details_text'] ?? null,
+            $row['ip_address'] ?? null
+        );
+    }
+
+    /**
+     * Returns the same key/value pairs from an already-decoded payload.
+     *
+     * Used by callers (e.g. the per-member activity tab) that hold the
+     * metadata as a PHP array instead of a JSON string. $details and $ip
+     * are optional — pass null if you don't have them.
+     */
+    public static function formatPayload($payload, ?string $details = null, ?string $ip = null): array
+    {
         $pairs = [];
 
-        if (!empty($row['details_text'])) {
-            $pairs[] = ['label' => 'Details', 'value' => (string) $row['details_text']];
+        if ($details !== null && $details !== '') {
+            $pairs[] = ['label' => 'Details', 'value' => (string) $details];
         }
 
-        if (is_array($raw)) {
+        if (is_array($payload)) {
             // Settings diff: before/after
-            if (array_key_exists('before', $raw) || array_key_exists('after', $raw)) {
-                $diffs = self::diffPairs($raw['before'] ?? null, $raw['after'] ?? null);
+            if (array_key_exists('before', $payload) || array_key_exists('after', $payload)) {
+                $diffs = self::diffPairs($payload['before'] ?? null, $payload['after'] ?? null);
                 foreach ($diffs as $d) {
                     $pairs[] = ['label' => $d['key'], 'value' => $d['old'] . ' → ' . $d['new']];
                 }
@@ -163,19 +179,32 @@ class AuditHubService
                     $pairs[] = ['label' => 'Change', 'value' => 'No field-level diff recorded'];
                 }
             } else {
-                // Activity log metadata: flatten 1-deep
-                foreach ($raw as $k => $v) {
-                    if ($k === 'target_type' || $k === 'target_id') continue; // already shown
+                // Activity-style metadata: flatten one level.
+                foreach ($payload as $k => $v) {
+                    // Skip keys that are already projected as their own columns
+                    // (Target type/id) or that we'll surface separately (IP).
+                    if ($k === 'target_type' || $k === 'target_id' || $k === 'ip_address') continue;
                     $pairs[] = ['label' => self::prettifyKey((string) $k), 'value' => self::scalarToString($v)];
                 }
             }
         }
 
-        if (!empty($row['ip_address'])) {
-            $pairs[] = ['label' => 'IP', 'value' => (string) $row['ip_address']];
+        if ($ip !== null && $ip !== '') {
+            $pairs[] = ['label' => 'IP', 'value' => (string) $ip];
         }
 
         return $pairs;
+    }
+
+    /**
+     * Pretty-print an already-decoded payload as JSON for the "Show raw"
+     * toggle. Returns null if the payload is empty.
+     */
+    public static function rawPayloadFromArray($payload): ?string
+    {
+        if (!is_array($payload) || $payload === []) return null;
+        $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return $encoded === false ? null : $encoded;
     }
 
     public static function rawPayload(array $row): ?string

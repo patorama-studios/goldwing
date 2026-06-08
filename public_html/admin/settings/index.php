@@ -775,9 +775,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   ['label' => 'Media & Files', 'icon' => 'photo_library', 'desc' => 'Allowed file types and upload limits.', 'href' => '/admin/settings/index.php?section=media', 'permission' => 'admin.media_library.manage'],
                   ['label' => 'Integrations', 'icon' => 'link', 'desc' => 'Email provider, YouTube, third-party keys.', 'href' => '/admin/settings/index.php?section=integrations', 'permission' => 'admin.integrations.manage'],
                 ],
-                'Logs & Diagnostics' => [
-                  ['label' => 'Audit Hub', 'icon' => 'receipt_long', 'desc' => 'Unified log of settings changes, admin actions, and security events.', 'href' => '/admin/audit/', 'permission' => 'admin.logs.view'],
-                ],
                 'Advanced' => [
                   ['label' => 'AI Settings', 'icon' => 'smart_toy', 'desc' => 'AI keys, models, feature flags.', 'href' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
                   ['label' => 'Advanced / Developer', 'icon' => 'code', 'desc' => 'Maintenance mode, system log, raw flags.', 'href' => '/admin/settings/index.php?section=advanced', 'permission' => 'admin.settings.general.manage'],

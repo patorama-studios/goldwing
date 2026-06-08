@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityRepository;
+use App\Services\AuditHubService;
 use App\Services\CommitteeService;
 use App\Services\Csrf;
 use App\Services\Database;
@@ -550,8 +551,10 @@ foreach ($activityEntries as $entry) {
     'id' => $entry['id'] ?? null,
     'timestamp' => $entry['created_at'],
     'actor_type' => $entry['actor_type'] ?? 'admin',
+    'source' => 'activity',
     'action' => $actionKey,
-    'label' => ucwords(str_replace('.', ' ', $actionKey)),
+    'label' => ucwords(str_replace(['_', '.'], ' ', $actionKey)),
+    'target' => '—',
     'metadata' => $metadata,
   ];
 }
@@ -564,8 +567,10 @@ foreach ($events as $rsvp) {
   $timeline[] = [
     'timestamp' => $rsvp['created_at'],
     'actor_type' => 'member',
+    'source' => 'event',
     'action' => $actionKey,
-    'label' => 'Event RSVP: ' . ($rsvp['event_title'] ?? 'Event'),
+    'label' => 'Event RSVP — ' . ucfirst((string) ($rsvp['status'] ?? 'unknown')),
+    'target' => $rsvp['event_title'] ?? 'Event',
     'metadata' => [
       'status' => $rsvp['status'],
       'event_date' => $rsvp['event_date'],
@@ -578,11 +583,17 @@ foreach ($downloads as $download) {
   if (!$matchesActivityFilters($download['created_at'], 'member', $actionKey)) {
     continue;
   }
+  $fileLabel = $download['file_path'] ?? '';
+  if ($fileLabel !== '') {
+    $fileLabel = basename((string) $fileLabel);
+  }
   $timeline[] = [
     'timestamp' => $download['created_at'],
     'actor_type' => 'member',
+    'source' => 'download',
     'action' => $actionKey,
     'label' => 'Download recorded',
+    'target' => $fileLabel !== '' ? $fileLabel : '—',
     'metadata' => [
       'file_path' => $download['file_path'],
       'ip_address' => $download['ip_address'],
@@ -596,15 +607,18 @@ foreach ($orders as $order) {
   if (!$matchesActivityFilters($order['created_at'], 'member', $actionKey)) {
     continue;
   }
+  $totalCents = (int) ($order['total_cents'] ?? 0);
   $timeline[] = [
     'timestamp' => $order['created_at'],
     'actor_type' => 'member',
+    'source' => 'order',
     'action' => $actionKey,
-    'label' => 'Order #' . ($order['order_number'] ?? $order['id']),
+    'label' => 'Order ' . ucfirst($statusKey),
+    'target' => '#' . ($order['order_number'] ?? $order['id']),
     'metadata' => [
       'status' => $statusKey,
       'order_id' => $order['id'],
-      'total_cents' => $order['total_cents'] ?? 0,
+      'total' => '$' . number_format($totalCents / 100, 2),
     ],
   ];
 }
@@ -615,14 +629,16 @@ foreach ($refunds as $refund) {
   if (!$matchesActivityFilters($refund['created_at'], 'admin', $actionKey)) {
     continue;
   }
+  $amountCents = (int) ($refund['amount_cents'] ?? 0);
   $timeline[] = [
     'timestamp' => $refund['created_at'],
     'actor_type' => 'admin',
+    'source' => 'refund',
     'action' => $actionKey,
-    'label' => 'Refund #' . ($refund['id'] ?? 'N/A'),
+    'label' => 'Refund ' . ucfirst($statusKey),
+    'target' => 'Order #' . ($refund['order_id'] ?? '—'),
     'metadata' => [
-      'order_id' => $refund['order_id'],
-      'amount_cents' => $refund['amount_cents'],
+      'amount' => '$' . number_format($amountCents / 100, 2),
       'reason' => $refund['reason'],
     ],
   ];
@@ -3017,6 +3033,41 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <?php endif; ?>
             </div>
           <?php elseif ($tab === 'activity'): ?>
+            <?php
+              // Source badges — mirror the Audit Hub palette where they overlap,
+              // and add a few extra for the per-member synthetic timeline.
+              $activitySourceLabel = static function (string $src): string {
+                return match ($src) {
+                  'activity' => 'Activity',
+                  'order'    => 'Order',
+                  'refund'   => 'Refund',
+                  'event'    => 'Event',
+                  'download' => 'Download',
+                  default    => ucfirst($src),
+                };
+              };
+              $activitySourceBadge = static function (string $src): string {
+                return match ($src) {
+                  'activity' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+                  'order'    => 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+                  'refund'   => 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+                  'event'    => 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
+                  'download' => 'bg-slate-100 text-slate-700 ring-1 ring-slate-200',
+                  default    => 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+                };
+              };
+              $activityRelativeTime = static function (string $datetime): string {
+                if (!$datetime) return '';
+                $ts = strtotime($datetime);
+                if (!$ts) return '';
+                $diff = time() - $ts;
+                if ($diff < 60)     return $diff <= 1 ? 'just now' : $diff . 's ago';
+                if ($diff < 3600)   return floor($diff / 60) . 'm ago';
+                if ($diff < 86400)  return floor($diff / 3600) . 'h ago';
+                if ($diff < 604800) return floor($diff / 86400) . 'd ago';
+                return date('j M Y', $ts);
+              };
+            ?>
             <div class="space-y-6">
               <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                 <form method="get" class="grid gap-4 lg:grid-cols-4">
@@ -3048,76 +3099,138 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <input type="text" name="activity_action" value="<?= e($activityAction) ?>"
                       class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="order.updated">
                   </label>
-                  <div class="lg:col-span-4">
-                    <button class="rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700"
+                  <div class="lg:col-span-4 flex items-center justify-between">
+                    <button class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink"
                       type="submit">Apply filters</button>
+                    <a href="/admin/audit/?q=<?= e(urlencode(($member['email'] ?? ''))) ?>"
+                       class="text-xs font-semibold text-primary hover:underline">
+                      View this member in the Audit Hub →
+                    </a>
                   </div>
                 </form>
               </div>
-              <div class="space-y-3">
-                <?php if ($timeline): ?>
-                  <?php foreach ($timeline as $entry): ?>
-                    <?php
-                    $metadata = $entry['metadata'] ?? [];
-                    $emailSnapshot = is_array($metadata) ? ($metadata['email_snapshot'] ?? null) : null;
-                    $notificationKey = is_array($metadata) ? ($metadata['notification_key'] ?? '') : '';
-                    $canResend = $entry['action'] === 'email.sent' && $notificationKey !== '' && !in_array($notificationKey, ['security_email_otp'], true);
-                    ?>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-gray-500">
-                        <span><?= e(formatDateTime($entry['timestamp'])) ?></span>
-                        <span><?= e(ucfirst($entry['actor_type'])) ?></span>
-                      </div>
-                      <p class="mt-2 text-sm font-semibold text-gray-900"><?= e($entry['label']) ?></p>
-                      <p class="text-xs text-gray-500"><?= e($entry['action']) ?></p>
-                      <?php if ($emailSnapshot && is_array($emailSnapshot)): ?>
-                        <div class="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700 space-y-2">
-                          <div><span class="font-semibold">Subject:</span> <?= e($emailSnapshot['subject'] ?? '') ?></div>
-                          <div><span class="font-semibold">From:</span>
-                            <?= e(($emailSnapshot['from_name'] ?? '') . ' <' . ($emailSnapshot['from_email'] ?? '') . '>') ?>
-                          </div>
-                          <?php if (!empty($emailSnapshot['reply_to'])): ?>
-                            <div><span class="font-semibold">Reply-to:</span> <?= e($emailSnapshot['reply_to']) ?></div>
-                          <?php endif; ?>
-                          <?php if (!empty($notificationKey)): ?>
-                            <div><span class="font-semibold">Notification:</span> <?= e($notificationKey) ?></div>
-                          <?php endif; ?>
-                          <?php if (isset($metadata['admin_override'])): ?>
-                            <div><span class="font-semibold">Admin override:</span>
-                              <?= !empty($metadata['admin_override']) ? 'Yes' : 'No' ?></div>
-                          <?php endif; ?>
-                        </div>
-                        <details class="mt-3">
-                          <summary class="cursor-pointer text-xs font-semibold text-gray-600">View email body</summary>
-                          <div class="mt-2 rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                            <?= $emailSnapshot['body'] ?? '' ?>
-                          </div>
-                        </details>
-                        <?php if ($canResend && !empty($entry['id'])): ?>
-                          <form method="post" action="/admin/members/actions.php" class="mt-3">
-                            <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                            <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                            <input type="hidden" name="tab" value="activity">
-                            <input type="hidden" name="action" value="resend_notification">
-                            <input type="hidden" name="activity_id" value="<?= e((string) $entry['id']) ?>">
-                            <button class="rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700"
-                              type="submit">Resend email</button>
-                          </form>
-                        <?php endif; ?>
-                      <?php elseif (!empty($entry['metadata'])): ?>
-                        <details class="mt-3">
-                          <summary class="cursor-pointer text-xs font-semibold text-gray-600">Details</summary>
-                          <pre
-                            class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600"><?= e(json_encode($entry['metadata'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) ?></pre>
-                        </details>
+
+              <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="text-left text-xs uppercase tracking-wide text-gray-400 bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th class="py-2.5 px-4">When</th>
+                        <th class="py-2.5 px-3">Source</th>
+                        <th class="py-2.5 px-3">Actor</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3">Target</th>
+                        <th class="py-2.5 px-3">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      <?php if (!$timeline): ?>
+                        <tr>
+                          <td colspan="6" class="py-12 text-center text-sm text-gray-500">
+                            No activity entries match the filters.
+                          </td>
+                        </tr>
+                      <?php else: ?>
+                        <?php foreach ($timeline as $entry):
+                          $metadata = is_array($entry['metadata'] ?? null) ? $entry['metadata'] : [];
+                          $emailSnapshot = $metadata['email_snapshot'] ?? null;
+                          $notificationKey = (string) ($metadata['notification_key'] ?? '');
+                          $canResend = ($entry['action'] ?? '') === 'email.sent'
+                                       && $notificationKey !== ''
+                                       && !in_array($notificationKey, ['security_email_otp'], true);
+                          $source = (string) ($entry['source'] ?? 'activity');
+                          $ip = (string) ($metadata['ip_address'] ?? '');
+                          // Drop the bulky email_snapshot from the friendly-pair
+                          // metadata since it has its own rendering block below.
+                          $metaForPairs = $metadata;
+                          unset($metaForPairs['email_snapshot']);
+                          $pairs = AuditHubService::formatPayload($metaForPairs, null, $ip ?: null);
+                          $rawJson = AuditHubService::rawPayloadFromArray($metadata);
+                          $relative = $activityRelativeTime((string) ($entry['timestamp'] ?? ''));
+                        ?>
+                          <tr class="hover:bg-gray-50/70 transition-colors align-top">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                              <p class="text-sm font-medium text-gray-900"><?= e($relative) ?></p>
+                              <p class="text-[11px] text-gray-400"><?= e((string) $entry['timestamp']) ?></p>
+                            </td>
+                            <td class="px-3 py-3">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold <?= e($activitySourceBadge($source)) ?>">
+                                <?= e($activitySourceLabel($source)) ?>
+                              </span>
+                            </td>
+                            <td class="px-3 py-3">
+                              <p class="text-sm font-medium text-gray-900"><?= e(ucfirst((string) ($entry['actor_type'] ?? '—'))) ?></p>
+                            </td>
+                            <td class="px-3 py-3">
+                              <p class="text-sm text-gray-800"><?= e((string) ($entry['label'] ?? '—')) ?></p>
+                              <?php if (!empty($entry['action']) && $entry['action'] !== $entry['label']): ?>
+                                <p class="text-[11px] text-gray-400 font-mono"><?= e((string) $entry['action']) ?></p>
+                              <?php endif; ?>
+                            </td>
+                            <td class="px-3 py-3 text-sm text-gray-700">
+                              <?= e((string) ($entry['target'] ?? '—')) ?>
+                            </td>
+                            <td class="px-3 py-3">
+                              <?php if ($emailSnapshot && is_array($emailSnapshot)): ?>
+                                <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700 space-y-1">
+                                  <div><span class="text-[11px] uppercase tracking-wide text-gray-400">Subject</span> <span class="text-gray-800"><?= e($emailSnapshot['subject'] ?? '') ?></span></div>
+                                  <div><span class="text-[11px] uppercase tracking-wide text-gray-400">From</span> <span class="text-gray-800"><?= e(($emailSnapshot['from_name'] ?? '') . ' <' . ($emailSnapshot['from_email'] ?? '') . '>') ?></span></div>
+                                  <?php if (!empty($emailSnapshot['reply_to'])): ?>
+                                    <div><span class="text-[11px] uppercase tracking-wide text-gray-400">Reply-to</span> <span class="text-gray-800"><?= e($emailSnapshot['reply_to']) ?></span></div>
+                                  <?php endif; ?>
+                                  <?php if ($notificationKey !== ''): ?>
+                                    <div><span class="text-[11px] uppercase tracking-wide text-gray-400">Notification</span> <span class="text-gray-800"><?= e($notificationKey) ?></span></div>
+                                  <?php endif; ?>
+                                  <?php if (isset($metadata['admin_override'])): ?>
+                                    <div><span class="text-[11px] uppercase tracking-wide text-gray-400">Admin override</span> <span class="text-gray-800"><?= !empty($metadata['admin_override']) ? 'Yes' : 'No' ?></span></div>
+                                  <?php endif; ?>
+                                </div>
+                                <details class="mt-2">
+                                  <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-primary hover:underline">View email body</summary>
+                                  <div class="mt-2 rounded-lg border border-gray-100 bg-white p-3 text-sm">
+                                    <?= $emailSnapshot['body'] ?? '' ?>
+                                  </div>
+                                </details>
+                                <?php if ($canResend && !empty($entry['id'])): ?>
+                                  <form method="post" action="/admin/members/actions.php" class="mt-3">
+                                    <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                    <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                    <input type="hidden" name="tab" value="activity">
+                                    <input type="hidden" name="action" value="resend_notification">
+                                    <input type="hidden" name="activity_id" value="<?= e((string) $entry['id']) ?>">
+                                    <button class="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-gray-300"
+                                      type="submit">Resend email</button>
+                                  </form>
+                                <?php endif; ?>
+                              <?php elseif ($pairs): ?>
+                                <ul class="space-y-1 text-sm text-gray-700">
+                                  <?php foreach (array_slice($pairs, 0, 4) as $pair): ?>
+                                    <li>
+                                      <span class="text-[11px] uppercase tracking-wide text-gray-400"><?= e($pair['label']) ?></span>
+                                      <span class="text-gray-800"><?= e($pair['value']) ?></span>
+                                    </li>
+                                  <?php endforeach; ?>
+                                  <?php if (count($pairs) > 4): ?>
+                                    <li class="text-[11px] text-gray-400">+<?= e((string) (count($pairs) - 4)) ?> more</li>
+                                  <?php endif; ?>
+                                </ul>
+                              <?php else: ?>
+                                <span class="text-sm text-gray-400">—</span>
+                              <?php endif; ?>
+                              <?php if ($rawJson && !$emailSnapshot): ?>
+                                <details class="mt-2">
+                                  <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-primary hover:underline">Show raw</summary>
+                                  <pre class="mt-2 max-w-md whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-[11px] text-gray-600 border border-gray-100"><?= e($rawJson) ?></pre>
+                                </details>
+                              <?php endif; ?>
+                            </td>
+                          </tr>
+                        <?php endforeach; ?>
                       <?php endif; ?>
-                    </div>
-                  <?php endforeach; ?>
-                <?php else: ?>
-                  <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">No activity entries
-                    match the filters.</div>
-                <?php endif; ?>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           <?php endif; ?>
         </div>
