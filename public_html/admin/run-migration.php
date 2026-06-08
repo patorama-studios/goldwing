@@ -2435,6 +2435,254 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 032 — One-off renewal + last-payment backfill from legacy xlsx
+//
+// Source: scripts/data/migration_renewal_dates.csv (158 rows, derived from
+// "Current AGA Members.xlsx" with columns Member #, Surname/First (M+A),
+// Date Joined, Date Renewed, Expiry Date, Life Member).
+//
+// For each row:
+//   • Match the main member by (member_number_base = X, suffix = 0);
+//     fall back to first_name+last_name (case-insensitive). Same for the
+//     associate when the xlsx row carries an A-side name pair.
+//
+//   • Renewal date  →  membership_periods.end_date on the latest period.
+//       – LIFE members: skipped (renewal is N/A in the UI).
+//       – No period at all → INSERT one (start = Date Joined, else 1y before
+//         expiry; end = xlsx Expiry Date; status='ACTIVE').
+//       – Period exists but end_date is NULL/0000 → UPDATE end_date.
+//       – Period exists with an end_date → LEAVE ALONE (no clobber).
+//
+//   • Last payment  →  orders.paid_at on the latest order_type='membership'.
+//       – No membership orders → INSERT a stub order (payment_status='accepted',
+//         total=0, internal_notes flags it as a backfill). The admin "Last
+//         payment" field reads from orders.paid_at, which is why we INSERT
+//         rather than just stamping the period.
+//       – Has any membership order → LEAVE ALONE.
+//
+//   • The associate uses date_renewed_a if present, else date_renewed_m.
+//
+// Once-off, idempotent (migration key guards re-runs). To re-trigger, clear the
+// `migrations.migration_032_backfill_renewal_payment` global setting.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_032_backfill_renewal_payment';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 032 — Renewal + last-payment backfill', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $csvPath = __DIR__ . '/../../scripts/data/migration_renewal_dates.csv';
+        if (!is_file($csvPath)) {
+            throw new RuntimeException('CSV not found at ' . $csvPath);
+        }
+
+        // Stub orders need a payment_channels row. Pick the lowest id.
+        $channelId = (int) ($pdo->query('SELECT MIN(id) FROM payment_channels')->fetchColumn() ?: 0);
+        if ($channelId <= 0) {
+            throw new RuntimeException('No payment_channels rows — cannot create stub orders.');
+        }
+
+        $findByNumber = $pdo->prepare(
+            'SELECT id, member_type, member_number_suffix FROM members
+             WHERE member_number_base = :base
+             ORDER BY member_number_suffix ASC, id ASC'
+        );
+        $findByName = $pdo->prepare(
+            "SELECT id, member_type FROM members
+             WHERE LOWER(first_name) = LOWER(:fn) AND LOWER(last_name) = LOWER(:ln)
+             ORDER BY (status = 'ACTIVE') DESC, id ASC LIMIT 1"
+        );
+        $findLatestPeriod = $pdo->prepare(
+            'SELECT id, end_date FROM membership_periods
+             WHERE member_id = :mid
+             ORDER BY start_date DESC, id DESC LIMIT 1'
+        );
+        $insertPeriod = $pdo->prepare(
+            "INSERT INTO membership_periods (member_id, term, start_date, end_date, status, created_at)
+             VALUES (:mid, '1Y', :start, :end, 'ACTIVE', NOW())"
+        );
+        $updatePeriodEnd = $pdo->prepare(
+            'UPDATE membership_periods SET end_date = :end WHERE id = :id'
+        );
+        $countMembershipOrders = $pdo->prepare(
+            "SELECT COUNT(*) FROM orders WHERE member_id = :mid AND order_type = 'membership'"
+        );
+        $insertOrder = $pdo->prepare(
+            "INSERT INTO orders
+              (order_number, member_id, status, payment_status, fulfillment_status,
+               order_type, channel_id, subtotal, total, paid_at, created_at, internal_notes)
+             VALUES
+              (:order_number, :mid, 'paid', 'accepted', 'active',
+               'membership', :channel, 0, 0, :paid_at, :created_at,
+               'Backfilled from legacy xlsx (migration_032)')"
+        );
+
+        $sub1YearBefore = static function (?string $iso): ?string {
+            if (!$iso) return null;
+            try {
+                $d = new DateTime($iso);
+                $d->modify('-1 year');
+                return $d->format('Y-m-d');
+            } catch (Throwable $e) {
+                return null;
+            }
+        };
+
+        $stats = [
+            'rows' => 0,
+            'main_by_number' => 0, 'main_by_name' => 0, 'main_unmatched' => 0,
+            'assoc_by_number' => 0, 'assoc_by_name' => 0, 'assoc_unmatched' => 0,
+            'periods_inserted' => 0, 'periods_filled' => 0, 'periods_kept' => 0, 'periods_life_skip' => 0,
+            'orders_inserted' => 0, 'orders_kept' => 0, 'orders_no_date' => 0,
+        ];
+        $unmatched = [];
+
+        // Apply one member's portion of a CSV row. Mutates $stats / $unmatched.
+        $applyMember = function (
+            ?array $member, ?string $renewedDate, ?string $joinedDate,
+            ?string $matchedBy, string $tag, int $memberNumber,
+            ?string $expiry, bool $rowLife
+        ) use (
+            &$stats, &$unmatched,
+            $findLatestPeriod, $insertPeriod, $updatePeriodEnd,
+            $countMembershipOrders, $insertOrder,
+            $channelId, $sub1YearBefore
+        ): void {
+            if (!$member) {
+                $stats[$tag . '_unmatched']++;
+                $unmatched[] = '#' . $memberNumber . '/' . $tag;
+                return;
+            }
+            $stats[$tag . '_by_' . ($matchedBy === 'number' ? 'number' : 'name')]++;
+            $mid = (int) $member['id'];
+            $memberIsLife = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE' || $rowLife;
+
+            // 1) Renewal date → membership_periods.end_date
+            if ($memberIsLife) {
+                $stats['periods_life_skip']++;
+            } elseif ($expiry) {
+                $findLatestPeriod->execute([':mid' => $mid]);
+                $period = $findLatestPeriod->fetch(PDO::FETCH_ASSOC);
+                if (!$period) {
+                    $startDate = $joinedDate ?: $sub1YearBefore($expiry) ?: date('Y-m-d');
+                    $insertPeriod->execute([':mid' => $mid, ':start' => $startDate, ':end' => $expiry]);
+                    $stats['periods_inserted']++;
+                } elseif (empty($period['end_date']) || $period['end_date'] === '0000-00-00') {
+                    $updatePeriodEnd->execute([':id' => (int) $period['id'], ':end' => $expiry]);
+                    $stats['periods_filled']++;
+                } else {
+                    $stats['periods_kept']++;
+                }
+            }
+
+            // 2) Last payment date → stub membership order if member has none
+            if (!$renewedDate) {
+                $stats['orders_no_date']++;
+                return;
+            }
+            $countMembershipOrders->execute([':mid' => $mid]);
+            if ((int) $countMembershipOrders->fetchColumn() > 0) {
+                $stats['orders_kept']++;
+                return;
+            }
+            $paidAt = $renewedDate . ' 00:00:00';
+            $insertOrder->execute([
+                ':order_number' => 'BACKFILL-' . $mid,
+                ':mid'          => $mid,
+                ':channel'      => $channelId,
+                ':paid_at'      => $paidAt,
+                ':created_at'   => $paidAt,
+            ]);
+            $stats['orders_inserted']++;
+        };
+
+        $fh = fopen($csvPath, 'r');
+        if (!$fh) throw new RuntimeException('Cannot open CSV at ' . $csvPath);
+        $header = fgetcsv($fh);
+        if (!$header) throw new RuntimeException('CSV header missing');
+        $col = array_flip($header);
+        foreach (['member_number','surname_m','first_name_m','surname_a','first_name_a',
+                  'date_joined_m','date_renewed_m','expiry_date',
+                  'date_joined_a','date_renewed_a','life_member'] as $required) {
+            if (!isset($col[$required])) {
+                fclose($fh);
+                throw new RuntimeException('CSV missing required column: ' . $required);
+            }
+        }
+
+        while (($row = fgetcsv($fh)) !== false) {
+            if (!$row || count($row) < count($header)) continue;
+            $stats['rows']++;
+
+            $memberNumber = (int) $row[$col['member_number']];
+            $expiry   = $row[$col['expiry_date']]    !== '' ? $row[$col['expiry_date']]    : null;
+            $rowLife  = (bool) (int) $row[$col['life_member']];
+            $renewedM = $row[$col['date_renewed_m']] !== '' ? $row[$col['date_renewed_m']] : null;
+            $renewedA = $row[$col['date_renewed_a']] !== '' ? $row[$col['date_renewed_a']] : $renewedM;
+            $joinedM  = $row[$col['date_joined_m']]  !== '' ? $row[$col['date_joined_m']]  : null;
+            $joinedA  = $row[$col['date_joined_a']]  !== '' ? $row[$col['date_joined_a']]  : $joinedM;
+            $surnameM = trim((string) $row[$col['surname_m']]);
+            $firstM   = trim((string) $row[$col['first_name_m']]);
+            $surnameA = trim((string) $row[$col['surname_a']]);
+            $firstA   = trim((string) $row[$col['first_name_a']]);
+
+            // Member# lookup: collect main (suffix=0) and first associate (suffix>0)
+            $findByNumber->execute([':base' => $memberNumber]);
+            $bynum = $findByNumber->fetchAll(PDO::FETCH_ASSOC);
+            $main = null; $assoc = null;
+            foreach ($bynum as $r) {
+                if ((int) $r['member_number_suffix'] === 0 && $main === null) {
+                    $main = $r;
+                } elseif ((int) $r['member_number_suffix'] > 0 && $assoc === null) {
+                    $assoc = $r;
+                }
+            }
+
+            $mainBy = $main ? 'number' : null;
+            if (!$main && $firstM !== '' && $surnameM !== '') {
+                $findByName->execute([':fn' => $firstM, ':ln' => $surnameM]);
+                $hit = $findByName->fetch(PDO::FETCH_ASSOC);
+                if ($hit) { $main = $hit; $mainBy = 'name'; }
+            }
+
+            $assocBy = $assoc ? 'number' : null;
+            if (!$assoc && $firstA !== '' && $surnameA !== '') {
+                $findByName->execute([':fn' => $firstA, ':ln' => $surnameA]);
+                $hit = $findByName->fetch(PDO::FETCH_ASSOC);
+                if ($hit) { $assoc = $hit; $assocBy = 'name'; }
+            }
+
+            $applyMember($main,  $renewedM, $joinedM, $mainBy,  'main',  $memberNumber, $expiry, $rowLife);
+            if ($firstA !== '' && $surnameA !== '') {
+                $applyMember($assoc, $renewedA, $joinedA, $assocBy, 'assoc', $memberNumber, $expiry, $rowLife);
+            }
+        }
+        fclose($fh);
+
+        $note = sprintf(
+            'rows=%d · main #/name/miss=%d/%d/%d · assoc #/name/miss=%d/%d/%d · periods new/filled/kept=%d/%d/%d · life-skip=%d · orders new/kept/no-date=%d/%d/%d',
+            $stats['rows'],
+            $stats['main_by_number'], $stats['main_by_name'], $stats['main_unmatched'],
+            $stats['assoc_by_number'], $stats['assoc_by_name'], $stats['assoc_unmatched'],
+            $stats['periods_inserted'], $stats['periods_filled'], $stats['periods_kept'],
+            $stats['periods_life_skip'],
+            $stats['orders_inserted'], $stats['orders_kept'], $stats['orders_no_date']
+        );
+        if ($unmatched) {
+            $note .= ' · unmatched: ' . implode(', ', array_slice($unmatched, 0, 8));
+            if (count($unmatched) > 8) $note .= ' (+' . (count($unmatched) - 8) . ' more)';
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 032 — Renewal + last-payment backfill', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 032 — Renewal + last-payment backfill', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
