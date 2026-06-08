@@ -1,4 +1,7 @@
 <?php
+// Reset OPcache so the latest deployed copy of this endpoint is what runs
+// (Goldwing's bytecode cache is sticky — see the search endpoint for context).
+if (function_exists('opcache_reset')) { @opcache_reset(); }
 // JSON save endpoint for the Committee & Leadership Role settings page.
 // Actions:
 //   assign       — add role_id to member_id

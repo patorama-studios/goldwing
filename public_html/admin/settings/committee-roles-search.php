@@ -1,4 +1,9 @@
 <?php
+// Reset OPcache so the latest deployed copy of this endpoint is what runs.
+// Goldwing's stack caches bytecode aggressively (see public_html/admin/requests/view.php,
+// run-migration.php) and stale bytecode is what made search return "lookup_failed"
+// for hours after the fix was actually deployed.
+if (function_exists('opcache_reset')) { @opcache_reset(); }
 // Quick member lookup for the Committee & Leadership Role assignment page.
 // Returns the top 8 active members whose name or member_number matches the
 // query (minimum 2 chars). JSON shape:

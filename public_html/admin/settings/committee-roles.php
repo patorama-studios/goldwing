@@ -1,4 +1,7 @@
 <?php
+// Reset OPcache so the latest deployed copy of this page is what runs
+// (Goldwing's bytecode cache is sticky — see committee-roles-search.php).
+if (function_exists('opcache_reset')) { @opcache_reset(); }
 // Committee & Leadership Roles — role-centric admin page.
 // Lives under Settings ▸ People & Access.
 //
