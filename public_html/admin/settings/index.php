@@ -1832,12 +1832,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <span class="material-icons-outlined text-sm">bolt</span>
                             Trigger: <?= e($definition['trigger']) ?>
                           </span>
-                          <?php if (!empty($definition['placeholders'])): ?>
-                            <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-slate-600 px-2.5 py-1">
-                              <span class="material-icons-outlined text-sm">tag</span>
-                              Merge tags: <?= e(implode(', ', array_map(function ($item) { return '{{' . $item . '}}'; }, $definition['placeholders']))) ?>
-                            </span>
-                          <?php endif; ?>
                         </div>
 
                         <!-- Tabs -->
@@ -1848,32 +1842,41 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         </div>
 
                         <!-- Tab: Content -->
-                        <div class="notification-tab-panel mt-5 space-y-4" data-tab="content">
-                          <label class="block text-sm">
-                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</span>
-                            <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['subject'] ?? '') ?>">
-                          </label>
-                          <div class="space-y-2">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Body</p>
-                            <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs notification-toolbar" data-target="notification-body-<?= e($key) ?>">
-                              <button type="button" data-command="formatBlock" data-arg="<h1>" class="rounded border border-gray-200 bg-white px-2 py-1">H1</button>
-                              <button type="button" data-command="formatBlock" data-arg="<h2>" class="rounded border border-gray-200 bg-white px-2 py-1">H2</button>
-                              <button type="button" data-command="formatBlock" data-arg="<h3>" class="rounded border border-gray-200 bg-white px-2 py-1">H3</button>
-                              <button type="button" data-command="formatBlock" data-arg="<h4>" class="rounded border border-gray-200 bg-white px-2 py-1">H4</button>
-                              <button type="button" data-command="bold" class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
-                              <button type="button" data-command="italic" class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
-                              <button type="button" data-command="underline" class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
-                              <button type="button" data-command="insertUnorderedList" class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
-                              <button type="button" data-command="createLink" class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
-                              <button type="button" data-command="insertButton" class="rounded border border-gray-200 bg-white px-2 py-1">Button</button>
-                              <button type="button" data-command="insertImage" class="rounded border border-gray-200 bg-white px-2 py-1">Image URL</button>
-                              <label class="rounded border border-gray-200 bg-white px-2 py-1 cursor-pointer">
-                                Upload image
-                                <input type="file" class="hidden notification-image-upload" data-target="notification-body-<?= e($key) ?>" accept="image/*">
+                        <div class="notification-tab-panel mt-5" data-tab="content">
+                          <div class="grid gap-5 xl:grid-cols-2">
+                            <!-- Editor column -->
+                            <div class="space-y-4 min-w-0">
+                              <label class="block text-sm">
+                                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</span>
+                                <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm notification-subject-input" data-key="<?= e($key) ?>" value="<?= e($settings['subject'] ?? '') ?>">
                               </label>
+                              <?php if (!empty($definition['placeholders'])): ?>
+                                <div class="flex flex-wrap items-center gap-2 text-xs">
+                                  <span class="text-slate-500 font-semibold uppercase tracking-wider">Insert tag:</span>
+                                  <?php foreach ($definition['placeholders'] as $tag): ?>
+                                    <button type="button" class="notification-merge-tag inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 text-amber-800 px-2.5 py-1 font-mono hover:bg-amber-100 transition" data-tag="{{<?= e($tag) ?>}}">
+                                      <span class="material-icons-outlined text-sm">add</span>
+                                      {{<?= e($tag) ?>}}
+                                    </button>
+                                  <?php endforeach; ?>
+                                </div>
+                              <?php endif; ?>
+                              <div class="space-y-2">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Body</p>
+                                <textarea name="notification_body[<?= e($key) ?>]" data-wysiwyg rows="12" placeholder="Write the message body…"><?= e($settings['body'] ?? '') ?></textarea>
+                              </div>
                             </div>
-                            <textarea id="notification-body-<?= e($key) ?>" name="notification_body[<?= e($key) ?>]" class="hidden"><?= e($settings['body'] ?? '') ?></textarea>
-                            <div class="notification-editor mt-2 min-h-[260px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none" contenteditable="true" data-target="notification-body-<?= e($key) ?>"><?= $settings['body'] ?? '' ?></div>
+                            <!-- Live preview column -->
+                            <div class="space-y-2 min-w-0">
+                              <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Live preview</p>
+                                <span class="text-xs text-slate-400">Branded email · sample merge values</span>
+                              </div>
+                              <div class="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+                                <iframe class="notification-preview-iframe w-full h-[640px] bg-white" data-key="<?= e($key) ?>" sandbox="allow-same-origin" title="Email preview"></iframe>
+                              </div>
+                              <p class="text-xs text-slate-400">Preview updates as you type. Real merge tags get filled in when the email is sent.</p>
+                            </div>
                           </div>
                         </div>
 
@@ -2010,14 +2013,58 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               (() => {
                 const activeKeyInput = document.getElementById('notification-active-key');
                 const panels = Array.from(document.querySelectorAll('.notification-panel'));
-                const editors = Array.from(document.querySelectorAll('.notification-editor'));
                 const listItems = Array.from(document.querySelectorAll('.notification-list-item'));
                 const groups = Array.from(document.querySelectorAll('.notification-group'));
                 const searchInput = document.getElementById('notification-search');
                 const emptyState = document.getElementById('notification-empty');
                 const sendTestForm = document.getElementById('send-test-form');
                 const sendTestKey = document.getElementById('send-test-key');
-                let activeEditor = editors[0] || null;
+
+                // ---- Preview helpers (declared before setActive so it can call them) ----
+                const previewCsrf = '<?= e(Csrf::token()) ?>';
+                const previewTimers = new WeakMap();
+
+                const findQuillForPanel = (panel) => {
+                  if (!window.Quill) return null;
+                  const wrapper = panel.querySelector('.gw-wysiwyg');
+                  if (!wrapper) return null;
+                  const editorRoot = wrapper.firstElementChild;
+                  if (!editorRoot) return null;
+                  try { return window.Quill.find(editorRoot); } catch (e) { return null; }
+                };
+
+                const updatePreview = async (panel) => {
+                  if (!panel) return;
+                  const key = panel.dataset.notificationKey;
+                  const iframe = panel.querySelector('.notification-preview-iframe');
+                  const subjectInput = panel.querySelector('.notification-subject-input');
+                  const bodyTextarea = panel.querySelector('textarea[name="notification_body[' + key + ']"]');
+                  if (!iframe || !bodyTextarea) return;
+                  try {
+                    const resp = await fetch('/api/admin/settings/notifications/preview', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': previewCsrf },
+                      body: JSON.stringify({
+                        csrf_token: previewCsrf,
+                        key: key,
+                        subject: subjectInput ? subjectInput.value : '',
+                        body: bodyTextarea.value || ''
+                      }),
+                    });
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    if (data && typeof data.html === 'string') iframe.srcdoc = data.html;
+                  } catch (e) { /* soft-fail; keep prior preview */ }
+                };
+
+                const schedulePreview = (panel, delay) => {
+                  if (!panel) return;
+                  const wait = typeof delay === 'number' ? delay : 350;
+                  const prior = previewTimers.get(panel);
+                  if (prior) clearTimeout(prior);
+                  const t = setTimeout(() => updatePreview(panel), wait);
+                  previewTimers.set(panel, t);
+                };
 
                 const setActive = (key) => {
                   panels.forEach((panel) => {
@@ -2034,10 +2081,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   }
                   const visible = panels.find((panel) => panel.dataset.notificationKey === key);
                   if (visible) {
-                    const editor = visible.querySelector('.notification-editor');
-                    if (editor) {
-                      activeEditor = editor;
-                    }
                     visible.querySelectorAll('.notification-tab-btn').forEach((btn, i) => {
                       const active = i === 0;
                       btn.classList.toggle('border-gray-900', active);
@@ -2050,6 +2093,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     visible.querySelectorAll('.notification-tab-panel').forEach((panel) => {
                       panel.classList.toggle('hidden', panel.dataset.tab !== 'content');
                     });
+                    schedulePreview(visible, 0);
                   }
                 };
 
@@ -2177,86 +2221,49 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   });
                 }
 
-                // Rich-text editor wiring (preserved)
-                const syncEditor = (editor) => {
-                  const targetId = editor.dataset.target;
-                  const target = document.getElementById(targetId);
-                  if (target) target.value = editor.innerHTML;
-                };
-                editors.forEach((editor) => {
-                  syncEditor(editor);
-                  editor.addEventListener('focus', () => { activeEditor = editor; });
-                  editor.addEventListener('input', () => syncEditor(editor));
-                });
-                const insertHtml = (editor, html) => {
-                  if (!editor) return;
-                  editor.focus();
-                  document.execCommand('insertHTML', false, html);
-                  syncEditor(editor);
-                };
-                document.querySelectorAll('.notification-toolbar').forEach((toolbar) => {
-                  toolbar.addEventListener('click', (event) => {
-                    const button = event.target.closest('button');
-                    if (!button) return;
-                    const command = button.dataset.command;
-                    const arg = button.dataset.arg || null;
-                    const editor = activeEditor || editors[0];
-                    if (!command) return;
-                    if (command === 'createLink') {
-                      const url = prompt('Enter link URL');
-                      if (url) {
-                        if (editor) editor.focus();
-                        document.execCommand('createLink', false, url);
-                        syncEditor(editor);
-                      }
-                      return;
-                    }
-                    if (command === 'insertButton') {
-                      const label = prompt('Button label');
-                      const url = prompt('Button URL');
-                      if (label && url) {
-                        const html = '<a href="' + url + '" style="display:inline-block;background:#9e9140;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">' + label + '</a>';
-                        insertHtml(editor, html);
-                      }
-                      return;
-                    }
-                    if (command === 'insertImage') {
-                      const url = prompt('Image URL');
-                      if (url) insertHtml(editor, '<img src="' + url + '" alt="" style="max-width:100%; height:auto;">');
-                      return;
-                    }
-                    if (command === 'formatBlock') {
-                      document.execCommand('formatBlock', false, arg);
-                      syncEditor(editor);
-                      return;
-                    }
-                    document.execCommand(command, false, null);
-                    syncEditor(editor);
+                // Rich-text editor: Quill auto-mounts on textarea[data-wysiwyg] via /assets/js/goldwing-wysiwyg.js
+
+                // Subject input → live preview
+                document.querySelectorAll('.notification-subject-input').forEach((input) => {
+                  input.addEventListener('input', () => {
+                    const panel = input.closest('.notification-panel');
+                    if (panel) schedulePreview(panel);
                   });
                 });
-                document.querySelectorAll('.notification-image-upload').forEach((input) => {
-                  input.addEventListener('change', async () => {
-                    const file = input.files && input.files[0];
-                    if (!file) return;
-                    const form = new FormData();
-                    form.append('file', file);
-                    form.append('context', 'notifications');
-                    const response = await fetch('/api/uploads/image', {
-                      method: 'POST',
-                      headers: { 'X-CSRF-TOKEN': '<?= e(Csrf::token()) ?>' },
-                      body: form,
-                    });
-                    const result = await response.json();
-                    if (result && result.url) {
-                      const targetId = input.dataset.target;
-                      const editor = editors.find((item) => item.dataset.target === targetId) || activeEditor;
-                      insertHtml(editor, '<img src="' + result.url + '" alt="" style="max-width:100%; height:auto;">');
-                    } else {
-                      alert(result.error || 'Upload failed.');
-                    }
-                    input.value = '';
+
+                // Merge-tag chip → insert at Quill cursor
+                document.querySelectorAll('.notification-merge-tag').forEach((chip) => {
+                  chip.addEventListener('click', () => {
+                    const panel = chip.closest('.notification-panel');
+                    if (!panel) return;
+                    const q = findQuillForPanel(panel);
+                    if (!q) return;
+                    q.focus();
+                    const range = q.getSelection(true) || { index: q.getLength(), length: 0 };
+                    const tag = chip.dataset.tag || '';
+                    q.insertText(range.index, tag, 'user');
+                    q.setSelection(range.index + tag.length, 0, 'user');
+                    schedulePreview(panel, 50);
                   });
                 });
+
+                // Hook Quill text-change once instances are mounted, then trigger initial preview.
+                const wireQuillPreview = () => {
+                  if (!window.Quill) { setTimeout(wireQuillPreview, 200); return; }
+                  let pending = false;
+                  panels.forEach((panel) => {
+                    const q = findQuillForPanel(panel);
+                    if (!q) { pending = true; return; }
+                    if (!q.__gwPreviewWired) {
+                      q.on('text-change', () => schedulePreview(panel));
+                      q.__gwPreviewWired = true;
+                    }
+                  });
+                  if (pending) { setTimeout(wireQuillPreview, 200); return; }
+                  const activePanel = panels.find((p) => !p.classList.contains('hidden'));
+                  if (activePanel) schedulePreview(activePanel, 0);
+                };
+                wireQuillPreview();
               })();
             </script>
           <?php elseif ($section === 'security'): ?>

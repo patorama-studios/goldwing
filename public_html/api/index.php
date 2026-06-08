@@ -20,6 +20,7 @@ use App\Services\MembershipPricingService;
 use App\Services\MemberRepository;
 use App\Services\MediaService;
 use App\Services\NotificationService;
+use App\Services\EmailService;
 
 header('Content-Type: application/json');
 
@@ -1993,6 +1994,47 @@ if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'settings
     }
 
     json_response(['error' => 'Not found.'], 404);
+}
+
+if ($resource === 'admin' && count($segments) >= 4 && $segments[1] === 'settings' && $segments[2] === 'notifications' && $segments[3] === 'preview') {
+    if ($method !== 'POST') {
+        json_response(['error' => 'Method not allowed.'], 405);
+    }
+    $user = require_admin_json();
+    require_csrf_json($body);
+    $subject = trim((string) ($body['subject'] ?? ''));
+    $bodyHtml = (string) ($body['body'] ?? '');
+    // Substitute common merge tags with sample values so the preview looks like a real email
+    // rather than one full of {{placeholder}} strings. Unknown tags are left intact as a signal.
+    $samples = [
+        'first_name'        => 'Pat',
+        'last_name'         => 'Lindley',
+        'member_name'       => 'Pat Lindley',
+        'reset_link'        => BaseUrlService::buildUrl('/login.php?reset=sample'),
+        'otp_code'          => '482915',
+        'expires_minutes'   => '10',
+        'request_type'      => 'Noticeboard post',
+        'request_title'     => 'Sample request title',
+        'submitter_name'    => 'Pat Lindley',
+        'review_link'       => BaseUrlService::buildUrl('/admin/requests/'),
+        'order_total'       => '$120.00',
+        'order_number'      => 'GW-12345',
+        'amount'            => '$120.00',
+        'support_email'     => 'webmaster@goldwing.org.au',
+        'ticket_codes'      => 'ABC-123, ABC-124',
+        'tracking_number'   => 'AP123456789AU',
+        'refund_amount'     => '$60.00',
+        'order_link'        => BaseUrlService::buildUrl('/account/orders'),
+        'site_url'          => BaseUrlService::configuredBaseUrl(),
+        'login_link'        => BaseUrlService::buildUrl('/login.php'),
+        'unsubscribe_link'  => BaseUrlService::buildUrl('/account/notifications'),
+    ];
+    $rendered = $bodyHtml;
+    foreach ($samples as $tag => $value) {
+        $rendered = str_replace('{{' . $tag . '}}', $value, $rendered);
+    }
+    $html = EmailService::wrapHtml($subject !== '' ? $subject : 'Email preview', $rendered);
+    json_response(['html' => $html]);
 }
 
 if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'refunds' && $segments[2] === 'create') {

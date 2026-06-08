@@ -81,6 +81,8 @@ The catalogue of every email the system sends — subjects, bodies, recipients, 
 
 The page is laid out as a compact **Sender Identity** card at the top (one-line From / Reply-to summary + an "Edit identity" dialog + the digest toggles), then a two-pane **Notification Templates** editor (left rail groups templates by category — Security, Payments, Store Orders, Admin — click one to edit it on the right with **Content / Recipients / Sender overrides** tabs). A **Send test** button lives inline next to each template's header.
 
+The Content tab is itself a side-by-side: a **Quill rich-text editor** on the left (auto-mounted by `/assets/js/goldwing-wysiwyg.js`) and a **live email preview** on the right — an iframe that renders the body through `EmailService::wrapHtml()` (the actual brand wrapper used at send time) and substitutes common merge tags with sample values so the preview reads like a real email. Above the editor sit **clickable merge-tag chips** (only the tags relevant to the current template, drawn from each definition's `placeholders` array); clicking a chip inserts the tag at the Quill cursor. The preview is fed by a small admin-only endpoint at `/api/admin/settings/notifications/preview` (POST with `key`, `subject`, `body`, CSRF) and debounced ~350ms on edit.
+
 - **From name** and **From email** — what every system email is signed as. The address has to end in `@goldwing.org.au` or email providers will reject it. Edit via the **Edit identity** button.
 - **Reply-to** — where replies actually land if it's different from the From address. Also in the Edit identity dialog.
 - **Admin emails** — comma-separated list of who gets admin-only alerts (new orders, refund alerts, security alerts). Also in the Edit identity dialog.
