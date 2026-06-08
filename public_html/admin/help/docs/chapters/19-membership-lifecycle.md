@@ -18,9 +18,10 @@ You'll wear your "membership secretary" hat for most of this. Day-to-day it's ch
 4. **Payment** — if they paid by card during the application, they're already active. If they chose bank transfer, the period stays "pending payment" until the treasurer marks the payment received.
 5. **Active** — they can log in, see member-only content, book rides, buy from the store.
 6. **Renewal reminders** — 60 days before their expiry, an automatic email goes out with a Stripe link to renew. If they don't pay, a second reminder goes out at 30 days.
-7. **Renew or expire** — if they pay before 31 July, they roll into a new period and stay active. If they don't, a nightly cron job marks them as **lapsed** the day after expiry.
+7. **Renew or expire** — within 60 days of expiry (or once lapsed) members see a prominent red **Renew now** call-to-action on their dashboard and billing page. Clicking it opens a renewal lightbox where they pick a term (1 / 2 / 3 years), optionally bundle their partner's renewal (Full members can renew their Associate and vice-versa), confirm their details are current, and pay through Stripe. If they don't renew before 31 July, a nightly cron job marks them as **lapsed** the day after expiry.
 8. **Lapsed** — they can still log in but member-only stuff is locked. They can come back any time by paying again — there's no penalty.
-9. **Life members** — never expire, never get reminders, never lapse.
+9. **Cancellation request** — members can choose **Cancel my membership** from the renewal lightbox. This is a "do not renew" intent, not a hard cancellation: they keep access until their current paid period ends, the committee gets notified, and the member's record is flagged so staff can follow up. Withdrawable at any time.
+10. **Life members** — never expire, never get reminders, never lapse.
 
 ### What you can do at each stage
 
@@ -83,6 +84,15 @@ When the automatic reminder didn't reach the member, or you just want to send a 
 3. The system builds a Stripe checkout link tied to their member type (Full, Associate) and 1-year renewal price.
 4. You can either email it directly from this page or copy the link and paste it into your own email / SMS.
 5. When they pay, Stripe tells us about it (via webhook), their period flips to active, and the member status goes back to active.
+
+### How members renew themselves
+
+In addition to the 60/30-day reminder emails, members can renew on demand from inside the member area:
+
+- A high-contrast red **Renew now** button appears on the member's dashboard and on **Billing & Payments** as soon as their period is within 60 days of expiry (or already lapsed). Life members never see it.
+- Clicking opens a lightbox where they pick **1, 2 or 3 years**, optionally tick **"Also renew my partner"** (Full ↔ Associate, in either direction), confirm a "details are correct" checkbox, and click through to Stripe.
+- If they bundle the partner, both renewals go through one combined Stripe Checkout session — so the member pays once for two periods.
+- A small **Cancel my membership instead** link sits at the bottom of the lightbox. It opens a confirmation step with a reason field; submitting flags the member as "do not renew" and emails the committee. They keep access until their period ends — nothing is terminated immediately.
 
 ### How renewal reminder emails work
 
@@ -186,7 +196,26 @@ Daily. Two windows: **60** and **30 days** before `end_date`. For each due activ
 
 #### 6. Renewal payment
 
+Two paths land here:
+
+1. **Cron-emailed link.** The 60/30-day reminder includes a Stripe Checkout link built by `cron/send_renewal_reminders.php` against the legacy `stripe.membership_prices.{TYPE}_1Y` key.
+2. **Member-initiated renewal lightbox** (`public_html/member/index.php`). On the dashboard and `?page=billing` views the member sees a red **Renew now** button when `$renewEligible` (current period ends within 60 days, or LAPSED). It opens a modal that lets the member pick a term (12 / 24 / 36 months), optionally bundle their partner (associate or full — symmetric), confirm a "details are correct" acknowledgement, and submit. The POST handler (search for `$_POST['action'] === 'membership_renew'`):
+   - Creates one `membership_periods` (`PENDING_PAYMENT`) and one `MembershipOrderService::createMembershipOrder()` per renewer (self + optional partner).
+   - Looks up Stripe price IDs via `membership_stripe_price_id($prices, $type, $months)` — prefers the `{TYPE}_{12|24|36}` admin keys, falls back to legacy `{TYPE}_1Y` / `{TYPE}_3Y` for backward compatibility.
+   - One renewer → `StripeService::createCheckoutSessionForPrice()`. Two renewers → `StripeService::createCheckoutSessionForPrices()` (single combined Checkout Session with both price IDs as line items).
+   - Acknowledgement is server-enforced — missing `acknowledged=1` aborts with an error.
+
 Member clicks, pays. The Stripe webhook ([Chapter 16](view.php?slug=16-webhooks-idempotency)) calls `MembershipService::markPaid($periodId, $paymentId)` — new period `ACTIVE`, `members.status = 'ACTIVE'`. Old period stays with its original expiry.
+
+#### 6a. Member cancellation request
+
+The same lightbox has a small **Cancel my membership instead** link. It opens a confirm modal with an optional "reason" textarea and POSTs `action=membership_cancel_request`. The handler:
+
+- Sets `members.do_not_renew = 1` and `members.do_not_renew_at = NOW()`.
+- Logs `membership.cancel_requested` via `ActivityLogger` (or `membership.cancel_request_withdrawn` if `undo=1`).
+- Emails the committee at `site.support_email` (or `mail.support_email`).
+
+The member keeps access until their current `membership_periods.end_date`. Nothing is auto-terminated — staff follow up before expiry. Withdrawable (`undo=1` flips the flag back to 0).
 
 #### 7. Expiry (`cron/expire_memberships.php`)
 
@@ -219,12 +248,17 @@ All `settings_global` unless noted.
 | `membership.member_number_format_full` / `…_associate` | Display templates (defaults `{base}`, `{base}.{suffix}`). |
 | `membership.member_number_base_padding` / `…_suffix_padding` | Zero-padding. |
 | `payments.bank_transfer_instructions` | Text on the wizard's bank-transfer panel. |
-| `stripe.membership_prices.*` (`config/app.php`) | Stripe Price IDs the renewal cron looks up by `{TYPE}_1Y`. |
+| `payments.membership_prices` | Stripe Price IDs keyed `{TYPE}_{12|24|36}` (and legacy `_1Y`/`_3Y`). Read by both the renewal cron and the member-initiated renewal lightbox. Edited at `/admin/settings/index.php?section=membership_pricing`. |
+| `stripe.membership_prices.*` (`config/app.php`) | Fallback Stripe Price IDs the renewal cron looks up by `{TYPE}_1Y`. |
+| `members.do_not_renew` / `members.do_not_renew_at` | Set to `1` + timestamp when a member submits the in-modal "Cancel my membership" request. Used by staff during renewal follow-up; not yet read by the reminder cron. |
 
 Full pricing matrix lives in `MembershipPricingService` — see [Chapter 14](view.php?slug=14-membership-pricing). Reminder windows (60, 30 days) are hard-coded in `cron/send_renewal_reminders.php`'s `$intervals` array.
 
 ### Gotchas
 
+- **Stripe price keys come in two formats and can drift.** The admin pricing UI saves `payments.membership_prices` with month-suffix keys (`FULL_12 / FULL_24 / FULL_36 / ASSOCIATE_*`). A previous version of the member renewal handler looked up `{TYPE}_1Y` — these never matched and renewal failed with *"Membership pricing is not configured"* even when every Stripe price ID was set. The current code uses `membership_stripe_price_id()` which prefers the new keys and falls back to legacy `_1Y`/`_3Y`. If you ever see the misconfig error again, check the admin keys are populated for the term the member is trying to buy.
+- **2-year renewal has no row in the pricing matrix.** `MembershipPricingService` only defines `ONE_YEAR`, `THREE_YEARS` (plus fractional join-year slices). The renewal modal estimates the 2-year AUD amount as `ONE_YEAR × 2` for display; the actual Stripe charge uses whatever `payments.membership_prices.FULL_24` is set to. If you want a discounted 2-year price displayed correctly, the matrix needs a `TWO_YEARS` row added.
+- **Renewal reminder cron does not yet honour `do_not_renew`.** Members who request cancellation will still receive the 60/30-day reminder emails until staff manually intervene. Follow-up is human-driven for now.
 - **Expiry is timezone-driven, cron runs in the server TZ.** Bootstrap sets `date_default_timezone_set(site.timezone ?? 'Australia/Sydney')`. If you change `site.timezone` mid-day, a membership expiring "today" can tip over an hour earlier or later than you'd guess.
 - **Email failure means no second chance.** If SMTP / Resend is down when `send_renewal_reminders.php` runs, the `renewal_reminders` row is *still* inserted — the member never gets that window again. The 30-day reminder is the safety net; if both fail, the member only learns at lapse. Watch `app/storage/logs/` and [Chapter 22](view.php?slug=22-notifications-email).
 - **`LAPSED` doesn't auto-restrict everything.** Login still works, `users.is_active = 1`. Any member-only page that only calls `require_login()` without also checking `members.status` will let a lapsed member in. Use `AdminMemberAccess::requireActiveMember()` — audit new pages for this.

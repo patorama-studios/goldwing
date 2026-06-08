@@ -41,6 +41,8 @@ CREATE TABLE members (
   assist_tools TINYINT(1) NOT NULL DEFAULT 0,
   exclude_printed TINYINT(1) NOT NULL DEFAULT 0,
   exclude_electronic TINYINT(1) NOT NULL DEFAULT 0,
+  do_not_renew TINYINT(1) NOT NULL DEFAULT 0,
+  do_not_renew_at DATETIME NULL,
   avatar_url VARCHAR(512) NULL,
   created_at DATETIME NOT NULL,
   join_date DATE NULL,

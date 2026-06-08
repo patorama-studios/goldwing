@@ -152,7 +152,7 @@ In order of precedence (highest first):
 
 #### The three services you'll touch
 
-- **`StripeService`** (`app/Services/StripeService.php`) — low-level SDK wrapper. Every Stripe API call goes through here: `createCheckoutSession`, `createCheckoutSessionWithLineItems`, `createCustomer`, `createRefund`, `retrievePaymentIntent`, `constructEvent`. Resolves the secret key internally, so callers never see one.
+- **`StripeService`** (`app/Services/StripeService.php`) — low-level SDK wrapper. Every Stripe API call goes through here: `createCheckoutSession`, `createCheckoutSessionForPrice` (single Stripe price ID), `createCheckoutSessionForPrices` (multiple price IDs in one session — used by member renewal when bundling a partner), `createCheckoutSessionWithLineItems` (ad-hoc `price_data` items), `createCustomer`, `createRefund`, `retrievePaymentIntent`, `constructEvent`. Resolves the secret key internally, so callers never see one.
 - **`StripeSettingsService`** (`app/Services/StripeSettingsService.php`) — read/write keys, mode flag, feature toggles (Apple Pay, Google Pay, BNPL, guest checkout). `getPublicConfig()` feeds the front-end Stripe.js client.
 - **`PaymentSettingsService`** (`app/Services/PaymentSettingsService.php`) — manages `payment_channels` / `settings_payments`: invoice prefix, last-webhook timestamp, per-year invoice counter. Only the `primary` channel is used today.
 

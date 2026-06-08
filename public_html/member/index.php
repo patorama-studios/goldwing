@@ -119,6 +119,38 @@ function status_badge_classes(string $status): string
   };
 }
 
+function membership_stripe_price_id(array $prices, string $memberTypeKey, string $termMonths): string
+{
+  // Admin pricing UI saves keys as FULL_12 / FULL_24 / FULL_36 / ASSOCIATE_*.
+  $primary = $memberTypeKey . '_' . $termMonths;
+  if (!empty($prices[$primary])) {
+    return (string) $prices[$primary];
+  }
+  // Legacy format (FULL_1Y / FULL_3Y / ASSOCIATE_1Y / ASSOCIATE_3Y) — fallback only.
+  static $legacyMonthsToTerm = ['12' => '1Y', '36' => '3Y'];
+  if (isset($legacyMonthsToTerm[$termMonths])) {
+    $legacy = $memberTypeKey . '_' . $legacyMonthsToTerm[$termMonths];
+    if (!empty($prices[$legacy])) {
+      return (string) $prices[$legacy];
+    }
+  }
+  return '';
+}
+
+function membership_renewal_amount_cents(string $magazineType, string $memberTypeKey, string $termMonths): int
+{
+  // 24-month renewal has no dedicated row in the pricing matrix, so derive
+  // it as 2 × annual. 12 and 36 map to ONE_YEAR / THREE_YEARS directly.
+  if ($termMonths === '36') {
+    return (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'THREE_YEARS') ?? 0);
+  }
+  $oneYear = (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'ONE_YEAR') ?? 0);
+  if ($termMonths === '24') {
+    return $oneYear * 2;
+  }
+  return $oneYear;
+}
+
 function normalize_membership_price_term(string $term): string
 {
   $clean = strtoupper(trim($term));
@@ -731,7 +763,16 @@ if ($user && $user['member_id']) {
           $billingError = 'Unable to start renewal.';
         } elseif (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
           $billingError = 'Life members do not need to renew.';
+        } elseif (empty($_POST['acknowledged'])) {
+          $billingError = 'Please confirm your membership details are correct before renewing.';
         } else {
+          $termMonths = (string) ($_POST['term'] ?? '12');
+          if (!in_array($termMonths, ['12', '24', '36'], true)) {
+            $termMonths = '12';
+          }
+          $termCode = $termMonths . 'M';
+          $includePartner = !empty($_POST['include_partner']);
+
           $pendingOrderId = 0;
           if ($ordersMemberColumn && $ordersMemberValue) {
             $stmt = $pdo->prepare('SELECT id FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' = "pending" ORDER BY created_at DESC LIMIT 1');
@@ -741,49 +782,134 @@ if ($user && $user['member_id']) {
           if ($pendingOrderId > 0) {
             $billingMessage = 'You already have a pending membership order.';
           } else {
-            $term = '1Y';
-            $periodId = MembershipService::createMembershipPeriod((int) $member['id'], $term, date('Y-m-d'));
-            $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
-            $membershipTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
-            $pricingPeriodKey = $term === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
-            $priceCents = MembershipPricingService::getPriceCents($magazineType, $membershipTypeKey, $pricingPeriodKey) ?? 0;
+            $renewers = [['member' => $member, 'role' => 'self']];
+            $partner = null;
+            if ($includePartner) {
+              if (!empty($associates)) {
+                $partner = $associates[0];
+              } elseif ($fullMember) {
+                $partner = $fullMember;
+              }
+            }
+            if ($partner && strtoupper((string) ($partner['member_type'] ?? '')) !== 'LIFE') {
+              $renewers[] = ['member' => $partner, 'role' => 'partner'];
+            }
+
+            $prices = SettingsService::getGlobal('payments.membership_prices', []);
+            if (!is_array($prices)) {
+              $prices = [];
+            }
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
-            $amount = round($priceCents / 100, 2);
-            $order = MembershipOrderService::createMembershipOrder((int) $member['id'], $periodId, $amount, [
-              'payment_method' => 'stripe',
-              'payment_status' => 'pending',
-              'fulfillment_status' => 'pending',
-              'currency' => $pricingCurrency,
-              'item_name' => 'Membership renewal ' . $term,
-              'term' => $term,
-            ]);
-            if (!$order) {
-              $billingError = 'Unable to create a renewal order.';
-            } else {
-              $priceKey = $membershipTypeKey . '_' . $term;
-              $prices = SettingsService::getGlobal('payments.membership_prices', []);
-              $priceId = is_array($prices) ? ($prices[$priceKey] ?? '') : '';
+            $startDate = date('Y-m-d');
+            $stripePriceIds = [];
+            $createdOrderIds = [];
+            $createdPeriodIds = [];
+            $renewError = null;
+
+            foreach ($renewers as $r) {
+              $rMember = $r['member'];
+              $rTypeKey = strtoupper((string) ($rMember['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+              $rMagazine = strtolower((string) ($rMember['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+
+              $priceId = membership_stripe_price_id($prices, $rTypeKey, $termMonths);
               if ($priceId === '') {
-                $billingError = 'Membership pricing is not configured. Please contact support.';
+                $renewError = 'Membership pricing is not configured for ' . ucfirst(strtolower($rTypeKey)) . ' ' . $termMonths . '-month renewal. Please contact support.';
+                break;
+              }
+
+              $amountCents = membership_renewal_amount_cents($rMagazine, $rTypeKey, $termMonths);
+              $amount = round($amountCents / 100, 2);
+
+              $periodId = MembershipService::createMembershipPeriod((int) $rMember['id'], $termCode, $startDate);
+              if (!$periodId) {
+                $renewError = 'Unable to create a renewal period.';
+                break;
+              }
+              $createdPeriodIds[] = $periodId;
+
+              $order = MembershipOrderService::createMembershipOrder((int) $rMember['id'], $periodId, $amount, [
+                'payment_method' => 'stripe',
+                'payment_status' => 'pending',
+                'fulfillment_status' => 'pending',
+                'currency' => $pricingCurrency,
+                'item_name' => 'Membership renewal ' . $termMonths . 'M (' . $rTypeKey . ')',
+                'term' => $termCode,
+              ]);
+              if (!$order) {
+                $renewError = 'Unable to create a renewal order.';
+                break;
+              }
+              $createdOrderIds[] = (int) ($order['id'] ?? 0);
+              $stripePriceIds[] = $priceId;
+            }
+
+            if ($renewError) {
+              $billingError = $renewError;
+            } else {
+              $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+              $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+              $metadata = [
+                'order_type' => 'membership',
+                'member_id' => (string) $member['id'],
+                'order_ids' => implode(',', $createdOrderIds),
+                'period_ids' => implode(',', $createdPeriodIds),
+                'term' => $termCode,
+                'includes_partner' => $partner ? '1' : '0',
+              ];
+              if (count($stripePriceIds) === 1) {
+                $session = StripeService::createCheckoutSessionForPrice($stripePriceIds[0], $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
               } else {
-                $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
-                $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
-                $session = StripeService::createCheckoutSessionForPrice($priceId, $member['email'] ?? '', $successUrl, $cancelUrl, [
-                  'period_id' => $periodId,
-                  'member_id' => $member['id'],
-                  'order_id' => $order['id'] ?? null,
-                  'order_type' => 'membership',
-                ]);
-                if (!$session || empty($session['id'])) {
-                  $billingError = 'Unable to start renewal payment.';
-                } else {
-                  OrderService::updateStripeSession((int) ($order['id'] ?? 0), $session['id']);
-                  header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
-                  exit;
+                $session = StripeService::createCheckoutSessionForPrices($stripePriceIds, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
+              }
+              if (!$session || empty($session['id'])) {
+                $billingError = 'Unable to start renewal payment.';
+              } else {
+                foreach ($createdOrderIds as $oid) {
+                  if ($oid > 0) {
+                    OrderService::updateStripeSession($oid, $session['id']);
+                  }
                 }
+                header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
+                exit;
               }
             }
           }
+        }
+      } elseif ($_POST['action'] === 'membership_cancel_request') {
+        if (!$member) {
+          $billingError = 'Unable to record cancellation.';
+        } else {
+          $undo = !empty($_POST['undo']);
+          if ($undo) {
+            $stmt = $pdo->prepare('UPDATE members SET do_not_renew = 0, do_not_renew_at = NULL, updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => (int) $member['id']]);
+            ActivityLogger::log('member', (int) $member['id'], $user['id'] ?? null, 'membership.cancel_request_withdrawn', []);
+            $_SESSION['flash_billing_message'] = 'Cancellation request withdrawn — your membership will still renew.';
+          } else {
+            $stmt = $pdo->prepare('UPDATE members SET do_not_renew = 1, do_not_renew_at = NOW(), updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['id' => (int) $member['id']]);
+            ActivityLogger::log('member', (int) $member['id'], $user['id'] ?? null, 'membership.cancel_requested', [
+              'reason' => trim((string) ($_POST['reason'] ?? '')),
+            ]);
+            $supportEmail = (string) SettingsService::getGlobal('site.support_email', '');
+            if ($supportEmail === '') {
+              $supportEmail = (string) SettingsService::getGlobal('mail.support_email', '');
+            }
+            if ($supportEmail !== '') {
+              $fullName = trim(((string) ($member['first_name'] ?? '')) . ' ' . ((string) ($member['last_name'] ?? '')));
+              $reasonText = trim((string) ($_POST['reason'] ?? ''));
+              $body = "A member has requested to cancel their renewal:\n\n"
+                . "Member: " . $fullName . " (#" . ($member['id'] ?? '') . ")\n"
+                . "Email: " . ($member['email'] ?? '') . "\n"
+                . "Type: " . ($member['member_type'] ?? '') . "\n"
+                . "Reason: " . ($reasonText !== '' ? $reasonText : '(none provided)') . "\n\n"
+                . "They will retain access until their current paid period expires. Their account is flagged 'do not renew'.";
+              EmailService::send($supportEmail, 'Member cancellation request: ' . $fullName, $body);
+            }
+            $_SESSION['flash_billing_message'] = 'Your cancellation request has been recorded. You will keep access until your current period ends. Staff will be in touch.';
+          }
+          header('Location: /member/index.php?page=billing');
+          exit;
         }
       } elseif ($_POST['action'] === 'upgrade_membership') {
         if (!$member) {
@@ -1553,11 +1679,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <span class="material-icons-outlined text-sm">payments</span>
                 </a>
               <?php elseif ($membershipPeriod && $membershipPeriod['end_date'] && strtotime($membershipPeriod['end_date']) <= strtotime('+60 days')): ?>
-                <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
-                  href="/member/index.php?page=billing">
-                  <span class="font-medium">Renew now</span>
-                  <span class="material-icons-outlined text-sm">payments</span>
-                </a>
+                <button type="button" data-renew-trigger
+                  class="w-full group flex items-center justify-between p-3 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg ring-2 ring-red-600/40 transition-all duration-200">
+                  <span class="font-semibold tracking-wide">Renew now</span>
+                  <span class="material-icons-outlined text-base">payments</span>
+                </button>
               <?php endif; ?>
             </div>
           </div>
@@ -3729,13 +3855,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <p class="text-sm text-gray-600">No pending membership payments.</p>
               <?php endif; ?>
               <?php if ($renewEligible && !$pendingMembershipOrder): ?>
-                <form method="post" data-tour="pay-fees-renew">
-                  <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                  <input type="hidden" name="action" value="membership_renew">
-                  <button
-                    class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700"
-                    type="submit">Renew membership</button>
-                </form>
+                <div data-tour="pay-fees-renew" class="flex flex-col items-start gap-2">
+                  <button type="button" data-renew-trigger
+                    class="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 px-5 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg ring-2 ring-red-600/40 transition-all">
+                    <span class="material-icons-outlined text-base">payments</span>
+                    Renew my membership
+                  </button>
+                  <p class="text-xs text-red-700 font-medium">Your membership <?= $membershipPeriod && strtoupper((string) ($membershipPeriod['status'] ?? '')) === 'LAPSED' ? 'has lapsed' : 'is due for renewal' ?>.</p>
+                </div>
               <?php endif; ?>
               <?php if (!$customerPortalEnabled): ?>
                 <p class="text-xs text-gray-500">Customer portal is disabled. Contact support for card updates.</p>
@@ -4652,6 +4779,243 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     </div>
   </main>
 </div>
+<?php
+$renewModalEligible = false;
+if ($member
+  && strtoupper((string) ($member['member_type'] ?? '')) !== 'LIFE'
+  && in_array($page, ['dashboard', 'billing'], true)
+) {
+  $renewModalEligible = true;
+}
+if ($renewModalEligible) {
+  $renewMemberType = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+  $renewMagazine = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+  $renewPrices = SettingsService::getGlobal('payments.membership_prices', []);
+  if (!is_array($renewPrices)) {
+    $renewPrices = [];
+  }
+  $renewCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+
+  $renewPartnerMember = null;
+  if (!empty($associates)) {
+    $renewPartnerMember = $associates[0];
+  } elseif ($fullMember) {
+    $renewPartnerMember = $fullMember;
+  }
+  if ($renewPartnerMember && strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'LIFE') {
+    $renewPartnerMember = null;
+  }
+
+  $renewTerms = ['12' => '1 year', '24' => '2 years', '36' => '3 years'];
+  $renewOptions = [];
+  foreach ($renewTerms as $months => $label) {
+    $selfPriceId = membership_stripe_price_id($renewPrices, $renewMemberType, $months);
+    $selfCents = membership_renewal_amount_cents($renewMagazine, $renewMemberType, $months);
+    $partnerPriceId = '';
+    $partnerCents = 0;
+    if ($renewPartnerMember) {
+      $partnerType = strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+      $partnerMagazine = strtolower((string) ($renewPartnerMember['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+      $partnerPriceId = membership_stripe_price_id($renewPrices, $partnerType, $months);
+      $partnerCents = membership_renewal_amount_cents($partnerMagazine, $partnerType, $months);
+    }
+    $renewOptions[$months] = [
+      'months' => $months,
+      'label' => $label,
+      'self_available' => $selfPriceId !== '',
+      'self_amount' => $selfCents / 100,
+      'partner_available' => $renewPartnerMember ? ($partnerPriceId !== '') : false,
+      'partner_amount' => $partnerCents / 100,
+    ];
+  }
+
+  $renewMemberName = trim(((string) ($member['first_name'] ?? '')) . ' ' . ((string) ($member['last_name'] ?? '')));
+  $renewPartnerName = $renewPartnerMember
+    ? trim(((string) ($renewPartnerMember['first_name'] ?? '')) . ' ' . ((string) ($renewPartnerMember['last_name'] ?? '')))
+    : '';
+  $renewPartnerTypeLabel = $renewPartnerMember
+    ? (strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'Associate' : 'Full')
+    : '';
+?>
+<div id="renew-modal" class="hidden fixed inset-0 z-50 items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600">
+    <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+      <div>
+        <h2 class="font-display text-xl font-bold text-gray-900 flex items-center gap-2">
+          <span class="material-icons-outlined text-red-600">payments</span>
+          Renew membership
+        </h2>
+        <p class="mt-1 text-sm text-gray-500">Choose your renewal term and confirm your details.</p>
+      </div>
+      <button type="button" data-renew-close
+        class="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100" aria-label="Close">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <form method="post" action="/member/index.php?page=billing" class="p-6 space-y-5" id="renew-form">
+      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+      <input type="hidden" name="action" value="membership_renew">
+      <div class="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-800">
+        <p class="font-semibold"><?= e($renewMemberName) ?> &middot; <?= e($renewMemberType === 'ASSOCIATE' ? 'Associate Member' : 'Full Member') ?></p>
+        <?php if (!empty($membershipPeriod['end_date'])): ?>
+          <p class="text-xs">Current period ends <?= e(format_date($membershipPeriod['end_date'])) ?>.</p>
+        <?php endif; ?>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900 mb-2">Renewal term</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-renew-term-group>
+          <?php $firstTerm = true; foreach ($renewOptions as $opt): ?>
+            <label class="relative cursor-pointer">
+              <input type="radio" name="term" value="<?= e($opt['months']) ?>" class="peer sr-only" data-renew-term-radio
+                data-self-amount="<?= e(number_format($opt['self_amount'], 2, '.', '')) ?>"
+                data-partner-amount="<?= e(number_format($opt['partner_amount'], 2, '.', '')) ?>"
+                <?= !$opt['self_available'] ? 'disabled' : '' ?>
+                <?= $firstTerm && $opt['self_available'] ? 'checked' : '' ?>>
+              <div class="rounded-xl border-2 border-gray-200 px-4 py-3 text-center peer-checked:border-red-600 peer-checked:bg-red-50 peer-disabled:opacity-40 transition-all">
+                <p class="text-sm font-bold text-gray-900"><?= e($opt['label']) ?></p>
+                <p class="mt-1 text-lg font-display font-bold text-red-700">$<?= e(number_format($opt['self_amount'], 2)) ?></p>
+                <p class="text-xs text-gray-500"><?= e($renewCurrency) ?></p>
+                <?php if (!$opt['self_available']): ?>
+                  <p class="text-[10px] text-amber-700 mt-1">Not configured</p>
+                <?php endif; ?>
+              </div>
+            </label>
+          <?php $firstTerm = false; endforeach; ?>
+        </div>
+      </div>
+      <?php if ($renewPartnerMember): ?>
+        <div>
+          <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
+            <input type="checkbox" name="include_partner" value="1" data-renew-partner-toggle
+              class="mt-0.5 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-600">
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-gray-900">Also renew my <?= e(strtolower($renewPartnerTypeLabel)) ?> member</p>
+              <p class="text-xs text-gray-600 mt-0.5"><?= e($renewPartnerName) ?> &middot; <?= e($renewPartnerTypeLabel) ?> Member</p>
+              <p class="text-xs text-red-700 mt-1 font-medium" data-renew-partner-price>+$<?= e(number_format($renewOptions['12']['partner_amount'], 2)) ?> for the same term</p>
+            </div>
+          </label>
+        </div>
+      <?php endif; ?>
+      <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-gray-600">You pay today</span>
+          <span class="text-xl font-display font-bold text-gray-900" data-renew-total>$<?= e(number_format($renewOptions['12']['self_amount'], 2)) ?> <?= e($renewCurrency) ?></span>
+        </div>
+        <p class="text-xs text-gray-500 flex items-center gap-1">
+          <span class="material-icons-outlined text-sm">lock</span>
+          Secure payment by card via Stripe.
+        </p>
+      </div>
+      <label class="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer">
+        <input type="checkbox" name="acknowledged" value="1" required
+          class="mt-0.5 h-5 w-5 rounded border-amber-300 text-red-600 focus:ring-red-600">
+        <span class="text-sm text-amber-900">
+          I confirm my membership details (name, address, contact, bike) are correct and up to date.
+          <a href="/member/index.php?page=profile" class="underline font-semibold ml-1">Review my details</a>
+        </span>
+      </label>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-100">
+        <button type="button" data-renew-cancel-trigger
+          class="text-xs text-gray-500 hover:text-red-700 underline self-start">Cancel my membership instead</button>
+        <div class="flex items-center gap-2">
+          <button type="button" data-renew-close
+            class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Close</button>
+          <button type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-md">
+            <span class="material-icons-outlined text-base">lock</span>
+            Continue to payment
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="renew-cancel-modal" class="hidden fixed inset-0 z-[60] items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md border-t-4 border-gray-900">
+    <div class="p-6 space-y-4">
+      <div class="flex items-start gap-3">
+        <span class="material-icons-outlined text-gray-700 text-3xl">warning_amber</span>
+        <div>
+          <h3 class="font-display text-lg font-bold text-gray-900">Cancel your membership?</h3>
+          <p class="text-sm text-gray-600 mt-1">Your membership will not auto-renew. You will keep access until your current paid period ends. Staff will be notified to follow up.</p>
+        </div>
+      </div>
+      <form method="post" action="/member/index.php?page=billing" class="space-y-3">
+        <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+        <input type="hidden" name="action" value="membership_cancel_request">
+        <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Reason (optional)</label>
+        <textarea name="reason" rows="2" placeholder="Help us improve — why are you leaving?"
+          class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:ring-gray-900"></textarea>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" data-renew-cancel-close
+            class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Keep my membership</button>
+          <button type="submit"
+            class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-900 hover:bg-black text-sm font-semibold text-white">Request cancellation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  (() => {
+    const modal = document.getElementById('renew-modal');
+    if (!modal) return;
+    const cancelModal = document.getElementById('renew-cancel-modal');
+    const triggers = document.querySelectorAll('[data-renew-trigger]');
+    const closers = modal.querySelectorAll('[data-renew-close]');
+    const termRadios = modal.querySelectorAll('[data-renew-term-radio]');
+    const partnerToggle = modal.querySelector('[data-renew-partner-toggle]');
+    const partnerPriceLabel = modal.querySelector('[data-renew-partner-price]');
+    const totalEl = modal.querySelector('[data-renew-total]');
+    const cancelTrigger = modal.querySelector('[data-renew-cancel-trigger]');
+    const cancelClosers = cancelModal ? cancelModal.querySelectorAll('[data-renew-cancel-close]') : [];
+    const currency = <?= json_encode($renewCurrency) ?>;
+
+    const open = (el) => {
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    };
+    const close = (el) => {
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+      document.body.style.overflow = '';
+    };
+    const fmt = (n) => '$' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const recalc = () => {
+      const selected = modal.querySelector('[data-renew-term-radio]:checked');
+      if (!selected) {
+        if (totalEl) totalEl.textContent = '—';
+        return;
+      }
+      const self = parseFloat(selected.dataset.selfAmount || '0');
+      const partner = parseFloat(selected.dataset.partnerAmount || '0');
+      const withPartner = partnerToggle && partnerToggle.checked;
+      const total = self + (withPartner ? partner : 0);
+      if (totalEl) totalEl.textContent = fmt(total) + ' ' + currency;
+      if (partnerPriceLabel) partnerPriceLabel.textContent = '+' + fmt(partner) + ' for the same term';
+    };
+
+    triggers.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); open(modal); recalc(); }));
+    closers.forEach((c) => c.addEventListener('click', () => close(modal)));
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(modal); });
+    termRadios.forEach((r) => r.addEventListener('change', recalc));
+    if (partnerToggle) partnerToggle.addEventListener('change', recalc);
+    if (cancelTrigger && cancelModal) {
+      cancelTrigger.addEventListener('click', () => { close(modal); open(cancelModal); });
+      cancelClosers.forEach((c) => c.addEventListener('click', () => close(cancelModal)));
+      cancelModal.addEventListener('click', (e) => { if (e.target === cancelModal) close(cancelModal); });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        close(modal);
+        if (cancelModal) close(cancelModal);
+      }
+    });
+  })();
+</script>
+<?php } ?>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
