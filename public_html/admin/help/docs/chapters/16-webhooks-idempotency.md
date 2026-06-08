@@ -126,7 +126,8 @@ The dispatcher in `stripe_webhook.php` routes on `$event['type']`:
 | Event type | Handler | What it does |
 |---|---|---|
 | `checkout.session.completed` | `handleCheckoutCompleted()` | Marks the `orders` row paid, saves `stripe_customer_id` on the member, activates the membership or store order, creates an invoice. For store orders also closes out the cart (`store_carts.status = 'converted'`) — see below. |
-| `payment_intent.succeeded` | `handlePaymentIntentSucceeded()` | Same, for the on-page Payment Element flows (store checkout + membership apply). Ignored if `intent.invoice` is set. Also closes out the cart for store orders. |
+| `payment_intent.succeeded` | `handlePaymentIntentSucceeded()` | Membership Payment Element flow + safety net for store. Skipped when `intent.invoice` is set — those events flow through `invoice.paid` below to keep the store invoice + PI in sync. Closes out the cart for store orders. |
+| `invoice.paid` | `handleInvoicePaid()` | **Primary event for store orders.** Resolves the order via `stripe_invoice_id` → `stripe_subscription_id` → `metadata.order_id`; for `order_type=store` rows hands off to `markStoreOrderPaid()` (cart conversion + stock + tickets + invoice email). For `order_type=membership` rows activates the membership period. |
 | `payment_intent.payment_failed`, `payment_intent.canceled` | `handlePaymentFailed()` | Marks the order `cancelled / failed`, dispatches `membership_payment_failed`. |
 | `charge.refunded` | `handleChargeRefunded()` | Marks order `refunded`, inserts a `refunds` row, demotes membership to `unpaid`, updates `store_orders.status`. |
 | `invoice.paid` | `handleInvoicePaid()` | Subscription invoices: backfills `stripe_invoice_id` / `stripe_subscription_id`, activates membership periods (including associate periods in `internal_notes`), reactivates the user. |
@@ -135,7 +136,7 @@ The dispatcher in `stripe_webhook.php` routes on `$event['type']`:
 
 Anything else gets recorded in `webhook_events` but no further action runs.
 
-> **Cart conversion happens here, not at checkout-create time.** For store orders, `markStoreOrderPaid()` (called by both `handleCheckoutCompleted` and `handlePaymentIntentSucceeded`) is what flips `store_carts.status` from `active` to `converted`. The `/api/stripe/create-payment-intent` endpoint deliberately leaves the cart `active` so a card decline or abandoned session doesn't lock the member out. The cart is looked up by `metadata.cart_id` on the PI/Session, with a fallback to the user's currently-active cart row.
+> **Cart conversion happens here, not at checkout-create time.** For store orders, `markStoreOrderPaid()` (called by `handleInvoicePaid`, `handleCheckoutCompleted`, and `handlePaymentIntentSucceeded`) is what flips `store_carts.status` from `active` to `converted`. The `/api/stripe/create-payment-intent` endpoint deliberately leaves the cart `active` so a card decline or abandoned session doesn't lock the member out. The cart is looked up by `metadata.cart_id` on the PI/Session, with a fallback to the user's currently-active cart row.
 
 After the dispatcher, `markProcessed($eventId, 'processed' | 'failed', $error)` updates the row, logs to `ActivityLogger`, and on failure calls `alertOnFailures()` which checks the threshold and may fire a Security Alert email.
 

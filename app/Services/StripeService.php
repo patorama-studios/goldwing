@@ -366,6 +366,180 @@ class StripeService
         return true;
     }
 
+    /* -----------------------------------------------------------------
+     * Product / Invoice helpers — used by StoreInvoiceService to mirror
+     * store products into Stripe's catalog and bill orders via Stripe
+     * Invoices (which natively show itemized line items in the dashboard).
+     * ----------------------------------------------------------------- */
+
+    public static function createProduct(array $payload): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $product = self::client($secret)->products->create($payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'product.create', $e, [
+                'name' => $payload['name'] ?? null,
+                'metadata' => $payload['metadata'] ?? null,
+            ]);
+            return null;
+        }
+        return $product->toArray();
+    }
+
+    public static function updateProduct(string $productId, array $payload): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $product = self::client($secret)->products->update($productId, $payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'product.update', $e, [
+                'product_id' => $productId,
+                'metadata' => $payload['metadata'] ?? null,
+            ]);
+            return null;
+        }
+        return $product->toArray();
+    }
+
+    public static function createCustomerSimple(array $payload): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $customer = self::client($secret)->customers->create($payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'customer.create', $e, [
+                'email' => $payload['email'] ?? null,
+            ]);
+            return null;
+        }
+        return $customer->toArray();
+    }
+
+    public static function createInvoice(array $payload, ?string $idempotencyKey = null): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        $options = [];
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            $options['idempotency_key'] = $idempotencyKey;
+        }
+        try {
+            $invoice = self::client($secret)->invoices->create($payload, $options);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.create', $e, [
+                'customer' => $payload['customer'] ?? null,
+                'metadata' => $payload['metadata'] ?? null,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+            return null;
+        }
+        return $invoice->toArray();
+    }
+
+    public static function createInvoiceItem(array $payload): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $item = self::client($secret)->invoiceItems->create($payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice_item.create', $e, [
+                'customer' => $payload['customer'] ?? null,
+                'invoice' => $payload['invoice'] ?? null,
+                'amount' => $payload['amount'] ?? null,
+                'description' => $payload['description'] ?? null,
+            ]);
+            return null;
+        }
+        return $item->toArray();
+    }
+
+    public static function finalizeInvoice(string $invoiceId, array $payload = []): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $invoice = self::client($secret)->invoices->finalizeInvoice($invoiceId, $payload);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.finalize', $e, [
+                'invoice_id' => $invoiceId,
+            ]);
+            return null;
+        }
+        return $invoice->toArray();
+    }
+
+    public static function retrieveInvoice(string $invoiceId, array $expand = []): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        $options = [];
+        if ($expand) {
+            $options['expand'] = $expand;
+        }
+        try {
+            $invoice = self::client($secret)->invoices->retrieve($invoiceId, $options);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.retrieve', $e, [
+                'invoice_id' => $invoiceId,
+            ]);
+            return null;
+        }
+        return $invoice->toArray();
+    }
+
+    public static function voidInvoice(string $invoiceId): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $invoice = self::client($secret)->invoices->voidInvoice($invoiceId);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.void', $e, [
+                'invoice_id' => $invoiceId,
+            ]);
+            return null;
+        }
+        return $invoice->toArray();
+    }
+
+    public static function retrievePaymentIntentSimple(string $paymentIntentId): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $intent = self::client($secret)->paymentIntents->retrieve($paymentIntentId);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'payment_intent.retrieve.simple', $e, [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+            return null;
+        }
+        return $intent->toArray();
+    }
+
     public static function constructEvent(string $payload, string $signature, string $secret): ?array
     {
         if ($secret === '') {

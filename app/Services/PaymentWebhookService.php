@@ -311,6 +311,7 @@ class PaymentWebhookService
 
         $pdo = Database::connection();
         $order = null;
+        $invoiceMetadata = is_array($invoice['metadata'] ?? null) ? $invoice['metadata'] : [];
         if ($invoiceId !== '') {
             $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_invoice_id = :invoice_id LIMIT 1');
             $stmt->execute(['invoice_id' => $invoiceId]);
@@ -321,9 +322,9 @@ class PaymentWebhookService
             $stmt->execute(['subscription_id' => $subscriptionId]);
             $order = $stmt->fetch();
         }
-        if (!$order && !empty($invoice['metadata']['order_id'])) {
+        if (!$order && !empty($invoiceMetadata['order_id'])) {
             $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
-            $stmt->execute(['id' => (int) $invoice['metadata']['order_id']]);
+            $stmt->execute(['id' => (int) $invoiceMetadata['order_id']]);
             $order = $stmt->fetch();
         }
         if (!$order) {
@@ -332,7 +333,7 @@ class PaymentWebhookService
                 'stripe_invoice_id' => $invoiceId !== '' ? $invoiceId : null,
                 'stripe_subscription_id' => $subscriptionId !== '' ? $subscriptionId : null,
                 'related_stripe_pi_id' => $paymentIntentId !== '' ? $paymentIntentId : null,
-                'metadata' => $invoice['metadata'] ?? null,
+                'metadata' => $invoiceMetadata,
             ]);
             return;
         }
@@ -344,6 +345,35 @@ class PaymentWebhookService
             'subscription_id' => $subscriptionId !== '' ? $subscriptionId : ($order['stripe_subscription_id'] ?? ''),
             'id' => (int) ($order['id'] ?? 0),
         ]);
+
+        // Store orders: hand off to markStoreOrderPaid which flips the order to
+        // paid, runs ticket/stock fulfillment, and converts the cart.
+        if (($order['order_type'] ?? '') === 'store') {
+            $storeOrderId = isset($invoiceMetadata['store_order_id']) ? (int) $invoiceMetadata['store_order_id'] : 0;
+            if ($storeOrderId <= 0) {
+                // Fall back to the store_orders row that matches our order_number
+                $stmt = $pdo->prepare('SELECT id FROM store_orders WHERE order_number = :n LIMIT 1');
+                $stmt->execute(['n' => $order['order_number'] ?? '']);
+                $storeOrderId = (int) ($stmt->fetchColumn() ?: 0);
+            }
+            if ($storeOrderId > 0) {
+                $cartId = isset($invoiceMetadata['cart_id']) && $invoiceMetadata['cart_id'] !== '' ? (int) $invoiceMetadata['cart_id'] : 0;
+                self::markStoreOrderPaid($storeOrderId, $paymentIntentId, null, $cartId);
+            } else {
+                StripeErrorLogger::logWebhookSkip(__METHOD__, 'store order: could not resolve store_order_id', [
+                    'event_id' => $event['id'] ?? null,
+                    'stripe_invoice_id' => $invoiceId,
+                    'order_number' => $order['order_number'] ?? null,
+                ]);
+            }
+            if (!self::invoiceExists((int) $order['id'])) {
+                $updatedOrder = OrderService::getOrderById((int) $order['id']);
+                if ($updatedOrder) {
+                    InvoiceService::createForOrder($updatedOrder);
+                }
+            }
+            return;
+        }
 
         if (($order['order_type'] ?? '') !== 'membership') {
             return;

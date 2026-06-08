@@ -9,6 +9,8 @@ use App\Services\MembershipService;
 use App\Services\PaymentSettingsService;
 use App\Services\PaymentWebhookService;
 use App\Services\StepUpService;
+use App\Services\StoreInvoiceService;
+use App\Services\StripeErrorLogger;
 use App\Services\StripeService;
 use App\Services\StripeSettingsService;
 use App\Services\SettingsService;
@@ -641,80 +643,40 @@ if ($resource === 'stripe') {
             ]);
         }
 
-        // Card flow: create a Stripe PaymentIntent for the order total and
-        // hand the client_secret back to the browser, which mounts a Stripe
-        // Payment Element to collect the card. The webhook
-        // (payment_intent.succeeded → markStoreOrderPaid) finalizes the order
-        // and converts the cart. We deliberately do NOT mark the cart
-        // converted here — if the user abandons or the card declines they
-        // can return to the same cart.
+        // Card flow: build a Stripe Invoice (with itemized line items per
+        // product, plus shipping / discount / processing-fee lines) and hand
+        // its PaymentIntent client_secret to the browser. The Payment Element
+        // confirms the PI; the `invoice.paid` webhook finalizes the order and
+        // converts the cart. Cart is intentionally NOT marked converted here.
 
         $amountCents = (int) round((float) $totals['total'] * 100);
         if ($amountCents <= 0) {
             json_response(['error' => 'Order total must be greater than zero.'], 422);
         }
 
-        $requestId = trim((string) ($body['request_id'] ?? ''));
-        $intentIdempotency = 'store_order_' . $storeOrderId;
-        if ($requestId !== '') {
-            $intentIdempotency .= '_' . substr(preg_replace('/[^A-Za-z0-9_-]/', '', $requestId), 0, 32);
-        }
-
-        $intentPayload = [
-            'amount' => $amountCents,
-            'currency' => 'aud',
-            'automatic_payment_methods' => ['enabled' => true],
-            'metadata' => [
-                'order_id' => (string) $orderId,
-                'channel_id' => (string) $channelId,
-                'order_type' => 'store',
-                'store_order_id' => (string) $storeOrderId,
-                'store_order_number' => (string) $orderNumber,
-                'user_id' => (string) ($user['id'] ?? ''),
-                'is_guest' => $user ? '0' : '1',
-                'cart_id' => (string) ($cart['id'] ?? ''),
-            ],
-        ];
-        if ($customerEmail !== '') {
-            $intentPayload['receipt_email'] = $customerEmail;
-        }
-        if ($requiresShipping && $fulfillment === 'shipping') {
-            $intentPayload['shipping'] = [
-                'name' => $shipping['name'] !== '' ? $shipping['name'] : $customerName,
-                'address' => [
-                    'line1' => $shipping['line1'],
-                    'line2' => $shipping['line2'] !== '' ? $shipping['line2'] : null,
-                    'city' => $shipping['city'],
-                    'state' => $shipping['state'],
-                    'postal_code' => $shipping['postal'],
-                    'country' => 'AU',
-                ],
-            ];
-        }
-
         try {
-            $intent = StripeService::createPaymentIntent($intentPayload, $intentIdempotency);
+            $invoiceBundle = StoreInvoiceService::ensureInvoiceForOrder(
+                $storeOrderId,
+                isset($cart['id']) ? (int) $cart['id'] : null
+            );
         } catch (Throwable $e) {
-            json_response(['error' => 'Unable to start checkout.'], 500);
-        }
-        if (!$intent || empty($intent['client_secret'])) {
-            json_response(['error' => 'Unable to start checkout.'], 500);
+            StripeErrorLogger::log('api.create-payment-intent', 'store.invoice.create', $e, [
+                'store_order_id' => $storeOrderId,
+                'order_id' => $orderId,
+                'amount_cents' => $amountCents,
+            ]);
+            json_response(['error' => 'Unable to start checkout. Please contact support.'], 500);
         }
 
-        $paymentIntentId = (string) ($intent['id'] ?? '');
-        if ($paymentIntentId !== '') {
-            $stmt = $pdo->prepare('UPDATE store_orders SET stripe_payment_intent_id = :payment_intent_id, updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['payment_intent_id' => $paymentIntentId, 'id' => $storeOrderId]);
-            $stmt = $pdo->prepare('UPDATE orders SET payment_method = "stripe", payment_status = "pending", stripe_payment_intent_id = :payment_intent_id, updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['payment_intent_id' => $paymentIntentId, 'id' => $orderId]);
-        } else {
-            $stmt = $pdo->prepare('UPDATE orders SET payment_method = "stripe", payment_status = "pending", updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['id' => $orderId]);
+        if (empty($invoiceBundle['client_secret'])) {
+            json_response(['error' => 'Unable to start checkout. Please contact support.'], 500);
         }
 
         json_response([
-            'client_secret' => $intent['client_secret'],
-            'payment_intent_id' => $paymentIntentId,
+            'client_secret' => $invoiceBundle['client_secret'],
+            'payment_intent_id' => $invoiceBundle['payment_intent_id'] ?? '',
+            'invoice_id' => $invoiceBundle['invoice_id'] ?? '',
+            'invoice_url' => $invoiceBundle['invoice_url'] ?? null,
             'orderId' => $orderId,
             'storeOrderId' => $storeOrderId,
             'orderNumber' => $orderNumber,

@@ -2370,6 +2370,71 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 031 — Stripe product + invoice sync for store
+//
+// Adds `store_products.stripe_product_id` so each store product can be mirrored
+// in Stripe's product catalog, and `store_orders.stripe_invoice_id` so we can
+// link a finalized Stripe Invoice back to our order row from the
+// `invoice.paid` webhook. Both columns are nullable VARCHAR(120) with indexes.
+// See: database/migrations/2026_06_08_store_stripe_sync.sql
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_031_store_stripe_sync';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 031 — Stripe product + invoice sync (store)', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $addColumnIfMissing = function (string $table, string $column, string $ddl) use ($pdo, &$applied) {
+            $exists = (bool) $pdo->query("SHOW COLUMNS FROM {$table} LIKE " . $pdo->quote($column))->fetchColumn();
+            if ($exists) {
+                $applied[] = "`{$table}.{$column}` already present";
+                return;
+            }
+            try {
+                $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$ddl}");
+                $applied[] = "`{$table}.{$column}` added";
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false) {
+                    throw $e;
+                }
+                $applied[] = "`{$table}.{$column}` already present (caught duplicate)";
+            }
+        };
+
+        $addIndexIfMissing = function (string $table, string $index, string $ddl) use ($pdo, &$applied) {
+            $exists = (bool) $pdo->query("SHOW INDEX FROM {$table} WHERE Key_name = " . $pdo->quote($index))->fetchColumn();
+            if ($exists) {
+                $applied[] = "`{$table}.{$index}` index already present";
+                return;
+            }
+            try {
+                $pdo->exec("ALTER TABLE {$table} ADD INDEX {$index} {$ddl}");
+                $applied[] = "`{$table}.{$index}` index added";
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false && stripos($e->getMessage(), 'exists') === false) {
+                    throw $e;
+                }
+                $applied[] = "`{$table}.{$index}` index already present (caught duplicate)";
+            }
+        };
+
+        $addColumnIfMissing('store_products', 'stripe_product_id', 'VARCHAR(120) NULL');
+        $addIndexIfMissing('store_products', 'idx_store_products_stripe', '(stripe_product_id)');
+        $addColumnIfMissing('store_orders', 'stripe_invoice_id', 'VARCHAR(120) NULL');
+        $addIndexIfMissing('store_orders', 'idx_store_orders_stripe_invoice', '(stripe_invoice_id)');
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 031 — Stripe product + invoice sync (store)', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 031 — Stripe product + invoice sync (store)', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
