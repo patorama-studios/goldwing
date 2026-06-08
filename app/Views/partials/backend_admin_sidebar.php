@@ -139,18 +139,23 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
 if (!$isSettingsActive && $currentPath && strpos($currentPath, '/admin/settings/') === 0) {
     $isSettingsActive = true;
 }
-// Keep the admin sidebar logo consistent with the member area.
-$logoUrl = '/uploads/library/2023/good-logo-cropped.png';
+// Dark admin sidebar uses the white-text logo so the Admin shell is visually
+// distinct from the member portal.
+$logoUrl = '/uploads/library/2023/good-logo-cropped-white.png';
 ?>
-<aside class="w-64 flex flex-col bg-card-light border-r border-gray-200 shadow-sm z-40 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-200 ease-out md:translate-x-0 md:static md:flex" data-backend-sidebar aria-hidden="true">
-  <div class="border-b border-gray-100 px-6 py-5">
+<aside class="admin-sidebar w-64 flex flex-col shadow-sm z-40 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-200 ease-out md:translate-x-0 md:static md:flex" style="background-color: #1c1a17;" data-backend-sidebar aria-hidden="true">
+  <div class="px-6 py-5" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
     <div class="flex flex-col items-center text-center gap-2">
       <img src="<?= e($logoUrl) ?>" alt="Goldwing logo" class="h-36 w-auto">
       <div>
-        <p class="font-display text-lg font-bold text-gray-900">Admin Area</p>
-        <p class="text-sm text-gray-500">Welcome <?= e($user['name'] ?? 'Admin') ?></p>
+        <p class="font-display text-lg font-bold text-white">Admin Area</p>
+        <p class="text-sm" style="color: rgba(255,255,255,0.6);">Welcome <?= e($user['name'] ?? 'Admin') ?></p>
       </div>
     </div>
+    <a href="/member/index.php" class="mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors bg-primary text-gray-900 hover:bg-primary/90">
+      <span class="material-icons-outlined text-base">switch_account</span>
+      View as Member
+    </a>
   </div>
   <?php
     $groups = [];
@@ -182,7 +187,7 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
     <?php $isFirstGroup = true; foreach ($groups as $groupName => $groupItems): ?>
       <?php $isActiveGroup = $groupName === $activeGroup; ?>
       <details class="sidebar-cat" data-sidebar-group="<?= e($groupName) ?>" data-active-group="<?= $isActiveGroup ? '1' : '0' ?>" <?= $isActiveGroup ? 'open' : '' ?>>
-        <summary class="flex items-center justify-between cursor-pointer list-none px-3 <?= $isFirstGroup ? 'pt-1' : 'pt-4 mt-2 border-t border-gray-100' ?> pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors">
+        <summary class="admin-sidebar-group-summary flex items-center justify-between cursor-pointer list-none px-3 <?= $isFirstGroup ? 'pt-1' : 'pt-4 mt-2 admin-sidebar-group-divider' ?> pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors">
           <span><?= e($groupName) ?></span>
           <span class="material-icons-outlined text-sm sidebar-cat-chevron transition-transform">expand_more</span>
         </summary>
@@ -201,8 +206,8 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                 }
               ?>
               <?php $isMuted = !empty($item['muted']); ?>
-              <details class="group rounded-lg <?= $isDropdownActive ? 'bg-primary/5' : '' ?> <?= $isMuted ? 'opacity-60' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
-                <summary class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'text-gray-900' : ($isMuted ? 'text-gray-500 hover:bg-gray-50' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900') ?>">
+              <details class="group rounded-lg <?= $isDropdownActive ? 'admin-sidebar-item-active' : '' ?> <?= $isMuted ? 'opacity-60' : '' ?>" <?= $isDropdownActive ? 'open' : '' ?>>
+                <summary class="admin-sidebar-item flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer list-none transition-colors <?= $isDropdownActive ? 'is-active' : '' ?> <?= $isMuted ? 'is-muted' : '' ?>">
                   <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
                   <span class="flex-1"><?= e($item['label']) ?></span>
                   <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
@@ -218,7 +223,7 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                           $isChildActive = true;
                       }
                     ?>
-                    <a class="block rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($child['href']) ?>">
+                    <a class="admin-sidebar-child <?= $isChildActive ? 'is-active' : '' ?> block rounded-lg px-3 py-2 text-sm font-medium transition-colors" href="<?= e($child['href']) ?>">
                       <?= e($child['label']) ?>
                     </a>
                   <?php endforeach; ?>
@@ -232,7 +237,7 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
                 }
                 $badge = (int) ($item['badge'] ?? 0);
               ?>
-              <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>" href="<?= e($item['href']) ?>">
+              <a class="admin-sidebar-item flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'is-active' : '' ?>" href="<?= e($item['href']) ?>">
                 <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
                 <span class="flex-1"><?= e($item['label']) ?></span>
                 <?php if ($badge > 0): ?>
@@ -250,6 +255,22 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
     details[data-sidebar-group] > summary::-webkit-details-marker { display: none; }
     details[data-sidebar-group] > summary { list-style: none; }
     details[data-sidebar-group][open] > summary .sidebar-cat-chevron { transform: rotate(180deg); }
+
+    /* Dark admin sidebar palette */
+    .admin-sidebar-group-summary { color: rgba(255,255,255,0.5); }
+    .admin-sidebar-group-summary:hover { color: rgba(255,255,255,0.85); }
+    .admin-sidebar-group-divider { border-top: 1px solid rgba(255,255,255,0.08); }
+
+    .admin-sidebar-item { color: rgba(255,255,255,0.82); }
+    .admin-sidebar-item:hover { background-color: rgba(255,255,255,0.06); color: #ffffff; }
+    .admin-sidebar-item.is-active { background-color: rgba(255,255,255,0.12); color: #ffffff; }
+    .admin-sidebar-item.is-muted { color: rgba(255,255,255,0.45); }
+    .admin-sidebar-item.is-muted:hover { background-color: rgba(255,255,255,0.04); color: rgba(255,255,255,0.7); }
+    .admin-sidebar-item-active { background-color: rgba(255,255,255,0.04); }
+
+    .admin-sidebar-child { color: rgba(255,255,255,0.65); }
+    .admin-sidebar-child:hover { background-color: rgba(255,255,255,0.06); color: #ffffff; }
+    .admin-sidebar-child.is-active { background-color: rgba(255,255,255,0.12); color: #ffffff; }
   </style>
   <script>
   (function() {
@@ -271,17 +292,17 @@ $logoUrl = '/uploads/library/2023/good-logo-cropped.png';
     } catch (e) {}
   })();
   </script>
-  <div class="p-4 border-t border-gray-100">
+  <div class="p-4" style="border-top: 1px solid rgba(255,255,255,0.08);">
     <div class="flex items-center gap-3 px-4 py-3">
       <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-gray-900 font-bold text-xs">
         <?= e(strtoupper(substr($user['name'] ?? 'A', 0, 2))) ?>
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-900 truncate"><?= e($user['name'] ?? 'Admin') ?></p>
-        <p class="text-xs text-gray-500 truncate"><?= e($user['email'] ?? '') ?></p>
+        <p class="text-sm font-medium text-white truncate"><?= e($user['name'] ?? 'Admin') ?></p>
+        <p class="text-xs truncate" style="color: rgba(255,255,255,0.55);"><?= e($user['email'] ?? '') ?></p>
       </div>
     </div>
-    <a class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" href="/logout.php">
+    <a class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors" style="color: #fca5a5; background-color: rgba(220,38,38,0.12);" onmouseover="this.style.backgroundColor='rgba(220,38,38,0.2)'" onmouseout="this.style.backgroundColor='rgba(220,38,38,0.12)'" href="/logout.php">
       <span class="material-icons-outlined text-lg">logout</span>
       Logout
     </a>
