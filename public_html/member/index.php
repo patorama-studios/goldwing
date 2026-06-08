@@ -22,6 +22,7 @@ use App\Services\MemberRepository;
 use App\Services\SecurityPolicyService;
 use App\Services\TwoFactorService;
 use App\Services\OrderService;
+use App\Services\NotificationService;
 
 $require_once = require_once __DIR__ . '/../../calendar/lib/calendar_occurrences.php';
 
@@ -829,6 +830,7 @@ if ($user && $user['member_id']) {
             $startDate = date('Y-m-d');
             $lineItems = [];
             $createdOrderIds = [];
+            $createdOrderRows = [];
             $createdPeriodIds = [];
             $renewError = null;
             $termYearsLabel = $termMonths === '36' ? '3 years' : ($termMonths === '24' ? '2 years' : '1 year');
@@ -866,6 +868,11 @@ if ($user && $user['member_id']) {
                 break;
               }
               $createdOrderIds[] = (int) ($order['id'] ?? 0);
+              $createdOrderRows[] = [
+                'order_number' => (string) ($order['order_number'] ?? ''),
+                'member_email' => (string) ($rMember['email'] ?? ''),
+                'member_name' => trim(((string) ($rMember['first_name'] ?? '')) . ' ' . ((string) ($rMember['last_name'] ?? ''))),
+              ];
               $lineItems[] = [
                 'name' => $itemLabel,
                 'unit_amount' => $amountCents,
@@ -895,6 +902,22 @@ if ($user && $user['member_id']) {
                   if ($oid > 0) {
                     OrderService::updateStripeSession($oid, $session['id']);
                   }
+                }
+                $resumeLink = (string) ($session['url'] ?? BaseUrlService::buildUrl('/member/index.php?page=billing'));
+                $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+                foreach ($createdOrderRows as $created) {
+                  if ($created['member_email'] === '') {
+                    continue;
+                  }
+                  NotificationService::dispatch('membership_order_created', [
+                    'primary_email' => $created['member_email'],
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'member_name' => $created['member_name'],
+                    'order_number' => $created['order_number'],
+                    'payment_link' => NotificationService::escape($resumeLink),
+                    'payment_method' => 'stripe',
+                    'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+                  ]);
                 }
                 header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
                 exit;

@@ -168,15 +168,56 @@ class PaymentWebhookService
             'reason' => $reason,
         ]);
 
+        $refundAmountCents = 0;
+        if (isset($charge['amount_refunded'])) {
+            $refundAmountCents = (int) $charge['amount_refunded'];
+        } elseif (isset($refunds[0]['amount'])) {
+            $refundAmountCents = (int) $refunds[0]['amount'];
+        }
+        $refundAmountFormatted = 'A$' . number_format(max(0, $refundAmountCents) / 100, 2);
+        $reasonText = $reason !== null && $reason !== '' ? $reason : 'Refund issued by Stripe.';
+
         if (($order['order_type'] ?? '') === 'membership') {
             MembershipOrderService::markOrderRefunded($order, 'Stripe refund received.');
             $stmt = $pdo->prepare('UPDATE memberships SET status = "unpaid", updated_at = NOW() WHERE order_id = :order_id');
             $stmt->execute(['order_id' => $order['id']]);
+
+            if (!empty($order['member_id'])) {
+                $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => (int) $order['member_id']]);
+                $member = $stmt->fetch();
+                if ($member && !empty($member['email'])) {
+                    NotificationService::dispatch('membership_refund_processed', [
+                        'primary_email' => $member['email'],
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                        'order_number' => $order['order_number'] ?? '',
+                        'refund_amount' => NotificationService::escape($refundAmountFormatted),
+                        'refund_reason' => NotificationService::escape($reasonText),
+                    ]);
+                }
+            }
         }
 
         if ($paymentIntentId !== '') {
             $stmt = $pdo->prepare('UPDATE store_orders SET status = "refunded", updated_at = NOW() WHERE stripe_payment_intent_id = :payment_intent_id');
             $stmt->execute(['payment_intent_id' => $paymentIntentId]);
+
+            if (($order['order_type'] ?? '') === 'store') {
+                $stmt = $pdo->prepare('SELECT customer_email, customer_name, order_number FROM store_orders WHERE stripe_payment_intent_id = :payment_intent_id LIMIT 1');
+                $stmt->execute(['payment_intent_id' => $paymentIntentId]);
+                $storeOrder = $stmt->fetch();
+                $customerEmail = (string) ($storeOrder['customer_email'] ?? '');
+                if ($customerEmail !== '') {
+                    NotificationService::dispatch('store_refund_processed', [
+                        'primary_email' => $customerEmail,
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'order_number' => NotificationService::escape((string) ($storeOrder['order_number'] ?? ($order['order_number'] ?? ''))),
+                        'refund_amount' => NotificationService::escape($refundAmountFormatted),
+                        'refund_reason' => NotificationService::escape($reasonText),
+                    ]);
+                }
+            }
         }
     }
 
@@ -449,6 +490,26 @@ class PaymentWebhookService
             $stmt = $pdo->prepare('UPDATE membership_periods SET status = "PENDING_PAYMENT" WHERE id = :id');
             $stmt->execute(['id' => $periodId]);
         }
+
+        if (($order['order_type'] ?? '') === 'membership' && !empty($order['member_id'])) {
+            $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $order['member_id']]);
+            $member = $stmt->fetch();
+            if ($member && !empty($member['email'])) {
+                $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+                NotificationService::dispatch('membership_payment_failed', [
+                    'primary_email' => $member['email'],
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                    'order_number' => $order['order_number'] ?? '',
+                    'payment_link' => NotificationService::escape($paymentLink),
+                ]);
+                ActivityLogger::log('system', null, (int) $order['member_id'], 'membership.invoice_payment_failed', [
+                    'order_id' => $order['id'],
+                    'invoice_id' => $invoiceId,
+                ]);
+            }
+        }
     }
 
     public static function handleSubscriptionUpdated(array $event): void
@@ -494,6 +555,25 @@ class PaymentWebhookService
             if ($memberId > 0) {
                 $stmt = $pdo->prepare('UPDATE members SET status = "INACTIVE", updated_at = NOW() WHERE id = :id');
                 $stmt->execute(['id' => $memberId]);
+
+                $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $memberId]);
+                $member = $stmt->fetch();
+                if ($member && !empty($member['email'])) {
+                    $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+                    NotificationService::dispatch('membership_subscription_cancelled', [
+                        'primary_email' => $member['email'],
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                        'order_number' => $order['order_number'] ?? '',
+                        'payment_link' => NotificationService::escape($paymentLink),
+                    ]);
+                    ActivityLogger::log('system', null, $memberId, 'membership.subscription_cancelled', [
+                        'order_id' => $order['id'] ?? null,
+                        'subscription_id' => $subscriptionId,
+                        'subscription_status' => $status,
+                    ]);
+                }
             }
         }
     }

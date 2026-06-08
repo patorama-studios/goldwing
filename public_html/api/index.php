@@ -19,6 +19,7 @@ use App\Services\Validator;
 use App\Services\MembershipPricingService;
 use App\Services\MemberRepository;
 use App\Services\MediaService;
+use App\Services\NotificationService;
 
 header('Content-Type: application/json');
 
@@ -2055,13 +2056,55 @@ if ($resource === 'admin' && count($segments) >= 3 && $segments[1] === 'refunds'
         'reason' => $body['reason'] ?? null,
     ]);
 
+    $refundAmountCents = (int) ($refund['amount'] ?? 0);
+    if ($refundAmountCents <= 0) {
+        $refundAmountCents = (int) round(((float) ($order['total'] ?? 0)) * 100);
+    }
+    $refundAmountFormatted = 'A$' . number_format(max(0, $refundAmountCents) / 100, 2);
+    $reasonText = trim((string) ($body['reason'] ?? ''));
+    if ($reasonText === '') {
+        $reasonText = 'Refund issued by admin.';
+    }
+
     if (($order['order_type'] ?? '') === 'membership') {
         $stmt = $pdo->prepare('UPDATE memberships SET status = "unpaid", updated_at = NOW() WHERE order_id = :order_id');
         $stmt->execute(['order_id' => $orderId]);
+
+        if (!empty($order['member_id'])) {
+            $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $order['member_id']]);
+            $member = $stmt->fetch();
+            if ($member && !empty($member['email'])) {
+                NotificationService::dispatch('membership_refund_processed', [
+                    'primary_email' => $member['email'],
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                    'order_number' => $order['order_number'] ?? '',
+                    'refund_amount' => NotificationService::escape($refundAmountFormatted),
+                    'refund_reason' => NotificationService::escape($reasonText),
+                ]);
+            }
+        }
     }
     if (!empty($order['stripe_payment_intent_id'])) {
         $stmt = $pdo->prepare('UPDATE store_orders SET status = "refunded", updated_at = NOW() WHERE stripe_payment_intent_id = :payment_intent_id');
         $stmt->execute(['payment_intent_id' => $order['stripe_payment_intent_id']]);
+
+        if (($order['order_type'] ?? '') === 'store') {
+            $stmt = $pdo->prepare('SELECT customer_email, order_number FROM store_orders WHERE stripe_payment_intent_id = :payment_intent_id LIMIT 1');
+            $stmt->execute(['payment_intent_id' => $order['stripe_payment_intent_id']]);
+            $storeOrder = $stmt->fetch();
+            $customerEmail = (string) ($storeOrder['customer_email'] ?? '');
+            if ($customerEmail !== '') {
+                NotificationService::dispatch('store_refund_processed', [
+                    'primary_email' => $customerEmail,
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'order_number' => NotificationService::escape((string) ($storeOrder['order_number'] ?? ($order['order_number'] ?? ''))),
+                    'refund_amount' => NotificationService::escape($refundAmountFormatted),
+                    'refund_reason' => NotificationService::escape($reasonText),
+                ]);
+            }
+        }
     }
 
     json_response(['success' => true, 'refund_id' => $refund['id'] ?? null]);

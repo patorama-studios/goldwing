@@ -203,8 +203,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$canManage) {
                 $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to manage orders.'];
             } else {
+                $cancelReason = trim((string) ($_POST['cancel_reason'] ?? ''));
                 store_apply_order_status($pdo, (int) $order['id'], 'cancelled');
-                store_add_order_event($pdo, (int) $order['id'], 'order.cancelled', 'Order cancelled.', $user['id'] ?? null);
+                store_add_order_event($pdo, (int) $order['id'], 'order.cancelled', 'Order cancelled.', $user['id'] ?? null, [
+                    'reason' => $cancelReason,
+                ]);
+                if (!empty($order['customer_email'])) {
+                    $cancelName = trim(((string) ($order['first_name'] ?? '')) . ' ' . ((string) ($order['last_name'] ?? '')));
+                    if ($cancelName === '') {
+                        $cancelName = (string) ($order['customer_name'] ?? '');
+                    }
+                    NotificationService::dispatch('store_order_cancelled', [
+                        'primary_email' => $order['customer_email'],
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'member_name' => $cancelName,
+                        'order_number' => NotificationService::escape((string) ($order['order_number'] ?? $order['id'])),
+                        'cancel_reason' => NotificationService::escape($cancelReason !== '' ? $cancelReason : 'No reason provided.'),
+                    ]);
+                }
                 $alerts[] = ['type' => 'success', 'message' => 'Order cancelled.'];
             }
         }
@@ -215,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $reason = trim((string) ($_POST['void_reason'] ?? ''));
                 OrderAdminService::voidStoreOrder((int) $order['id'], (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+                OrderAdminService::sendStoreOrderVoidedNotification((int) $order['id'], $reason !== '' ? $reason : null);
                 $alerts[] = ['type' => 'success', 'message' => 'Order voided. It is hidden from default lists but kept on file.'];
             }
         }

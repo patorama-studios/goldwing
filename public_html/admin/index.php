@@ -1447,6 +1447,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               if ($linkedStoreId) {
                 OrderAdminService::voidStoreOrder($linkedStoreId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
               }
+              OrderAdminService::sendOrderVoidedNotification($orderId, $reason !== '' ? $reason : null);
               $alerts[] = ['type' => 'success', 'message' => 'Order voided.'];
             } elseif ($orderAction === 'unvoid_order') {
               OrderAdminService::unvoidMembershipOrder($orderId);

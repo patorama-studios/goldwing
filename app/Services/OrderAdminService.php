@@ -170,6 +170,116 @@ class OrderAdminService
         }
     }
 
+    /**
+     * Send the `order_voided` notification for a row in the unified `orders`
+     * table. Callers opt in after calling voidMembershipOrder() so the void/
+     * delete methods themselves stay pure data ops.
+     */
+    public static function sendOrderVoidedNotification(int $orderId, ?string $reason): void
+    {
+        if ($orderId <= 0) {
+            return;
+        }
+        $pdo = Database::connection();
+        try {
+            $stmt = $pdo->prepare('SELECT id, order_number, order_type, member_id, user_id FROM orders WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $orderId]);
+            $row = $stmt->fetch();
+        } catch (Throwable $e) {
+            return;
+        }
+        if (!$row) {
+            return;
+        }
+        $email = '';
+        $firstName = '';
+        $lastName = '';
+        if (!empty($row['member_id'])) {
+            $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $row['member_id']]);
+            $m = $stmt->fetch();
+            if ($m) {
+                $email = (string) ($m['email'] ?? '');
+                $firstName = (string) ($m['first_name'] ?? '');
+                $lastName = (string) ($m['last_name'] ?? '');
+            }
+        }
+        if ($email === '' && !empty($row['user_id'])) {
+            $stmt = $pdo->prepare('SELECT name, email FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $row['user_id']]);
+            $u = $stmt->fetch();
+            if ($u) {
+                $email = (string) ($u['email'] ?? '');
+                if ($firstName === '' && !empty($u['name'])) {
+                    $firstName = (string) $u['name'];
+                }
+            }
+        }
+        if ($email === '') {
+            return;
+        }
+        $typeRaw = (string) ($row['order_type'] ?? '');
+        $typeLabel = $typeRaw === 'membership' ? 'membership' : ($typeRaw === 'store' ? 'store' : 'order');
+        $reasonText = trim((string) ($reason ?? ''));
+        if ($reasonText === '') {
+            $reasonText = 'No reason provided.';
+        }
+        NotificationService::dispatch('order_voided', [
+            'primary_email' => $email,
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'member_name' => trim($firstName . ' ' . $lastName),
+            'order_number' => (string) ($row['order_number'] ?? ''),
+            'order_type_label' => $typeLabel,
+            'void_reason' => NotificationService::escape($reasonText),
+        ]);
+    }
+
+    /**
+     * Same as sendOrderVoidedNotification but for rows in the separate
+     * `store_orders` table (used by /admin/store/orders bulk void and the
+     * single-order view).
+     */
+    public static function sendStoreOrderVoidedNotification(int $storeOrderId, ?string $reason): void
+    {
+        if ($storeOrderId <= 0) {
+            return;
+        }
+        $pdo = Database::connection();
+        try {
+            $stmt = $pdo->prepare('SELECT o.id, o.order_number, o.customer_email, o.customer_name, m.first_name, m.last_name, m.email AS member_email FROM store_orders o LEFT JOIN members m ON m.id = o.member_id WHERE o.id = :id LIMIT 1');
+            $stmt->execute(['id' => $storeOrderId]);
+            $row = $stmt->fetch();
+        } catch (Throwable $e) {
+            return;
+        }
+        if (!$row) {
+            return;
+        }
+        $email = (string) ($row['customer_email'] ?? '');
+        if ($email === '') {
+            $email = (string) ($row['member_email'] ?? '');
+        }
+        if ($email === '') {
+            return;
+        }
+        $name = trim(((string) ($row['first_name'] ?? '')) . ' ' . ((string) ($row['last_name'] ?? '')));
+        if ($name === '') {
+            $name = (string) ($row['customer_name'] ?? '');
+        }
+        $reasonText = trim((string) ($reason ?? ''));
+        if ($reasonText === '') {
+            $reasonText = 'No reason provided.';
+        }
+        NotificationService::dispatch('order_voided', [
+            'primary_email' => $email,
+            'admin_emails' => NotificationService::getAdminEmails(),
+            'member_name' => $name,
+            'order_number' => (string) ($row['order_number'] ?? ''),
+            'order_type_label' => 'store',
+            'void_reason' => NotificationService::escape($reasonText),
+        ]);
+    }
+
     private static function tableExists(PDO $pdo, string $table): bool
     {
         try {

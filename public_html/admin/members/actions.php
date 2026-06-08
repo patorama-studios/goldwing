@@ -1355,6 +1355,18 @@ switch ($action) {
                 'membership_type' => $membershipType['name'] ?? 'Member',
                 'renewal_date' => $endDate ?: 'N/A',
             ]);
+        } elseif ($membershipStatus === 'pending' && !empty($member['email'])) {
+            $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+            $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+            NotificationService::dispatch('membership_order_created', [
+                'primary_email' => $member['email'],
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                'order_number' => $orderNumber !== '' ? $orderNumber : '',
+                'payment_link' => NotificationService::escape($paymentLink),
+                'payment_method' => $paymentMethod,
+                'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+            ]);
         }
 
         redirectWithFlash($memberId, $tab, 'Manual membership order saved.');
@@ -1548,6 +1560,7 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
         }
         OrderAdminService::voidMembershipOrder($orderId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+        OrderAdminService::sendOrderVoidedNotification($orderId, $reason !== '' ? $reason : null);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.order_voided', [
             'order_id' => $orderId,
             'order_number' => $order['order_number'] ?? null,
@@ -1626,6 +1639,7 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Store order not found.', 'error');
         }
         OrderAdminService::voidStoreOrder($orderId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+        OrderAdminService::sendStoreOrderVoidedNotification($orderId, $reason !== '' ? $reason : null);
         ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'store.order_voided', [
             'order_id' => $orderId,
             'order_number' => $order['order_number'] ?? null,

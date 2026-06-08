@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 foreach ($orderIds as $orderId) {
                     OrderAdminService::voidStoreOrder((int) $orderId, (int) ($user['id'] ?? 0), null);
+                    OrderAdminService::sendStoreOrderVoidedNotification((int) $orderId, null);
                 }
                 $alerts[] = ['type' => 'success', 'message' => count($orderIds) . ' order(s) voided.'];
             }
