@@ -755,15 +755,7 @@ if ($user && $user['member_id']) {
           $termCode = $termMonths . 'M';
           $includePartner = !empty($_POST['include_partner']);
 
-          $pendingOrderId = 0;
-          if ($ordersMemberColumn && $ordersMemberValue) {
-            $stmt = $pdo->prepare('SELECT id FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" AND ' . $ordersPaymentStatusColumn . ' = "pending" ORDER BY created_at DESC LIMIT 1');
-            $stmt->execute(['value' => $ordersMemberValue]);
-            $pendingOrderId = (int) $stmt->fetchColumn();
-          }
-          if ($pendingOrderId > 0) {
-            $billingMessage = 'You already have a pending membership order.';
-          } else {
+          {
             $renewers = [['member' => $member, 'role' => 'self']];
             $partner = null;
             if ($includePartner) {
@@ -775,6 +767,52 @@ if ($user && $user['member_id']) {
             }
             if ($partner && strtoupper((string) ($partner['member_type'] ?? '')) !== 'LIFE') {
               $renewers[] = ['member' => $partner, 'role' => 'partner'];
+            }
+
+            // Void any prior PENDING_PAYMENT periods + pending/failed orders for
+            // every renewer in this transaction. If the member already started a
+            // renewal and bailed out of Stripe, we want THIS submission's term
+            // and price to be what ships — not the abandoned attempt.
+            $renewerMemberIds = [];
+            $renewerOrderValues = [];
+            foreach ($renewers as $r) {
+              $rid = (int) ($r['member']['id'] ?? 0);
+              if ($rid > 0) {
+                $renewerMemberIds[] = $rid;
+              }
+              if ($ordersMemberColumn) {
+                $val = orders_member_value($r['member'], $user ?? [], $ordersMemberColumn);
+                if ($val !== null) {
+                  $renewerOrderValues[] = (int) $val;
+                }
+              }
+            }
+            // Mark old pending/failed membership orders as cancelled. Voiding
+            // (voided_at) would also work, but `cancelled` is the same status
+            // markOrderRejected/Failed use and keeps the row visible in audit.
+            if ($renewerOrderValues && $ordersMemberColumn) {
+              $placeholders = implode(',', array_fill(0, count($renewerOrderValues), '?'));
+              $orderUpdate = $pdo->prepare(
+                'UPDATE orders SET status = "cancelled", '
+                . $ordersPaymentStatusColumn . ' = "cancelled", updated_at = NOW(), '
+                . 'internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" '
+                . 'THEN "Superseded by new renewal attempt" '
+                . 'ELSE CONCAT(internal_notes, "\nSuperseded by new renewal attempt") END '
+                . 'WHERE ' . $ordersMemberColumn . ' IN (' . $placeholders . ') '
+                . 'AND order_type = "membership" '
+                . 'AND ' . $ordersPaymentStatusColumn . ' IN ("pending", "failed")'
+              );
+              $orderUpdate->execute($renewerOrderValues);
+            }
+            // Delete pending periods — they were never paid, no audit value.
+            if ($renewerMemberIds) {
+              $periodPlaceholders = implode(',', array_fill(0, count($renewerMemberIds), '?'));
+              $periodDelete = $pdo->prepare(
+                'DELETE FROM membership_periods '
+                . 'WHERE member_id IN (' . $periodPlaceholders . ') '
+                . 'AND status = "PENDING_PAYMENT"'
+              );
+              $periodDelete->execute($renewerMemberIds);
             }
 
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
@@ -3728,8 +3766,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
             $memberTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
             $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
-            $pricingPeriodKey = $termKey === '3Y' ? 'THREE_YEARS' : 'ONE_YEAR';
-            $priceCents = MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, $pricingPeriodKey) ?? 0;
+            // Translate stored term (1Y/2Y/3Y) into the months key the renewal
+            // pricing helper understands. Anything unrecognised falls back to 1Y.
+            $termMonthsForPrice = match ($termKey) {
+              '3Y' => '36',
+              '2Y' => '24',
+              default => '12',
+            };
+            $priceCents = membership_renewal_amount_cents($magazineType, $memberTypeKey, $termMonthsForPrice);
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
             $amount = round($priceCents / 100, 2);
             $order = MembershipOrderService::createMembershipOrder((int) $member['id'], (int) ($pendingPeriod['id'] ?? 0), $amount, [
