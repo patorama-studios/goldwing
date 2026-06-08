@@ -731,6 +731,7 @@ if ($alreadyRun) {
             ['national_secretary',          'National Secretary',          30, 'aga.secretary@goldwing.org.au',      null],
             ['national_treasurer',          'National Treasurer',          40, 'aga.treasurer@goldwing.org.au',      '0412 662 448'],
             ['national_promotions_officer', 'National Promotions Officer', 50, 'aga.promotions@goldwing.org.au',     '0449 150 530'],
+            ['national_quartermaster',      'Quartermaster',               55, 'aga.quartermaster@goldwing.org.au', null],
             ['committee_member_1',          'Committee Member',            60, 'aga.committee1@goldwing.org.au',     '0412 226 886'],
             ['committee_member_2',          'Committee Member',            61, 'aga.committee2@goldwing.org.au',     null],
             ['committee_member_3',          'Committee Member',            62, 'aga.committee3@goldwing.org.au',     null],
@@ -2335,6 +2336,36 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 029 — Voided columns on orders', 'status' => 'applied', 'note' => implode(' · ', $applied)];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 029 — Voided columns on orders', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 030 — Add Quartermaster to committee_roles catalog
+//
+// Migration 015 seeds the national committee roles, but it's guarded by a
+// migrationKey so editing its seed array won't add the new role on databases
+// where 015 has already run. This migration inserts (or reactivates) the
+// Quartermaster row directly. Idempotent on the slug.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_030_committee_quartermaster';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 030 — Quartermaster committee role', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->prepare("
+            INSERT INTO committee_roles (slug, name, category, chapter_id, email, phone, sort_order, is_active)
+            VALUES ('national_quartermaster', 'Quartermaster', 'national', NULL, 'aga.quartermaster@goldwing.org.au', NULL, 55, 1)
+            ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email),
+              sort_order = VALUES(sort_order), is_active = 1
+        ");
+        $stmt->execute();
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 030 — Quartermaster committee role', 'status' => 'applied', 'note' => 'Quartermaster role added to committee_roles catalog.'];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 030 — Quartermaster committee role', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 
