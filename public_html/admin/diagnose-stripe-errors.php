@@ -6,6 +6,8 @@
  *
  * Filters to the last 24 hours by default; ?hours=N overrides.
  */
+if (function_exists('opcache_reset')) { @opcache_reset(); }
+
 require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\Database;
@@ -13,11 +15,17 @@ use App\Services\Database;
 require_permission('admin.members.view');
 
 header('Content-Type: text/plain; charset=utf-8');
+header('Cache-Control: no-store');
 
 $hours = max(1, min(168, (int) ($_GET['hours'] ?? 24)));
 $limit = max(1, min(200, (int) ($_GET['limit'] ?? 20)));
 
+$scriptVersion = 'v3 — opcache-reset + inline-quote';
+$scriptMtime   = @date('c', filemtime(__FILE__));
+
 echo "=== Recent stripe_errors ===\n";
+echo "Version: {$scriptVersion}\n";
+echo "Source mtime: {$scriptMtime}\n";
 echo "Window: last {$hours}h · limit {$limit}\n";
 echo "Time:   " . date('c') . "\n\n";
 
