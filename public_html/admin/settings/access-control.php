@@ -57,18 +57,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <h1 class="font-display text-2xl font-bold text-gray-900">Page Access Control</h1>
-              <p class="text-sm text-slate-500">Control which roles can access which pages. Pages hidden from navigation are also blocked via direct URL.</p>
+              <nav class="mt-1 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+                <a href="/admin/" class="hover:text-slate-700">Admin</a>
+                <span class="text-slate-300">/</span>
+                <a href="/admin/settings/" class="hover:text-slate-700">Settings</a>
+                <span class="text-slate-300">/</span>
+                <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5">Page Access Control</span>
+              </nav>
+              <p class="text-sm text-slate-500 mt-2 max-w-3xl">Control which roles can access which pages. Pages hidden from navigation are also blocked via direct URL.</p>
             </div>
-            <div class="flex flex-col sm:flex-row gap-3">
-              <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Role</label>
-              <select id="role-select" class="min-w-[220px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm">
-                <?php foreach ($roleOptions as $role): ?>
-                  <option value="<?= e($role) ?>" <?= $role === $selectedRole ? 'selected' : '' ?>><?= e($roleLabels[$role] ?? $role) ?></option>
-                <?php endforeach; ?>
-              </select>
+            <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <div>
+                <label for="role-select" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Role</label>
+                <select id="role-select" class="mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm">
+                  <?php foreach ($roleOptions as $role): ?>
+                    <option value="<?= e($role) ?>" <?= $role === $selectedRole ? 'selected' : '' ?>><?= e($roleLabels[$role] ?? $role) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
               <div class="relative">
                 <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">search</span>
-                <input id="page-search" type="search" placeholder="Search pages" class="w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2 text-sm shadow-sm">
+                <input id="page-search" type="search" placeholder="Search pages" class="w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm">
               </div>
             </div>
           </div>
@@ -109,10 +118,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </section>
         <?php endforeach; ?>
 
-        <div class="sticky bottom-0 bg-background-light/95 backdrop-blur border-t border-gray-100 py-4">
-          <div class="max-w-6xl mx-auto px-2 sm:px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <button type="button" id="reset-button" class="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600">Reset to defaults</button>
-            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save changes</button>
+        <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+          <button type="button" id="reset-button" class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+            <span class="material-icons-outlined text-base">restart_alt</span>
+            Reset to defaults
+          </button>
+          <div class="flex items-center gap-3">
+            <a href="/admin/settings/access-control.php?role=<?= e($selectedRole) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+              <span class="material-icons-outlined text-base">save</span>
+              Save Changes
+            </button>
           </div>
         </div>
       </form>

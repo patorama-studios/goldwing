@@ -65,13 +65,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       <div class="bg-card-light rounded-2xl border border-gray-100 p-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div class="flex items-center gap-3 mb-1">
-              <a href="/admin/settings/index.php" class="text-xs text-slate-500 hover:text-gray-900 inline-flex items-center gap-1">
-                <span class="material-icons-outlined text-sm">arrow_back</span> Settings
-              </a>
-            </div>
             <h1 class="font-display text-2xl font-bold text-gray-900">Committee &amp; Leadership Roles</h1>
-            <p class="text-sm text-slate-500 mt-1">
+            <nav class="mt-1 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+              <a href="/admin/" class="hover:text-slate-700">Admin</a>
+              <span class="text-slate-300">/</span>
+              <a href="/admin/settings/" class="hover:text-slate-700">Settings</a>
+              <span class="text-slate-300">/</span>
+              <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5">Committee &amp; Leadership Roles</span>
+            </nav>
+            <p class="text-sm text-slate-500 mt-2 max-w-3xl">
               Pick a role, search for a member by name or member number, and assign.
               Cards on the public Committee &amp; Chapter Reps pages and the member-area Committee page render from these assignments automatically.
             </p>
@@ -79,7 +81,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="flex flex-col sm:flex-row gap-3">
             <div class="relative">
               <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">filter_list</span>
-              <select id="category-filter" class="min-w-[200px] rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2 text-sm shadow-sm">
+              <select id="category-filter" class="min-w-[200px] rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm">
                 <option value="all">All roles</option>
                 <option value="national">National only</option>
                 <option value="chapter">Chapter only</option>
@@ -87,7 +89,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
             <div class="relative">
               <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">search</span>
-              <input id="role-search" type="search" placeholder="Filter roles or chapters" class="w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2 text-sm shadow-sm">
+              <input id="role-search" type="search" placeholder="Filter roles or chapters" class="w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm">
             </div>
           </div>
         </div>

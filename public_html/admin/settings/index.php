@@ -701,59 +701,71 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         <div id="toast" class="rounded-lg px-4 py-2 text-sm bg-green-50 text-green-700"><?= e($toast) ?></div>
       <?php endif; ?>
 
+      <?php
+        $sectionKeys = [
+            'site' => ['site.name', 'site.logo_url', 'site.timezone'],
+            'store' => ['store.name', 'store.members_only', 'store.shipping_region'],
+            'payments' => ['payments.stripe.mode', 'payments.stripe.publishable_key'],
+            'notifications' => ['notifications.from_email', 'notifications.weekly_digest_enabled'],
+            'security' => ['security.force_https', 'security.password_min_length'],
+            'integrations' => ['integrations.email_provider', 'integrations.youtube_embeds_enabled', 'integrations.resend_api_key'],
+            'media' => ['media.allowed_types', 'media.max_upload_mb'],
+            'events' => ['events.visibility_default', 'events.timezone'],
+            'membership_pricing' => [
+                'membership.pricing_matrix',
+                'membership.member_number_start',
+                'membership.associate_suffix_start',
+                'membership.member_number_format_full',
+                'membership.member_number_format_associate',
+                'membership.member_number_base_padding',
+                'membership.member_number_suffix_padding',
+                'membership.manual_migration_enabled',
+                'membership.manual_migration_expiry_days',
+            ],
+            'advanced' => ['advanced.maintenance_mode', 'advanced.feature_flags'],
+            'accounts' => ['accounts.user_approval_required', 'accounts.audit_role_changes'],
+        ];
+        $sectionLabels = [
+            'site' => 'Site',
+            'store' => 'Store',
+            'payments' => 'Payments &amp; Stripe',
+            'notifications' => 'Notifications',
+            'accounts' => 'Accounts &amp; Roles',
+            'security' => 'Security &amp; Authentication',
+            'integrations' => 'Integrations',
+            'media' => 'Media',
+            'events' => 'Events',
+            'membership_pricing' => 'Membership &amp; Pricing',
+            'advanced' => 'Advanced',
+        ];
+        $last = $sectionKeys[$section] ?? [];
+        $lastMeta = $last ? section_last_updated($last, $pdo) : ['updated_at' => null, 'updated_by' => null];
+        $lastModifiedDisplay = '';
+        if (!empty($lastMeta['updated_at'])) {
+            $ts = strtotime((string) $lastMeta['updated_at']);
+            $lastModifiedDisplay = $ts ? date('j M Y', $ts) : (string) $lastMeta['updated_at'];
+        }
+        $cancelHref = '/admin/settings/index.php?section=' . urlencode($section);
+      ?>
       <section class="space-y-6">
         <div class="bg-card-light rounded-2xl border border-gray-100 p-6">
           <div class="flex items-center justify-between gap-4">
               <div>
                 <h1 class="font-display text-2xl font-bold text-gray-900"><?= e($pageTitle) ?></h1>
-                <?php if ($section === 'payments'): ?>
+                <?php if ($section === 'hub'): ?>
+                  <p class="text-sm text-slate-500">Choose a category below to manage configuration across the platform.</p>
+                <?php else: ?>
                   <nav class="mt-1 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
                     <a href="/admin/" class="hover:text-slate-700">Admin</a>
                     <span class="text-slate-300">/</span>
                     <a href="/admin/settings/" class="hover:text-slate-700">Settings</a>
                     <span class="text-slate-300">/</span>
-                    <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5">Payments &amp; Stripe</span>
+                    <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5"><?= $sectionLabels[$section] ?? e(ucwords(str_replace('_', ' ', $section))) ?></span>
                   </nav>
-                <?php else: ?>
-                  <p class="text-sm text-slate-500">
-                    <?php if ($section === 'hub'): ?>
-                      Choose a category below to manage configuration across the platform.
-                    <?php else: ?>
-                      <a href="/admin/settings/" class="text-primary hover:underline">&larr; All settings</a>
-                      &nbsp;&middot;&nbsp; Single source of truth for configuration.
-                    <?php endif; ?>
-                  </p>
                 <?php endif; ?>
               </div>
               <?php if ($section !== 'hub'): ?>
                 <div class="text-xs text-slate-500 text-right">
-                  <?php
-                    $sectionKeys = [
-                        'site' => ['site.name', 'site.logo_url', 'site.timezone'],
-                        'store' => ['store.name', 'store.members_only', 'store.shipping_region'],
-                        'payments' => ['payments.stripe.mode', 'payments.stripe.publishable_key'],
-                        'notifications' => ['notifications.from_email', 'notifications.weekly_digest_enabled'],
-                        'security' => ['security.force_https', 'security.password_min_length'],
-                        'integrations' => ['integrations.email_provider', 'integrations.youtube_embeds_enabled', 'integrations.resend_api_key'],
-                        'media' => ['media.allowed_types', 'media.max_upload_mb'],
-                        'events' => ['events.visibility_default', 'events.timezone'],
-                        'membership_pricing' => [
-                            'membership.pricing_matrix',
-                            'membership.member_number_start',
-                            'membership.associate_suffix_start',
-                            'membership.member_number_format_full',
-                            'membership.member_number_format_associate',
-                            'membership.member_number_base_padding',
-                            'membership.member_number_suffix_padding',
-                            'membership.manual_migration_enabled',
-                            'membership.manual_migration_expiry_days',
-                        ],
-                        'advanced' => ['advanced.maintenance_mode', 'advanced.feature_flags'],
-                        'accounts' => ['accounts.user_approval_required', 'accounts.audit_role_changes'],
-                    ];
-                    $last = $sectionKeys[$section] ?? [];
-                    $lastMeta = $last ? section_last_updated($last, $pdo) : ['updated_at' => null, 'updated_by' => null];
-                  ?>
                   <?php if (!empty($lastMeta['updated_at'])): ?>
                     <div>Last updated: <?= e($lastMeta['updated_at']) ?></div>
                     <?php if (!empty($lastMeta['updated_by'])): ?>
@@ -830,186 +842,326 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <?php endforeach; ?>
             <?php endif; ?>
           <?php elseif ($section === 'site'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="site">
 
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Brand</h2>
-                  <label class="text-sm text-slate-600">Site name
-                    <input name="site_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.name', '')) ?>" required>
-                  </label>
-                  <label class="text-sm text-slate-600">Tagline
-                    <input name="site_tagline" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.tagline', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Logo URL
-                    <input name="site_logo_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.logo_url', '')) ?>" placeholder="https://">
-                  </label>
-                  <label class="text-sm text-slate-600">Favicon URL
-                    <input name="site_favicon_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.favicon_url', '')) ?>" placeholder="https://">
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">palette</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Brand</h2>
+                      <p class="text-sm text-slate-500">Public-facing identity used across the website.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="site_name" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Site name</label>
+                      <input id="site_name" name="site_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.name', '')) ?>" required>
+                    </div>
+                    <div>
+                      <label for="site_tagline" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tagline</label>
+                      <input id="site_tagline" name="site_tagline" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.tagline', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="site_logo_url" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Logo URL</label>
+                      <input id="site_logo_url" name="site_logo_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.logo_url', '')) ?>" placeholder="https://">
+                    </div>
+                    <div>
+                      <label for="site_favicon_url" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Favicon URL</label>
+                      <input id="site_favicon_url" name="site_favicon_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.favicon_url', '')) ?>" placeholder="https://">
+                    </div>
+                  </div>
                 </div>
 
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Contact & Locale</h2>
-                  <label class="text-sm text-slate-600">Base URL
-                    <input name="site_base_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.base_url', '')) ?>" placeholder="https://goldwing.org.au">
-                  </label>
-                  <label class="text-sm text-slate-600">Timezone
-                    <input name="site_timezone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.timezone', 'Australia/Sydney')) ?>" required>
-                  </label>
-                  <label class="text-sm text-slate-600">Contact email
-                    <input name="site_contact_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.contact_email', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Contact phone
-                    <input name="site_contact_phone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('site.contact_phone', '')) ?>">
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">public</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Contact &amp; Locale</h2>
+                      <p class="text-sm text-slate-500">Where members can reach you and the regional defaults.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="site_base_url" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Base URL</label>
+                      <input id="site_base_url" name="site_base_url" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.base_url', '')) ?>" placeholder="https://goldwing.org.au">
+                    </div>
+                    <div>
+                      <label for="site_timezone" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Timezone</label>
+                      <input id="site_timezone" name="site_timezone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.timezone', 'Australia/Sydney')) ?>" required>
+                    </div>
+                    <div>
+                      <label for="site_contact_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact email</label>
+                      <input id="site_contact_email" name="site_contact_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.contact_email', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="site_contact_phone" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact phone</label>
+                      <input id="site_contact_phone" name="site_contact_phone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('site.contact_phone', '')) ?>">
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Social Links</h2>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">share</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Social Links</h2>
+                      <p class="text-sm text-slate-500">Profiles linked from the footer and contact page.</p>
+                    </div>
+                  </div>
                   <?php $social = SettingsService::getGlobal('site.social_links', []); ?>
-                  <label class="text-sm text-slate-600">Facebook
-                    <input name="social_facebook" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($social['facebook'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Instagram
-                    <input name="social_instagram" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($social['instagram'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">YouTube
-                    <input name="social_youtube" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($social['youtube'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">TikTok
-                    <input name="social_tiktok" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($social['tiktok'] ?? '') ?>">
-                  </label>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="social_facebook" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Facebook</label>
+                      <input id="social_facebook" name="social_facebook" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($social['facebook'] ?? '') ?>">
+                    </div>
+                    <div>
+                      <label for="social_instagram" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Instagram</label>
+                      <input id="social_instagram" name="social_instagram" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($social['instagram'] ?? '') ?>">
+                    </div>
+                    <div>
+                      <label for="social_youtube" class="text-xs font-semibold uppercase tracking-wider text-slate-500">YouTube</label>
+                      <input id="social_youtube" name="social_youtube" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($social['youtube'] ?? '') ?>">
+                    </div>
+                    <div>
+                      <label for="social_tiktok" class="text-xs font-semibold uppercase tracking-wider text-slate-500">TikTok</label>
+                      <input id="social_tiktok" name="social_tiktok" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($social['tiktok'] ?? '') ?>">
+                    </div>
+                  </div>
                 </div>
 
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Legal & Navigation</h2>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">policy</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Legal &amp; Navigation</h2>
+                      <p class="text-sm text-slate-500">Footer links and high-level chrome toggles.</p>
+                    </div>
+                  </div>
                   <?php $legal = SettingsService::getGlobal('site.legal_urls', []); ?>
-                  <label class="text-sm text-slate-600">Privacy URL
-                    <input name="legal_privacy" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($legal['privacy'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Terms URL
-                    <input name="legal_terms" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($legal['terms'] ?? '') ?>">
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="site_show_nav" class="rounded border-gray-200" <?= SettingsService::getGlobal('site.show_nav', true) ? 'checked' : '' ?>>
-                    Show navigation
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="site_show_footer" class="rounded border-gray-200" <?= SettingsService::getGlobal('site.show_footer', true) ? 'checked' : '' ?>>
-                    Show footer
-                  </label>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="legal_privacy" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Privacy URL</label>
+                      <input id="legal_privacy" name="legal_privacy" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($legal['privacy'] ?? '') ?>">
+                    </div>
+                    <div>
+                      <label for="legal_terms" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Terms URL</label>
+                      <input id="legal_terms" name="legal_terms" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($legal['terms'] ?? '') ?>">
+                    </div>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Show navigation</div>
+                        <div class="text-xs text-slate-500">Display the main navigation across the site</div>
+                      </div>
+                      <input type="checkbox" name="site_show_nav" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('site.show_nav', true) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Show footer</div>
+                        <div class="text-xs text-slate-500">Display the standard footer on public pages</div>
+                      </div>
+                      <input type="checkbox" name="site_show_footer" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('site.show_footer', true) ? 'checked' : '' ?>>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=site">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'store'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="store">
 
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Store Basics</h2>
-                  <label class="text-sm text-slate-600">Store name
-                    <input name="store_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.name', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Store slug
-                    <input name="store_slug" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.slug', 'store')) ?>">
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_members_only" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.members_only', true) ? 'checked' : '' ?>>
-                    Members-only purchasing
-                  </label>
-                  <label class="text-sm text-slate-600">Shipping region
-                    <select name="store_shipping_region" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                      <?php $region = SettingsService::getGlobal('store.shipping_region', 'AU'); ?>
-                      <option value="AU" <?= $region === 'AU' ? 'selected' : '' ?>>Australia only</option>
-                      <option value="INTL" <?= $region === 'INTL' ? 'selected' : '' ?>>International</option>
-                    </select>
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_gst_enabled" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.gst_enabled', true) ? 'checked' : '' ?>>
-                    Apply GST to orders
-                  </label>
-                </div>
-
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Fees & Fulfillment</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_pass_fees" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.pass_stripe_fees', true) ? 'checked' : '' ?>>
-                    Pass Stripe fees to buyer
-                  </label>
-                  <div class="grid grid-cols-2 gap-3">
-                    <label class="text-sm text-slate-600">Fee percent
-                      <input name="store_fee_percent" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_percent', 0)) ?>">
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">storefront</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Store Basics</h2>
+                      <p class="text-sm text-slate-500">Name, URL slug, regional and tax behaviour.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="store_name" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Store name</label>
+                      <input id="store_name" name="store_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.name', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="store_slug" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Store slug</label>
+                      <input id="store_slug" name="store_slug" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.slug', 'store')) ?>">
+                    </div>
+                    <div>
+                      <label for="store_shipping_region" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Shipping region</label>
+                      <select id="store_shipping_region" name="store_shipping_region" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                        <?php $region = SettingsService::getGlobal('store.shipping_region', 'AU'); ?>
+                        <option value="AU" <?= $region === 'AU' ? 'selected' : '' ?>>Australia only</option>
+                        <option value="INTL" <?= $region === 'INTL' ? 'selected' : '' ?>>International</option>
+                      </select>
+                    </div>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Members-only purchasing</div>
+                        <div class="text-xs text-slate-500">Require sign-in to add items to cart</div>
+                      </div>
+                      <input type="checkbox" name="store_members_only" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.members_only', true) ? 'checked' : '' ?>>
                     </label>
-                    <label class="text-sm text-slate-600">Fee fixed
-                      <input name="store_fee_fixed" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_fixed', 0)) ?>">
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Apply GST to orders</div>
+                        <div class="text-xs text-slate-500">Calculate and include GST in totals</div>
+                      </div>
+                      <input type="checkbox" name="store_gst_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.gst_enabled', true) ? 'checked' : '' ?>>
                     </label>
                   </div>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_shipping_flat_enabled" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.shipping_flat_enabled', false) ? 'checked' : '' ?>>
-                    Enable flat-rate shipping
+                </div>
+
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">local_shipping</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Fees &amp; Fulfilment</h2>
+                      <p class="text-sm text-slate-500">Stripe fee handling, shipping, and pickup options.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Pass Stripe fees to buyer</div>
+                      <div class="text-xs text-slate-500">Add the processing surcharge at checkout</div>
+                    </div>
+                    <input type="checkbox" name="store_pass_fees" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.pass_stripe_fees', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Flat-rate amount
-                    <input name="store_shipping_flat_rate" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('store.shipping_flat_rate', '')) ?>">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="store_fee_percent" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fee percent</label>
+                      <input id="store_fee_percent" name="store_fee_percent" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_percent', 0)) ?>">
+                    </div>
+                    <div>
+                      <label for="store_fee_fixed" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fee fixed</label>
+                      <input id="store_fee_fixed" name="store_fee_fixed" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_fixed', 0)) ?>">
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Enable flat-rate shipping</div>
+                      <div class="text-xs text-slate-500">One amount applied to every shippable order</div>
+                    </div>
+                    <input type="checkbox" name="store_shipping_flat_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.shipping_flat_enabled', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_shipping_free_enabled" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.shipping_free_enabled', false) ? 'checked' : '' ?>>
-                    Enable free shipping threshold
+                  <div>
+                    <label for="store_shipping_flat_rate" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Flat-rate amount</label>
+                    <input id="store_shipping_flat_rate" name="store_shipping_flat_rate" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.shipping_flat_rate', '')) ?>">
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Free shipping threshold</div>
+                      <div class="text-xs text-slate-500">Waive shipping on orders above the limit</div>
+                    </div>
+                    <input type="checkbox" name="store_shipping_free_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.shipping_free_enabled', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Free shipping threshold
-                    <input name="store_shipping_free_threshold" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('store.shipping_free_threshold', '')) ?>">
+                  <div>
+                    <label for="store_shipping_free_threshold" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Free shipping threshold</label>
+                    <input id="store_shipping_free_threshold" name="store_shipping_free_threshold" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.shipping_free_threshold', '')) ?>">
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Enable pickup</div>
+                      <div class="text-xs text-slate-500">Offer a self-collect option at checkout</div>
+                    </div>
+                    <input type="checkbox" name="store_pickup_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.pickup_enabled', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="store_pickup_enabled" class="rounded border-gray-200" <?= SettingsService::getGlobal('store.pickup_enabled', false) ? 'checked' : '' ?>>
-                    Enable pickup
-                  </label>
-                  <label class="text-sm text-slate-600">Pickup instructions
-                    <textarea name="store_pickup_instructions" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(SettingsService::getGlobal('store.pickup_instructions', '')) ?></textarea>
-                  </label>
+                  <div>
+                    <label for="store_pickup_instructions" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Pickup instructions</label>
+                    <textarea id="store_pickup_instructions" name="store_pickup_instructions" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('store.pickup_instructions', '')) ?></textarea>
+                  </div>
                 </div>
               </div>
 
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Store Emails</h2>
-                  <label class="text-sm text-slate-600">Admin notification emails
-                    <textarea name="store_notification_emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(SettingsService::getGlobal('store.notification_emails', '')) ?></textarea>
-                  </label>
-                  <label class="text-sm text-slate-600">Email logo URL
-                    <input name="store_email_logo" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.email_logo_url', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Email footer text
-                    <input name="store_email_footer" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.email_footer_text', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Support email
-                    <input name="store_support_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.support_email', '')) ?>">
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">email</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Store Emails</h2>
+                      <p class="text-sm text-slate-500">Branding and recipients for transactional emails.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="store_notification_emails" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Admin notification emails</label>
+                      <textarea id="store_notification_emails" name="store_notification_emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('store.notification_emails', '')) ?></textarea>
+                    </div>
+                    <div>
+                      <label for="store_email_logo" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Email logo URL</label>
+                      <input id="store_email_logo" name="store_email_logo" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.email_logo_url', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="store_email_footer" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Email footer text</label>
+                      <input id="store_email_footer" name="store_email_footer" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.email_footer_text', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="store_support_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Support email</label>
+                      <input id="store_support_email" name="store_support_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.support_email', '')) ?>">
+                    </div>
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Order Rules</h2>
-                  <label class="text-sm text-slate-600">Paid order status
-                    <input name="store_order_paid_status" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('store.order_paid_status', 'paid')) ?>">
-                  </label>
-                  <a class="text-sm text-blue-600" href="/admin/store/products">Manage products</a>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">receipt_long</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Order Rules</h2>
+                      <p class="text-sm text-slate-500">Statuses and references applied to new orders.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="store_order_paid_status" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Paid order status</label>
+                    <input id="store_order_paid_status" name="store_order_paid_status" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('store.order_paid_status', 'paid')) ?>">
+                  </div>
+                  <a class="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline" href="/admin/store/products">
+                    Manage products
+                    <span class="material-icons-outlined text-base">arrow_forward</span>
+                  </a>
                 </div>
               </div>
 
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=store">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'payments'): ?>
@@ -1054,11 +1206,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $lastSyncDisplay = e($lastReceived);
               } else {
                   $lastSyncDisplay = 'Never';
-              }
-              $lastModifiedDisplay = '';
-              if (!empty($lastMeta['updated_at'])) {
-                  $ts = strtotime((string) $lastMeta['updated_at']);
-                  $lastModifiedDisplay = $ts ? date('j M Y', $ts) : (string) $lastMeta['updated_at'];
               }
             ?>
             <form method="post" class="space-y-6 pb-24" id="stripe-settings-form">
@@ -1522,44 +1669,70 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               });
             </script>
           <?php elseif ($section === 'notifications'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="notifications">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Sender Defaults</h2>
-                  <label class="text-sm text-slate-600">From name
-                    <input name="notify_from_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_name', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">From email
-                    <input name="notify_from_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_email', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Reply-to
-                    <input name="notify_reply_to" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('notifications.reply_to', '')) ?>">
-                  </label>
-                  <p class="text-xs text-amber-600">SPF/DKIM/DMARC are not configured yet. Expect reduced deliverability until DNS records are added.</p>
-                  <label class="text-sm text-slate-600">Admin notification emails
-                    <textarea name="notify_admin_emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(SettingsService::getGlobal('notifications.admin_emails', '')) ?></textarea>
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="notify_weekly_digest" class="rounded border-gray-200" <?= SettingsService::getGlobal('notifications.weekly_digest_enabled', false) ? 'checked' : '' ?>>
-                    Weekly digest enabled
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="notify_event_reminders" class="rounded border-gray-200" <?= SettingsService::getGlobal('notifications.event_reminders_enabled', true) ? 'checked' : '' ?>>
-                    Event reminders enabled
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">mark_email_read</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Sender Defaults</h2>
+                      <p class="text-sm text-slate-500">From / reply-to addresses and digest preferences.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div>
+                      <label for="notify_from_name" class="text-xs font-semibold uppercase tracking-wider text-slate-500">From name</label>
+                      <input id="notify_from_name" name="notify_from_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_name', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="notify_from_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">From email</label>
+                      <input id="notify_from_email" name="notify_from_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_email', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="notify_reply_to" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Reply-to</label>
+                      <input id="notify_reply_to" name="notify_reply_to" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.reply_to', '')) ?>">
+                    </div>
+                    <p class="text-xs text-amber-600 rounded-lg bg-amber-50 px-3 py-2">SPF/DKIM/DMARC are not configured yet. Expect reduced deliverability until DNS records are added.</p>
+                    <div>
+                      <label for="notify_admin_emails" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Admin notification emails</label>
+                      <textarea id="notify_admin_emails" name="notify_admin_emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('notifications.admin_emails', '')) ?></textarea>
+                    </div>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Weekly digest</div>
+                        <div class="text-xs text-slate-500">Send a Monday summary to subscribers</div>
+                      </div>
+                      <input type="checkbox" name="notify_weekly_digest" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('notifications.weekly_digest_enabled', false) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Event reminders</div>
+                        <div class="text-xs text-slate-500">Auto-send the day before events</div>
+                      </div>
+                      <input type="checkbox" name="notify_event_reminders" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('notifications.event_reminders_enabled', true) ? 'checked' : '' ?>>
+                    </label>
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">In-app Notifications</h2>
-                  <label class="text-sm text-slate-600">Categories (comma-separated)
-                    <input name="notify_categories" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(implode(', ', SettingsService::getGlobal('notifications.in_app_categories', []))) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Template
-                    <textarea name="notify_template_basic" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(SettingsService::getGlobal('notifications.template_basic', '')) ?></textarea>
-                  </label>
-                  <p class="text-xs text-slate-500">Template supports <code>{{body}}</code> for rendered content.</p>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">notifications</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">In-app Notifications</h2>
+                      <p class="text-sm text-slate-500">Categories shown in the bell menu and the wrapper template.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="notify_categories" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Categories (comma-separated)</label>
+                    <input id="notify_categories" name="notify_categories" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(implode(', ', SettingsService::getGlobal('notifications.in_app_categories', []))) ?>">
+                  </div>
+                  <div>
+                    <label for="notify_template_basic" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Template</label>
+                    <textarea id="notify_template_basic" name="notify_template_basic" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('notifications.template_basic', '')) ?></textarea>
+                    <p class="mt-1 text-xs text-slate-400">Template supports <code>{{body}}</code> for rendered content.</p>
+                  </div>
                 </div>
               </div>
               <?php
@@ -1574,19 +1747,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               ];
               ?>
               <input type="hidden" name="notification_active_key" id="notification-active-key" value="<?= e($defaultNotificationKey) ?>">
-              <div class="space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Notification Templates</h2>
-                <label class="text-sm text-slate-600">Select notification
-                  <select id="notification-selector" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">edit_note</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Notification Templates</h2>
+                    <p class="text-sm text-slate-500">Pick a template to edit its recipients, subject and body.</p>
+                  </div>
+                </div>
+                <div>
+                  <label for="notification-selector" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Select notification</label>
+                  <select id="notification-selector" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                     <?php foreach ($notificationDefinitions as $key => $definition): ?>
                       <option value="<?= e($key) ?>"><?= e($definition['label']) ?></option>
                     <?php endforeach; ?>
                   </select>
-                </label>
-                <?php $firstNotification = true; ?>
-                <?php foreach ($notificationDefinitions as $key => $definition): ?>
-                  <?php $settings = $notificationCatalog[$key] ?? ($definition['defaults'] ?? []); ?>
-                  <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 notification-panel<?= $firstNotification ? '' : ' hidden' ?>" data-notification-key="<?= e($key) ?>">
+                </div>
+              </div>
+              <?php $firstNotification = true; ?>
+              <?php foreach ($notificationDefinitions as $key => $definition): ?>
+                <?php $settings = $notificationCatalog[$key] ?? ($definition['defaults'] ?? []); ?>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 notification-panel<?= $firstNotification ? '' : ' hidden' ?>" data-notification-key="<?= e($key) ?>">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h3 class="text-base font-semibold text-gray-900"><?= e($definition['label']) ?></h3>
@@ -1650,32 +1831,55 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <?php endif; ?>
                     </div>
                   </div>
-                  <?php $firstNotification = false; ?>
-                <?php endforeach; ?>
-              </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=notifications">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+                <?php $firstNotification = false; ?>
+              <?php endforeach; ?>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
             <form method="post" class="mt-6">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="send_test_notification">
               <input type="hidden" name="section" value="notifications">
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Send Test Notification</h2>
-                <label class="text-sm text-slate-600">Notification to test
-                  <select name="test_notification_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">send</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Send Test Notification</h2>
+                    <p class="text-sm text-slate-500">Trigger a one-off send to verify recipients and rendering.</p>
+                  </div>
+                </div>
+                <div>
+                  <label for="test_notification_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Notification to test</label>
+                  <select id="test_notification_key" name="test_notification_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                     <?php foreach ($notificationDefinitions as $key => $definition): ?>
                       <option value="<?= e($key) ?>"><?= e($definition['label']) ?></option>
                     <?php endforeach; ?>
                   </select>
-                </label>
-                <label class="text-sm text-slate-600">Send test to (optional)
-                  <input name="test_notification_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" placeholder="you@example.com">
-                </label>
-                <p class="text-xs text-slate-500">Leave blank to use your admin email; admin recipients still apply based on template settings.</p>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Send test email</button>
+                </div>
+                <div>
+                  <label for="test_notification_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Send test to (optional)</label>
+                  <input id="test_notification_email" name="test_notification_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" placeholder="you@example.com">
+                  <p class="mt-1 text-xs text-slate-400">Leave blank to use your admin email; admin recipients still apply based on template settings.</p>
+                </div>
+                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                  <span class="material-icons-outlined text-base">outgoing_mail</span>
+                  Send test email
+                </button>
               </div>
             </form>
             <script>
@@ -1813,118 +2017,201 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php elseif ($section === 'accounts'): ?>
             <?php if (!SettingsService::isFeatureEnabled('accounts.roles')): ?>
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 text-sm text-slate-600">
-                Accounts & roles management is planned. Enable the feature flag in Advanced settings to unlock these controls.
+                Accounts &amp; roles management is planned. Enable the feature flag in Advanced settings to unlock these controls.
               </div>
             <?php else: ?>
-              <form method="post" class="space-y-6">
+              <form method="post" class="space-y-6 pb-24">
                 <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                 <input type="hidden" name="action" value="save_settings">
                 <input type="hidden" name="section" value="accounts">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="accounts_user_approval" class="rounded border-gray-200" <?= SettingsService::getGlobal('accounts.user_approval_required', true) ? 'checked' : '' ?>>
-                    Require admin approval for new users
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">manage_accounts</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Account Policy</h2>
+                      <p class="text-sm text-slate-500">User approval, visibility, and role auditing rules.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Require admin approval for new users</div>
+                      <div class="text-xs text-slate-500">Block sign-ins until an admin approves the account</div>
+                    </div>
+                    <input type="checkbox" name="accounts_user_approval" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('accounts.user_approval_required', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Membership status visibility
-                    <select name="accounts_membership_visibility" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <div>
+                    <label for="accounts_membership_visibility" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Membership status visibility</label>
+                    <select id="accounts_membership_visibility" name="accounts_membership_visibility" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <?php $visibility = SettingsService::getGlobal('accounts.membership_status_visibility', 'member'); ?>
                       <option value="public" <?= $visibility === 'public' ? 'selected' : '' ?>>Public</option>
                       <option value="member" <?= $visibility === 'member' ? 'selected' : '' ?>>Members only</option>
                       <option value="admin" <?= $visibility === 'admin' ? 'selected' : '' ?>>Admin only</option>
                     </select>
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="accounts_audit_roles" class="rounded border-gray-200" <?= SettingsService::getGlobal('accounts.audit_role_changes', true) ? 'checked' : '' ?>>
-                    Audit role changes
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Audit role changes</div>
+                      <div class="text-xs text-slate-500">Log who promoted or demoted each user</div>
+                    </div>
+                    <input type="checkbox" name="accounts_audit_roles" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('accounts.audit_role_changes', true) ? 'checked' : '' ?>>
                   </label>
                 </div>
-                <div class="flex items-center justify-between">
-                  <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=accounts">Cancel</a>
-                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+                <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div class="text-xs text-slate-500 flex items-center gap-2">
+                    <span class="material-icons-outlined text-base text-slate-400">history</span>
+                    <?php if ($lastModifiedDisplay !== ''): ?>
+                      Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                    <?php else: ?>
+                      Not modified yet
+                    <?php endif; ?>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                      <span class="material-icons-outlined text-base">save</span>
+                      Save Settings
+                    </button>
+                  </div>
                 </div>
               </form>
             <?php endif; ?>
           <?php elseif ($section === 'security'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="security">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Security & Authentication</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="security_force_https" class="rounded border-gray-200" <?= SettingsService::getGlobal('security.force_https', false) ? 'checked' : '' ?>>
-                    Enforce HTTPS
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">vpn_key</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Security &amp; Authentication</h2>
+                      <p class="text-sm text-slate-500">Transport security and password requirements.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Enforce HTTPS</div>
+                      <div class="text-xs text-slate-500">Redirect all HTTP traffic to HTTPS</div>
+                    </div>
+                    <input type="checkbox" name="security_force_https" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('security.force_https', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Password minimum length
-                    <input name="security_password_min" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('security.password_min_length', 12)) ?>">
-                  </label>
+                  <div>
+                    <label for="security_password_min" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Password minimum length</label>
+                    <input id="security_password_min" name="security_password_min" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('security.password_min_length', 12)) ?>">
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">2FA Enforcement Policy</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="twofa_enabled" class="rounded border-gray-200" <?= $securitySettings['enable_2fa'] ? 'checked' : '' ?>>
-                    Enable 2FA
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">security</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">2FA Enforcement Policy</h2>
+                      <p class="text-sm text-slate-500">Who must enrol in two-factor authentication.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Enable 2FA</div>
+                      <div class="text-xs text-slate-500">Master switch for the 2FA system</div>
+                    </div>
+                    <input type="checkbox" name="twofa_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $securitySettings['enable_2fa'] ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Default enforcement mode
-                    <select name="twofa_mode" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <div>
+                    <label for="twofa_mode" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Default enforcement mode</label>
+                    <select id="twofa_mode" name="twofa_mode" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <option value="REQUIRED_FOR_ALL" <?= $securitySettings['twofa_mode'] === 'REQUIRED_FOR_ALL' ? 'selected' : '' ?>>Required for all</option>
                       <option value="REQUIRED_FOR_ROLES" <?= $securitySettings['twofa_mode'] === 'REQUIRED_FOR_ROLES' ? 'selected' : '' ?>>Required for selected roles</option>
                       <option value="OPTIONAL_FOR_ALL" <?= $securitySettings['twofa_mode'] === 'OPTIONAL_FOR_ALL' ? 'selected' : '' ?>>Optional for all</option>
                       <option value="DISABLED" <?= $securitySettings['twofa_mode'] === 'DISABLED' ? 'selected' : '' ?>>Disabled</option>
                     </select>
-                  </label>
-                  <label class="text-sm text-slate-600">Roles required (when mode is role-based)</label>
-                  <div class="grid gap-2 text-sm text-slate-600">
-                    <?php foreach (['admin','store_manager','area_rep','member'] as $roleOption): ?>
-                      <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="twofa_roles[]" value="<?= e($roleOption) ?>" class="rounded border-gray-200" <?= in_array($roleOption, $securitySettings['twofa_required_roles'], true) ? 'checked' : '' ?>>
-                        <?= e($roleOption) ?>
-                      </label>
-                    <?php endforeach; ?>
                   </div>
-                  <label class="text-sm text-slate-600">Grace period (days)
-                    <input name="twofa_grace_days" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['twofa_grace_days']) ?>">
-                  </label>
-                  <p class="text-xs text-slate-500">Per-user overrides are managed in the Members screen.</p>
+                  <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Roles required (when mode is role-based)</span>
+                    <div class="mt-2 grid gap-2 text-sm text-slate-600">
+                      <?php foreach (['admin','store_manager','area_rep','member'] as $roleOption): ?>
+                        <label class="inline-flex items-center gap-2">
+                          <input type="checkbox" name="twofa_roles[]" value="<?= e($roleOption) ?>" class="rounded border-gray-200" <?= in_array($roleOption, $securitySettings['twofa_required_roles'], true) ? 'checked' : '' ?>>
+                          <?= e($roleOption) ?>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="twofa_grace_days" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Grace period (days)</label>
+                    <input id="twofa_grace_days" name="twofa_grace_days" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['twofa_grace_days']) ?>">
+                    <p class="mt-1 text-xs text-slate-400">Per-user overrides are managed in the Members screen.</p>
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Step-up Authentication</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stepup_enabled" class="rounded border-gray-200" <?= $securitySettings['stepup_enabled'] ? 'checked' : '' ?>>
-                    Require step-up for sensitive actions
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">fingerprint</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Step-up Authentication</h2>
+                      <p class="text-sm text-slate-500">Re-prompt admins before sensitive actions.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Require step-up for sensitive actions</div>
+                      <div class="text-xs text-slate-500">Re-prompt before refunds, role edits, etc.</div>
+                    </div>
+                    <input type="checkbox" name="stepup_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $securitySettings['stepup_enabled'] ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Step-up window (minutes)
-                    <input name="stepup_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['stepup_window_minutes']) ?>">
+                  <div>
+                    <label for="stepup_window_minutes" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Step-up window (minutes)</label>
+                    <input id="stepup_window_minutes" name="stepup_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['stepup_window_minutes']) ?>">
+                  </div>
+                </div>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">lock</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Login Security</h2>
+                      <p class="text-sm text-slate-500">Rate-limiting and lockout protection.</p>
+                    </div>
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label for="login_ip_max_attempts" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Max attempts per IP</label>
+                      <input id="login_ip_max_attempts" name="login_ip_max_attempts" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['login_ip_max_attempts']) ?>">
+                    </div>
+                    <div>
+                      <label for="login_ip_window_minutes" class="text-xs font-semibold uppercase tracking-wider text-slate-500">IP window (minutes)</label>
+                      <input id="login_ip_window_minutes" name="login_ip_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['login_ip_window_minutes']) ?>">
+                    </div>
+                    <div>
+                      <label for="login_account_max_attempts" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Max attempts per account</label>
+                      <input id="login_account_max_attempts" name="login_account_max_attempts" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['login_account_max_attempts']) ?>">
+                    </div>
+                    <div>
+                      <label for="login_account_window_minutes" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Account window (minutes)</label>
+                      <input id="login_account_window_minutes" name="login_account_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['login_account_window_minutes']) ?>">
+                    </div>
+                    <div class="sm:col-span-2">
+                      <label for="login_lockout_minutes" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Lockout duration (minutes)</label>
+                      <input id="login_lockout_minutes" name="login_lockout_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['login_lockout_minutes']) ?>">
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Progressive delay</div>
+                      <div class="text-xs text-slate-500">Add increasing latency to repeated failures</div>
+                    </div>
+                    <input type="checkbox" name="login_progressive_delay" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $securitySettings['login_progressive_delay'] ? 'checked' : '' ?>>
                   </label>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Login Security</h2>
-                  <label class="text-sm text-slate-600">Max attempts per IP
-                    <input name="login_ip_max_attempts" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['login_ip_max_attempts']) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">IP window (minutes)
-                    <input name="login_ip_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['login_ip_window_minutes']) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Max attempts per account
-                    <input name="login_account_max_attempts" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['login_account_max_attempts']) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Account window (minutes)
-                    <input name="login_account_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['login_account_window_minutes']) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Lockout duration (minutes)
-                    <input name="login_lockout_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['login_lockout_minutes']) ?>">
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="login_progressive_delay" class="rounded border-gray-200" <?= $securitySettings['login_progressive_delay'] ? 'checked' : '' ?>>
-                    Progressive delay enabled
-                  </label>
-                </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Security Alerting</h2>
-                  <label class="text-sm text-slate-600">Alert email
-                    <input name="alert_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['alert_email']) ?>">
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">notifications_active</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Security Alerting</h2>
+                      <p class="text-sm text-slate-500">Events that page the security alert email.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="alert_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Alert email</label>
+                    <input id="alert_email" name="alert_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['alert_email']) ?>">
+                  </div>
                   <div class="grid gap-2 text-sm text-slate-600">
                     <label class="flex items-center gap-2">
                       <input type="checkbox" name="alert_failed_login" class="rounded border-gray-200" <?= !empty($securitySettings['alerts']['failed_login']) ? 'checked' : '' ?>>
@@ -1956,200 +2243,360 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </label>
                   </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">File Integrity Monitoring</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="fim_enabled" class="rounded border-gray-200" <?= $securitySettings['fim_enabled'] ? 'checked' : '' ?>>
-                    Enable file integrity monitoring
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">folder_managed</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">File Integrity Monitoring</h2>
+                      <p class="text-sm text-slate-500">Detect unexpected file changes in monitored paths.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Enable file integrity monitoring</div>
+                      <div class="text-xs text-slate-500">Recommended cron frequency: hourly or nightly</div>
+                    </div>
+                    <input type="checkbox" name="fim_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $securitySettings['fim_enabled'] ? 'checked' : '' ?>>
                   </label>
-                  <p class="text-xs text-slate-500">Recommended cron frequency: hourly or nightly.</p>
-                  <label class="text-sm text-slate-600">Directories to monitor (comma or newline)
-                    <textarea name="fim_paths" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(implode("\n", $securitySettings['fim_paths'])) ?></textarea>
-                  </label>
-                  <label class="text-sm text-slate-600">Exclude paths
-                    <textarea name="fim_exclude_paths" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(implode("\n", $securitySettings['fim_exclude_paths'])) ?></textarea>
-                  </label>
-                  <button type="submit" name="approve_fim_baseline" value="1" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700">Approve baseline</button>
+                  <div>
+                    <label for="fim_paths" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Directories to monitor (comma or newline)</label>
+                    <textarea id="fim_paths" name="fim_paths" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(implode("\n", $securitySettings['fim_paths'])) ?></textarea>
+                  </div>
+                  <div>
+                    <label for="fim_exclude_paths" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Exclude paths</label>
+                    <textarea id="fim_exclude_paths" name="fim_exclude_paths" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(implode("\n", $securitySettings['fim_exclude_paths'])) ?></textarea>
+                  </div>
+                  <button type="submit" name="approve_fim_baseline" value="1" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    <span class="material-icons-outlined text-base">verified</span>
+                    Approve baseline
+                  </button>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Stripe Webhook Monitoring</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="webhook_alerts_enabled" class="rounded border-gray-200" <?= $securitySettings['webhook_alerts_enabled'] ? 'checked' : '' ?>>
-                    Alert on webhook failures
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">webhook</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Stripe Webhook Monitoring</h2>
+                      <p class="text-sm text-slate-500">Alert thresholds for failed Stripe webhook deliveries.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Alert on webhook failures</div>
+                      <div class="text-xs text-slate-500">Email the security alert address on repeated errors</div>
+                    </div>
+                    <input type="checkbox" name="webhook_alerts_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $securitySettings['webhook_alerts_enabled'] ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Alert threshold
-                    <input name="webhook_alert_threshold" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['webhook_alert_threshold']) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Window (minutes)
-                    <input name="webhook_alert_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) $securitySettings['webhook_alert_window_minutes']) ?>">
-                  </label>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label for="webhook_alert_threshold" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Alert threshold</label>
+                      <input id="webhook_alert_threshold" name="webhook_alert_threshold" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['webhook_alert_threshold']) ?>">
+                    </div>
+                    <div>
+                      <label for="webhook_alert_window_minutes" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Window (minutes)</label>
+                      <input id="webhook_alert_window_minutes" name="webhook_alert_window_minutes" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) $securitySettings['webhook_alert_window_minutes']) ?>">
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=security">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'integrations'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="integrations">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Email Provider</h2>
-                  <label class="text-sm text-slate-600">Provider
-                    <select name="integrations_email_provider" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">mail</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Email Provider</h2>
+                      <p class="text-sm text-slate-500">Outbound transport for transactional and bulk emails.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="integrations_email_provider" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Provider</label>
+                    <select id="integrations_email_provider" name="integrations_email_provider" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <?php $provider = SettingsService::getGlobal('integrations.email_provider', 'php_mail'); ?>
                       <option value="php_mail" <?= $provider === 'php_mail' ? 'selected' : '' ?>>PHP Mail</option>
                       <option value="smtp" <?= $provider === 'smtp' ? 'selected' : '' ?>>SMTP</option>
                       <option value="mailgun" <?= $provider === 'mailgun' ? 'selected' : '' ?>>Mailgun</option>
                       <option value="resend" <?= $provider === 'resend' ? 'selected' : '' ?>>Resend</option>
                     </select>
-                  </label>
-                  <label class="text-sm text-slate-600">Resend API Key
+                  </div>
+                  <div>
+                    <label for="integrations_resend_api_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Resend API Key</label>
                     <?php $resendMask = SettingsService::getMaskedSecret('integrations.resend_api_key'); ?>
-                    <input name="integrations_resend_api_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm <?= $resendMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $resendMask['configured'] ? 'Configured (ends in ' . e($resendMask['last4']) . ') - leave blank to keep' : 're_...' ?>" value="">
-                  </label>
-                  <label class="text-sm text-slate-600">SMTP host
-                    <input name="integrations_smtp_host" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_host', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">SMTP port
-                    <input name="integrations_smtp_port" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('integrations.smtp_port', 587)) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">SMTP username
-                    <input name="integrations_smtp_user" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_user', '')) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">SMTP password
+                    <input id="integrations_resend_api_key" name="integrations_resend_api_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono <?= $resendMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $resendMask['configured'] ? 'Configured (ends in ' . e($resendMask['last4']) . ') - leave blank to keep' : 're_...' ?>" value="">
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label for="integrations_smtp_host" class="text-xs font-semibold uppercase tracking-wider text-slate-500">SMTP host</label>
+                      <input id="integrations_smtp_host" name="integrations_smtp_host" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_host', '')) ?>">
+                    </div>
+                    <div>
+                      <label for="integrations_smtp_port" class="text-xs font-semibold uppercase tracking-wider text-slate-500">SMTP port</label>
+                      <input id="integrations_smtp_port" name="integrations_smtp_port" type="number" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('integrations.smtp_port', 587)) ?>">
+                    </div>
+                  </div>
+                  <div>
+                    <label for="integrations_smtp_user" class="text-xs font-semibold uppercase tracking-wider text-slate-500">SMTP username</label>
+                    <input id="integrations_smtp_user" name="integrations_smtp_user" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('integrations.smtp_user', '')) ?>">
+                  </div>
+                  <div>
+                    <label for="integrations_smtp_password" class="text-xs font-semibold uppercase tracking-wider text-slate-500">SMTP password</label>
                     <?php $smtpMask = SettingsService::getMaskedSecret('integrations.smtp_password'); ?>
-                    <input name="integrations_smtp_password" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm <?= $smtpMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $smtpMask['configured'] ? 'Configured - leave blank to keep' : '' ?>" value="">
-                  </label>
-                  <label class="text-sm text-slate-600">SMTP encryption
-                    <select name="integrations_smtp_encryption" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <input id="integrations_smtp_password" name="integrations_smtp_password" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono <?= $smtpMask['configured'] ? 'placeholder-green-600' : '' ?>" placeholder="<?= $smtpMask['configured'] ? 'Configured - leave blank to keep' : '' ?>" value="">
+                  </div>
+                  <div>
+                    <label for="integrations_smtp_encryption" class="text-xs font-semibold uppercase tracking-wider text-slate-500">SMTP encryption</label>
+                    <select id="integrations_smtp_encryption" name="integrations_smtp_encryption" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <?php $smtpEnc = SettingsService::getGlobal('integrations.smtp_encryption', 'tls'); ?>
                       <option value="tls" <?= $smtpEnc === 'tls' ? 'selected' : '' ?>>TLS</option>
                       <option value="ssl" <?= $smtpEnc === 'ssl' ? 'selected' : '' ?>>SSL</option>
                       <option value="none" <?= $smtpEnc === 'none' ? 'selected' : '' ?>>None</option>
                     </select>
-                  </label>
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Media Embeds</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="integrations_youtube" class="rounded border-gray-200" <?= SettingsService::getGlobal('integrations.youtube_embeds_enabled', true) ? 'checked' : '' ?>>
-                    YouTube embeds enabled
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">smart_display</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Media Embeds &amp; Apps</h2>
+                      <p class="text-sm text-slate-500">Third-party embeds and connected services.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">YouTube embeds</div>
+                      <div class="text-xs text-slate-500">Allow YouTube videos inside content areas</div>
+                    </div>
+                    <input type="checkbox" name="integrations_youtube" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('integrations.youtube_embeds_enabled', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="integrations_vimeo" class="rounded border-gray-200" <?= SettingsService::getGlobal('integrations.vimeo_embeds_enabled', true) ? 'checked' : '' ?>>
-                    Vimeo embeds enabled
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Vimeo embeds</div>
+                      <div class="text-xs text-slate-500">Allow Vimeo videos inside content areas</div>
+                    </div>
+                    <input type="checkbox" name="integrations_vimeo" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('integrations.vimeo_embeds_enabled', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Zoom default URL
-                    <input name="integrations_zoom_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('integrations.zoom_default_url', '')) ?>">
-                  </label>
+                  <div>
+                    <label for="integrations_zoom_default" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Zoom default URL</label>
+                    <input id="integrations_zoom_default" name="integrations_zoom_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('integrations.zoom_default_url', '')) ?>">
+                  </div>
                   <?php if (SettingsService::isFeatureEnabled('integrations.myob')): ?>
-                    <label class="flex items-center gap-3 text-sm text-slate-600">
-                      <input type="checkbox" name="integrations_myob_enabled" class="rounded border-gray-200" <?= SettingsService::getGlobal('integrations.myob_enabled', false) ? 'checked' : '' ?>>
-                      MYOB integration enabled
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">MYOB integration</div>
+                        <div class="text-xs text-slate-500">Sync invoices with MYOB AccountRight</div>
+                      </div>
+                      <input type="checkbox" name="integrations_myob_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('integrations.myob_enabled', false) ? 'checked' : '' ?>>
                     </label>
                   <?php else: ?>
                     <p class="text-xs text-slate-500">MYOB integration is disabled. Enable via feature flags.</p>
                   <?php endif; ?>
                 </div>
               </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=integrations">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'media'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="media">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Upload Limits</h2>
-                  <label class="text-sm text-slate-600">Allowed MIME types
-                    <textarea name="media_allowed_types" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(implode(', ', SettingsService::getGlobal('media.allowed_types', []))) ?></textarea>
-                  </label>
-                  <label class="text-sm text-slate-600">Max upload (MB)
-                    <input name="media_max_upload" type="number" step="0.1" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('media.max_upload_mb', 10)) ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Storage limit (MB)
-                    <input name="media_storage_limit" type="number" step="1" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e((string) SettingsService::getGlobal('media.storage_limit_mb', 5120)) ?>">
-                  </label>
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">cloud_upload</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Upload Limits</h2>
+                      <p class="text-sm text-slate-500">Allowed file types and storage ceilings.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="media_allowed_types" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Allowed MIME types</label>
+                    <textarea id="media_allowed_types" name="media_allowed_types" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(implode(', ', SettingsService::getGlobal('media.allowed_types', []))) ?></textarea>
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label for="media_max_upload" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Max upload (MB)</label>
+                      <input id="media_max_upload" name="media_max_upload" type="number" step="0.1" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('media.max_upload_mb', 10)) ?>">
+                    </div>
+                    <div>
+                      <label for="media_storage_limit" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Storage limit (MB)</label>
+                      <input id="media_storage_limit" name="media_storage_limit" type="number" step="1" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('media.storage_limit_mb', 5120)) ?>">
+                    </div>
+                  </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Defaults</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="media_image_opt" class="rounded border-gray-200" <?= SettingsService::getGlobal('media.image_optimization_enabled', false) ? 'checked' : '' ?>>
-                    Enable image optimization on upload
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">tune</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Defaults</h2>
+                      <p class="text-sm text-slate-500">Behavioural defaults applied to new uploads.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Image optimisation on upload</div>
+                      <div class="text-xs text-slate-500">Auto-compress JPEG/PNG/WebP at ingest</div>
+                    </div>
+                    <input type="checkbox" name="media_image_opt" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('media.image_optimization_enabled', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Default privacy
-                    <select name="media_privacy_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <div>
+                    <label for="media_privacy_default" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Default privacy</label>
+                    <select id="media_privacy_default" name="media_privacy_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <?php $privacy = SettingsService::getGlobal('media.privacy_default', 'member'); ?>
                       <option value="public" <?= $privacy === 'public' ? 'selected' : '' ?>>Public</option>
                       <option value="member" <?= $privacy === 'member' ? 'selected' : '' ?>>Member</option>
                       <option value="admin" <?= $privacy === 'admin' ? 'selected' : '' ?>>Admin only</option>
                     </select>
-                  </label>
+                  </div>
                   <?php if (SettingsService::isFeatureEnabled('media.folder_taxonomy')): ?>
-                    <label class="text-sm text-slate-600">Folder taxonomy
-                      <textarea name="media_folder_taxonomy" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e(implode(', ', SettingsService::getGlobal('media.folder_taxonomy', []))) ?></textarea>
-                    </label>
+                    <div>
+                      <label for="media_folder_taxonomy" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Folder taxonomy</label>
+                      <textarea id="media_folder_taxonomy" name="media_folder_taxonomy" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(implode(', ', SettingsService::getGlobal('media.folder_taxonomy', []))) ?></textarea>
+                    </div>
                   <?php else: ?>
                     <p class="text-xs text-slate-500">Folder taxonomy is disabled. Enable via feature flags.</p>
                   <?php endif; ?>
                 </div>
               </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=media">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'events'): ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="events">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Defaults</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="events_rsvp_default" class="rounded border-gray-200" <?= SettingsService::getGlobal('events.rsvp_default_enabled', true) ? 'checked' : '' ?>>
-                    RSVP enabled by default
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">tune</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Defaults</h2>
+                      <p class="text-sm text-slate-500">RSVP, visibility, and ticketing defaults for new events.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">RSVP enabled by default</div>
+                      <div class="text-xs text-slate-500">Newly created events allow RSVPs out of the box</div>
+                    </div>
+                    <input type="checkbox" name="events_rsvp_default" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('events.rsvp_default_enabled', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="text-sm text-slate-600">Visibility default
-                    <select name="events_visibility_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <div>
+                    <label for="events_visibility_default" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Visibility default</label>
+                    <select id="events_visibility_default" name="events_visibility_default" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <?php $visibility = SettingsService::getGlobal('events.visibility_default', 'member'); ?>
                       <option value="public" <?= $visibility === 'public' ? 'selected' : '' ?>>Public</option>
                       <option value="member" <?= $visibility === 'member' ? 'selected' : '' ?>>Member</option>
                     </select>
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="events_public_ticketing" class="rounded border-gray-200" <?= SettingsService::getGlobal('events.public_ticketing_enabled', false) ? 'checked' : '' ?>>
-                    Allow public ticket purchasing
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Allow public ticket purchasing</div>
+                      <div class="text-xs text-slate-500">Permit guest checkout for paid events</div>
+                    </div>
+                    <input type="checkbox" name="events_public_ticketing" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('events.public_ticketing_enabled', false) ? 'checked' : '' ?>>
                   </label>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Fields</h2>
-                  <label class="text-sm text-slate-600">Timezone
-                    <input name="events_timezone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e(SettingsService::getGlobal('events.timezone', 'Australia/Sydney')) ?>">
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">list_alt</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Fields</h2>
+                      <p class="text-sm text-slate-500">Optional fields shown on the event form.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="events_timezone" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Timezone</label>
+                    <input id="events_timezone" name="events_timezone" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('events.timezone', 'Australia/Sydney')) ?>">
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Map link field</div>
+                      <div class="text-xs text-slate-500">Show the map URL input in the editor</div>
+                    </div>
+                    <input type="checkbox" name="events_include_map" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('events.include_map_link', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="events_include_map" class="rounded border-gray-200" <?= SettingsService::getGlobal('events.include_map_link', true) ? 'checked' : '' ?>>
-                    Include map link field
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Zoom link field</div>
+                      <div class="text-xs text-slate-500">Show the Zoom URL input in the editor</div>
+                    </div>
+                    <input type="checkbox" name="events_include_zoom" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('events.include_zoom_link', true) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="events_include_zoom" class="rounded border-gray-200" <?= SettingsService::getGlobal('events.include_zoom_link', true) ? 'checked' : '' ?>>
-                    Include Zoom link field
-                  </label>
-                  <a class="text-sm text-blue-600" href="/admin/index.php?page=events">Go to Events</a>
+                  <a class="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline" href="/admin/index.php?page=events">
+                    Go to Events
+                    <span class="material-icons-outlined text-base">arrow_forward</span>
+                  </a>
                 </div>
               </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=events">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
           <?php elseif ($section === 'membership_pricing'): ?>
@@ -2181,14 +2628,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $chaptersHasSortOrder = ChapterRepository::hasColumn($chaptersPdo, 'sort_order');
               $chapters = ChapterRepository::listForManagement($chaptersPdo);
             ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="membership_pricing">
               <input type="hidden" name="reset_defaults" id="reset-membership-defaults" value="0">
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-3">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">workspaces</span>
                   <div>
                     <h2 class="font-display text-lg font-bold text-gray-900">Membership Settings</h2>
                     <p class="text-sm text-slate-500">Manage pricing, member ID sequencing, and chapters.</p>
@@ -2198,9 +2646,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div>
-                  <h2 class="font-display text-lg font-bold text-gray-900">Member ID Sequencing</h2>
-                  <p class="text-sm text-slate-500">Control the starting number and format for full and associate member IDs.</p>
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">tag</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Member ID Sequencing</h2>
+                    <p class="text-sm text-slate-500">Control the starting number and format for full and associate member IDs.</p>
+                  </div>
                 </div>
                 <div class="grid gap-4 lg:grid-cols-2">
                   <label class="text-sm text-slate-600">Full member ID start
@@ -2286,9 +2737,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div>
-                  <h2 class="font-display text-lg font-bold text-gray-900">Manual Migration</h2>
-                  <p class="text-sm text-slate-500">Control manual migration link availability and expiry windows.</p>
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">swap_horiz</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Manual Migration</h2>
+                    <p class="text-sm text-slate-500">Control manual migration link availability and expiry windows.</p>
+                  </div>
                 </div>
                 <label class="flex items-center gap-3 text-sm text-slate-600">
                   <input type="checkbox" name="manual_migration_enabled" class="rounded border-gray-200" <?= $manualMigrationEnabled ? 'checked' : '' ?>>
@@ -2310,9 +2764,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div>
-                  <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
-                  <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">trending_up</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
+                    <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
+                  </div>
                 </div>
                 <div class="space-y-3">
                   <label class="flex items-start gap-3 text-sm text-slate-700">
@@ -2347,9 +2804,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
 
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div>
-                  <h2 class="font-display text-lg font-bold text-gray-900">Chapters</h2>
-                  <p class="text-sm text-slate-500">Create chapters and control their display order.</p>
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">map</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Chapters</h2>
+                    <p class="text-sm text-slate-500">Create chapters and control their display order.</p>
+                  </div>
                 </div>
                 <div class="overflow-x-auto">
                   <table class="w-full text-sm">
@@ -2540,11 +3000,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               </div>
 
-              <div class="flex items-center justify-between">
-                <button type="button" id="reset-membership-button" class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600">Reset to defaults</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="text-xs text-slate-500 flex items-center gap-2">
+                    <span class="material-icons-outlined text-base text-slate-400">history</span>
+                    <?php if ($lastModifiedDisplay !== ''): ?>
+                      Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                    <?php else: ?>
+                      Not modified yet
+                    <?php endif; ?>
+                  </div>
+                  <button type="button" id="reset-membership-button" class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    <span class="material-icons-outlined text-base">restart_alt</span>
+                    Reset to defaults
+                  </button>
+                </div>
                 <div class="flex items-center gap-3">
-                  <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=membership_pricing">Cancel</a>
-                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save changes</button>
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
                 </div>
               </div>
             </form>
@@ -2591,63 +3067,114 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </script>
           <?php elseif ($section === 'advanced'): ?>
             <?php $flags = SettingsService::getGlobal('advanced.feature_flags', []); ?>
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="advanced">
               <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">System</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="advanced_maintenance" class="rounded border-gray-200" <?= SettingsService::getGlobal('advanced.maintenance_mode', false) ? 'checked' : '' ?>>
-                    Maintenance mode
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">settings_suggest</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">System</h2>
+                      <p class="text-sm text-slate-500">Maintenance mode and global runtime toggles.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Maintenance mode</div>
+                      <div class="text-xs text-slate-500">Blocks non-admin access to the site</div>
+                    </div>
+                    <input type="checkbox" name="advanced_maintenance" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('advanced.maintenance_mode', false) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="advanced_disable_password_reset_rate_limit" class="rounded border-gray-200" <?= SettingsService::getGlobal('advanced.disable_password_reset_rate_limit', false) ? 'checked' : '' ?>>
-                    Disable password reset rate limit
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Disable password reset rate limit</div>
+                      <div class="text-xs text-slate-500">Temporary override for high-volume migrations</div>
+                    </div>
+                    <input type="checkbox" name="advanced_disable_password_reset_rate_limit" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('advanced.disable_password_reset_rate_limit', false) ? 'checked' : '' ?>>
                   </label>
-                  <p class="text-xs text-slate-500">Maintenance mode blocks non-admin access.</p>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-3">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Feature Flags</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="flag_security_two_factor" class="rounded border-gray-200" <?= !empty($flags['security.two_factor']) ? 'checked' : '' ?>>
-                    Security: 2FA
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">flag</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Feature Flags</h2>
+                      <p class="text-sm text-slate-500">Reveal experimental sections in their respective settings tabs.</p>
+                    </div>
+                  </div>
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Security: 2FA</div>
+                      <div class="text-xs text-slate-500">Two-factor authentication subsystem</div>
+                    </div>
+                    <input type="checkbox" name="flag_security_two_factor" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['security.two_factor']) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="flag_payments_secondary" class="rounded border-gray-200" <?= !empty($flags['payments.secondary_stripe']) ? 'checked' : '' ?>>
-                    Payments: Secondary Stripe account
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Payments: Secondary Stripe account</div>
+                      <div class="text-xs text-slate-500">Extra Stripe channel for AGM / events</div>
+                    </div>
+                    <input type="checkbox" name="flag_payments_secondary" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['payments.secondary_stripe']) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="flag_integrations_myob" class="rounded border-gray-200" <?= !empty($flags['integrations.myob']) ? 'checked' : '' ?>>
-                    Integrations: MYOB
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Integrations: MYOB</div>
+                      <div class="text-xs text-slate-500">Toggle the MYOB sync controls</div>
+                    </div>
+                    <input type="checkbox" name="flag_integrations_myob" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['integrations.myob']) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="flag_accounts_roles" class="rounded border-gray-200" <?= !empty($flags['accounts.roles']) ? 'checked' : '' ?>>
-                    Accounts: Roles management
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Accounts: Roles management</div>
+                      <div class="text-xs text-slate-500">Show the accounts &amp; roles policy tab</div>
+                    </div>
+                    <input type="checkbox" name="flag_accounts_roles" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['accounts.roles']) ? 'checked' : '' ?>>
                   </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="flag_media_folder_taxonomy" class="rounded border-gray-200" <?= !empty($flags['media.folder_taxonomy']) ? 'checked' : '' ?>>
-                    Media: Folder taxonomy
+                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Media: Folder taxonomy</div>
+                      <div class="text-xs text-slate-500">Allow custom folder categories on uploads</div>
+                    </div>
+                    <input type="checkbox" name="flag_media_folder_taxonomy" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['media.folder_taxonomy']) ? 'checked' : '' ?>>
                   </label>
                 </div>
               </div>
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=advanced">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </form>
-            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 mt-6">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="font-display text-lg font-bold text-gray-900">System Logs</h2>
-                  <p class="text-xs text-slate-500">Shows PHP error_log output and internal system error messages.</p>
+            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5 mt-6">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">terminal</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">System Logs</h2>
+                    <p class="text-sm text-slate-500">PHP error_log output and internal system error messages.</p>
+                  </div>
                 </div>
                 <form method="post">
                   <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                   <input type="hidden" name="action" value="clear_system_log">
                   <input type="hidden" name="section" value="advanced">
-                  <button type="submit" class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">Clear log</button>
+                  <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    <span class="material-icons-outlined text-base">delete_sweep</span>
+                    Clear log
+                  </button>
                 </form>
               </div>
               <?php if ($systemLog && $systemLog['path'] !== ''): ?>
@@ -2664,10 +3191,13 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <pre class="whitespace-pre-wrap"><?= e($systemLog['content'] ?? 'No log entries yet.') ?></pre>
               </div>
             </div>
-            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 mt-6">
-              <div>
-                <h2 class="font-display text-lg font-bold text-gray-900">Email Log</h2>
-                <p class="text-xs text-slate-500">Latest email sends recorded by the system.</p>
+            <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5 mt-6">
+              <div class="flex items-start gap-3">
+                <span class="material-icons-outlined text-slate-500">forward_to_inbox</span>
+                <div>
+                  <h2 class="font-display text-lg font-bold text-gray-900">Email Log</h2>
+                  <p class="text-sm text-slate-500">Latest email sends recorded by the system.</p>
+                </div>
               </div>
               <?php if ($emailLogError): ?>
                 <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">

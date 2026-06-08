@@ -111,14 +111,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <h1 class="font-display text-2xl font-bold text-gray-900">Admin Role Builder</h1>
-                <p class="text-sm text-slate-500">Define what each admin role can access across the portal.</p>
+                <nav class="mt-1 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+                  <a href="/admin/" class="hover:text-slate-700">Admin</a>
+                  <span class="text-slate-300">/</span>
+                  <a href="/admin/settings/" class="hover:text-slate-700">Settings</a>
+                  <span class="text-slate-300">/</span>
+                  <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5">Admin Role Builder</span>
+                </nav>
+                <p class="text-sm text-slate-500 mt-2 max-w-3xl">Define what each admin role can access across the portal.</p>
               </div>
               <?php if ($selectedRole && $canManage && !$isSystemRole): ?>
                 <form method="post" action="/admin/settings/roles-save.php" onsubmit="return confirm('Delete this role? This cannot be undone.');">
                   <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
                   <input type="hidden" name="role_id" value="<?= (int) $selectedRole['id'] ?>">
                   <input type="hidden" name="action" value="delete">
-                  <button class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 <?= $userCount > 0 ? 'opacity-50 cursor-not-allowed' : '' ?>" type="submit" <?= $userCount > 0 ? 'disabled' : '' ?>>
+                  <button class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 <?= $userCount > 0 ? 'opacity-50 cursor-not-allowed' : '' ?>" type="submit" <?= $userCount > 0 ? 'disabled' : '' ?>>
                     <span class="material-icons-outlined text-sm">delete</span>
                     Delete role
                   </button>
@@ -183,11 +190,25 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php endforeach; ?>
               </div>
 
-              <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
-                <?php if (!$canManage): ?>
-                  <p class="text-xs text-slate-500">Only Admins can manage roles.</p>
-                <?php else: ?>
-                  <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save role</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if (!$canManage): ?>
+                    Only Admins can manage roles.
+                  <?php elseif ($roleId > 0): ?>
+                    Editing <?= e((string) ($roleName ?: 'role')) ?> &middot; <?= (int) $userCount ?> user<?= $userCount === 1 ? '' : 's' ?> assigned
+                  <?php else: ?>
+                    Creating a new admin role
+                  <?php endif; ?>
+                </div>
+                <?php if ($canManage): ?>
+                  <div class="flex items-center gap-3">
+                    <a href="/admin/settings/roles.php" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                      <span class="material-icons-outlined text-base">save</span>
+                      Save Role
+                    </button>
+                  </div>
                 <?php endif; ?>
               </div>
             </form>
