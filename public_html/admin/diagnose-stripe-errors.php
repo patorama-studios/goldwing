@@ -17,39 +17,49 @@ header('Content-Type: text/plain; charset=utf-8');
 $hours = max(1, min(168, (int) ($_GET['hours'] ?? 24)));
 $limit = max(1, min(200, (int) ($_GET['limit'] ?? 20)));
 
-$pdo = Database::connection();
-
 echo "=== Recent stripe_errors ===\n";
 echo "Window: last {$hours}h · limit {$limit}\n";
 echo "Time:   " . date('c') . "\n\n";
 
-// ── Schema sanity check ──────────────────────────────────────────────────────
-$checkColumn = function (string $table, string $column) use ($pdo): bool {
-    $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE :c");
-    $stmt->execute(['c' => $column]);
-    return (bool) $stmt->fetchColumn();
+try {
+    $pdo = Database::connection();
+} catch (Throwable $e) {
+    echo "FATAL: could not open DB connection: " . $e->getMessage() . "\n";
+    exit;
+}
+
+// ── Schema sanity check (inline-quoted; SHOW COLUMNS rejects bound params) ──
+$checkColumn = function (string $table, string $column) use ($pdo): string {
+    try {
+        $sql = "SHOW COLUMNS FROM {$table} LIKE " . $pdo->quote($column);
+        $row = $pdo->query($sql)->fetchColumn();
+        return $row ? 'YES' : 'NO';
+    } catch (Throwable $e) {
+        return 'ERROR: ' . $e->getMessage();
+    }
 };
-echo "store_products.stripe_product_id present: "
-    . ($checkColumn('store_products', 'stripe_product_id') ? 'YES' : 'NO') . "\n";
-echo "store_orders.stripe_invoice_id present:   "
-    . ($checkColumn('store_orders', 'stripe_invoice_id') ? 'YES' : 'NO') . "\n";
-echo "store_orders.stripe_payment_intent_id:    "
-    . ($checkColumn('store_orders', 'stripe_payment_intent_id') ? 'YES' : 'NO') . "\n";
-echo "members.stripe_customer_id present:       "
-    . ($checkColumn('members', 'stripe_customer_id') ? 'YES' : 'NO') . "\n\n";
+echo "store_products.stripe_product_id present: " . $checkColumn('store_products', 'stripe_product_id') . "\n";
+echo "store_orders.stripe_invoice_id present:   " . $checkColumn('store_orders', 'stripe_invoice_id') . "\n";
+echo "store_orders.stripe_payment_intent_id:    " . $checkColumn('store_orders', 'stripe_payment_intent_id') . "\n";
+echo "members.stripe_customer_id present:       " . $checkColumn('members', 'stripe_customer_id') . "\n\n";
 
 // ── Recent stripe_errors rows ────────────────────────────────────────────────
-$stmt = $pdo->prepare(
-    "SELECT id, occurred_at, source, operation, error_code, error_message,
-            related_order_id, related_store_order_id, related_stripe_pi_id,
-            context_json
-       FROM stripe_errors
-      WHERE occurred_at >= NOW() - INTERVAL :hours HOUR
-      ORDER BY id DESC
-      LIMIT {$limit}"
-);
-$stmt->execute(['hours' => $hours]);
-$rows = $stmt->fetchAll();
+try {
+    $stmt = $pdo->prepare(
+        "SELECT id, occurred_at, source, operation, error_code, error_message,
+                related_order_id, related_store_order_id, related_stripe_pi_id,
+                context_json
+           FROM stripe_errors
+          WHERE occurred_at >= NOW() - INTERVAL {$hours} HOUR
+          ORDER BY id DESC
+          LIMIT {$limit}"
+    );
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+} catch (Throwable $e) {
+    echo "ERROR querying stripe_errors: " . $e->getMessage() . "\n";
+    exit;
+}
 
 if (!$rows) {
     echo "(no stripe_errors rows in the last {$hours}h)\n";
