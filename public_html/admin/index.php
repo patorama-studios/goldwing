@@ -2350,8 +2350,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $canEditSettings = function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php');
         ?>
 
-        <section class="space-y-6">
-          <div class="flex flex-wrap items-center gap-3">
+        <section class="space-y-6" data-tour="admin-payments-page">
+          <div class="flex flex-wrap items-center gap-3" data-tour="admin-payments-header">
             <h1 class="font-display text-2xl font-bold text-gray-900">Payments &amp; Settings</h1>
             <span class="inline-flex items-center gap-1.5 rounded-full <?= $systemsOperational ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' ?> px-2.5 py-1 text-[11px] font-semibold tracking-wide">
               <span class="h-1.5 w-1.5 rounded-full <?= $systemsOperational ? 'bg-emerald-500' : 'bg-rose-500' ?>"></span>
@@ -2360,7 +2360,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6" data-tour="admin-payments-stripe-status">
               <div class="flex items-start justify-between gap-4 mb-5">
                 <div class="flex items-center gap-3">
                   <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
@@ -2486,7 +2486,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
           </div>
 
-          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6" data-tour="admin-payments-transactions">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
               <div class="flex items-center gap-2">
                 <h2 class="font-display text-xl font-bold text-gray-900">Recent Transactions</h2>
@@ -2494,7 +2494,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </div>
               <form method="get" class="flex flex-wrap items-center gap-2" id="orders-filter-form">
                 <input type="hidden" name="page" value="payments">
-                <label class="relative">
+                <label class="relative" data-tour="admin-payments-search">
                   <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
                   <input type="text" name="orders_q" value="<?= e($ordersSearch) ?>"
                     placeholder="Search orders..."
@@ -2502,6 +2502,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </label>
                 <button type="button"
                   data-filter-toggle
+                  data-tour="admin-payments-filters"
                   class="relative inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 px-3 text-sm font-semibold text-slate-600 hover:bg-gray-50"
                   aria-expanded="<?= $hasActiveFilter ? 'true' : 'false' ?>"
                   aria-controls="orders-filter-panel">
@@ -2580,7 +2581,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <?php foreach ($orders as $order): ?>
+                  <?php $isFirstPaymentRow = true; foreach ($orders as $order): ?>
                     <?php
                     $orderNumber = $order['order_number'] ?? ('ORD-' . $order['id']);
                     $orderTypeRaw = (string) ($order['order_type'] ?? '');
@@ -2633,7 +2634,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <td class="py-4 pr-4 align-top">
                         <span class="inline-flex items-center rounded-full <?= $statusClass ?> px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase"><?= e($status !== '' ? $status : '—') ?></span>
                       </td>
-                      <td class="py-4 align-top" data-no-row-click>
+                      <td class="py-4 align-top" data-no-row-click <?= $isFirstPaymentRow ? 'data-tour="admin-payments-row-actions"' : '' ?>>
                         <div class="flex items-center gap-1">
                           <?php if ($orderViewUrl): ?>
                             <a href="<?= e($orderViewUrl) ?>"
@@ -2648,6 +2649,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                               data-order-id="<?= e((string) $order['id']) ?>"
                               data-order-number="<?= e((string) $orderNumber) ?>"
                               data-order-total="A$<?= e(number_format((float) $order['total'], 2)) ?>"
+                              <?= $isFirstPaymentRow ? 'data-tour="admin-payments-refund-button"' : '' ?>
                               class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-emerald-600 hover:bg-emerald-50"
                               title="Refund" aria-label="Refund order">
                               <span class="material-icons-outlined text-[16px]">currency_exchange</span>
@@ -2688,6 +2690,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         </div>
                       </td>
                     </tr>
+                    <?php $isFirstPaymentRow = false; ?>
                   <?php endforeach; ?>
                   <?php if (!$orders): ?>
                     <tr><td colspan="7" class="py-8 text-center text-slate-500">No transactions found.</td></tr>
@@ -2732,7 +2735,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php endif; ?>
           </div>
 
-          <details class="group bg-white rounded-2xl border border-gray-100 shadow-sm [&_summary::-webkit-details-marker]:hidden">
+          <details class="group bg-white rounded-2xl border border-gray-100 shadow-sm [&_summary::-webkit-details-marker]:hidden" data-tour="admin-payments-debug-log">
             <summary class="flex items-center justify-between gap-3 px-6 py-4 cursor-pointer list-none">
               <div class="flex items-center gap-2">
                 <span class="material-icons-outlined text-slate-600 text-[20px]">terminal</span>

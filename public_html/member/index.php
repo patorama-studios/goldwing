@@ -4890,7 +4890,7 @@ if ($renewModalEligible) {
     ? (strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'Associate' : 'Full')
     : '';
 ?>
-<div id="renew-modal" class="hidden fixed inset-0 z-50 items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4">
+<div id="renew-modal" data-tour="renew-modal" class="hidden fixed inset-0 z-50 items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600">
     <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
       <div>
@@ -4914,7 +4914,7 @@ if ($renewModalEligible) {
           <p class="text-xs">Current period ends <?= e(format_date($membershipPeriod['end_date'])) ?>.</p>
         <?php endif; ?>
       </div>
-      <div>
+      <div data-tour="renew-term">
         <p class="text-sm font-semibold text-gray-900 mb-2">Renewal term</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-renew-term-group>
           <?php $firstTerm = true; foreach ($renewOptions as $opt): ?>
@@ -4937,7 +4937,7 @@ if ($renewModalEligible) {
         </div>
       </div>
       <?php if ($renewPartnerMember): ?>
-        <div>
+        <div data-tour="renew-partner">
           <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
             <input type="checkbox" name="include_partner" value="1" data-renew-partner-toggle
               class="mt-0.5 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-600">
@@ -4968,12 +4968,12 @@ if ($renewModalEligible) {
         </span>
       </label>
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-100">
-        <button type="button" data-renew-cancel-trigger
+        <button type="button" data-renew-cancel-trigger data-tour="renew-cancel-link"
           class="text-xs text-gray-500 hover:text-red-700 underline self-start">Cancel my membership instead</button>
         <div class="flex items-center gap-2">
           <button type="button" data-renew-close
             class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Close</button>
-          <button type="submit"
+          <button type="submit" data-tour="renew-submit"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-md">
             <span class="material-icons-outlined text-base">lock</span>
             Continue to payment

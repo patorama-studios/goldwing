@@ -35,7 +35,12 @@
         "[data-tour=\"pay-fees-expiry\"]",
         "[data-tour=\"pay-fees-pay-now\"]",
         "[data-tour=\"pay-fees-renew\"]",
-        "[data-tour=\"pay-fees-history\"]"
+        "[data-tour=\"pay-fees-history\"]",
+        "[data-tour=\"renew-modal\"]",
+        "[data-tour=\"renew-term\"]",
+        "[data-tour=\"renew-partner\"]",
+        "[data-tour=\"renew-cancel-link\"]",
+        "[data-tour=\"renew-submit\"]"
       ],
       "watched_files": [
         "public_html/member/index.php",
@@ -321,6 +326,31 @@
       "watched_files": [
         "public_html/admin/store/order_view.php",
         "public_html/assets/js/tours/tours/admin-process-order.js"
+      ]
+    },
+    "admin-action-refund": {
+      "slug": "admin-action-refund",
+      "name": "How to view orders and action a refund",
+      "blurb": "Walk me through the Payments dashboard and refunding a payment via Stripe.",
+      "audience": "admin",
+      "roles": ["admin", "committee_member", "treasurer"],
+      "page_url": "/admin/index.php?page=payments",
+      "page_match": "page=payments",
+      "steps_file": "/assets/js/tours/tours/admin-action-refund.js",
+      "selectors": [
+        "[data-tour=\"admin-payments-page\"]",
+        "[data-tour=\"admin-payments-header\"]",
+        "[data-tour=\"admin-payments-stripe-status\"]",
+        "[data-tour=\"admin-payments-transactions\"]",
+        "[data-tour=\"admin-payments-search\"]",
+        "[data-tour=\"admin-payments-filters\"]",
+        "[data-tour=\"admin-payments-row-actions\"]",
+        "[data-tour=\"admin-payments-refund-button\"]",
+        "[data-tour=\"admin-payments-debug-log\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/index.php",
+        "public_html/assets/js/tours/tours/admin-action-refund.js"
       ]
     },
     "admin-notification-hub": {

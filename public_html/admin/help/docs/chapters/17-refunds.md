@@ -26,19 +26,39 @@ If you're none of these, you won't see the refund button. Ask an admin to change
 
 ### Where to find it in admin
 
-There are two places, depending on what you're looking at:
+Three places, depending on what you're looking at:
 
-1. **From an order** — Admin → Store → Orders → click the order number → scroll to the **Refunds** panel.
+1. **From the Payments dashboard** — Admin → Payments & Settings → find the order in the **Recent Transactions** table (use the search box or the Filters panel) → click the green **Refund** icon (the currency-exchange button on the right of the row). This is the fastest path when you only know who paid or roughly when, and it never leaves the dashboard — a modal asks for an optional reason and confirms.
+
+    {{link:/admin/index.php?page=payments|Take me to the Payments dashboard}}
+
+2. **From a store order** — Admin → Store → Orders → click the order number → scroll to the **Refunds** panel. Use this when you've also got fulfilment work to do on the same order (tracking, notes).
 
     {{link:/admin/store/orders|Take me to Store Orders}}
 
-2. **From a member's profile** — Admin → Members → click the member → **Orders** tab → click the order → **Refund** button.
+3. **From a member's profile** — Admin → Members → click the member → **Orders** tab → click the order → **Refund** button.
 
     {{link:/admin/members/|Take me to Members}}
 
-Both routes do exactly the same thing.
+All three routes call the same `RefundService` — the dashboard's row-action is a convenience, not a separate refund path.
 
 ### How to issue a refund (step by step)
+
+{{tour:admin-action-refund}}
+
+There are two slightly different shapes for the same flow — one for the dashboard's row-action modal, one for the order detail page's Refunds panel.
+
+#### From the Payments dashboard (the fast path)
+
+1. Open **Admin → Payments & Settings**.
+2. Find the order — use the search box (member name, email, or order number) or open **Filters** to narrow by status, type, or date range.
+3. Click the green **currency_exchange** icon in the Action column. The icon only shows for orders that are **paid** and not already voided.
+4. A modal opens with the order number and total. Optionally type a **reason** (a sentence is fine — it gets emailed to the member and saved in our records).
+5. Click **Refund order**.
+6. You'll be asked for your **2FA code** if it's been more than a few minutes since you last entered one (the "step-up" check — a deliberate extra layer of safety on any action that moves money).
+7. The page reloads, the order's status changes to **refunded** in the table, and the member gets an email immediately.
+
+#### From the order detail page (the long-form path)
 
 The Refunds panel sits at the bottom of the order detail page and looks like this:
 
@@ -46,12 +66,12 @@ The Refunds panel sits at the bottom of the order detail page and looks like thi
 
 Then:
 
-1. Find the order you want to refund (either route above).
+1. Find the order (any of the three routes above).
 2. Scroll to the **Refunds** panel.
 3. Type the **amount** (in dollars). Leave it blank to refund the whole order's remaining balance.
-4. Type a short **reason** (a sentence is fine — this gets emailed to the member and saved in our records).
+4. Type a short **reason** (a sentence — emailed to the member, saved in our records).
 5. Click **Process refund**.
-6. You'll be asked for your **2FA code** if it's been more than a few minutes since you last entered one (this is the "step-up" check — a deliberate extra layer of safety on actions involving money).
+6. Step-up 2FA if needed.
 7. Confirm the browser pop-up: "Process this refund in Stripe?"
 
     ![Browser confirm dialog before the Stripe call](images/17-refund-confirm.png)
@@ -59,6 +79,18 @@ Then:
 8. Wait a few seconds. The page reloads and you'll see the refund listed in the panel with a status of **Processed**.
 
 That's it. Stripe sends the money. The member gets an email immediately. We never touch any cards or bank details ourselves — Stripe does all of that.
+
+### The refund cycle — what happens once you click Refund
+
+Whichever path you used, the same chain of events fires:
+
+1. **Our database is updated.** The order's `payment_status` flips to **refunded** (full) or **partial_refund** (partial); a row is written to the local refunds table with who issued it, when, and why.
+2. **Stripe is told.** We call Stripe's refunds API against the order's payment intent. Stripe responds with a refund receipt ID (e.g. `re_3Q4xxxxxxxx`) — that's the canonical handle you'll see in the Stripe dashboard.
+3. **Stripe processes the bank movement.** Stripe pulls the money out of the association's Stripe balance and sends it back to the same card the member originally paid with. Their bank receives it in 5–10 business days — we don't quote a specific number to the member because the timing is the bank's, not ours.
+4. **An email goes to the member** ("Your refund for order #X has been processed. Amount: $X. Reason: …").
+5. **A security alert goes to admins.** Every refund is treated as a money-movement event worth flagging — see [Chapter 08 — Activity & audit log](view.php?slug=08-activity-audit).
+6. **A row is added to the activity log**, searchable by `refund.processed`.
+7. **Stripe fires a `refund.updated` webhook back to us.** This is mostly a safety net — Stripe has now confirmed end-to-end. If Stripe ever rejects the refund after we recorded it (rare), the webhook flips our local row to `failed` so the records stay in sync. See [Chapter 16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
 
 ### What the member gets
 
@@ -120,10 +152,11 @@ Members can **not** refund themselves. There is no member-portal refund button b
 
 The permission key is `admin.payments.refund`. Per `ADMIN_GUIDE.md` and `includes/admin_permissions.php`, three roles have it by default: Admin, Committee Member, Treasurer. The store-side check uses a parallel key `store_refunds_manage` (`includes/store_helpers.php`) which is admin-only.
 
-Two entry points, same service call:
+Three entry points, same service call:
 
 | Entry point | Check | File |
 |---|---|---|
+| Payments dashboard → Recent Transactions row action | `AdminMemberAccess::canRefund($user)` | `public_html/admin/index.php` (action `api_refund`, posts to `/api/admin/refunds/create`) |
 | Order detail → Refunds panel | `store_user_can($user, 'store_refunds_manage')` | `public_html/admin/store/order_view.php` (action `refund_order`) |
 | Member profile → Orders → Refund | `AdminMemberAccess::canRefund($user)` | `public_html/admin/members/actions.php` (action `refund_submit`) |
 
@@ -197,6 +230,12 @@ The `store_refund_processed` template (in `App\Services\NotificationService`) em
     ![Refund button on order detail page](images/17-refund-button.png)
   • The confirm() dialog that fires on click. Save as 17-refund-confirm.png.
 -->
+
+<!-- SCREENSHOT: /admin/index.php?page=payments with the green Refund icon on a paid row highlighted/circled. Save as 17-payments-refund-button.png. -->
+<!-- ![Payments dashboard refund row action](../images/17-payments-refund-button.png) -->
+
+<!-- SCREENSHOT: same page with the Refund modal open (click the icon). Save as 17-payments-refund-modal.png. -->
+<!-- ![Payments dashboard refund modal](../images/17-payments-refund-modal.png) -->
 
 ## Related chapters
 

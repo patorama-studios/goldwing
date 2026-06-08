@@ -32,6 +32,7 @@ In **cPanel → Cron Jobs**. The page shows every scheduled command, the schedul
 
 - **Renewal reminders** — runs daily. Emails (and SMS's, where a phone is on file) members who are due to renew in 60 days, and again at 30 days. Builds them a ready-to-pay Stripe checkout link.
 - **Membership expiry** — runs daily, just after midnight. Looks for any active memberships whose end date has passed, and marks them as **lapsed**. After this runs, those members lose member-only access until they renew.
+- **Stale pending-order cleanup** — runs daily. Closes off abandoned card-checkout orders that never got paid (Stripe's hosted checkout link expires after about a day, so we close ours too). Without this, the orders list would slowly fill with "pending" rows that no one will ever pay.
 - **File integrity scan** — runs hourly (or nightly, depending on configuration). Compares the site's files against a saved baseline and alerts the security recipient if anything has changed unexpectedly. Cross-reference with [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity).
 - **Daily admin summary** — optional. Emails the first admin a one-paragraph digest each morning: how many active members, how many pending applications, how many memberships are due soon. A useful "is the site still alive?" heartbeat.
 
@@ -98,6 +99,20 @@ One SQL pass: `WHERE status = 'ACTIVE' AND end_date < CURDATE()`. For each match
 
 **If it fails:** lapsed members will still show `ACTIVE`. Run `php cron/expire_memberships.php` on the server; check `last_expire_run`.
 
+### `cron/expire_pending_orders.php` — daily
+
+Stripe's hosted Checkout Session expires after ~24h on Stripe's side, but our `orders.status='pending'` row never finds out. Without this job, abandoned card checkouts pile up forever as pending with no breadcrumb.
+
+The job walks `orders` rows that are: `status='pending'`, `payment_status='pending'`, `payment_method='stripe'`, and older than `$thresholdHours` (24). It skips any row that has a `stripe_charge_id` or `paid_at` set (defensive — a slow webhook may have raced us). For each match:
+
+- `orders` → `status='cancelled'`, `payment_status='failed'`, with `admin_notes` appended explaining the auto-expire.
+- Any linked `membership_periods` row in `PENDING_PAYMENT` → `LAPSED` (mirrors `MembershipOrderService::markOrderRejected`).
+- Any linked `store_orders` row at the same threshold → `status='cancelled'`.
+
+No email, no member notification — this is house-keeping. Activity log gets a row per expire so the audit hub shows what was cleaned up.
+
+**If it fails:** stale pending rows accumulate. Run `php cron/expire_pending_orders.php` manually; nothing bad happens if it runs twice in a day.
+
 ### `cron/daily_summary_admin.php` — optional, `15 6 * * *`
 
 Picks the first admin user, counts active members + pending applications + members due within 60 days, emails a one-paragraph summary, writes `last_daily_summary_run`. Disable by removing the cron entry — no settings toggle. Non-fatal if it fails.
@@ -115,6 +130,7 @@ In cPanel → **Cron Jobs**, add an entry per script with the schedule on the le
 ```
 0 6 * * *    /usr/bin/php /home2/goldwing/cron/send_renewal_reminders.php
 5 0 * * *    /usr/bin/php /home2/goldwing/cron/expire_memberships.php
+15 0 * * *   /usr/bin/php /home2/goldwing/cron/expire_pending_orders.php
 15 6 * * *   /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
 0 * * * *    /usr/bin/php /home2/goldwing/cron/fim_scan.php
 ```

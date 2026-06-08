@@ -32,13 +32,26 @@ If buttons are missing or you can't open an order, your role probably doesn't ha
 
 ![The Store Orders queue (customer names sanitized to 'Member N')](images/15-orders-list.jpg)
 
-Three doors lead to orders:
+Four doors lead to orders:
 
-1. **Admin → Store → Orders** — the master list of every store order, with filters for status, fulfilment, date, and a search box that finds order numbers, customer names, emails, and product codes.
-2. **Admin → Members → click a member → Orders tab** — every order that member has placed, both memberships and store.
-3. **Recent payments card on the admin dashboard** — the latest handful of orders from both types, useful for a quick "did that payment come through?" check.
+1. **Admin → Payments & Settings** — the **master payments dashboard**. Lists every transaction the site has ever taken (both memberships and store, mixed together), with a search box, filter panel (Status / Type / Date From / Date To / Voided), real pagination, and four row-actions per order: **View**, **Refund**, **Void**, **Delete**. The top of the page also shows Stripe connection status, the last-received webhook, and a collapsible **Payments Debug Log** of recent webhook events. This is the page you open when you don't know which order you're looking for, or when you need to action one quickly without opening the full detail page.
+2. **Admin → Store → Orders** — the store-only list, with extra filters for fulfilment (new / processing / packed / shipped) and search across SKUs. Use this when you're working the fulfilment queue rather than the payments side.
+3. **Admin → Members → click a member → Orders tab** — every order that member has placed, both memberships and store.
+4. **Recent payments card on the admin dashboard** — the latest handful of orders from both types, useful for a quick "did that payment come through?" check.
 
-All three routes show the same data — pick whichever matches what you already know (order number vs member name vs "what came in today").
+All four routes show the same underlying data — pick whichever matches what you already know (order number vs member name vs "what came in today" vs "I need to refund this now").
+
+### Actioning an order from the Payments dashboard
+
+From **Admin → Payments & Settings**, every row in the Recent Transactions table is clickable: a click on the row takes you to the order's detail page (the member view for membership orders, the store order view for store orders). The four icon buttons on the right of each row let you act without opening the detail page first:
+
+- **View** (eye icon) — opens the order detail page in the same way clicking the row does.
+- **Refund** (currency icon) — only shown on **paid** orders. Opens a modal asking for an optional reason and confirms before calling the same `RefundService` used everywhere else. See [Chapter 17 — Refunds](view.php?slug=17-refunds) for what happens next.
+- **Void** (block icon) — marks the order as voided without touching Stripe. Use when the order should be hidden from the books (e.g. a manual test order or a duplicate that never got paid). Voided orders are hidden by the default filter; switch the **Voided** filter to **Show** or **Only** to see them again.
+- **Unvoid** (restart icon) — shown instead of Void when the order is already voided. Returns it to its previous state.
+- **Delete** (trash icon) — hard-deletes the order from the database, cascading to the linked `store_orders` row for store-type orders. **There's no undo.** The modal requires you to type `DELETE` to confirm.
+
+Voiding and deleting are restricted to the **admin** role only — the Refund button shows for Admin / Committee Member / Treasurer.
 
 ### How to look up an order
 
@@ -65,7 +78,7 @@ Once you open an order, you'll see several panels. Here's what each one means in
 
 ### What can go wrong (and what to do)
 
-- **The order is stuck on "pending" forever.** The member started checkout but never finished paying. The page redirected them to the payment provider and they bailed, or their card was declined. There's nothing to do — these aren't real orders. You can safely ignore them. The orders list lets you filter them out.
+- **The order is stuck on "pending" forever.** The member started checkout but never finished paying. The page redirected them to the payment provider and they bailed, or their card was declined. There's nothing to do — these aren't real orders. You can safely ignore them; the **stale pending-order cleanup** cron ([Chapter 34](view.php?slug=34-cron-jobs)) automatically cancels any card-checkout that's been pending for more than 24 hours, so the list won't fill up over time. The orders list also lets you filter pending orders out.
 - **The payment shows "paid" but the order status is still "new".** That's normal — payment status and order status are tracked separately. *Paid* just means the money's in. The order status moves through *new → processing → packed → shipped → completed* as you (or whoever does fulfilment) works through it.
 - **The member says they paid but I can't find the order.** Two things to check: (1) was it under a different email or as a guest checkout? Search by email rather than by member. (2) Look at the recent payments card on the dashboard — if Stripe took the money but the order didn't appear in the admin, the webhook might be misconfigured. Flag it to a developer with the order number and amount.
 - **The order isn't linked to a member.** Some checkouts come in as guest. You can link the order to a member from the order's detail page. This matters for refunds — refunds need a linked member account.
@@ -144,8 +157,10 @@ A **store checkout writes both rows.** `store_orders` is created first; then `Or
 2. **Review** at `/store/cart.php`, **checkout** at `/checkout`. `store_calculate_cart_totals()` applies the discount code (Ch 29), shipping, and processing fee; stock is re-checked per-variant.
 3. **`store_orders` insert** with shipping fields, totals, and `pickup_instructions_snapshot` for pickup. **`store_order_items`** rows hold the per-line snapshots; **`store_order_discounts`** captures any code used.
 4. **`OrderService::createOrder()`** writes the matching `orders` row with `order_type='store'` and embeds `store_order_id` in `shipping_address_json`.
-5. **Stripe Checkout Session** is built from the snapshotted lines (shipping, GST, processing fee as separate Stripe lines) and the user is redirected.
-6. **Webhook** flips both tables to paid/accepted and decrements inventory on `store_products` / `store_product_variants`.
+5. **Stripe Invoice + on-page Payment Element.** `StoreInvoiceService::ensureInvoiceForOrder()` mints a Stripe Invoice with one itemized line per cart item (plus shipping / GST / processing-fee lines), reuses any existing draft/open invoice if the customer reopened the order, and returns the invoice's `PaymentIntent.client_secret`. The browser embeds Stripe's Payment Element directly on `/store/orders/{order_number}` and confirms the PI in-page — there's no longer a redirect to Stripe's hosted Checkout page. The Stripe Invoice carries our internal `STORE-YYYY-NNNNN` invoice number in metadata + description, so a Stripe-side search finds Goldwing orders.
+6. **Webhook** (`invoice.paid`) flips both tables to paid/accepted and decrements inventory on `store_products` / `store_product_variants`. See [Chapter 16](view.php?slug=16-webhooks-idempotency).
+
+Membership renewals still use `StripeService::createCheckoutSessionWithLineItems()` (a hosted Checkout Session) — only the store side moved to invoices.
 
 #### Order states
 
@@ -157,6 +172,7 @@ Every line item carries its **own copy** of the name and unit price. Store items
 
 ### Where to change it
 
+- **Master payments dashboard:** `/admin/index.php?page=payments`. The Recent Transactions table reads from `orders` directly, supports search + the filter panel (status, type, date range, voided), and renders the four-button row-actions (View / Refund / Void / Delete). POST handler at the same path handles `void_order`, `unvoid_order`, `delete_order` (gated on `AdminMemberAccess::canManualOrderFix()`); `api_refund` reuses the existing `/api/admin/refunds/create` payload, routed through `RefundService` (Ch 17).
 - **Store orders list:** `/admin/store/orders` (`public_html/admin/store/orders.php`). Filters by status, fulfilment, date, and free-text search across order number, customer, email, SKU. Bulk status changes supported.
 - **Single store order:** `/admin/store/order_view.php?id=X` (or `?order=ORDER_NUMBER`). Status changes, shipment creation (carrier + tracking → `store_shipments`), internal notes, refund initiation.
 - **Recent payments card** on `/admin/index.php` — reads `orders`, so memberships and store both appear.
@@ -175,9 +191,20 @@ Order-time pricing pulls from store settings: flat vs free-over-threshold shippi
 - **Two tables, one Stripe session.** Store checkout writes both `store_orders` and `orders`, linked through `orders.shipping_address_json.store_order_id`. Use `orders` for payment-ledger questions (totals, Stripe IDs, refundability); `store_orders` for store-ops (shipping, fulfilment, tracking).
 - **Snapshotted prices mean catalogue updates don't touch historical orders.** Refund math, invoice reprints, and order history all read the snapshot — never the live `store_products` row. If a price looks "wrong" on an old order, that's what it was at the time.
 - **Cancellation doesn't auto-restock.** Marking a store order `cancelled` via the admin drop-down does not put units back on `store_products.stock_quantity`. Use the refund flow (Ch 17) if you need stock returned — refunds restock; cancellations don't, in case the stock was already shipped.
-- **Order numbers are per-series, not per-table.** Memberships use `M-YYYY-NNNNNN`; store orders use their own series via `store_generate_order_number()`.
+- **Order numbers are per-series, not per-table.** Memberships use `M-YYYY-NNNNNN`; store orders use their own series via `store_generate_order_number()`. *Invoice* numbers are a separate concern — `MEM-YYYY-NNNNN` and `STORE-YYYY-NNNNN`, minted by `PaymentSettingsService::nextInvoiceNumber()`. See [Chapter 18](view.php?slug=18-invoices).
+- **Voiding ≠ deleting ≠ cancelling.** Three different actions, three different outcomes. Cancel changes the order status but keeps the row; void hides it from the default list (and from member-facing history) without touching Stripe; delete is a hard `DELETE` cascading the linked `store_orders` row. Voided rows still show in the dashboard if you flip the **Voided** filter to *Show* or *Only*.
+- **Stale pending cleanup is now automated.** `cron/expire_pending_orders.php` ([Chapter 34](view.php?slug=34-cron-jobs)) closes off any card-method `pending` order older than 24h, mirroring `MembershipOrderService::markOrderRejected` for the linked `membership_periods` row. Don't try to clean those rows by hand — let the cron do it.
 
 </details>
+
+<!-- SCREENSHOT: Admin payments dashboard at /admin/index.php?page=payments, showing Stripe Connection card + Billing Configuration card + Recent Transactions table with at least one paid row visible (so the row-action buttons render). Save as 15-payments-dashboard.png. -->
+<!-- ![Admin Payments dashboard](../images/15-payments-dashboard.png) -->
+
+<!-- SCREENSHOT: Same page, Filters panel expanded (click "Filters" so the Status / Type / Date From / Date To / Voided controls show). Save as 15-payments-filters.png. -->
+<!-- ![Payments dashboard filters](../images/15-payments-filters.png) -->
+
+<!-- SCREENSHOT: Same page, Refund modal open (click the green currency_exchange icon on a paid order). Save as 15-payments-refund-modal.png. -->
+<!-- ![Refund modal](../images/15-payments-refund-modal.png) -->
 
 <!-- SCREENSHOT: Admin store orders list at /admin/store/orders, showing the filter row and a few rows of mixed statuses. Save as 15-store-orders-list.png. -->
 <!-- ![Store orders list](../images/15-store-orders-list.png) -->
@@ -185,8 +212,8 @@ Order-time pricing pulls from store settings: flat vs free-over-threshold shippi
 <!-- SCREENSHOT: Single store order at /admin/store/order_view.php?id=X, full page showing items, totals, status panel, shipment panel, refund panel, notes. Save as 15-store-order-view.png. -->
 <!-- ![Single order view](../images/15-store-order-view.png) -->
 
-<!-- SCREENSHOT: Stripe-hosted Checkout page reached by going through /store/checkout (use test mode). Save as 15-stripe-checkout.png. -->
-<!-- ![Stripe Checkout page](../images/15-stripe-checkout.png) -->
+<!-- SCREENSHOT: New store checkout page /store/orders/{order_number} with the embedded Stripe Payment Element visible (use test mode). Save as 15-store-payment-element.png. -->
+<!-- ![Store on-page Payment Element](../images/15-store-payment-element.png) -->
 
 ## Related chapters
 

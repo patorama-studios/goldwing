@@ -87,12 +87,27 @@ When the automatic reminder didn't reach the member, or you just want to send a 
 
 ### How members renew themselves
 
-In addition to the 60/30-day reminder emails, members can renew on demand from inside the member area:
+{{tour:member-pay-fees}}
 
-- A high-contrast red **Renew now** button appears on the member's dashboard and on **Billing & Payments** as soon as their period is within 60 days of expiry (or already lapsed). Life members never see it.
-- Clicking opens a lightbox where they pick **1, 2 or 3 years**, optionally tick **"Also renew my partner"** (Full ↔ Associate, in either direction), confirm a "details are correct" checkbox, and click through to Stripe.
+In addition to the 60/30-day reminder emails, members can renew on demand from inside the member area. There's nothing they have to remember and no menu to find — the prompt appears for them automatically:
+
+- A high-contrast red **Renew now** button **auto-appears** on the member's dashboard and on **Billing & Payments** as soon as their period is within 60 days of expiry (or already lapsed). Life members never see it. Members outside the 60-day window don't see it either — only members who actually need to act. Nothing pops up on its own; the button is a visible CTA, not a modal that opens itself.
+- Clicking it opens the **renewal lightbox** — a focused, full-screen modal that handles the whole renewal in one place. Inside the lightbox they:
+  1. Pick a **term** — 1, 2, or 3 years. Each option shows the price for their member type and magazine preference; greyed-out options mean that term has no AUD amount set in the pricing matrix.
+  2. Optionally tick **"Also renew my partner"** — visible only when the member has a linked partner (Full ↔ Associate, either direction). When ticked, the modal shows the combined total live.
+  3. Confirm the **"details are correct"** acknowledgement.
+  4. Click through to Stripe to pay.
 - If they bundle the partner, both renewals go through one combined Stripe Checkout session — so the member pays once for two periods.
 - A small **Cancel my membership instead** link sits at the bottom of the lightbox. It opens a confirmation step with a reason field; submitting flags the member as "do not renew" and emails the committee. They keep access until their period ends — nothing is terminated immediately.
+
+<!-- SCREENSHOT: Member dashboard at /member/index.php for a member within 60 days of expiry, showing the red "Renew now" button in Quick Actions. Save as 19-renew-now-cta.png. -->
+<!-- ![Renew now CTA on the member dashboard](../images/19-renew-now-cta.png) -->
+
+<!-- SCREENSHOT: The renewal lightbox open (click "Renew now"), showing the three term radios, the partner toggle, and the running total. Save as 19-renewal-lightbox.png. -->
+<!-- ![Renewal lightbox](../images/19-renewal-lightbox.png) -->
+
+<!-- SCREENSHOT: The cancel-membership confirmation step (click "Cancel my membership instead" from the lightbox), showing the reason textarea. Save as 19-cancel-request.png. -->
+<!-- ![Cancel-membership request modal](../images/19-cancel-request.png) -->
 
 ### How renewal reminder emails work
 

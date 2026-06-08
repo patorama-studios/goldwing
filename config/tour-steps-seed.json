@@ -530,7 +530,7 @@
       "element": "[data-tour=\"pay-fees-expiry\"]",
       "popover": {
         "title": "When your membership runs out",
-        "description": "This is the date your membership ends. If it's getting close, it's time to pay your fees.",
+        "description": "This is the date your membership ends. If it's within 60 days, a red <strong>Renew now</strong> button appears automatically — that's your prompt to pay.",
         "side": "bottom",
         "align": "start"
       }
@@ -538,9 +538,45 @@
     {
       "element": "[data-tour=\"pay-fees-pay-now\"], [data-tour=\"pay-fees-renew\"], [data-tour=\"pay-fees-status-card\"]",
       "popover": {
-        "title": "Pay your fees",
-        "description": "Click the gold <strong>Pay now</strong> button (or <strong>Renew membership</strong> if it's close to expiring). You'll be taken to a safe page to pay with your card.",
+        "title": "Start the renewal",
+        "description": "Click the gold <strong>Pay now</strong> button (for a one-off charge), or the red <strong>Renew now</strong> button (which opens the renewal options). We'll walk through the renewal options next.",
         "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"renew-term\"], [data-tour=\"pay-fees-renew\"], [data-tour=\"pay-fees-status-card\"]",
+      "popover": {
+        "title": "Pick how long you want to renew for",
+        "description": "<strong>Open the Renew now button first, then click Next.</strong> Inside the pop-up you'll see three options — <strong>1 year</strong>, <strong>2 years</strong>, or <strong>3 years</strong>. Each one shows your price. Pick whichever suits you.",
+        "side": "right",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"renew-partner\"], [data-tour=\"renew-term\"]",
+      "popover": {
+        "title": "Renew your partner too (if you have one)",
+        "description": "If your spouse / partner is also a member, you'll see a tick box to <strong>also renew them</strong> at the same time. Tick it and the price updates live — you only pay once for both of you.",
+        "side": "right",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"renew-submit\"], [data-tour=\"renew-term\"]",
+      "popover": {
+        "title": "Confirm and pay",
+        "description": "Tick the <em>'my details are correct'</em> box, then click the red <strong>Continue to payment</strong> button. We'll send you to a safe Stripe page to pay with your card. Once you pay, your membership is renewed straight away.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"renew-cancel-link\"], [data-tour=\"renew-term\"]",
+      "popover": {
+        "title": "Don't want to renew?",
+        "description": "Down the bottom of the pop-up there's a small <strong>Cancel my membership instead</strong> link. Clicking it lets you tell us you're not renewing this year — you keep access until your current paid period ends, and the committee gets a heads-up to follow up.",
+        "side": "top",
         "align": "start"
       }
     },
@@ -549,6 +585,71 @@
       "popover": {
         "title": "Check your past payments",
         "description": "Down here you can see every fee you've paid. <br><br><strong>That's it — you've done it!</strong>",
+        "side": "top",
+        "align": "start"
+      }
+    }
+  ],
+  "admin-action-refund": [
+    {
+      "element": "[data-tour=\"admin-payments-header\"]",
+      "popover": {
+        "title": "Payments & Settings",
+        "description": "This is the master payments dashboard. Every order the site has ever taken — memberships and store, mixed together — lives here. Click <strong>Next</strong> to see how to find and action one.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-stripe-status\"]",
+      "popover": {
+        "title": "Stripe connection",
+        "description": "Quick health check at the top of the page. <strong>SYSTEM ONLINE</strong> + <strong>Connected</strong> + a recent webhook means money can flow. If this is red, refunds and new payments will fail — don't action anything until you fix it.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-search\"]",
+      "popover": {
+        "title": "Find the order",
+        "description": "Type the member's name, email, or the order number (like <em>M-2026-000482</em>). Hit Apply or press Enter.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-filters\"]",
+      "popover": {
+        "title": "Don't know the order number?",
+        "description": "Click <strong>Filters</strong> to narrow by Status (paid / pending / refunded), Type (membership / store), Date From / Date To. Useful when a member says <em>'I paid last Tuesday'</em>.",
+        "side": "bottom",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-row-actions\"]",
+      "popover": {
+        "title": "Four actions per row",
+        "description": "<strong>View</strong> (eye) opens the full order. <strong>Refund</strong> (green) only shows for paid orders. <strong>Void</strong> hides the order without touching Stripe. <strong>Delete</strong> wipes the row permanently — it makes you type DELETE to confirm.",
+        "side": "left",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-refund-button\"], [data-tour=\"admin-payments-row-actions\"]",
+      "popover": {
+        "title": "Issuing the refund",
+        "description": "Click the green <strong>Refund</strong> icon. A modal pops up — type a short reason (optional) and click <strong>Refund order</strong>. You'll be asked for your 2FA code if it's been a while since you used it.<br><br><strong>What happens next:</strong> we update our records, tell Stripe, Stripe pulls the money from the association balance, the member's card gets credited in 5–10 business days, the member gets an email, and the activity log records it. <strong>There's no undo</strong> — once Stripe accepts, you can't reverse it.",
+        "side": "top",
+        "align": "start"
+      }
+    },
+    {
+      "element": "[data-tour=\"admin-payments-debug-log\"]",
+      "popover": {
+        "title": "Something went wrong?",
+        "description": "If a payment didn't land or a refund failed, expand the <strong>Payments Debug Log</strong>. It shows the last 50 Stripe webhooks we received, with any error messages. Send the matching row to your developer if the error looks like jargon.<br><br><strong>That's it — you can refund any payment from this dashboard.</strong>",
         "side": "top",
         "align": "start"
       }
