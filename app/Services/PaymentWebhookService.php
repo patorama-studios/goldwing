@@ -100,7 +100,8 @@ class PaymentWebhookService
                 self::markMembershipPaid($order, $metadata);
             }
             if (($order['order_type'] ?? '') === 'store' && !empty($metadata['store_order_id'])) {
-                self::markStoreOrderPaid((int) $metadata['store_order_id'], $paymentIntentId, $sessionId);
+                $cartId = isset($metadata['cart_id']) && $metadata['cart_id'] !== '' ? (int) $metadata['cart_id'] : 0;
+                self::markStoreOrderPaid((int) $metadata['store_order_id'], $paymentIntentId, $sessionId, $cartId);
             }
 
             InvoiceService::createForOrder($order);
@@ -274,7 +275,8 @@ class PaymentWebhookService
             if (($order['order_type'] ?? '') === 'store') {
                 $storeOrderId = isset($metadata['store_order_id']) ? (int) $metadata['store_order_id'] : 0;
                 if ($storeOrderId > 0) {
-                    self::markStoreOrderPaid($storeOrderId, $paymentIntentId, null);
+                    $cartId = isset($metadata['cart_id']) && $metadata['cart_id'] !== '' ? (int) $metadata['cart_id'] : 0;
+                    self::markStoreOrderPaid($storeOrderId, $paymentIntentId, null, $cartId);
                 }
             }
 
@@ -495,7 +497,7 @@ class PaymentWebhookService
         return $order ?: null;
     }
 
-    private static function markStoreOrderPaid(int $storeOrderId, string $paymentIntentId, ?string $sessionId = null): void
+    private static function markStoreOrderPaid(int $storeOrderId, string $paymentIntentId, ?string $sessionId = null, int $cartId = 0): void
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id LIMIT 1');
@@ -503,6 +505,18 @@ class PaymentWebhookService
         $order = $stmt->fetch();
         if (!$order) {
             return;
+        }
+
+        // Close out the cart that produced this paid order. Lookup by cart_id
+        // from PI/session metadata, with a fallback to the user's currently
+        // active cart. This intentionally lives here (not in the create
+        // endpoint) so abandoned/failed attempts don't lock the user out.
+        if ($cartId > 0) {
+            $stmt = $pdo->prepare('UPDATE store_carts SET status = "converted", updated_at = NOW() WHERE id = :id AND status = "active"');
+            $stmt->execute(['id' => $cartId]);
+        } elseif (!empty($order['user_id'])) {
+            $stmt = $pdo->prepare('UPDATE store_carts SET status = "converted", updated_at = NOW() WHERE user_id = :user_id AND status = "active"');
+            $stmt->execute(['user_id' => (int) $order['user_id']]);
         }
 
         $paidStatus = (string) SettingsService::getGlobal('store.order_paid_status', 'paid');

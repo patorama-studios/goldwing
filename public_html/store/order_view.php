@@ -30,8 +30,30 @@ $tickets = $stmt->fetchAll();
 $pageTitle = 'Order ' . $order['order_number'];
 $heroTitle = 'Order ' . $order['order_number'];
 $heroLead = 'Status: ' . ucfirst($order['status']);
+
+// Returning from Stripe after confirming a PaymentIntent. Stripe appends
+// ?payment_intent=...&payment_intent_client_secret=...&redirect_status=...
+// onto our return_url (which already has ?success=1). The webhook handles the
+// authoritative status update; if the user beats the webhook we show a
+// "finalizing" message and auto-refresh once.
+$justPaid = isset($_GET['success']) && $_GET['success'] === '1';
+$stripeRedirectStatus = isset($_GET['redirect_status']) ? (string) $_GET['redirect_status'] : '';
+$isPaid = ($order['status'] ?? '') === 'paid' || ($order['payment_status'] ?? '') === 'paid';
+$paymentFailed = $stripeRedirectStatus === 'failed';
+$autoRefresh = $justPaid && !$isPaid && !$paymentFailed && $stripeRedirectStatus !== 'requires_payment_method';
 ?>
 <div class="grid gap-6">
+  <?php if ($paymentFailed): ?>
+    <div class="alert error">Payment was not successful. <a href="/store/checkout">Return to checkout</a> to try again.</div>
+  <?php elseif ($stripeRedirectStatus === 'requires_payment_method'): ?>
+    <div class="alert error">Your card was declined. <a href="/store/checkout">Return to checkout</a> to try a different card.</div>
+  <?php elseif ($justPaid && $isPaid): ?>
+    <div class="alert success">Thank you — your payment has been received and your order is confirmed.</div>
+  <?php elseif ($autoRefresh): ?>
+    <div class="alert info">Your payment was received. Finalizing your order — this page will refresh in a few seconds...</div>
+    <meta http-equiv="refresh" content="5">
+  <?php endif; ?>
+
   <div class="card">
     <h3>Order summary</h3>
     <p>Status: <strong><?= e(ucfirst($order['status'])) ?></strong></p>

@@ -150,7 +150,7 @@ A product can sit in multiple categories and carry multiple tags — categories 
 | `/store` | `catalog.php` | Product grid, filtered by category/tag/search. |
 | `/store/product/<slug>` | `product.php` | Single product with variant picker. |
 | `/store/cart` | `cart.php` | Cart edit, discount-code entry. |
-| `/store/checkout` | `checkout.php` | Shipping/pickup, redirect to Stripe Checkout. |
+| `/store/checkout` | `checkout.php` | Shipping/pickup, on-page Stripe Payment Element for card entry, "Pay now" confirms a PaymentIntent (no off-site redirect for cards). |
 | `/store/orders`, `/store/order/<order_number>` | `orders.php`, `order_view.php` | "My orders" + order detail / ticket codes. |
 
 If `store.members_only` is on and Stripe `allow_guest_checkout` is off (the default), `require_login()` fires immediately and non-members are bounced to `/login.php?return=…`.
@@ -182,9 +182,12 @@ Inventory tracking is **opt-in per product**: set `track_inventory = 1` and a `s
 
 - **Shipping** — flat-rate (`shipping_flat_rate`), with optional free-over-threshold. Pickup is a separate option with custom instructions.
 - **Processing fee passthrough** — `stripe_fee_enabled` plus percent/fixed components add the Stripe surcharge to the buyer's total instead of absorbing it.
-- **Stripe Checkout** — checkout builds a Session with `metadata.type = 'store_order'` and `metadata.order_id`; Stripe redirects back to `/store/order/<order_number>`.
+- **Stripe Payment Element** — `/api/stripe/create-payment-intent` builds a PaymentIntent (currency `aud`, `automatic_payment_methods.enabled = true`) with `metadata.order_type = 'store'`, `metadata.store_order_id`, `metadata.store_order_number`, `metadata.cart_id`. The browser mounts a Stripe Payment Element with the returned `client_secret`; `stripe.confirmPayment()` confirms with `return_url = /store/orders/<order_number>?success=1`. Card entry stays on-site (no hosted-checkout redirect); 3DS challenges and Apple/Google Pay buttons render inside the Element.
+- **Returning from Stripe** — `order_view.php` looks at the URL's `redirect_status` plus the local order row. If `?success=1` is present and `order.status === 'paid'` it shows a success banner. If the webhook hasn't yet finalized the order it shows "Finalizing your order…" with a `<meta http-equiv="refresh" content="5">`. `redirect_status=failed` or `requires_payment_method` surface as red "card declined" alerts that link back to checkout.
 
-Webhooks land on `/api/stripe_webhook.php` and are dispatched by `PaymentWebhookService` ([Ch 16](view.php?slug=16-webhooks-idempotency)). The handler reads `metadata.type` and routes store events (`checkout.session.completed`, `charge.refunded`) to the store branch — marking the order paid, decrementing stock, generating ticket codes for ticket items, and sending the confirmation email.
+Webhooks land on `/api/stripe_webhook.php` and are dispatched by `PaymentWebhookService` ([Ch 16](view.php?slug=16-webhooks-idempotency)). The handler reads `metadata.order_type` and routes store events (`payment_intent.succeeded`, `checkout.session.completed`, `charge.refunded`) to the store branch — marking the order paid, **converting the cart (`store_carts.status = 'converted'`)**, decrementing stock, generating ticket codes for ticket items, and sending the confirmation email. The cart is intentionally NOT marked converted at create-PaymentIntent time, so an abandoned attempt or declined card leaves the cart `active` and the user can retry from the same cart.
+
+> **Cleaning up stuck carts.** The admin tool `/admin/cleanup-stuck-store-orders.php` (gate: `admin.settings.general.manage`) lists every pending `store_orders` row from the last N days, retrieves each one's Stripe Session/PaymentIntent to confirm it never paid, and on `?confirm=1` cancels the orders + reopens the carts. Use it after legacy stuck checkouts or whenever members report being "locked out of their cart."
 
 ### Where to change it
 

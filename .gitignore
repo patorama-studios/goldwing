@@ -10,6 +10,7 @@ app/storage/logs/system.log
 
 # Claude Code local state
 .claude/
+.mcp.json
 
 # Spreadsheet working files (not tracked in repo)
 *.xlsx

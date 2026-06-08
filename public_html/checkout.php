@@ -312,7 +312,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                   <div class="form-error" id="payment-method-error" hidden></div>
                 </div>
                 <div class="payment-panel stripe-style" data-payment-panel="card" hidden>
-                  <p id="stripe-payment-note" class="form-helper">The Stripe Payment Element handles card details securely. Complete it below to pay instantly.</p>
+                  <p id="stripe-payment-note" class="form-helper">Enter your card details below. Apple&nbsp;Pay and Google&nbsp;Pay are also supported by Stripe.</p>
                   <div id="stripe-payment-element" class="mt-4"></div>
                   <div class="form-error" id="stripe-payment-error" hidden></div>
                 </div>
@@ -407,6 +407,8 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
     let clientSecret = null;
     let stripeConfig = null;
     let orderId = null;
+    let currentOrderNumber = null;
+    let stripeInitInProgress = false;
 
     const setError = (message) => {
       if (!errorEl) {
@@ -524,6 +526,48 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       clientSecret = secret;
     };
 
+    // Eagerly create a PaymentIntent + mount the Stripe Payment Element so the
+    // user can enter card details. Called when the card option is selected.
+    // Re-entrant: if a request is in flight or the Element is already mounted
+    // it returns immediately. Order rows are created on the server during this
+    // call; abandoned orders are cleaned by /admin/cleanup-stuck-store-orders.
+    const ensureStripeReady = async () => {
+      if (clientSecret && paymentElement) {
+        return;
+      }
+      if (stripeInitInProgress) {
+        return;
+      }
+      stripeInitInProgress = true;
+      setError('');
+      try {
+        const payload = collectPayload();
+        payload.payment_method = 'card';
+        const response = await fetch('/api/stripe/create-payment-intent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Unable to prepare payment.');
+        }
+        if (!data.client_secret) {
+          throw new Error('Unable to prepare payment — no client_secret returned.');
+        }
+        orderId = data.orderId || null;
+        currentOrderNumber = data.orderNumber || null;
+        await initStripeElements(data.client_secret);
+      } catch (error) {
+        setError(error.message || 'Unable to prepare payment.');
+      } finally {
+        stripeInitInProgress = false;
+      }
+    };
+
     if (paymentMethodInputs.length) {
       let defaultMethod = paymentMethodInputs.find((input) => !input.disabled && input.value === 'card');
       if (!defaultMethod) {
@@ -532,16 +576,16 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       if (defaultMethod) {
         defaultMethod.checked = true;
         setPaymentPanel(defaultMethod.value);
+        if (defaultMethod.value === 'card') {
+          ensureStripeReady();
+        }
       }
       paymentMethodInputs.forEach((input) => {
         input.addEventListener('change', () => {
           showPaymentMethodError('');
           setPaymentPanel(input.value);
-          if (input.value !== 'card' && paymentElement) {
-            paymentElement.unmount();
-            paymentElement = null;
-            elements = null;
-            clientSecret = null;
+          if (input.value === 'card') {
+            ensureStripeReady();
           }
         });
       });
@@ -581,31 +625,29 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             window.location.href = `${window.location.origin}/order/success?orderId=${encodeURIComponent(bankOrderId || '')}`;
             return;
           }
-          if (!clientSecret) {
-            const response = await fetch('/api/stripe/create-payment-intent', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken,
-              },
-              body: JSON.stringify(payload),
-            });
-            const data = await response.json();
-            if (!response.ok || data.error) {
-              throw new Error(data.error || 'Unable to start checkout.');
+          // Card flow: PaymentIntent + Payment Element. The Element was mounted
+          // on page load (ensureStripeReady). Now confirm the payment using the
+          // card details the user entered. On success Stripe redirects to
+          // return_url; the payment_intent.succeeded webhook updates the order
+          // status and converts the cart.
+          if (!clientSecret || !elements) {
+            // Element wasn't ready when Pay was clicked — try to prepare now.
+            await ensureStripeReady();
+            if (!clientSecret || !elements) {
+              throw new Error('Payment is not ready. Please reload the page and try again.');
             }
-            orderId = data.orderId || null;
-            await initStripeElements(data.client_secret);
           }
-
-          const { error } = await stripe.confirmPayment({
+          const returnPath = currentOrderNumber
+            ? `/store/orders/${encodeURIComponent(currentOrderNumber)}?success=1`
+            : '/store/cart';
+          const { error: confirmError } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-              return_url: `${window.location.origin}/order/success?orderId=${encodeURIComponent(orderId || '')}`,
+              return_url: `${window.location.origin}${returnPath}`,
             },
           });
-          if (error) {
-            throw error;
+          if (confirmError) {
+            throw confirmError;
           }
         } catch (error) {
           setError(error.message || 'Payment could not be processed.');
