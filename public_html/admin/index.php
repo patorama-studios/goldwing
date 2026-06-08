@@ -21,6 +21,7 @@ use App\Services\ChapterRepository;
 use App\Services\DomSnapshotService;
 use App\Services\BaseUrlService;
 use App\Services\MediaService;
+use App\Services\OrderAdminService;
 
 require_login();
 
@@ -1409,6 +1410,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
+    if ($page === 'payments' && in_array(($_POST['action'] ?? ''), ['void_order', 'unvoid_order', 'delete_order'], true)) {
+      $orderAction = (string) $_POST['action'];
+      $orderId = (int) ($_POST['order_id'] ?? 0);
+      $reason = trim((string) ($_POST['reason'] ?? ''));
+      if (!AdminMemberAccess::canManualOrderFix($user)) {
+        $alerts[] = ['type' => 'error', 'message' => 'Voiding / deleting orders is restricted.'];
+      } elseif ($orderId <= 0) {
+        $alerts[] = ['type' => 'error', 'message' => 'Order not found.'];
+      } else {
+        $orderRow = null;
+        try {
+          $stmt = $pdo->prepare('SELECT id, order_number, order_type FROM orders WHERE id = :id LIMIT 1');
+          $stmt->execute(['id' => $orderId]);
+          $orderRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+          $orderRow = null;
+        }
+        if (!$orderRow) {
+          $alerts[] = ['type' => 'error', 'message' => 'Order not found.'];
+        } else {
+          $linkedStoreId = null;
+          if (($orderRow['order_type'] ?? '') === 'store' && !empty($orderRow['order_number'])) {
+            try {
+              $stmt = $pdo->prepare('SELECT id FROM store_orders WHERE order_number = :n LIMIT 1');
+              $stmt->execute(['n' => $orderRow['order_number']]);
+              $linkedStoreId = (int) ($stmt->fetchColumn() ?: 0) ?: null;
+            } catch (\Throwable $e) {
+              $linkedStoreId = null;
+            }
+          }
+
+          try {
+            if ($orderAction === 'void_order') {
+              OrderAdminService::voidMembershipOrder($orderId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+              if ($linkedStoreId) {
+                OrderAdminService::voidStoreOrder($linkedStoreId, (int) ($user['id'] ?? 0), $reason !== '' ? $reason : null);
+              }
+              $alerts[] = ['type' => 'success', 'message' => 'Order voided.'];
+            } elseif ($orderAction === 'unvoid_order') {
+              OrderAdminService::unvoidMembershipOrder($orderId);
+              if ($linkedStoreId) {
+                OrderAdminService::unvoidStoreOrder($linkedStoreId, (int) ($user['id'] ?? 0));
+              }
+              $alerts[] = ['type' => 'success', 'message' => 'Order restored.'];
+            } elseif ($orderAction === 'delete_order') {
+              $confirm = strtoupper(trim((string) ($_POST['delete_confirm'] ?? '')));
+              if ($confirm !== 'DELETE') {
+                $alerts[] = ['type' => 'error', 'message' => 'Type DELETE to confirm permanent removal.'];
+              } else {
+                if ($linkedStoreId) {
+                  OrderAdminService::deleteStoreOrder($linkedStoreId);
+                }
+                OrderAdminService::deleteMembershipOrder($orderId);
+                $alerts[] = ['type' => 'success', 'message' => 'Order permanently deleted.'];
+              }
+            }
+          } catch (\Throwable $e) {
+            $alerts[] = ['type' => 'error', 'message' => 'Order action failed: ' . $e->getMessage()];
+          }
+        }
+      }
+    }
+
     if ($page === 'wings' && ($_POST['action'] ?? '') === 'edit_wings_issue') {
       $issueId = (int) ($_POST['issue_id'] ?? 0);
       $title = trim($_POST['title'] ?? '');
@@ -2188,16 +2252,69 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $isConnected = !empty($activeKeys['secret_key']) && !empty($activeKeys['publishable_key']);
         $canRefund = AdminMemberAccess::canRefund($user);
 
+        $canManualOrderFix = AdminMemberAccess::canManualOrderFix($user);
+        $hasVoidedCol = false;
+        try {
+          $hasVoidedCol = (bool) $pdo->query("SHOW COLUMNS FROM orders LIKE 'voided_at'")->fetchColumn();
+        } catch (\Throwable $e) {
+          $hasVoidedCol = false;
+        }
+
         $ordersPerPage = 10;
         $ordersPage = max(1, (int) ($_GET['orders_page'] ?? 1));
         $ordersSearch = trim((string) ($_GET['orders_q'] ?? ''));
-        $ordersWhere = '';
+        $ordersStatusFilter = trim((string) ($_GET['orders_status'] ?? ''));
+        $ordersTypeFilter = trim((string) ($_GET['orders_type'] ?? ''));
+        $ordersFrom = trim((string) ($_GET['orders_from'] ?? ''));
+        $ordersTo = trim((string) ($_GET['orders_to'] ?? ''));
+        $ordersVoided = trim((string) ($_GET['orders_voided'] ?? 'hide'));
+        $allowedStatuses = ['paid', 'pending', 'failed', 'refunded', 'cancelled'];
+        $allowedTypes = ['membership', 'store'];
+        if ($ordersStatusFilter !== '' && !in_array($ordersStatusFilter, $allowedStatuses, true)) {
+          $ordersStatusFilter = '';
+        }
+        if ($ordersTypeFilter !== '' && !in_array($ordersTypeFilter, $allowedTypes, true)) {
+          $ordersTypeFilter = '';
+        }
+        if (!in_array($ordersVoided, ['hide', 'show', 'only'], true)) {
+          $ordersVoided = 'hide';
+        }
+        $isValidDate = static function (string $value): bool {
+          return $value !== '' && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);
+        };
+        $ordersConditions = [];
         $ordersParams = [];
         if ($ordersSearch !== '') {
+          $ordersConditions[] = '(o.order_number LIKE :q1 OR u.name LIKE :q2 OR u.email LIKE :q3)';
           $like = '%' . $ordersSearch . '%';
-          $ordersWhere = 'WHERE o.order_number LIKE :q1 OR u.name LIKE :q2 OR u.email LIKE :q3';
-          $ordersParams = [':q1' => $like, ':q2' => $like, ':q3' => $like];
+          $ordersParams[':q1'] = $like;
+          $ordersParams[':q2'] = $like;
+          $ordersParams[':q3'] = $like;
         }
+        if ($ordersStatusFilter !== '') {
+          $ordersConditions[] = 'o.status = :status';
+          $ordersParams[':status'] = $ordersStatusFilter;
+        }
+        if ($ordersTypeFilter !== '') {
+          $ordersConditions[] = 'o.order_type = :otype';
+          $ordersParams[':otype'] = $ordersTypeFilter;
+        }
+        if ($isValidDate($ordersFrom)) {
+          $ordersConditions[] = 'o.created_at >= :ofrom';
+          $ordersParams[':ofrom'] = $ordersFrom . ' 00:00:00';
+        }
+        if ($isValidDate($ordersTo)) {
+          $ordersConditions[] = 'o.created_at <= :oto';
+          $ordersParams[':oto'] = $ordersTo . ' 23:59:59';
+        }
+        if ($hasVoidedCol) {
+          if ($ordersVoided === 'hide') {
+            $ordersConditions[] = 'o.voided_at IS NULL';
+          } elseif ($ordersVoided === 'only') {
+            $ordersConditions[] = 'o.voided_at IS NOT NULL';
+          }
+        }
+        $ordersWhere = $ordersConditions ? 'WHERE ' . implode(' AND ', $ordersConditions) : '';
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM orders o LEFT JOIN users u ON u.id = o.user_id {$ordersWhere}");
         $countStmt->execute($ordersParams);
         $ordersTotal = (int) $countStmt->fetchColumn();
@@ -2207,6 +2324,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $listStmt = $pdo->prepare("SELECT o.*, u.name, u.email FROM orders o LEFT JOIN users u ON u.id = o.user_id {$ordersWhere} ORDER BY o.created_at DESC LIMIT {$ordersPerPage} OFFSET {$ordersOffset}");
         $listStmt->execute($ordersParams);
         $orders = $listStmt->fetchAll();
+
+        $hasActiveFilter = $ordersStatusFilter !== '' || $ordersTypeFilter !== '' || $isValidDate($ordersFrom) || $isValidDate($ordersTo) || $ordersVoided !== 'hide';
+        $activeFilterCount = (int) ($ordersStatusFilter !== '') + (int) ($ordersTypeFilter !== '') + (int) $isValidDate($ordersFrom) + (int) $isValidDate($ordersTo) + (int) ($ordersVoided !== 'hide');
 
         $webhookEvents = $pdo->query('SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 50')->fetchAll();
 
@@ -2371,7 +2491,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <h2 class="font-display text-xl font-bold text-gray-900">Recent Transactions</h2>
                 <span class="rounded-md bg-gray-900 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white">NEW</span>
               </div>
-              <form method="get" class="flex items-center gap-2">
+              <form method="get" class="flex flex-wrap items-center gap-2" id="orders-filter-form">
                 <input type="hidden" name="page" value="payments">
                 <label class="relative">
                   <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
@@ -2379,11 +2499,69 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     placeholder="Search orders..."
                     class="rounded-xl border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-gray-200">
                 </label>
-                <button type="submit"
-                  class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-slate-500 hover:bg-gray-50"
-                  aria-label="Apply filter">
+                <button type="button"
+                  data-filter-toggle
+                  class="relative inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 px-3 text-sm font-semibold text-slate-600 hover:bg-gray-50"
+                  aria-expanded="<?= $hasActiveFilter ? 'true' : 'false' ?>"
+                  aria-controls="orders-filter-panel">
                   <span class="material-icons-outlined text-[18px]">tune</span>
+                  <span>Filters</span>
+                  <?php if ($activeFilterCount > 0): ?>
+                    <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-1.5 text-[10px] font-bold text-white"><?= e((string) $activeFilterCount) ?></span>
+                  <?php endif; ?>
                 </button>
+                <button type="submit"
+                  class="inline-flex h-9 items-center rounded-xl bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-800">
+                  Apply
+                </button>
+                <?php if ($hasActiveFilter || $ordersSearch !== ''): ?>
+                  <a href="?page=payments"
+                    class="inline-flex h-9 items-center rounded-xl border border-gray-200 px-3 text-xs font-semibold text-slate-600 hover:bg-gray-50">
+                    Clear
+                  </a>
+                <?php endif; ?>
+
+                <div id="orders-filter-panel"
+                  class="w-full <?= $hasActiveFilter ? '' : 'hidden' ?> mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <label class="text-xs font-semibold text-slate-600">
+                    Status
+                    <select name="orders_status" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                      <option value="">All statuses</option>
+                      <?php foreach ($allowedStatuses as $s): ?>
+                        <option value="<?= e($s) ?>" <?= $ordersStatusFilter === $s ? 'selected' : '' ?>><?= e(ucfirst($s)) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">
+                    Type
+                    <select name="orders_type" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                      <option value="">All types</option>
+                      <?php foreach ($allowedTypes as $t): ?>
+                        <option value="<?= e($t) ?>" <?= $ordersTypeFilter === $t ? 'selected' : '' ?>><?= e(ucfirst($t)) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">
+                    From
+                    <input type="date" name="orders_from" value="<?= e($ordersFrom) ?>"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">
+                    To
+                    <input type="date" name="orders_to" value="<?= e($ordersTo) ?>"
+                      class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                  </label>
+                  <?php if ($hasVoidedCol): ?>
+                    <label class="text-xs font-semibold text-slate-600">
+                      Voided
+                      <select name="orders_voided" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm">
+                        <option value="hide" <?= $ordersVoided === 'hide' ? 'selected' : '' ?>>Hide voided</option>
+                        <option value="show" <?= $ordersVoided === 'show' ? 'selected' : '' ?>>Include voided</option>
+                        <option value="only" <?= $ordersVoided === 'only' ? 'selected' : '' ?>>Voided only</option>
+                      </select>
+                    </label>
+                  <?php endif; ?>
+                </div>
               </form>
             </div>
 
@@ -2406,12 +2584,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     $orderNumber = $order['order_number'] ?? ('ORD-' . $order['id']);
                     $orderTypeRaw = (string) ($order['order_type'] ?? '');
                     $isMembership = $orderTypeRaw === 'membership';
-                    $memberOrderUrl = null;
+                    $isStore = $orderTypeRaw === 'store';
+                    $orderViewUrl = null;
                     if (!empty($order['member_id']) && $isMembership) {
-                      $memberOrderUrl = '/admin/members/view.php?id=' . urlencode((string) $order['member_id'])
+                      $orderViewUrl = '/admin/members/view.php?id=' . urlencode((string) $order['member_id'])
                         . '&tab=orders&orders_section=membership&order_id=' . urlencode((string) $order['id']);
+                    } elseif ($isStore && !empty($order['order_number'])) {
+                      $orderViewUrl = '/admin/store/orders/' . urlencode((string) $order['order_number']);
                     }
                     $status = strtolower((string) $order['status']);
+                    $isVoided = $hasVoidedCol && !empty($order['voided_at']);
                     $statusStyles = [
                       'paid' => 'bg-emerald-50 text-emerald-700',
                       'pending' => 'bg-amber-50 text-amber-700',
@@ -2420,19 +2602,23 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       'cancelled' => 'bg-slate-100 text-slate-500',
                     ];
                     $statusClass = $statusStyles[$status] ?? 'bg-slate-100 text-slate-700';
-                    $typeClass = $isMembership ? 'bg-indigo-50 text-indigo-700' : 'bg-sky-50 text-sky-700';
+                    $typeClass = $isMembership ? 'bg-indigo-50 text-indigo-700' : ($isStore ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-700');
                     $createdAt = (string) $order['created_at'];
+                    $canRefundRow = $canRefund && $status === 'paid' && !$isVoided;
+                    $canVoidRow = $canManualOrderFix && !$isVoided && $status !== 'refunded';
+                    $canUnvoidRow = $canManualOrderFix && $isVoided;
+                    $canDeleteRow = $canManualOrderFix;
                     ?>
-                    <tr class="hover:bg-gray-50/60">
+                    <tr class="<?= $orderViewUrl ? 'cursor-pointer' : '' ?> hover:bg-gray-50/60 <?= $isVoided ? 'opacity-60' : '' ?>"
+                      <?= $orderViewUrl ? 'data-row-href="' . e($orderViewUrl) . '"' : '' ?>>
                       <td class="py-4 pr-4 align-top">
                         <span class="block font-medium text-slate-800"><?= e(substr($createdAt, 0, 10)) ?></span>
                         <span class="block text-xs text-slate-500"><?= e(substr($createdAt, 11, 8)) ?></span>
                       </td>
                       <td class="py-4 pr-4 align-top">
-                        <?php if ($memberOrderUrl): ?>
-                          <a class="font-mono text-xs font-semibold text-indigo-600 hover:underline" href="<?= e($memberOrderUrl) ?>">#<?= e($orderNumber) ?></a>
-                        <?php else: ?>
-                          <span class="font-mono text-xs font-semibold text-slate-600">#<?= e($orderNumber) ?></span>
+                        <span class="font-mono text-xs font-semibold <?= $orderViewUrl ? 'text-indigo-600' : 'text-slate-600' ?>">#<?= e($orderNumber) ?></span>
+                        <?php if ($isVoided): ?>
+                          <span class="ml-2 inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-rose-700 uppercase">Voided</span>
                         <?php endif; ?>
                       </td>
                       <td class="py-4 pr-4 align-top">
@@ -2446,16 +2632,59 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <td class="py-4 pr-4 align-top">
                         <span class="inline-flex items-center rounded-full <?= $statusClass ?> px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase"><?= e($status !== '' ? $status : '—') ?></span>
                       </td>
-                      <td class="py-4 align-top">
-                        <?php if ($canRefund && $status === 'paid'): ?>
-                          <form data-refund-form method="post" class="flex items-center gap-2">
-                            <input type="hidden" name="order_id" value="<?= e((string) $order['id']) ?>">
-                            <input type="text" name="reason" placeholder="Reason (opt)" class="text-xs rounded-lg border border-gray-200 px-2 py-1.5 w-28">
-                            <button type="submit" class="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">Refund</button>
-                          </form>
-                        <?php else: ?>
-                          <span class="text-xs text-slate-400">—</span>
-                        <?php endif; ?>
+                      <td class="py-4 align-top" data-no-row-click>
+                        <div class="flex items-center gap-1">
+                          <?php if ($orderViewUrl): ?>
+                            <a href="<?= e($orderViewUrl) ?>"
+                              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-500 hover:bg-gray-50 hover:text-slate-800"
+                              title="View order" aria-label="View order">
+                              <span class="material-icons-outlined text-[16px]">visibility</span>
+                            </a>
+                          <?php endif; ?>
+                          <?php if ($canRefundRow): ?>
+                            <button type="button"
+                              data-action="refund"
+                              data-order-id="<?= e((string) $order['id']) ?>"
+                              data-order-number="<?= e((string) $orderNumber) ?>"
+                              data-order-total="A$<?= e(number_format((float) $order['total'], 2)) ?>"
+                              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-emerald-600 hover:bg-emerald-50"
+                              title="Refund" aria-label="Refund order">
+                              <span class="material-icons-outlined text-[16px]">currency_exchange</span>
+                            </button>
+                          <?php endif; ?>
+                          <?php if ($canVoidRow): ?>
+                            <button type="button"
+                              data-action="void"
+                              data-order-id="<?= e((string) $order['id']) ?>"
+                              data-order-number="<?= e((string) $orderNumber) ?>"
+                              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-amber-600 hover:bg-amber-50"
+                              title="Void" aria-label="Void order">
+                              <span class="material-icons-outlined text-[16px]">block</span>
+                            </button>
+                          <?php elseif ($canUnvoidRow): ?>
+                            <button type="button"
+                              data-action="unvoid"
+                              data-order-id="<?= e((string) $order['id']) ?>"
+                              data-order-number="<?= e((string) $orderNumber) ?>"
+                              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-500 hover:bg-gray-50"
+                              title="Restore voided order" aria-label="Restore order">
+                              <span class="material-icons-outlined text-[16px]">restart_alt</span>
+                            </button>
+                          <?php endif; ?>
+                          <?php if ($canDeleteRow): ?>
+                            <button type="button"
+                              data-action="delete"
+                              data-order-id="<?= e((string) $order['id']) ?>"
+                              data-order-number="<?= e((string) $orderNumber) ?>"
+                              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-rose-600 hover:bg-rose-50"
+                              title="Delete permanently" aria-label="Delete order">
+                              <span class="material-icons-outlined text-[16px]">delete</span>
+                            </button>
+                          <?php endif; ?>
+                          <?php if (!$orderViewUrl && !$canRefundRow && !$canVoidRow && !$canUnvoidRow && !$canDeleteRow): ?>
+                            <span class="text-xs text-slate-400">—</span>
+                          <?php endif; ?>
+                        </div>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -2470,11 +2699,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <?php
                 $prevPage = max(1, $ordersPage - 1);
                 $nextPage = min($ordersTotalPages, $ordersPage + 1);
-                $buildPageUrl = static function (int $p) use ($ordersSearch): string {
+                $buildPageUrl = static function (int $p) use ($ordersSearch, $ordersStatusFilter, $ordersTypeFilter, $ordersFrom, $ordersTo, $ordersVoided): string {
                   $params = ['page' => 'payments', 'orders_page' => $p];
-                  if ($ordersSearch !== '') {
-                    $params['orders_q'] = $ordersSearch;
-                  }
+                  if ($ordersSearch !== '') { $params['orders_q'] = $ordersSearch; }
+                  if ($ordersStatusFilter !== '') { $params['orders_status'] = $ordersStatusFilter; }
+                  if ($ordersTypeFilter !== '') { $params['orders_type'] = $ordersTypeFilter; }
+                  if ($ordersFrom !== '') { $params['orders_from'] = $ordersFrom; }
+                  if ($ordersTo !== '') { $params['orders_to'] = $ordersTo; }
+                  if ($ordersVoided !== 'hide') { $params['orders_voided'] = $ordersVoided; }
                   return '?' . http_build_query($params);
                 };
                 $rangeStart = $ordersOffset + 1;
@@ -2535,6 +2767,75 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </table>
             </div>
           </details>
+
+          <div id="orders-modal-backdrop"
+            class="hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            data-modal-backdrop>
+            <div class="bg-white rounded-2xl shadow-card w-full max-w-md p-6" data-modal-card>
+              <div class="flex items-start justify-between gap-3 mb-3">
+                <h3 class="font-display text-lg font-bold text-gray-900" data-modal-title>Confirm</h3>
+                <button type="button" class="text-slate-400 hover:text-slate-700" data-modal-close aria-label="Close">
+                  <span class="material-icons-outlined text-[18px]">close</span>
+                </button>
+              </div>
+              <p class="text-sm text-slate-600 mb-4" data-modal-body></p>
+
+              <form method="post" class="space-y-3 hidden" data-modal-form="refund">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="api_refund">
+                <input type="hidden" name="order_id" value="">
+                <label class="block text-xs font-semibold text-slate-600">
+                  Reason (optional)
+                  <input type="text" name="reason" maxlength="200"
+                    class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                </label>
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <button type="button" data-modal-close class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Refund order</button>
+                </div>
+              </form>
+
+              <form method="post" class="space-y-3 hidden" data-modal-form="void">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="void_order">
+                <input type="hidden" name="order_id" value="">
+                <label class="block text-xs font-semibold text-slate-600">
+                  Reason (optional)
+                  <input type="text" name="reason" maxlength="200"
+                    class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                </label>
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <button type="button" data-modal-close class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Void order</button>
+                </div>
+              </form>
+
+              <form method="post" class="space-y-3 hidden" data-modal-form="unvoid">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="unvoid_order">
+                <input type="hidden" name="order_id" value="">
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <button type="button" data-modal-close class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Restore order</button>
+                </div>
+              </form>
+
+              <form method="post" class="space-y-3 hidden" data-modal-form="delete">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="action" value="delete_order">
+                <input type="hidden" name="order_id" value="">
+                <label class="block text-xs font-semibold text-slate-600">
+                  Type <span class="font-mono font-bold text-rose-600">DELETE</span> to confirm permanent removal
+                  <input type="text" name="delete_confirm" autocomplete="off" required
+                    class="mt-1 w-full rounded-lg border border-rose-200 px-3 py-2 text-sm uppercase">
+                </label>
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <button type="button" data-modal-close class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Delete permanently</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </section>
 
         <script>
@@ -2557,28 +2858,115 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             });
           });
 
-          document.querySelectorAll('[data-refund-form]').forEach((form) => {
-            form.addEventListener('submit', async (event) => {
-              event.preventDefault();
-              const formData = new FormData(form);
-              const payload = {
-                order_id: formData.get('order_id'),
-                reason: formData.get('reason') || null,
-                csrf_token: '<?= e(Csrf::token()) ?>',
-              };
-              const response = await fetch('/api/admin/refunds/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+          (() => {
+            const toggle = document.querySelector('[data-filter-toggle]');
+            const panel = document.getElementById('orders-filter-panel');
+            if (toggle && panel) {
+              toggle.addEventListener('click', () => {
+                const isHidden = panel.classList.toggle('hidden');
+                toggle.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
               });
-              const data = await response.json();
-              if (data.error) {
-                alert(data.error);
-                return;
-              }
-              window.location.reload();
+            }
+          })();
+
+          (() => {
+            document.querySelectorAll('tr[data-row-href]').forEach((row) => {
+              row.addEventListener('click', (event) => {
+                if (event.target.closest('[data-no-row-click], a, button, input, select, textarea, label')) return;
+                window.location.href = row.dataset.rowHref;
+              });
             });
-          });
+          })();
+
+          (() => {
+            const backdrop = document.getElementById('orders-modal-backdrop');
+            if (!backdrop) return;
+            const title = backdrop.querySelector('[data-modal-title]');
+            const body = backdrop.querySelector('[data-modal-body]');
+            const forms = backdrop.querySelectorAll('[data-modal-form]');
+
+            const open = (action, orderId, orderNumber, extras = {}) => {
+              forms.forEach((f) => f.classList.add('hidden'));
+              const form = backdrop.querySelector('[data-modal-form="' + action + '"]');
+              if (!form) return;
+              form.classList.remove('hidden');
+              const orderIdInput = form.querySelector('input[name="order_id"]');
+              if (orderIdInput) orderIdInput.value = orderId;
+              const reasonInput = form.querySelector('input[name="reason"]');
+              if (reasonInput) reasonInput.value = '';
+              const confirmInput = form.querySelector('input[name="delete_confirm"]');
+              if (confirmInput) confirmInput.value = '';
+
+              const titles = {
+                refund: 'Refund order',
+                void: 'Void order',
+                unvoid: 'Restore order',
+                delete: 'Delete order permanently',
+              };
+              const bodies = {
+                refund: 'Issue a full refund for order #' + orderNumber + (extras.total ? ' (' + extras.total + ').' : '.') + ' This cannot be undone.',
+                void: 'Void order #' + orderNumber + '. Voided orders are hidden by default but can be restored.',
+                unvoid: 'Restore order #' + orderNumber + ' so it appears in default views again.',
+                delete: 'Permanently delete order #' + orderNumber + ' and all related items, refunds, and events. This cannot be undone.',
+              };
+              if (title) title.textContent = titles[action] || 'Confirm';
+              if (body) body.textContent = bodies[action] || '';
+              backdrop.classList.remove('hidden');
+              backdrop.classList.add('flex');
+            };
+            const close = () => {
+              backdrop.classList.add('hidden');
+              backdrop.classList.remove('flex');
+            };
+
+            document.querySelectorAll('[data-action]').forEach((btn) => {
+              btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                open(btn.dataset.action, btn.dataset.orderId, btn.dataset.orderNumber, {
+                  total: btn.dataset.orderTotal || '',
+                });
+              });
+            });
+
+            backdrop.addEventListener('click', (event) => {
+              if (event.target === backdrop) close();
+            });
+            backdrop.querySelectorAll('[data-modal-close]').forEach((el) => {
+              el.addEventListener('click', (event) => { event.preventDefault(); close(); });
+            });
+            document.addEventListener('keydown', (event) => {
+              if (event.key === 'Escape' && !backdrop.classList.contains('hidden')) close();
+            });
+
+            const refundForm = backdrop.querySelector('[data-modal-form="refund"]');
+            if (refundForm) {
+              refundForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const fd = new FormData(refundForm);
+                const payload = {
+                  order_id: fd.get('order_id'),
+                  reason: fd.get('reason') || null,
+                  csrf_token: '<?= e(Csrf::token()) ?>',
+                };
+                const submitBtn = refundForm.querySelector('button[type="submit"]');
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Refunding…'; }
+                try {
+                  const response = await fetch('/api/admin/refunds/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  });
+                  const data = await response.json();
+                  if (data.error) { alert(data.error); }
+                  else { window.location.reload(); }
+                } catch (err) {
+                  alert('Refund failed: ' + err.message);
+                } finally {
+                  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Refund order'; }
+                }
+              });
+            }
+          })();
         </script>
       <?php elseif ($page === 'events'): ?>
         <?php $events = $pdo->query('SELECT * FROM events ORDER BY event_date DESC')->fetchAll(); ?>
