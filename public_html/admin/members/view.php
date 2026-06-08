@@ -2163,7 +2163,94 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
             <?php endif; ?>
           <?php elseif ($tab === 'orders'): ?>
+            <?php
+              // Renewal countdown — derive a friendly "X days remaining" badge for the summary card.
+              $renewalEndDate        = $membershipPeriod['end_date'] ?? '';
+              $renewalCountdownText  = '';
+              $renewalCountdownClass = 'bg-gray-100 text-gray-700 border border-gray-200';
+              if ($renewalEndDate) {
+                  try {
+                      $today    = new DateTimeImmutable(date('Y-m-d'));
+                      $end      = new DateTimeImmutable($renewalEndDate);
+                      $daysLeft = (int) $today->diff($end)->format('%r%a');
+                      if ($daysLeft < 0) {
+                          $renewalCountdownText  = abs($daysLeft) . ' day' . (abs($daysLeft) === 1 ? '' : 's') . ' overdue';
+                          $renewalCountdownClass = 'bg-rose-50 text-rose-700 border border-rose-100';
+                      } elseif ($daysLeft === 0) {
+                          $renewalCountdownText  = 'Due today';
+                          $renewalCountdownClass = 'bg-amber-50 text-amber-700 border border-amber-100';
+                      } elseif ($daysLeft <= 30) {
+                          $renewalCountdownText  = $daysLeft . ' days remaining';
+                          $renewalCountdownClass = 'bg-amber-50 text-amber-700 border border-amber-100';
+                      } else {
+                          $renewalCountdownText  = $daysLeft . ' days remaining';
+                          $renewalCountdownClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                      }
+                  } catch (Exception $e) {
+                      // Silent fail — countdown just won't show.
+                  }
+              }
+            ?>
             <div class="space-y-6">
+              <!-- ── Membership summary (hero card at top) ─────────────────────── -->
+              <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Membership summary</p>
+                    <p class="text-sm text-gray-500">Latest status and payment history at a glance.</p>
+                  </div>
+                  <span class="text-xs font-semibold text-gray-500"><?= count($membershipOrders) ?> order<?= count($membershipOrders) === 1 ? '' : 's' ?></span>
+                </div>
+                <div class="grid grid-cols-2 gap-5 md:grid-cols-4">
+                  <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Membership type</p>
+                    <p class="mt-1 text-base font-semibold text-gray-900"><?= e($membershipTypeLabel) ?></p>
+                  </div>
+                  <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</p>
+                    <span class="mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold <?= statusBadgeClasses(strtolower((string) $membershipStatusLabel)) ?>"><?= e($membershipStatusLabel) ?></span>
+                  </div>
+                  <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Last payment</p>
+                    <p class="mt-1 text-base font-semibold text-gray-900"><?= e($lastPaymentDateLabel) ?></p>
+                    <p class="text-[11px] text-gray-500 truncate"><?= e($paymentMethodLabel) ?> · <?= e($paymentStatusLabel) ?></p>
+                  </div>
+                  <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Renewal date</p>
+                    <div class="mt-1 flex items-center gap-1.5">
+                      <p class="text-base font-semibold text-gray-900"><?= e($renewalDateLabel) ?></p>
+                      <?php if ($canEditFullProfile): ?>
+                        <button type="button" data-renewal-edit-toggle
+                          class="text-gray-400 hover:text-gray-700 transition" title="Edit renewal date" aria-label="Edit renewal date">
+                          <span class="material-icons-outlined text-base">edit</span>
+                        </button>
+                      <?php endif; ?>
+                    </div>
+                    <?php if ($renewalCountdownText): ?>
+                      <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold <?= $renewalCountdownClass ?>"><?= e($renewalCountdownText) ?></span>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <?php if ($canEditFullProfile): ?>
+                  <div data-renewal-edit class="hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <form method="post" action="/admin/members/actions.php" class="flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                      <input type="hidden" name="tab" value="orders">
+                      <input type="hidden" name="orders_section" value="membership">
+                      <input type="hidden" name="action" value="membership_renewal_update">
+                      <label class="flex-1 min-w-[200px] text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        Renewal date
+                        <input type="date" name="renewal_date" value="<?= e($membershipPeriod['end_date'] ?? '') ?>"
+                          class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-900">
+                      </label>
+                      <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-gray-900">Save</button>
+                      <button type="button" data-renewal-edit-cancel class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button>
+                    </form>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <!-- ── Membership & Admin (slimmed: chapter / type / status / notes) ── -->
               <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -2171,7 +2258,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   </div>
                   <div>
                     <h2 class="font-display text-xl font-bold text-gray-900">Membership &amp; Admin</h2>
-                    <p class="text-sm text-gray-500">Admin-only controls for status and membership details.</p>
+                    <p class="text-sm text-gray-500">Current state — chapter, membership type, status, and admin notes.</p>
                   </div>
                 </div>
                 <form method="post" action="/admin/members/actions.php" class="space-y-4">
@@ -2226,104 +2313,25 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <textarea name="notes" rows="3"
                           class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"><?= e($member['notes'] ?? '') ?></textarea>
                       </div>
-                      <?php
-                        // ── Committee & Leadership role assignment ─────────
-                        // New multi-select pulled from CommitteeService. The
-                        // dropdown is fed by the committee_roles catalog and
-                        // saves to member_committee_assignments. The legacy
-                        // is_committee / is_area_rep / committee_role columns
-                        // are kept in sync by the save handler for backward
-                        // compatibility with anything still reading them.
-                        $cmtCatalog       = CommitteeService::catalogForAssignment();
-                        $cmtAssignedIds   = CommitteeService::roleIdsForMember($memberId);
-                        $cmtAssignedSet   = array_fill_keys($cmtAssignedIds, true);
-                        $cmtMemberChapter = (int) ($member['chapter_id'] ?? 0);
-                      ?>
+                      <?php $cmtHeldRoles = CommitteeService::rolesForMember($memberId); ?>
                       <div class="md:col-span-2">
                         <div class="flex items-center justify-between mb-2">
-                          <p class="text-sm font-medium text-gray-700">Committee &amp; Leadership Role</p>
-                          <?php if ($cmtAssignedIds): ?>
-                            <span class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                              <?= count($cmtAssignedIds) ?> assigned
-                            </span>
-                          <?php endif; ?>
+                          <p class="text-sm font-medium text-gray-700">Committee &amp; Leadership</p>
+                          <a href="/admin/settings/committee-roles.php" class="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                            Manage <span class="material-icons-outlined text-sm">open_in_new</span>
+                          </a>
                         </div>
-                        <p class="text-xs text-gray-500 mb-3">
-                          Select one or more roles this member holds. Cards on the public Committee &amp; Chapter Reps pages, plus the member-area Committee &amp; Leadership page, render from these assignments automatically.
-                        </p>
-                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
-                          <?php if (!empty($cmtCatalog['national'])): ?>
-                            <div>
-                              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">National Roles</p>
-                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <?php foreach ($cmtCatalog['national'] as $role): ?>
-                                  <label class="flex items-start gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer hover:border-primary/40">
-                                    <input type="checkbox" name="committee_role_ids[]" value="<?= e($role['id']) ?>"
-                                      <?= isset($cmtAssignedSet[(int)$role['id']]) ? 'checked' : '' ?>
-                                      class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
-                                    <span class="flex-1">
-                                      <span class="block font-medium text-gray-900"><?= e($role['name']) ?></span>
-                                      <?php if (!empty($role['email'])): ?>
-                                        <span class="block text-[11px] text-gray-400 truncate"><?= e($role['email']) ?></span>
-                                      <?php endif; ?>
-                                    </span>
-                                  </label>
-                                <?php endforeach; ?>
-                              </div>
-                            </div>
-                          <?php endif; ?>
-
-                          <?php if (!empty($cmtCatalog['chapter'])): ?>
-                            <div>
-                              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Chapter Representative Roles</p>
-                              <?php
-                                // Surface the role matching this member's home chapter at the very top.
-                                $chapterRoles = $cmtCatalog['chapter'];
-                                usort($chapterRoles, function ($a, $b) use ($cmtMemberChapter) {
-                                    $aMatch = ((int) $a['chapter_id']) === $cmtMemberChapter ? 0 : 1;
-                                    $bMatch = ((int) $b['chapter_id']) === $cmtMemberChapter ? 0 : 1;
-                                    if ($aMatch !== $bMatch) { return $aMatch - $bMatch; }
-                                    return strcmp($a['name'], $b['name']);
-                                });
-                              ?>
-                              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <?php foreach ($chapterRoles as $role):
-                                  $isMine = ((int) $role['chapter_id']) === $cmtMemberChapter && $cmtMemberChapter > 0;
-                                ?>
-                                  <label class="flex items-start gap-2 rounded-lg border <?= $isMine ? 'border-primary/40 bg-primary/5' : 'border-gray-100 bg-white' ?> px-3 py-2 text-sm text-gray-700 cursor-pointer hover:border-primary/40">
-                                    <input type="checkbox" name="committee_role_ids[]" value="<?= e($role['id']) ?>"
-                                      <?= isset($cmtAssignedSet[(int)$role['id']]) ? 'checked' : '' ?>
-                                      class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
-                                    <span class="flex-1">
-                                      <span class="block font-medium text-gray-900"><?= e($role['name']) ?>
-                                        <?php if ($isMine): ?><span class="ml-1 text-[10px] text-primary">(home chapter)</span><?php endif; ?>
-                                      </span>
-                                      <?php if (!empty($role['chapter_state'])): ?>
-                                        <span class="block text-[11px] text-gray-400 truncate"><?= e($role['chapter_state']) ?></span>
-                                      <?php endif; ?>
-                                    </span>
-                                  </label>
-                                <?php endforeach; ?>
-                              </div>
-                            </div>
-                          <?php endif; ?>
-
-                          <?php if (empty($cmtCatalog['national']) && empty($cmtCatalog['chapter'])): ?>
-                            <p class="text-sm text-gray-500 py-2 text-center">No committee roles configured yet. Run the migration to seed the default catalog.</p>
-                          <?php endif; ?>
-                        </div>
-                        <input type="hidden" name="committee_roles_submitted" value="1">
-
-                        <?php // Privacy toggle — hide last name + role phone on public/member cards. ?>
-                        <label class="mt-3 flex items-start gap-2 rounded-lg border border-gray-100 bg-amber-50 px-3 py-2 text-sm text-gray-700 cursor-pointer">
-                          <input type="checkbox" name="committee_private" value="1"
-                            <?= !empty($member['committee_private']) ? 'checked' : '' ?>
-                            class="mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
-                          <span class="flex-1">
-                            <span class="block font-medium text-gray-900">Private listing</span>
-                            <span class="block text-xs text-gray-500 mt-0.5">Hide this member's last name and the role's phone number on public Committee &amp; Chapter Rep cards. The role title, chapter, and role email are still shown so people can still reach them.</span>
-                          </span>
-                        </label>
+                        <?php if ($cmtHeldRoles): ?>
+                          <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <ul class="flex flex-wrap gap-2">
+                              <?php foreach ($cmtHeldRoles as $hr): ?>
+                                <li class="text-xs bg-white border border-gray-100 rounded-full px-3 py-1 text-gray-700"><?= e($hr['name']) ?></li>
+                              <?php endforeach; ?>
+                            </ul>
+                          </div>
+                        <?php else: ?>
+                          <p class="text-xs text-gray-500">No committee roles assigned. Use the Committee &amp; Leadership Roles settings page to assign.</p>
+                        <?php endif; ?>
                       </div>
                     <?php endif; ?>
                   </div>
@@ -2647,137 +2655,90 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       </table>
                     </div>
                   <?php endif; ?>
-                  <div class="grid gap-6 lg:grid-cols-2">
-                    <div class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+                  <?php // Membership summary has moved to the top of the tab.
+                        // Manual order is now full-width below the orders table. ?>
+                  <?php if ($canManualFix): ?>
+                    <div data-tour="manual-membership-section" class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
                       <div class="flex items-center justify-between">
                         <div>
-                          <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Membership summary</p>
-                          <p class="text-sm text-gray-500">Latest membership status and payment history.</p>
+                          <h3 class="text-base font-semibold text-gray-900">Manual membership order</h3>
+                          <p class="text-sm text-gray-500">Create a <strong>new</strong> membership period — separate from the current state above.</p>
                         </div>
-                        <span class="text-xs font-semibold text-gray-500"><?= count($membershipOrders) ?> orders</span>
+                        <span class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">Admin only</span>
                       </div>
-                      <div class="space-y-3 text-sm text-gray-700">
-                        <div class="flex items-center justify-between">
-                          <span>Membership type</span>
-                          <span class="font-semibold text-gray-900"><?= e($membershipTypeLabel) ?></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <span>Status</span>
-                          <span class="font-semibold text-gray-900"><?= e($membershipStatusLabel) ?></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <span>Last payment</span>
-                          <span class="font-semibold text-gray-900"><?= e($lastPaymentDateLabel) ?></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <span>Renewal date</span>
-                          <span class="font-semibold text-gray-900"><?= e($renewalDateLabel) ?></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <span>Payment method</span>
-                          <span class="font-semibold text-gray-900"><?= e($paymentMethodLabel) ?></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <span>Payment status</span>
-                          <span class="font-semibold text-gray-900"><?= e($paymentStatusLabel) ?></span>
-                        </div>
-                      </div>
-                      <?php if ($canEditFullProfile): ?>
-                        <form method="post" action="/admin/members/actions.php" class="space-y-2">
-                          <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                          <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                          <input type="hidden" name="tab" value="orders">
-                          <input type="hidden" name="orders_section" value="membership">
-                          <input type="hidden" name="action" value="membership_renewal_update">
-                          <label class="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">Renewal date</label>
-                          <input type="date" name="renewal_date" value="<?= e($membershipPeriod['end_date'] ?? '') ?>"
-                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                          <button type="submit"
-                            class="w-full rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Update
-                            renewal date</button>
-                        </form>
-                      <?php endif; ?>
-                    </div>
-                    <?php if ($canManualFix): ?>
-                      <div data-tour="manual-membership-section" class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
-                        <div class="flex items-center justify-between">
-                          <h3 class="text-sm font-semibold text-gray-900">Manual membership order</h3>
-                          <span class="text-xs text-gray-500">Admin only</span>
-                        </div>
-                        <p class="text-sm text-gray-500">Create a manual membership entry and update access immediately.</p>
-                        <?php $currentMembershipTypeId = (int) ($member['membership_type_id'] ?? 0); ?>
-                        <?php $manualMembershipCost = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE' ? '0.00' : ''; ?>
-                        <form method="post" action="/admin/members/actions.php" class="space-y-4">
-                          <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                          <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                          <input type="hidden" name="tab" value="orders">
-                          <input type="hidden" name="orders_section" value="membership">
-                          <input type="hidden" name="action" value="manual_membership_order">
-                          <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="text-sm font-medium text-gray-700">
-                              Membership type
-                              <select data-tour="manual-membership-type" name="manual_membership_type_id"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                <?php foreach ($membershipTypes as $type): ?>
-                                  <option value="<?= e($type['id']) ?>" <?= $currentMembershipTypeId === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
-                                <?php endforeach; ?>
-                              </select>
-                            </label>
-                            <label class="text-sm font-medium text-gray-700">
-                              Cost (AUD)
-                              <input data-tour="manual-membership-cost" type="number" step="0.01" min="0" name="manual_membership_cost"
-                                value="<?= e($manualMembershipCost) ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                            </label>
-                          </div>
-                          <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="text-sm font-medium text-gray-700">
-                              Payment method
-                              <select name="manual_payment_method"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                <?php foreach (['Stripe', 'Manual', 'Bank Transfer', 'Cash', 'Complimentary'] as $method): ?>
-                                  <option value="<?= e($method) ?>"><?= e($method) ?></option>
-                                <?php endforeach; ?>
-                              </select>
-                            </label>
-                            <label class="text-sm font-medium text-gray-700">
-                              Membership status
-                              <select name="manual_membership_status"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                <?php foreach (['active' => 'Active', 'pending' => 'Pending', 'complimentary' => 'Complimentary', 'lapsed' => 'Lapsed'] as $value => $label): ?>
-                                  <option value="<?= e($value) ?>"><?= e($label) ?></option>
-                                <?php endforeach; ?>
-                              </select>
-                            </label>
-                          </div>
-                          <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="text-sm font-medium text-gray-700">
-                              Membership start date
-                              <input type="date" name="manual_start_date" value="<?= e(date('Y-m-d')) ?>"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                            </label>
-                            <label class="text-sm font-medium text-gray-700">
-                              Renewal date
-                              <input type="date" name="manual_renewal_date"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                            </label>
-                          </div>
+                      <form method="post" action="/admin/members/actions.php" class="space-y-4">
+                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                        <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                        <input type="hidden" name="tab" value="orders">
+                        <input type="hidden" name="orders_section" value="membership">
+                        <input type="hidden" name="action" value="manual_membership_order">
+                        <div class="grid gap-3 sm:grid-cols-2">
                           <label class="text-sm font-medium text-gray-700">
-                            Order reference / internal notes
-                            <textarea name="manual_order_reference" rows="2"
-                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></textarea>
+                            Membership type
+                            <select data-tour="manual-membership-type" name="manual_membership_type_id" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                              <option value="" disabled selected>— Select type —</option>
+                              <?php foreach ($membershipTypes as $type): ?>
+                                <option value="<?= e($type['id']) ?>"><?= e($type['name']) ?></option>
+                              <?php endforeach; ?>
+                            </select>
                           </label>
-                          <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <span class="material-icons-outlined text-base text-secondary">info</span>
-                            <p>Manual entries update Payment, Membership Periods, and Activity automatically.</p>
-                          </div>
-                          <button type="submit" data-tour="manual-membership-save"
-                            class="w-full rounded-full bg-primary px-5 py-2 text-xs font-semibold text-gray-900">Save manual
-                            order</button>
-                        </form>
-                      </div>
-                    <?php endif; ?>
-                  </div>
+                          <label class="text-sm font-medium text-gray-700">
+                            Cost (AUD)
+                            <input data-tour="manual-membership-cost" type="number" step="0.01" min="0" name="manual_membership_cost"
+                              value="" placeholder="0.00" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                          </label>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <label class="text-sm font-medium text-gray-700">
+                            Payment method
+                            <select name="manual_payment_method" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                              <option value="" disabled selected>— Select method —</option>
+                              <?php foreach (['Stripe', 'Manual', 'Bank Transfer', 'Cash', 'Complimentary'] as $method): ?>
+                                <option value="<?= e($method) ?>"><?= e($method) ?></option>
+                              <?php endforeach; ?>
+                            </select>
+                          </label>
+                          <label class="text-sm font-medium text-gray-700">
+                            Membership status
+                            <select name="manual_membership_status" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                              <option value="" disabled selected>— Select status —</option>
+                              <?php foreach (['active' => 'Active', 'pending' => 'Pending', 'complimentary' => 'Complimentary', 'lapsed' => 'Lapsed'] as $value => $label): ?>
+                                <option value="<?= e($value) ?>"><?= e($label) ?></option>
+                              <?php endforeach; ?>
+                            </select>
+                          </label>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <label class="text-sm font-medium text-gray-700">
+                            Membership start date
+                            <input type="date" name="manual_start_date" value="" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                          </label>
+                          <label class="text-sm font-medium text-gray-700">
+                            Renewal date
+                            <input type="date" name="manual_renewal_date" value="" required
+                              class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                          </label>
+                        </div>
+                        <label class="text-sm font-medium text-gray-700">
+                          Order reference / internal notes
+                          <textarea name="manual_order_reference" rows="2" placeholder="Optional"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></textarea>
+                        </label>
+                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                          <span class="material-icons-outlined text-base text-secondary">info</span>
+                          <p>Manual entries update Payment, Membership Periods, and Activity automatically.</p>
+                        </div>
+                        <button type="submit" data-tour="manual-membership-save"
+                          class="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-gray-900">Save manual
+                          order</button>
+                      </form>
+                    </div>
+                  <?php endif; ?>
                 </div>
               <?php else: ?>
                 <div class="space-y-6">
@@ -2953,6 +2914,24 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 form.delete_confirm.value = 'DELETE';
                 return true;
               }
+
+              // Renewal-date inline editor — pencil icon on the summary card toggles the form below.
+              (function () {
+                var toggle = document.querySelector('[data-renewal-edit-toggle]');
+                var panel  = document.querySelector('[data-renewal-edit]');
+                var cancel = document.querySelector('[data-renewal-edit-cancel]');
+                if (!toggle || !panel) return;
+                toggle.addEventListener('click', function () {
+                  panel.classList.toggle('hidden');
+                  if (!panel.classList.contains('hidden')) {
+                    var input = panel.querySelector('input[name="renewal_date"]');
+                    if (input) input.focus();
+                  }
+                });
+                if (cancel) {
+                  cancel.addEventListener('click', function () { panel.classList.add('hidden'); });
+                }
+              })();
             </script>
           <?php elseif ($tab === 'refunds'): ?>
           <?php elseif ($tab === 'refunds'): ?>

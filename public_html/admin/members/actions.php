@@ -5,7 +5,6 @@ use App\Services\AdminMemberAccess;
 use App\Services\ActivityLogger;
 use App\Services\AuthService;
 use App\Services\BaseUrlService;
-use App\Services\CommitteeService;
 use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\MemberRepository;
@@ -491,35 +490,6 @@ switch ($action) {
                 $payload['is_area_rep'] = isset($_POST['is_area_rep']) ? 1 : 0;
                 $payload['is_committee'] = isset($_POST['is_committee']) ? 1 : 0;
                 $payload['committee_role'] = trim((string) ($_POST['committee_role'] ?? ''));
-            }
-            // ── New committee/leadership role assignments ────────────────────
-            // The Profile/Orders tab now exposes a multi-select sourced from
-            // committee_roles. We sync the join table, then derive the legacy
-            // is_committee / is_area_rep / committee_role columns from the
-            // resulting assignments so anything still reading those flags
-            // (directory, member-area cards) keeps working.
-            $committeeFormSubmitted = !empty($_POST['committee_roles_submitted']);
-            if ($committeeFormSubmitted && AdminMemberAccess::canEditFullProfile($user)) {
-                $submittedRoleIds = array_map('intval', (array) ($_POST['committee_role_ids'] ?? []));
-                CommitteeService::syncAssignments($targetMemberId, $submittedRoleIds);
-                // Persist the privacy flag alongside the assignments.
-                $payload['committee_private'] = isset($_POST['committee_private']) ? 1 : 0;
-
-                // Backward-compat flag sync. Fetch the active roles for this
-                // member directly so we cover roles we just added.
-                $heldRoles = CommitteeService::rolesForMember($targetMemberId);
-                $hasNational = false; $hasChapter = false; $nationalNames = [];
-                foreach ($heldRoles as $hr) {
-                    if (($hr['category'] ?? '') === 'national') {
-                        $hasNational = true;
-                        $nationalNames[] = $hr['name'];
-                    } elseif (($hr['category'] ?? '') === 'chapter') {
-                        $hasChapter = true;
-                    }
-                }
-                $payload['is_committee']   = $hasNational ? 1 : 0;
-                $payload['is_area_rep']    = $hasChapter ? 1 : 0;
-                $payload['committee_role'] = $hasNational ? implode(', ', $nationalNames) : '';
             }
         }
         if ($allowFullProfile && $member['member_type'] === 'ASSOCIATE' && !empty($member['full_member_id'])) {

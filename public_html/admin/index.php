@@ -2187,186 +2187,376 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $webhookHealth = StripeSettingsService::webhookHealth($paymentSettings);
         $isConnected = !empty($activeKeys['secret_key']) && !empty($activeKeys['publishable_key']);
         $canRefund = AdminMemberAccess::canRefund($user);
-        $orders = $pdo->query('SELECT o.*, u.name, u.email FROM orders o LEFT JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 50')->fetchAll();
-        $webhookEvents = $pdo->query('SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 50')->fetchAll();
-        ?>
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
-          <h1 class="font-display text-2xl font-bold text-gray-900">Payments & Settings</h1>
 
-          <div class="grid gap-6">
-            <div class="rounded-xl border border-gray-100 bg-white p-5">
-              <div class="flex items-center justify-between gap-4">
-                <div>
-                  <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Stripe Connection (Primary)
-                  </h2>
-                  <p class="mt-1 text-xs text-slate-500">Settings are managed in the Settings Hub.</p>
+        $ordersPerPage = 10;
+        $ordersPage = max(1, (int) ($_GET['orders_page'] ?? 1));
+        $ordersSearch = trim((string) ($_GET['orders_q'] ?? ''));
+        $ordersWhere = '';
+        $ordersParams = [];
+        if ($ordersSearch !== '') {
+          $like = '%' . $ordersSearch . '%';
+          $ordersWhere = 'WHERE o.order_number LIKE :q1 OR u.name LIKE :q2 OR u.email LIKE :q3';
+          $ordersParams = [':q1' => $like, ':q2' => $like, ':q3' => $like];
+        }
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM orders o LEFT JOIN users u ON u.id = o.user_id {$ordersWhere}");
+        $countStmt->execute($ordersParams);
+        $ordersTotal = (int) $countStmt->fetchColumn();
+        $ordersTotalPages = max(1, (int) ceil($ordersTotal / $ordersPerPage));
+        $ordersPage = min($ordersPage, $ordersTotalPages);
+        $ordersOffset = ($ordersPage - 1) * $ordersPerPage;
+        $listStmt = $pdo->prepare("SELECT o.*, u.name, u.email FROM orders o LEFT JOIN users u ON u.id = o.user_id {$ordersWhere} ORDER BY o.created_at DESC LIMIT {$ordersPerPage} OFFSET {$ordersOffset}");
+        $listStmt->execute($ordersParams);
+        $orders = $listStmt->fetchAll();
+
+        $webhookEvents = $pdo->query('SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 50')->fetchAll();
+
+        $maskKey = static function (string $key, int $prefixLen = 8): string {
+          if ($key === '') return '';
+          return substr($key, 0, $prefixLen) . '••••••••';
+        };
+        $pkRaw = (string) ($activeKeys['publishable_key'] ?? '');
+        $skRaw = (string) ($activeKeys['secret_key'] ?? '');
+        $whsecRaw = (string) ($stripeSettings['webhook_secret'] ?? '');
+        $pkMasked = $maskKey($pkRaw, 8);
+        $skMasked = $maskKey($skRaw, 8);
+        $whsecMasked = $whsecRaw !== '' ? (substr($whsecRaw, 0, 6) . '••••••••') : '';
+        $modeLabel = strtoupper((string) ($activeKeys['mode'] ?? 'test'));
+        $pdfEnabled = !empty($paymentSettings['generate_pdf']);
+        $invoicePrefix = $paymentSettings['invoice_prefix'] ?? 'INV';
+        $lastWebhook = $webhookHealth['last_received_at'] ?? null;
+        $lastWebhookError = $webhookHealth['last_error'] ?? null;
+        $systemsOperational = $isConnected && !$lastWebhookError;
+        $canEditSettings = function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php');
+        ?>
+
+        <section class="space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h1 class="font-display text-2xl font-bold text-gray-900">Payments &amp; Settings</h1>
+            <span class="inline-flex items-center gap-1.5 rounded-full <?= $systemsOperational ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' ?> px-2.5 py-1 text-[11px] font-semibold tracking-wide">
+              <span class="h-1.5 w-1.5 rounded-full <?= $systemsOperational ? 'bg-emerald-500' : 'bg-rose-500' ?>"></span>
+              <?= $systemsOperational ? 'SYSTEM ONLINE' : 'NEEDS ATTENTION' ?>
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div class="flex items-start justify-between gap-4 mb-5">
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <span class="material-icons-outlined text-[20px]">payments</span>
+                  </span>
+                  <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Stripe Connection (Primary)</h2>
+                    <p class="mt-0.5 text-xs text-slate-500">Managed via the secure infrastructure gateway.</p>
+                  </div>
                 </div>
-                <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
-                  <a class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-slate-700"
-                    href="/admin/settings/index.php?section=payments">Go to Stripe Settings</a>
+                <?php if ($canEditSettings): ?>
+                  <a href="/admin/settings/index.php?section=payments"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-800">
+                    Go to Stripe Settings
+                    <span class="material-icons-outlined text-[14px]">open_in_new</span>
+                  </a>
                 <?php endif; ?>
               </div>
-              <div class="mt-4 space-y-3 text-sm">
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                 <div class="flex items-center justify-between">
-                  <span class="text-slate-600">Status</span>
-                  <span class="<?= $isConnected ? 'text-green-600' : 'text-red-600' ?> font-semibold">
+                  <span class="text-slate-500">Status</span>
+                  <span class="font-semibold <?= $isConnected ? 'text-emerald-600' : 'text-rose-600' ?>">
                     <?= $isConnected ? 'Connected' : 'Not connected' ?>
                   </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-slate-600">Mode</span>
-                  <span class="text-slate-800 font-semibold"><?= e($activeKeys['mode'] ?? 'test') ?></span>
+                  <span class="text-slate-500">Publishable key</span>
+                  <span class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-slate-800" data-key-display="pk"><?= e($pkMasked !== '' ? $pkMasked : 'Not set') ?></span>
+                    <?php if ($pkMasked !== ''): ?>
+                      <button type="button"
+                        class="text-slate-400 hover:text-slate-700"
+                        data-toggle-key="pk"
+                        data-key-real="<?= e($pkRaw) ?>"
+                        data-key-mask="<?= e($pkMasked) ?>"
+                        aria-label="Reveal publishable key">
+                        <span class="material-icons-outlined text-[16px]">visibility</span>
+                      </button>
+                    <?php endif; ?>
+                  </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-slate-600">Publishable key</span>
-                  <span
-                    class="text-slate-800 font-semibold"><?= !empty($activeKeys['publishable_key']) ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-500">Mode</span>
+                  <span class="inline-flex items-center rounded-md <?= $modeLabel === 'LIVE' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' ?> px-2 py-0.5 text-[11px] font-bold tracking-wide"><?= e($modeLabel) ?></span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-slate-600">Secret key</span>
-                  <span
-                    class="text-slate-800 font-semibold"><?= !empty($activeKeys['secret_key']) ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-500">Secret key</span>
+                  <span class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-slate-800"><?= e($skMasked !== '' ? $skMasked : 'Not set') ?></span>
+                    <?php if ($skMasked !== ''): ?>
+                      <span class="text-slate-300" title="Hidden — manage in Stripe Settings">
+                        <span class="material-icons-outlined text-[16px]">visibility_off</span>
+                      </span>
+                    <?php endif; ?>
+                  </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-slate-600">Webhook secret</span>
-                  <span
-                    class="text-slate-800 font-semibold"><?= !empty($stripeSettings['webhook_secret']) ? 'Configured' : 'Not set' ?></span>
+                  <span class="text-slate-500">Currency</span>
+                  <span class="font-semibold text-slate-800">AUD ($)</span>
                 </div>
-                <div class="pt-2 text-xs text-slate-500">
-                  Last webhook: <?= e($webhookHealth['last_received_at'] ?? 'Never') ?><br>
-                  Last error: <?= e($webhookHealth['last_error'] ?? 'None') ?>
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-500">Webhook secret</span>
+                  <span class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-slate-800"><?= e($whsecMasked !== '' ? $whsecMasked : 'Not set') ?></span>
+                    <?php if ($whsecMasked !== ''): ?>
+                      <span class="text-slate-300" title="Hidden — manage in Stripe Settings">
+                        <span class="material-icons-outlined text-[16px]">visibility_off</span>
+                      </span>
+                    <?php endif; ?>
+                  </span>
                 </div>
+              </div>
+
+              <div class="mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span class="text-slate-500">Last successful webhook:
+                  <span class="font-semibold text-slate-700"><?= e($lastWebhook ?: 'Never') ?></span>
+                </span>
+                <span class="<?= $systemsOperational ? 'text-emerald-600' : 'text-rose-600' ?> font-semibold">
+                  <?= $systemsOperational ? 'All systems operational' : ($lastWebhookError ? 'Last error: ' . e($lastWebhookError) : 'Not connected') ?>
+                </span>
               </div>
             </div>
 
-            <div class="rounded-xl border border-gray-100 bg-white p-5 space-y-3 text-sm text-slate-600">
-              <div class="flex items-center justify-between">
-                <span>Invoice prefix</span>
-                <span class="text-slate-900 font-semibold"><?= e($paymentSettings['invoice_prefix'] ?? 'INV') ?></span>
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+              <h2 class="font-display text-lg font-bold text-gray-900">Billing Configuration</h2>
+
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-slate-800">Invoice prefix</p>
+                  <p class="text-xs text-slate-500">Custom label for store orders</p>
+                </div>
+                <span class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-bold tracking-wide text-slate-700"><?= e($invoicePrefix) ?></span>
               </div>
-              <div class="flex items-center justify-between">
-                <span>PDF invoices</span>
-                <span
-                  class="text-slate-900 font-semibold"><?= !empty($paymentSettings['generate_pdf']) ? 'Enabled' : 'Disabled' ?></span>
+
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-slate-800">PDF Invoices</p>
+                  <p class="text-xs text-slate-500">Auto-generate upon payment</p>
+                </div>
+                <span class="relative inline-flex h-6 w-11 items-center rounded-full <?= $pdfEnabled ? 'bg-gray-900' : 'bg-gray-300' ?>">
+                  <span class="inline-block h-5 w-5 rounded-full bg-white transition <?= $pdfEnabled ? 'translate-x-5' : 'translate-x-0.5' ?>"></span>
+                </span>
               </div>
-              <div class="flex items-center justify-between">
-                <span>Refund permissions</span>
-                <span class="text-slate-900 font-semibold">Admin, Treasurer</span>
+
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-slate-800">Refund permissions</p>
+                  <p class="text-xs text-slate-500">Restricted to Admin/Treasurer</p>
+                </div>
+                <div class="flex -space-x-1.5">
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800 ring-2 ring-white">AD</span>
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-50 text-[10px] font-bold text-amber-700 ring-2 ring-white">TR</span>
+                </div>
               </div>
-              <div class="pt-2">
-                <?php if (function_exists('can_access_path') && can_access_path($user, '/admin/settings/index.php')): ?>
-                  <a class="text-sm text-blue-600" href="/admin/settings/index.php?section=store">Go to Store Settings</a>
-                <?php endif; ?>
-              </div>
+
+              <?php if ($canEditSettings): ?>
+                <a href="/admin/settings/index.php?section=payments"
+                  class="block w-full text-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50">
+                  Edit Global Settings
+                </a>
+              <?php endif; ?>
             </div>
           </div>
-        </section>
 
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="font-display text-xl font-bold text-gray-900">Recent Orders</h2>
-            <span class="text-xs text-slate-500">Refunds are full only.</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th class="py-2 pr-3">Date</th>
-                  <th class="py-2 pr-3">Order</th>
-                  <th class="py-2 pr-3">Customer</th>
-                  <th class="py-2 pr-3">Type</th>
-                  <th class="py-2 pr-3">Total</th>
-                  <th class="py-2 pr-3">Status</th>
-                  <th class="py-2">Refund</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <?php foreach ($orders as $order): ?>
-                  <?php
-                  $orderNumber = $order['order_number'] ?? ('ORD-' . $order['id']);
-                  $memberOrderUrl = null;
-                  if (!empty($order['member_id']) && ($order['order_type'] ?? '') === 'membership') {
-                    $memberOrderUrl = '/admin/members/view.php?id=' . urlencode((string) $order['member_id'])
-                      . '&tab=orders&orders_section=membership&order_id=' . urlencode((string) $order['id']);
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div class="flex items-center gap-2">
+                <h2 class="font-display text-xl font-bold text-gray-900">Recent Transactions</h2>
+                <span class="rounded-md bg-gray-900 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white">NEW</span>
+              </div>
+              <form method="get" class="flex items-center gap-2">
+                <input type="hidden" name="page" value="payments">
+                <label class="relative">
+                  <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
+                  <input type="text" name="orders_q" value="<?= e($ordersSearch) ?>"
+                    placeholder="Search orders..."
+                    class="rounded-xl border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-gray-200">
+                </label>
+                <button type="submit"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-slate-500 hover:bg-gray-50"
+                  aria-label="Apply filter">
+                  <span class="material-icons-outlined text-[18px]">tune</span>
+                </button>
+              </form>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-gray-100">
+                  <tr>
+                    <th class="py-3 pr-4 font-semibold">Date / Time</th>
+                    <th class="py-3 pr-4 font-semibold">Order ID</th>
+                    <th class="py-3 pr-4 font-semibold">Customer</th>
+                    <th class="py-3 pr-4 font-semibold">Type</th>
+                    <th class="py-3 pr-4 font-semibold">Total</th>
+                    <th class="py-3 pr-4 font-semibold">Status</th>
+                    <th class="py-3 font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <?php foreach ($orders as $order): ?>
+                    <?php
+                    $orderNumber = $order['order_number'] ?? ('ORD-' . $order['id']);
+                    $orderTypeRaw = (string) ($order['order_type'] ?? '');
+                    $isMembership = $orderTypeRaw === 'membership';
+                    $memberOrderUrl = null;
+                    if (!empty($order['member_id']) && $isMembership) {
+                      $memberOrderUrl = '/admin/members/view.php?id=' . urlencode((string) $order['member_id'])
+                        . '&tab=orders&orders_section=membership&order_id=' . urlencode((string) $order['id']);
+                    }
+                    $status = strtolower((string) $order['status']);
+                    $statusStyles = [
+                      'paid' => 'bg-emerald-50 text-emerald-700',
+                      'pending' => 'bg-amber-50 text-amber-700',
+                      'failed' => 'bg-rose-50 text-rose-700',
+                      'refunded' => 'bg-slate-100 text-slate-700',
+                      'cancelled' => 'bg-slate-100 text-slate-500',
+                    ];
+                    $statusClass = $statusStyles[$status] ?? 'bg-slate-100 text-slate-700';
+                    $typeClass = $isMembership ? 'bg-indigo-50 text-indigo-700' : 'bg-sky-50 text-sky-700';
+                    $createdAt = (string) $order['created_at'];
+                    ?>
+                    <tr class="hover:bg-gray-50/60">
+                      <td class="py-4 pr-4 align-top">
+                        <span class="block font-medium text-slate-800"><?= e(substr($createdAt, 0, 10)) ?></span>
+                        <span class="block text-xs text-slate-500"><?= e(substr($createdAt, 11, 8)) ?></span>
+                      </td>
+                      <td class="py-4 pr-4 align-top">
+                        <?php if ($memberOrderUrl): ?>
+                          <a class="font-mono text-xs font-semibold text-indigo-600 hover:underline" href="<?= e($memberOrderUrl) ?>">#<?= e($orderNumber) ?></a>
+                        <?php else: ?>
+                          <span class="font-mono text-xs font-semibold text-slate-600">#<?= e($orderNumber) ?></span>
+                        <?php endif; ?>
+                      </td>
+                      <td class="py-4 pr-4 align-top">
+                        <span class="block font-semibold text-slate-900"><?= e($order['name'] ?? 'Member') ?></span>
+                        <span class="block text-xs text-slate-500"><?= e($order['email'] ?? '') ?></span>
+                      </td>
+                      <td class="py-4 pr-4 align-top">
+                        <span class="inline-flex items-center rounded-md <?= $typeClass ?> px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"><?= e($orderTypeRaw !== '' ? $orderTypeRaw : '—') ?></span>
+                      </td>
+                      <td class="py-4 pr-4 align-top font-semibold text-slate-900">A$<?= e(number_format((float) $order['total'], 2)) ?></td>
+                      <td class="py-4 pr-4 align-top">
+                        <span class="inline-flex items-center rounded-full <?= $statusClass ?> px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase"><?= e($status !== '' ? $status : '—') ?></span>
+                      </td>
+                      <td class="py-4 align-top">
+                        <?php if ($canRefund && $status === 'paid'): ?>
+                          <form data-refund-form method="post" class="flex items-center gap-2">
+                            <input type="hidden" name="order_id" value="<?= e((string) $order['id']) ?>">
+                            <input type="text" name="reason" placeholder="Reason (opt)" class="text-xs rounded-lg border border-gray-200 px-2 py-1.5 w-28">
+                            <button type="submit" class="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">Refund</button>
+                          </form>
+                        <?php else: ?>
+                          <span class="text-xs text-slate-400">—</span>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                  <?php if (!$orders): ?>
+                    <tr><td colspan="7" class="py-8 text-center text-slate-500">No transactions found.</td></tr>
+                  <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+
+            <?php if ($ordersTotal > 0): ?>
+              <?php
+                $prevPage = max(1, $ordersPage - 1);
+                $nextPage = min($ordersTotalPages, $ordersPage + 1);
+                $buildPageUrl = static function (int $p) use ($ordersSearch): string {
+                  $params = ['page' => 'payments', 'orders_page' => $p];
+                  if ($ordersSearch !== '') {
+                    $params['orders_q'] = $ordersSearch;
                   }
-                  ?>
-                  <tr>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($order['created_at']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600">
-                      <?php if ($memberOrderUrl): ?>
-                        <a class="text-xs font-semibold text-blue-600 underline"
-                          href="<?= e($memberOrderUrl) ?>">#<?= e($orderNumber) ?></a>
-                      <?php else: ?>
-                        <span class="text-xs font-semibold text-gray-600">#<?= e($orderNumber) ?></span>
-                      <?php endif; ?>
-                    </td>
-                    <td class="py-2 pr-3 text-gray-900">
-                      <?= e($order['name'] ?? 'Member') ?><br>
-                      <span class="text-xs text-slate-500"><?= e($order['email'] ?? '') ?></span>
-                    </td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($order['order_type']) ?></td>
-                    <td class="py-2 pr-3 text-gray-900">A$<?= e(number_format((float) $order['total'], 2)) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($order['status']) ?></td>
-                    <td class="py-2">
-                      <?php if ($canRefund && $order['status'] === 'paid'): ?>
-                        <form data-refund-form method="post" class="flex items-center gap-2">
-                          <input type="hidden" name="order_id" value="<?= e((string) $order['id']) ?>">
-                          <input type="text" name="reason" placeholder="Reason (optional)"
-                            class="text-xs rounded border border-gray-200 px-2 py-1">
-                          <button
-                            class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold"
-                            type="submit">Refund</button>
-                        </form>
-                      <?php else: ?>
-                        <span class="text-xs text-gray-400">Restricted</span>
-                      <?php endif; ?>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-                <?php if (!$orders): ?>
-                  <tr>
-                    <td colspan="6" class="py-4 text-center text-gray-500">No orders found.</td>
-                  </tr>
-                <?php endif; ?>
-              </tbody>
-            </table>
+                  return '?' . http_build_query($params);
+                };
+                $rangeStart = $ordersOffset + 1;
+                $rangeEnd = $ordersOffset + count($orders);
+              ?>
+              <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <span>Showing <?= e((string) $rangeStart) ?>–<?= e((string) $rangeEnd) ?> of <?= e((string) $ordersTotal) ?> transactions</span>
+                <div class="flex items-center gap-2">
+                  <a href="<?= e($buildPageUrl($prevPage)) ?>"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-600 <?= $ordersPage <= 1 ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50' ?>"
+                    aria-label="Previous page">
+                    <span class="material-icons-outlined text-[16px]">chevron_left</span>
+                  </a>
+                  <span class="px-2 font-semibold text-slate-700">Page <?= e((string) $ordersPage) ?> of <?= e((string) $ordersTotalPages) ?></span>
+                  <a href="<?= e($buildPageUrl($nextPage)) ?>"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-600 <?= $ordersPage >= $ordersTotalPages ? 'pointer-events-none opacity-50' : 'hover:bg-gray-50' ?>"
+                    aria-label="Next page">
+                    <span class="material-icons-outlined text-[16px]">chevron_right</span>
+                  </a>
+                </div>
+              </div>
+            <?php endif; ?>
           </div>
-        </section>
 
-        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-          <h2 class="font-display text-xl font-bold text-gray-900">Payments Debug</h2>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th class="py-2 pr-3">Received</th>
-                  <th class="py-2 pr-3">Event</th>
-                  <th class="py-2 pr-3">Type</th>
-                  <th class="py-2 pr-3">Status</th>
-                  <th class="py-2">Error</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <?php foreach ($webhookEvents as $event): ?>
+          <details class="group bg-white rounded-2xl border border-gray-100 shadow-sm [&_summary::-webkit-details-marker]:hidden">
+            <summary class="flex items-center justify-between gap-3 px-6 py-4 cursor-pointer list-none">
+              <div class="flex items-center gap-2">
+                <span class="material-icons-outlined text-slate-600 text-[20px]">terminal</span>
+                <span class="font-display text-lg font-bold text-gray-900">Payments Debug Log</span>
+              </div>
+              <span class="material-icons-outlined text-slate-400 transition group-open:rotate-180">expand_more</span>
+            </summary>
+            <div class="px-6 pb-6 overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-gray-100">
                   <tr>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($event['received_at']) ?></td>
-                    <td class="py-2 pr-3 text-gray-900"><?= e($event['stripe_event_id']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($event['type']) ?></td>
-                    <td class="py-2 pr-3 text-gray-600"><?= e($event['processed_status']) ?></td>
-                    <td class="py-2 text-gray-600"><?= e($event['error'] ?? '') ?></td>
+                    <th class="py-2 pr-3 font-semibold">Received</th>
+                    <th class="py-2 pr-3 font-semibold">Event</th>
+                    <th class="py-2 pr-3 font-semibold">Type</th>
+                    <th class="py-2 pr-3 font-semibold">Status</th>
+                    <th class="py-2 font-semibold">Error</th>
                   </tr>
-                <?php endforeach; ?>
-                <?php if (!$webhookEvents): ?>
-                  <tr>
-                    <td colspan="5" class="py-4 text-center text-gray-500">No webhook events yet.</td>
-                  </tr>
-                <?php endif; ?>
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <?php foreach ($webhookEvents as $event): ?>
+                    <tr>
+                      <td class="py-2 pr-3 text-slate-600"><?= e($event['received_at']) ?></td>
+                      <td class="py-2 pr-3 font-mono text-xs text-slate-700"><?= e($event['stripe_event_id']) ?></td>
+                      <td class="py-2 pr-3 text-slate-600"><?= e($event['type']) ?></td>
+                      <td class="py-2 pr-3 text-slate-600"><?= e($event['processed_status']) ?></td>
+                      <td class="py-2 text-slate-600"><?= e($event['error'] ?? '') ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                  <?php if (!$webhookEvents): ?>
+                    <tr><td colspan="5" class="py-4 text-center text-slate-500">No webhook events yet.</td></tr>
+                  <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </section>
 
         <script>
+          document.querySelectorAll('[data-toggle-key]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const target = btn.parentElement.querySelector('[data-key-display]');
+              if (!target) return;
+              const real = btn.dataset.keyReal || '';
+              const mask = btn.dataset.keyMask || '';
+              const icon = btn.querySelector('.material-icons-outlined');
+              if (target.dataset.revealed === '1') {
+                target.textContent = mask;
+                target.dataset.revealed = '0';
+                if (icon) icon.textContent = 'visibility';
+              } else {
+                target.textContent = real;
+                target.dataset.revealed = '1';
+                if (icon) icon.textContent = 'visibility_off';
+              }
+            });
+          });
+
           document.querySelectorAll('[data-refund-form]').forEach((form) => {
             form.addEventListener('submit', async (event) => {
               event.preventDefault();

@@ -237,7 +237,7 @@ When something needs to change site-wide — a contact email, the Stripe mode, t
 
 ### How it works (briefly)
 
-All sections except the three standalone pages (`ai.php`, `roles.php`, `access-control.php`) are rendered by the same dispatcher: `public_html/admin/settings/index.php` reads `?section=<key>` (or `hub`, the default when no section is given). For `hub` it renders the card-grid index, filtering each card by its declared permission so admins only see categories they can actually open. For a real section it looks the key up in `$sections`, runs the per-section permission check via `current_admin_can()`, then renders the matching form. Saves go through `SettingsService::setGlobal($userId, $key, $value)` — which JSON-encodes the value, stamps `audit_log`, and (for sensitive keys) encrypts via `CryptoService`. Reads go through `SettingsService::getGlobal($key, $default)`.
+All sections except the standalone pages (`ai.php`, `roles.php`, `access-control.php`, `committee-roles.php`) are rendered by the same dispatcher: `public_html/admin/settings/index.php` reads `?section=<key>` (or `hub`, the default when no section is given). For `hub` it renders the card-grid index, filtering each card by its declared permission so admins only see categories they can actually open. For a real section it looks the key up in `$sections`, runs the per-section permission check via `current_admin_can()`, then renders the matching form. Saves go through `SettingsService::setGlobal($userId, $key, $value)` — which JSON-encodes the value, stamps `audit_log`, and (for sensitive keys) encrypts via `CryptoService`. Reads go through `SettingsService::getGlobal($key, $default)`.
 
 Defaults come from three places:
 
@@ -267,6 +267,7 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 | Advanced / Developer | `/admin/settings/index.php?section=advanced` | `admin.settings.general.manage` |
 | Admin Role Builder | `/admin/settings/roles.php` | `admin.roles.view` (view) / `admin.roles.manage` (edit) |
 | Access Control | `/admin/settings/access-control.php` | `admin.roles.manage` |
+| Committee & Leadership Roles | `/admin/settings/committee-roles.php` | `admin.members.view` |
 
 The permission map lives in `$hubGroups` at the top of `public_html/admin/settings/index.php` (each card declares its `permission` key) and is enforced in the dispatcher's `can_access_section()` check on form save. The sidebar entry for Settings (`app/Views/partials/backend_admin_sidebar.php`) is gated by `$settingsPermissions` — visible to any admin with at least one of the section permissions. Step-up authentication ([Ch 06](view.php?slug=06-2fa-stepup)) is required for every save *except* the Payments section (which uses Stripe's own gating).
 
@@ -515,6 +516,12 @@ Owns no `settings_global` keys — its source of truth is the `roles` and `role_
 What it controls: which page each role can access in the admin sidebar. Reads `pages_registry`, joins `page_role_access`, writes back per-role flags. Permission required: `admin.roles.manage`. Deep dive: [Ch 07 — Roles & permissions](view.php?slug=07-roles-permissions).
 
 Owns no `settings_global` keys — its source of truth is the `page_role_access` table.
+
+#### Committee & Leadership Roles (standalone)
+
+What it controls: which member currently holds each National or Chapter Rep role. Role-centric UI — pick the role, search a member by name or member number, click to assign. Per-assignment privacy toggle and remove button live on the same row. Permission required: `admin.members.view`. Reads/writes the `committee_roles` and `member_committee_assignments` tables via `CommitteeService`; `syncAssignments()` mirrors state back onto the legacy `members.is_committee` / `is_area_rep` / `committee_role` columns. Deep dive: [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+
+Owns no `settings_global` keys — its sources of truth are `committee_roles` (catalog) and `member_committee_assignments` (who holds what).
 
 ### Gotchas
 

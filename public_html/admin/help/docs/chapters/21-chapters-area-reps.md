@@ -33,7 +33,7 @@ If an Area Rep needs to cover two chapters (e.g. acting in another chapter's rol
 
 - **Member chapter assignments** — Admin → Members → click the member → **Profile** tab → **Chapter** dropdown.
 - **The list of chapters** — Admin → Settings → **Membership & Pricing** → scroll to the **Chapters** table.
-- **Committee role assignments** — Admin → Members → click the member → **Committee Roles** panel.
+- **Committee role assignments** — Admin → Settings → **People & Access** → **Committee & Leadership Roles**. Pick the role, search for the member by name or member number, assign. (Each member's profile still shows a read-only summary of what they hold, with a link back to this page.)
 - **Pending chapter-change requests** — Admin → **Notification Hub** (the bell icon / `/admin/requests/`) → filter by **Chapter Change**.
 - **Assigning the Area Rep role to a user** — Admin → Settings → **Access Control**.
 
@@ -45,7 +45,7 @@ The committee and chapter assignments you make in the admin feed three pages on 
 - **Chapters and Area Representatives** — `/?page=chapters-representatives` (linked under **About → Chapters and Area Representatives**). Grouped by state. Each chapter shows its current Area Rep with their name and the contact email/phone set on the role.
 - **Members directory** — the in-portal directory (`/member/index.php?page=directory`) shows each member's chapter against their name, so members can find people in their own chapter.
 
-What this means in practice: at the AGM when committee roles rotate, you don't open the committee page and edit text. You go to Admin → Members → the new role-holder → tick the role. The public page updates itself.
+What this means in practice: at the AGM when committee roles rotate, you don't open the committee page and edit text. You go to Admin → Settings → **Committee & Leadership Roles**, pick the role, and assign the new holder. The public page updates itself.
 
 If a member is missing from the public committee or chapter rep page despite having a role ticked, three usual reasons:
 
@@ -205,7 +205,7 @@ The flow:
 ### Where to change it
 
 - **Edit the list of chapters** — `/admin/settings/index.php?section=membership_pricing`. The membership pricing page also exposes a chapters editor (name, state, active flag, sort order). Inserts and updates are written directly to the `chapters` table (around lines 545 and 572 of that file).
-- **Assign committee or rep roles to a member** — `/admin/members/view.php?id={memberId}` → the "Committee Roles" panel. The form posts `committee_role_ids[]` and the handler calls `CommitteeService::syncAssignments($memberId, $roleIds)`. The catalog dropdown pulls from `CommitteeService::catalogForAssignment()` and pre-sorts chapter roles so the member's own chapter's roles appear first.
+- **Assign committee or rep roles** — `/admin/settings/committee-roles.php` (Admin → Settings → **People & Access** → Committee & Leadership Roles). The page is role-centric: pick the role, type a name or member number into the per-role search box, click a result. Assign / unassign / privacy toggles hit `committee-roles-save.php` (JSON, CSRF-protected), which delegates to `CommitteeService::syncAssignments()`. `syncAssignments()` mirrors the new state back onto the legacy `members.is_committee` / `is_area_rep` / `committee_role` columns automatically so older code reading those flags keeps working. The member-search endpoint is `committee-roles-search.php` (matches `first_name` / `last_name` / `member_number`, top 8 results). Each member's profile under `/admin/members/view.php` shows a read-only summary of held roles with a link back to this page.
 - **Toggle the `area_rep` role on a user** — `/admin/settings/access-control.php`. The role is treated like any other (see [Chapter 07](view.php?slug=07-roles-permissions)); the *chapter* scoping is automatic via the rep's `members.chapter_id`.
 - **Approve or reject a chapter change** — `/admin/requests/` (the Notification Hub), filter by **Chapter Change**.
 - **Change a member's chapter directly** (admin override, no member request) — `/admin/members/view.php?id={memberId}` → Profile tab → Chapter dropdown.

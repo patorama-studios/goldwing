@@ -135,6 +135,11 @@ final class CommitteeService
     /**
      * Replace the set of role assignments for a member with the given role IDs.
      * Idempotent — calling with the same set twice is a no-op.
+     *
+     * Also mirrors the resulting assignments into the legacy
+     * is_committee / is_area_rep / committee_role columns on members, so
+     * older code paths still reading those flags (directory, member-area
+     * cards) keep working without any caller having to remember.
      */
     public static function syncAssignments(int $memberId, array $roleIds): void
     {
@@ -177,6 +182,50 @@ final class CommitteeService
             $del->execute(array_merge([$memberId], array_values($toRemove)));
         }
         self::$cache = []; // any change blows the request-local cache
+
+        self::syncLegacyFlags($memberId);
+    }
+
+    /**
+     * Recompute is_committee / is_area_rep / committee_role on members from
+     * the current assignments. Safe to call on its own (e.g. after a manual
+     * cleanup) — pulls straight from the join table, no caller bookkeeping.
+     */
+    public static function syncLegacyFlags(int $memberId): void
+    {
+        if ($memberId <= 0) { return; }
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare("
+                SELECT r.category, r.name
+                FROM member_committee_assignments a
+                JOIN committee_roles r ON r.id = a.role_id
+                WHERE a.member_id = :m AND r.is_active = 1
+            ");
+            $stmt->execute([':m' => $memberId]);
+            $hasNational = false; $hasChapter = false; $nationalNames = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                if (($row['category'] ?? '') === 'national') {
+                    $hasNational = true;
+                    $nationalNames[] = $row['name'];
+                } elseif (($row['category'] ?? '') === 'chapter') {
+                    $hasChapter = true;
+                }
+            }
+            $upd = $pdo->prepare("
+                UPDATE members
+                SET is_committee = :ic, is_area_rep = :iar, committee_role = :cr
+                WHERE id = :m
+            ");
+            $upd->execute([
+                ':ic' => $hasNational ? 1 : 0,
+                ':iar' => $hasChapter ? 1 : 0,
+                ':cr' => $hasNational ? implode(', ', $nationalNames) : '',
+                ':m'  => $memberId,
+            ]);
+        } catch (Throwable $e) {
+            // Non-fatal — legacy flags are derived, not authoritative.
+        }
     }
 
     /**

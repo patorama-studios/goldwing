@@ -682,6 +682,9 @@ function section_last_updated(array $keys, PDO $pdo): array
 $pdo = db();
 $activePage = 'settings';
 $pageTitle = $sections[$section]['label'] ?? 'Settings Hub';
+if ($section === 'payments') {
+    $pageTitle = 'Stripe Configuration';
+}
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 ?>
 <div class="flex h-screen overflow-hidden">
@@ -703,14 +706,24 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="flex items-center justify-between gap-4">
               <div>
                 <h1 class="font-display text-2xl font-bold text-gray-900"><?= e($pageTitle) ?></h1>
-                <p class="text-sm text-slate-500">
-                  <?php if ($section === 'hub'): ?>
-                    Choose a category below to manage configuration across the platform.
-                  <?php else: ?>
-                    <a href="/admin/settings/" class="text-primary hover:underline">&larr; All settings</a>
-                    &nbsp;&middot;&nbsp; Single source of truth for configuration.
-                  <?php endif; ?>
-                </p>
+                <?php if ($section === 'payments'): ?>
+                  <nav class="mt-1 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+                    <a href="/admin/" class="hover:text-slate-700">Admin</a>
+                    <span class="text-slate-300">/</span>
+                    <a href="/admin/settings/" class="hover:text-slate-700">Settings</a>
+                    <span class="text-slate-300">/</span>
+                    <span class="font-semibold text-gray-900 border-b-2 border-primary pb-0.5">Payments &amp; Stripe</span>
+                  </nav>
+                <?php else: ?>
+                  <p class="text-sm text-slate-500">
+                    <?php if ($section === 'hub'): ?>
+                      Choose a category below to manage configuration across the platform.
+                    <?php else: ?>
+                      <a href="/admin/settings/" class="text-primary hover:underline">&larr; All settings</a>
+                      &nbsp;&middot;&nbsp; Single source of truth for configuration.
+                    <?php endif; ?>
+                  </p>
+                <?php endif; ?>
               </div>
               <?php if ($section !== 'hub'): ?>
                 <div class="text-xs text-slate-500 text-right">
@@ -769,6 +782,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   ['label' => 'Security & Authentication', 'icon' => 'shield', 'desc' => 'Login policy, password rules, step-up.', 'href' => '/admin/settings/index.php?section=security', 'permission' => 'admin.settings.general.manage'],
                   ['label' => 'Admin Role Builder', 'icon' => 'engineering', 'desc' => 'Define admin roles and permission sets.', 'href' => '/admin/settings/roles.php', 'permission' => 'admin.roles.view'],
                   ['label' => 'Access Control', 'icon' => 'lock', 'desc' => 'Map roles to pages and actions.', 'href' => '/admin/settings/access-control.php', 'permission' => 'admin.roles.manage'],
+                  ['label' => 'Committee & Leadership Roles', 'icon' => 'workspace_premium', 'desc' => 'Assign members to National and Chapter Rep roles.', 'href' => '/admin/settings/committee-roles.php', 'permission' => 'admin.members.view'],
                   ['label' => 'Membership Settings', 'icon' => 'badge', 'desc' => 'Pricing matrix and member-number format.', 'href' => '/admin/settings/index.php?section=membership_pricing', 'permission' => 'admin.membership_types.manage'],
                 ],
                 'Content & Media' => [
@@ -1026,164 +1040,320 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $defaultTerm = (string) ($stripeSettings['membership_default_term'] ?? '12M');
               $dashboardUrl = $activeMode === 'test' ? 'https://dashboard.stripe.com/test' : 'https://dashboard.stripe.com';
             ?>
-            <form method="post" class="space-y-6" id="stripe-settings-form">
+            <?php
+              $statusClasses = $webhookHealth['status'] === 'ok' ? 'text-green-600' : ($webhookHealth['status'] === 'failing' ? 'text-red-600' : 'text-amber-600');
+              $statusLabel = $webhookHealth['status'] === 'ok' ? 'Active' : ($webhookHealth['status'] === 'failing' ? 'Failing' : 'Stale');
+              $statusDot = $webhookHealth['status'] === 'ok' ? 'bg-green-500' : ($webhookHealth['status'] === 'failing' ? 'bg-red-500' : 'bg-amber-500');
+              $connectionPillBg = $activeMode === 'live' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700';
+              $connectionPillDot = $activeMode === 'live' ? 'bg-green-500' : 'bg-amber-500';
+              $connectionLabel = $activeMode === 'live' ? 'Live Connection' : 'Test Connection';
+              $connectionState = $activeKeys['secret_key'] ?? '' ? 'Connected' : 'Not connected';
+              $isTestMode = !empty($stripeSettings['use_test_mode']);
+              $lastReceived = $webhookHealth['last_received_at'] ?? null;
+              if ($lastReceived) {
+                  $lastSyncDisplay = e($lastReceived);
+              } else {
+                  $lastSyncDisplay = 'Never';
+              }
+              $lastModifiedDisplay = '';
+              if (!empty($lastMeta['updated_at'])) {
+                  $ts = strtotime((string) $lastMeta['updated_at']);
+                  $lastModifiedDisplay = $ts ? date('j M Y', $ts) : (string) $lastMeta['updated_at'];
+              }
+            ?>
+            <form method="post" class="space-y-6 pb-24" id="stripe-settings-form">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="payments">
 
-              <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Stripe Mode &amp; Keys</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_use_test_mode" class="rounded border-gray-200" <?= !empty($stripeSettings['use_test_mode']) ? 'checked' : '' ?>>
-                    Use Test Mode
-                  </label>
-                  <div class="flex items-center justify-between text-sm text-slate-600">
-                    <span>Active mode</span>
-                    <span class="font-semibold text-slate-900"><?= e($activeMode) ?></span>
-                  </div>
-                  <div class="grid gap-4">
-                    <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
-                      <h3 class="text-sm font-semibold text-slate-900">Test keys</h3>
-                      <label class="text-xs text-slate-600">Publishable key
-                        <input name="stripe_test_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($testPublishableDisplay) ?>" data-mask-value="<?= e($testPublishableDisplay) ?>" placeholder="<?= $testPublishableMask['configured'] ? 'Configured (last 4: ' . e($testPublishableMask['last4']) . ')' : 'Not configured' ?>">
-                      </label>
-                      <label class="text-xs text-slate-600">Secret key
-                        <input name="stripe_test_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($testSecretDisplay) ?>" data-mask-value="<?= e($testSecretDisplay) ?>" placeholder="<?= $testSecretMask['configured'] ? 'Configured (last 4: ' . e($testSecretMask['last4']) . ')' : 'Not configured' ?>">
-                        <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
-                      </label>
+              <div class="grid gap-6 lg:grid-cols-3">
+                <div class="lg:col-span-2 bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Stripe Connection</h2>
+                      <p class="text-sm text-slate-500 mt-1">Manage your association's Stripe link and environment settings.</p>
                     </div>
-                    <div class="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
-                      <h3 class="text-sm font-semibold text-slate-900">Live keys</h3>
-                      <label class="text-xs text-slate-600">Publishable key
-                        <input name="stripe_live_publishable_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($livePublishableDisplay) ?>" data-mask-value="<?= e($livePublishableDisplay) ?>" placeholder="<?= $livePublishableMask['configured'] ? 'Configured (last 4: ' . e($livePublishableMask['last4']) . ')' : 'Not configured' ?>">
-                      </label>
-                      <label class="text-xs text-slate-600">Secret key
-                        <input name="stripe_live_secret_key" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($liveSecretDisplay) ?>" data-mask-value="<?= e($liveSecretDisplay) ?>" placeholder="<?= $liveSecretMask['configured'] ? 'Configured (last 4: ' . e($liveSecretMask['last4']) . ')' : 'Not configured' ?>">
-                        <span class="text-xs text-slate-500">Leave blank to keep current secret.</span>
-                      </label>
+                    <div class="inline-flex items-center gap-2 rounded-full <?= e($connectionPillBg) ?> px-3 py-1.5 text-xs font-semibold whitespace-nowrap">
+                      <span class="h-2 w-2 rounded-full <?= e($connectionPillDot) ?>"></span>
+                      <span><?= e($connectionLabel) ?> &middot; <?= e($connectionState) ?></span>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border border-gray-200 bg-white p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="h-10 w-10 rounded-lg bg-gray-900 flex items-center justify-center flex-shrink-0">
+                          <span class="material-icons-outlined text-primary text-lg">bolt</span>
+                        </div>
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold text-gray-900">Operational Mode</div>
+                          <div class="text-xs text-slate-500">Switch between Live and Sandbox testing environments</div>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-3 flex-shrink-0">
+                        <span class="text-xs font-semibold <?= $isTestMode ? 'text-gray-900' : 'text-slate-400' ?>">Test Mode</span>
+                        <label class="relative inline-flex h-6 w-11 cursor-pointer" title="Toggle Stripe mode">
+                          <input type="checkbox" name="stripe_use_test_mode" value="1" class="sr-only peer" <?= $isTestMode ? 'checked' : '' ?>>
+                          <span class="absolute inset-0 rounded-full bg-green-500 peer-checked:bg-gray-300 transition-colors"></span>
+                          <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform translate-x-5 peer-checked:translate-x-0"></span>
+                        </label>
+                        <span class="text-xs font-semibold <?= $isTestMode ? 'text-slate-400' : 'text-gray-900' ?>">Live Mode</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Webhook &amp; Health</h2>
-                  <label class="text-sm text-slate-600">Webhook endpoint URL
-                    <input class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($webhookUrl) ?>" readonly>
-                  </label>
-                  <label class="text-sm text-slate-600">Webhook secret
-                    <input name="stripe_webhook_secret" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($webhookDisplay) ?>" data-mask-value="<?= e($webhookDisplay) ?>" placeholder="<?= $webhookMask['configured'] ? 'Configured (last 4: ' . e($webhookMask['last4']) . ')' : 'Not configured' ?>">
-                  </label>
-                  <div class="rounded-lg border border-gray-100 bg-white p-4 text-sm">
+
+                <div class="bg-card-light rounded-2xl border border-gray-100 border-t-4 <?= $webhookHealth['status'] === 'ok' ? 'border-t-green-500' : ($webhookHealth['status'] === 'failing' ? 'border-t-red-500' : 'border-t-amber-500') ?> p-6 space-y-4">
+                  <div class="flex items-center gap-2">
+                    <span class="material-icons-outlined text-green-500">verified_user</span>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Webhook Health</h2>
+                  </div>
+                  <dl class="space-y-3 text-sm">
                     <div class="flex items-center justify-between">
-                      <span class="text-slate-600">Status</span>
-                      <?php
-                        $statusClasses = $webhookHealth['status'] === 'ok' ? 'text-green-600' : ($webhookHealth['status'] === 'failing' ? 'text-red-600' : 'text-amber-600');
-                        $statusLabel = $webhookHealth['status'] === 'ok' ? 'OK' : ($webhookHealth['status'] === 'failing' ? 'Failing' : 'Stale');
-                      ?>
-                      <span class="font-semibold <?= $statusClasses ?>"><?= $statusLabel ?></span>
+                      <dt class="text-slate-500">Endpoint Status</dt>
+                      <dd class="font-semibold <?= $statusClasses ?>"><?= e($statusLabel) ?></dd>
                     </div>
-                    <div class="mt-2 text-xs text-slate-500">
-                      Last webhook: <?= e($webhookHealth['last_received_at'] ?? 'Never') ?><br>
-                      Last error: <?= e($webhookHealth['last_error'] ?? 'None') ?>
+                    <div class="flex items-center justify-between">
+                      <dt class="text-slate-500">Last Error</dt>
+                      <dd class="font-semibold text-gray-900 truncate max-w-[12rem]" title="<?= e($webhookHealth['last_error'] ?? 'None') ?>"><?= e($webhookHealth['last_error'] ? 'See log' : 'None') ?></dd>
                     </div>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <button type="button" id="stripe-test-connection" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-slate-700">Test connection</button>
-                    <a class="text-xs text-blue-600" href="<?= e($dashboardUrl) ?>" target="_blank" rel="noopener">Open Stripe Dashboard</a>
-                  </div>
+                    <div class="flex items-center justify-between">
+                      <dt class="text-slate-500">Last Sync</dt>
+                      <dd class="font-semibold text-gray-900"><?= $lastSyncDisplay ?></dd>
+                    </div>
+                  </dl>
+                  <button type="button" id="stripe-test-connection" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-700 hover:bg-gray-50">
+                    Run Connection Test
+                  </button>
                   <div id="stripe-test-result" class="text-xs text-slate-500"></div>
+                  <a class="block text-center text-xs text-blue-600 hover:underline" href="<?= e($dashboardUrl) ?>" target="_blank" rel="noopener">Open Stripe Dashboard &rarr;</a>
+                </div>
+              </div>
+
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                  <h2 class="font-display text-lg font-bold text-gray-900">API Credentials</h2>
+                  <span class="material-icons-outlined text-slate-300 cursor-help" title="Stripe API keys never leave this server. Secrets are encrypted at rest.">info</span>
+                </div>
+                <div class="grid gap-6 md:grid-cols-2">
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-2">
+                      <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                      <span class="text-sm font-semibold text-gray-900">Production Keys (Live)</span>
+                    </div>
+                    <div>
+                      <label for="stripe_live_publishable_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Publishable Key</label>
+                      <div class="relative mt-2">
+                        <input id="stripe_live_publishable_key" name="stripe_live_publishable_key" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm font-mono" value="<?= e($livePublishableDisplay) ?>" data-mask-value="<?= e($livePublishableDisplay) ?>" placeholder="<?= $livePublishableMask['configured'] ? 'pk_live_…' . e($livePublishableMask['last4']) : 'pk_live_…' ?>">
+                        <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-slate-700 hover:bg-gray-100" data-copy-target="stripe_live_publishable_key" title="Copy to clipboard">
+                          <span class="material-icons-outlined text-base">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label for="stripe_live_secret_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Secret Key</label>
+                      <div class="relative mt-2">
+                        <input id="stripe_live_secret_key" name="stripe_live_secret_key" type="password" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm font-mono" value="<?= e($liveSecretDisplay) ?>" data-mask-value="<?= e($liveSecretDisplay) ?>" placeholder="<?= $liveSecretMask['configured'] ? 'sk_live_…' . e($liveSecretMask['last4']) : 'sk_live_…' ?>">
+                        <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-slate-700 hover:bg-gray-100" data-toggle-secret="stripe_live_secret_key" title="Show / hide secret">
+                          <span class="material-icons-outlined text-base">visibility</span>
+                        </button>
+                      </div>
+                      <span class="mt-1 block text-xs text-slate-400">Leave blank to keep current secret.</span>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-2">
+                      <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                      <span class="text-sm font-semibold text-gray-900">Sandbox Keys (Test)</span>
+                    </div>
+                    <div>
+                      <label for="stripe_test_publishable_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Publishable Key</label>
+                      <div class="relative mt-2">
+                        <input id="stripe_test_publishable_key" name="stripe_test_publishable_key" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm font-mono" value="<?= e($testPublishableDisplay) ?>" data-mask-value="<?= e($testPublishableDisplay) ?>" placeholder="<?= $testPublishableMask['configured'] ? 'pk_test_…' . e($testPublishableMask['last4']) : 'pk_test_…' ?>">
+                        <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-slate-700 hover:bg-gray-100" data-copy-target="stripe_test_publishable_key" title="Copy to clipboard">
+                          <span class="material-icons-outlined text-base">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label for="stripe_test_secret_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Secret Key</label>
+                      <div class="relative mt-2">
+                        <input id="stripe_test_secret_key" name="stripe_test_secret_key" type="password" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm font-mono" value="<?= e($testSecretDisplay) ?>" data-mask-value="<?= e($testSecretDisplay) ?>" placeholder="<?= $testSecretMask['configured'] ? 'sk_test_…' . e($testSecretMask['last4']) : 'sk_test_…' ?>">
+                        <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-slate-700 hover:bg-gray-100" data-toggle-secret="stripe_test_secret_key" title="Show / hide secret">
+                          <span class="material-icons-outlined text-base">visibility</span>
+                        </button>
+                      </div>
+                      <span class="mt-1 block text-xs text-slate-400">Leave blank to keep current secret.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-5 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Webhook URL</label>
+                    <input class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-mono text-slate-600" value="<?= e($webhookUrl) ?>" readonly>
+                  </div>
+                  <div>
+                    <label for="stripe_webhook_secret" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Webhook Secret</label>
+                    <div class="relative mt-2">
+                      <input id="stripe_webhook_secret" name="stripe_webhook_secret" type="password" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm font-mono" value="<?= e($webhookDisplay) ?>" data-mask-value="<?= e($webhookDisplay) ?>" placeholder="<?= $webhookMask['configured'] ? 'whsec_…' . e($webhookMask['last4']) : 'whsec_…' ?>">
+                      <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-slate-700 hover:bg-gray-100" data-toggle-secret="stripe_webhook_secret" title="Show / hide secret">
+                        <span class="material-icons-outlined text-base">visibility</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div class="grid gap-6 lg:grid-cols-2">
                 <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Checkout Behavior</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_checkout_enabled" class="rounded border-gray-200" <?= !empty($stripeSettings['checkout_enabled']) ? 'checked' : '' ?>>
-                    Enable Stripe checkout
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_allow_guest_checkout" class="rounded border-gray-200" <?= !empty($stripeSettings['allow_guest_checkout']) ? 'checked' : '' ?>>
-                    Allow guest checkout
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_require_shipping_for_physical" class="rounded border-gray-200" <?= !empty($stripeSettings['require_shipping_for_physical']) ? 'checked' : '' ?>>
-                    Require shipping address for physical items
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_digital_only_minimal" class="rounded border-gray-200" <?= !empty($stripeSettings['digital_only_minimal']) ? 'checked' : '' ?>>
-                    Digital-only checkout requires only email + name
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_customer_portal_enabled" class="rounded border-gray-200" <?= !empty($stripeSettings['customer_portal_enabled']) ? 'checked' : '' ?>>
-                    Enable customer portal (members)
-                  </label>
-                  <div class="pt-3 text-xs text-slate-500">Currency is fixed to AUD. Shipping rules follow Store Settings.</div>
+                  <div class="flex items-center gap-2">
+                    <span class="material-icons-outlined text-slate-500">shopping_cart</span>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Checkout Behavior</h2>
+                  </div>
+                  <div class="space-y-3">
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Enable Stripe Checkout</div>
+                        <div class="text-xs text-slate-500">Master switch for Stripe-powered payments</div>
+                      </div>
+                      <input type="checkbox" name="stripe_checkout_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['checkout_enabled']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Enable Apple Pay &amp; Google Pay</div>
+                        <div class="text-xs text-slate-500">One-tap mobile wallet payments</div>
+                      </div>
+                      <input type="checkbox" name="stripe_enable_apple_pay" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['enable_apple_pay']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Enable Google Pay</div>
+                        <div class="text-xs text-slate-500">Google wallet checkout</div>
+                      </div>
+                      <input type="checkbox" name="stripe_enable_google_pay" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['enable_google_pay']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Allow Guest Checkout</div>
+                        <div class="text-xs text-slate-500">Permit payments without account login</div>
+                      </div>
+                      <input type="checkbox" name="stripe_allow_guest_checkout" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['allow_guest_checkout']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Customer Portal</div>
+                        <div class="text-xs text-slate-500">Self-service for members</div>
+                      </div>
+                      <input type="checkbox" name="stripe_customer_portal_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['customer_portal_enabled']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Require shipping for physical items</div>
+                        <div class="text-xs text-slate-500">Force address collection for shippable orders</div>
+                      </div>
+                      <input type="checkbox" name="stripe_require_shipping_for_physical" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['require_shipping_for_physical']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Digital-only minimal checkout</div>
+                        <div class="text-xs text-slate-500">Only collect email + name for digital orders</div>
+                      </div>
+                      <input type="checkbox" name="stripe_digital_only_minimal" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['digital_only_minimal']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Enable BNPL methods</div>
+                        <div class="text-xs text-slate-500">Buy-now-pay-later providers (where supported)</div>
+                      </div>
+                      <input type="checkbox" name="stripe_enable_bnpl" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['enable_bnpl']) ? 'checked' : '' ?>>
+                    </label>
+                  </div>
+                  <p class="text-xs text-slate-400 pt-2 border-t border-gray-100">Currency is fixed to AUD. Shipping rules follow Store Settings.</p>
                 </div>
+
                 <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <h2 class="font-display text-lg font-bold text-gray-900">Payment Methods</h2>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_enable_apple_pay" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_apple_pay']) ? 'checked' : '' ?>>
-                    Enable Apple Pay
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_enable_google_pay" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_google_pay']) ? 'checked' : '' ?>>
-                    Enable Google Pay
-                  </label>
-                  <label class="flex items-center gap-3 text-sm text-slate-600">
-                    <input type="checkbox" name="stripe_enable_bnpl" class="rounded border-gray-200" <?= !empty($stripeSettings['enable_bnpl']) ? 'checked' : '' ?>>
-                    Enable BNPL methods (if supported)
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <span class="material-icons-outlined text-slate-500">receipt_long</span>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Receipt &amp; Invoice preferences</h2>
+                  </div>
+                  <div class="space-y-3">
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Send Stripe Receipts</div>
+                        <div class="text-xs text-slate-500">Automatic email after successful charge</div>
+                      </div>
+                      <input type="checkbox" name="stripe_send_receipts" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['send_receipts']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Generate PDF Invoices</div>
+                        <div class="text-xs text-slate-500">Attach downloadable invoice to members area</div>
+                      </div>
+                      <input type="checkbox" name="stripe_generate_pdf" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($paymentSettings['generate_pdf']) ? 'checked' : '' ?>>
+                    </label>
+                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">Save invoice references</div>
+                        <div class="text-xs text-slate-500">Persist Stripe invoice IDs against orders</div>
+                      </div>
+                      <input type="checkbox" name="stripe_save_invoice_refs" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['save_invoice_refs']) ? 'checked' : '' ?>>
+                    </label>
+                  </div>
+                  <div class="pt-3 border-t border-gray-100">
+                    <label for="stripe_invoice_prefix" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Invoice Prefix</label>
+                    <input id="stripe_invoice_prefix" name="stripe_invoice_prefix" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($paymentSettings['invoice_prefix'] ?? 'INV') ?>" placeholder="INV">
+                  </div>
+                  <div>
+                    <label for="stripe_invoice_email_template" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Invoice email template</label>
+                    <textarea id="stripe_invoice_email_template" name="stripe_invoice_email_template" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e($paymentSettings['invoice_email_template'] ?? '') ?></textarea>
+                    <p class="mt-1 text-xs text-slate-400">Tokens: {{invoice_number}}, {{invoice_date}}, {{total}}, {{download_url}}, {{download_link}}.</p>
+                  </div>
+                  <div class="text-xs text-slate-500 pt-2 border-t border-gray-100">
+                    Email from: <span class="font-medium text-slate-700"><?= $fromEmail !== '' ? e($fromEmail) : 'Not configured' ?></span>
+                  </div>
                 </div>
               </div>
 
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Receipts &amp; Invoices</h2>
-                <label class="flex items-center gap-3 text-sm text-slate-600">
-                  <input type="checkbox" name="stripe_send_receipts" class="rounded border-gray-200" <?= !empty($stripeSettings['send_receipts']) ? 'checked' : '' ?>>
-                  Send Stripe receipts
-                </label>
-                <label class="flex items-center gap-3 text-sm text-slate-600">
-                  <input type="checkbox" name="stripe_save_invoice_refs" class="rounded border-gray-200" <?= !empty($stripeSettings['save_invoice_refs']) ? 'checked' : '' ?>>
-                  Save invoice references to the database
-                </label>
-                <div class="text-xs text-slate-500">Email from: <?= $fromEmail !== '' ? e($fromEmail) : 'Not configured' ?></div>
-                <label class="flex items-center gap-3 text-sm text-slate-600">
-                  <input type="checkbox" name="stripe_generate_pdf" class="rounded border-gray-200" <?= !empty($paymentSettings['generate_pdf']) ? 'checked' : '' ?>>
-                  Generate PDF invoices
-                </label>
-                <label class="text-sm text-slate-600">Invoice prefix
-                  <input name="stripe_invoice_prefix" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($paymentSettings['invoice_prefix'] ?? 'INV') ?>">
-                </label>
-                <label class="text-sm text-slate-600">Invoice email template
-                  <textarea name="stripe_invoice_email_template" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e($paymentSettings['invoice_email_template'] ?? '') ?></textarea>
-                  <span class="text-xs text-slate-500">Optional. Supports tokens: {{invoice_number}}, {{invoice_date}}, {{total}}, {{download_url}}, {{download_link}}.</span>
-                </label>
-              </div>
-
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Membership Price IDs</h2>
-                <div class="grid gap-4 md:grid-cols-2">
-                  <label class="text-sm text-slate-600">Full member 12m
-                    <input name="price_full_12" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_12'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Associate member 12m
-                    <input name="price_associate_12" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_12'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Full member 24m
-                    <input name="price_full_24" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_24'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Associate member 24m
-                    <input name="price_associate_24" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_24'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Full member 36m
-                    <input name="price_full_36" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_36'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Associate member 36m
-                    <input name="price_associate_36" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_36'] ?? '') ?>">
-                  </label>
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                  <h2 class="font-display text-lg font-bold text-gray-900">Membership Stripe Price IDs</h2>
+                  <span class="text-xs text-slate-500 italic">Mapped to Association Billing Cycles</span>
                 </div>
-                <div class="grid gap-4 md:grid-cols-2 pt-2">
+                <div class="grid gap-6 md:grid-cols-2">
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2">Full Membership Plans</h3>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Full 12m</span>
+                      <input name="price_full_12" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['FULL_12'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Full 24m</span>
+                      <input name="price_full_24" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['FULL_24'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Full 36m</span>
+                      <input name="price_full_36" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['FULL_36'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                  </div>
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2">Associate Membership Plans</h3>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Associate 12m</span>
+                      <input name="price_associate_12" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['ASSOCIATE_12'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Associate 24m</span>
+                      <input name="price_associate_24" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['ASSOCIATE_24'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Associate 36m</span>
+                      <input name="price_associate_36" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['ASSOCIATE_36'] ?? '') ?>" placeholder="price_…">
+                    </label>
+                  </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-5 grid gap-4 md:grid-cols-2">
                   <label class="text-sm text-slate-600">Default membership term
                     <select name="membership_default_term" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                       <option value="12M" <?= $defaultTerm === '12M' ? 'selected' : '' ?>>12 months</option>
@@ -1196,39 +1366,63 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     Allow selecting both membership types
                   </label>
                 </div>
-                <div class="grid gap-4 md:grid-cols-2 pt-2">
-                  <label class="text-sm text-slate-600">Legacy FULL 1Y
-                    <input name="price_full_1y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_1Y'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Legacy FULL 3Y
-                    <input name="price_full_3y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['FULL_3Y'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Legacy ASSOCIATE 1Y
-                    <input name="price_associate_1y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_1Y'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Legacy ASSOCIATE 3Y
-                    <input name="price_associate_3y" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['ASSOCIATE_3Y'] ?? '') ?>">
-                  </label>
-                  <label class="text-sm text-slate-600">Legacy LIFE
-                    <input name="price_life" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($prices['LIFE'] ?? '') ?>">
-                  </label>
-                </div>
+
+                <details class="border-t border-gray-100 pt-4">
+                  <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700">Legacy price IDs</summary>
+                  <div class="grid gap-3 md:grid-cols-2 pt-4">
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Legacy FULL 1Y</span>
+                      <input name="price_full_1y" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['FULL_1Y'] ?? '') ?>">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Legacy FULL 3Y</span>
+                      <input name="price_full_3y" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['FULL_3Y'] ?? '') ?>">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Legacy ASSOCIATE 1Y</span>
+                      <input name="price_associate_1y" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['ASSOCIATE_1Y'] ?? '') ?>">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Legacy ASSOCIATE 3Y</span>
+                      <input name="price_associate_3y" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['ASSOCIATE_3Y'] ?? '') ?>">
+                    </label>
+                    <label class="grid grid-cols-3 items-center gap-3 text-sm">
+                      <span class="text-slate-600">Legacy LIFE</span>
+                      <input name="price_life" class="col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono" value="<?= e($prices['LIFE'] ?? '') ?>">
+                    </label>
+                  </div>
+                </details>
+
                 <?php if (!SettingsService::isFeatureEnabled('payments.secondary_stripe')): ?>
-                  <div class="text-xs text-slate-500">Secondary Stripe account (AGM) is disabled. Enable via feature flags.</div>
+                  <div class="text-xs text-slate-400">Secondary Stripe account (AGM) is disabled. Enable via feature flags.</div>
                 <?php endif; ?>
               </div>
 
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <h2 class="font-display text-lg font-bold text-gray-900">Bank Transfer Instructions</h2>
-                <p class="text-sm text-slate-600">Shown on membership billing screens and sent in membership order emails.</p>
-                <label class="text-sm text-slate-600">Instructions
-                  <textarea name="bank_transfer_instructions" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><?= e((string) $bankTransferInstructions) ?></textarea>
-                </label>
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-3">
+                <div class="flex items-center gap-2">
+                  <span class="material-icons-outlined text-slate-500">account_balance</span>
+                  <h2 class="font-display text-lg font-bold text-gray-900">Bank Transfer Instructions <span class="text-sm font-normal text-slate-500">(Manual Billing)</span></h2>
+                </div>
+                <p class="text-sm text-slate-500">This text is displayed to users who opt for manual payment. It should include the BSB, Account Number, and Reference formatting.</p>
+                <textarea name="bank_transfer_instructions" rows="6" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono"><?= e((string) $bankTransferInstructions) ?></textarea>
               </div>
 
-              <div class="flex items-center justify-between">
-                <a class="text-sm text-slate-500" href="/admin/settings/index.php?section=payments">Cancel</a>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-ink">Save settings</button>
+              <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                  <span class="material-icons-outlined text-base text-slate-400">history</span>
+                  <?php if ($lastModifiedDisplay !== ''): ?>
+                    Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
+                  <?php else: ?>
+                    Not modified yet
+                  <?php endif; ?>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a href="/admin/settings/index.php?section=payments" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">save</span>
+                    Save Configuration
+                  </button>
+                </div>
               </div>
             </form>
             <script>
@@ -1253,6 +1447,45 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     });
                   });
                 }
+
+                document.querySelectorAll('[data-copy-target]').forEach((btn) => {
+                  btn.addEventListener('click', async () => {
+                    const target = document.getElementById(btn.dataset.copyTarget);
+                    if (!target || !target.value) return;
+                    try {
+                      await navigator.clipboard.writeText(target.value);
+                      const icon = btn.querySelector('.material-icons-outlined');
+                      if (icon) {
+                        const original = icon.textContent;
+                        icon.textContent = 'check';
+                        btn.classList.add('text-green-600');
+                        setTimeout(() => {
+                          icon.textContent = original;
+                          btn.classList.remove('text-green-600');
+                        }, 1200);
+                      }
+                    } catch (e) {
+                      target.select();
+                      document.execCommand && document.execCommand('copy');
+                    }
+                  });
+                });
+
+                document.querySelectorAll('[data-toggle-secret]').forEach((btn) => {
+                  btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.toggleSecret);
+                    if (!target) return;
+                    const icon = btn.querySelector('.material-icons-outlined');
+                    if (target.type === 'password') {
+                      target.type = 'text';
+                      if (icon) icon.textContent = 'visibility_off';
+                    } else {
+                      target.type = 'password';
+                      if (icon) icon.textContent = 'visibility';
+                    }
+                  });
+                });
+
                 const testButton = document.getElementById('stripe-test-connection');
                 const result = document.getElementById('stripe-test-result');
                 if (!testButton || !result) {
@@ -1260,6 +1493,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 }
                 testButton.addEventListener('click', async () => {
                   result.textContent = 'Testing connection...';
+                  result.className = 'text-xs text-slate-500';
                   try {
                     const response = await fetch('/api/admin/settings/stripe/test-connection', {
                       method: 'POST',
@@ -1272,14 +1506,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     const data = await response.json();
                     if (!response.ok || data.error) {
                       result.textContent = data.error || 'Connection test failed.';
+                      result.className = 'text-xs text-red-600 font-medium';
                       return;
                     }
                     const account = data.account || {};
                     const label = account.name || 'Stripe Account';
                     const suffix = account.id_last4 ? `•••• ${account.id_last4}` : 'Unknown';
                     result.textContent = `Connected: ${label} (${suffix}) [${data.mode || 'unknown'}]`;
+                    result.className = 'text-xs text-green-600 font-medium';
                   } catch (error) {
                     result.textContent = 'Connection test failed.';
+                    result.className = 'text-xs text-red-600 font-medium';
                   }
                 });
               });
