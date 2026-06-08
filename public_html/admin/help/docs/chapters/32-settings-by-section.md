@@ -77,14 +77,18 @@ Full picture: [Chapter 13 — Stripe integration overview](view.php?slug=13-stri
 
 {{link:/admin/settings/?section=notifications|Take me to Notifications}}
 
-The catalogue of every email and in-app notification the system sends — subjects, bodies, recipients, on/off toggles.
+The catalogue of every email the system sends — subjects, bodies, recipients, on/off toggles.
 
-- **From name** and **From email** — what every system email is signed as. The address has to end in `@goldwing.org.au` or email providers will reject it.
-- **Reply-to** — where replies actually land if it's different from the From address.
-- **Admin emails** — comma-separated list of who gets admin-only alerts (new orders, refund alerts, security alerts).
+The page is laid out as a compact **Sender Identity** card at the top (one-line From / Reply-to summary + an "Edit identity" dialog + the digest toggles), then a two-pane **Notification Templates** editor (left rail groups templates by category — Security, Payments, Store Orders, Admin — click one to edit it on the right with **Content / Recipients / Sender overrides** tabs). A **Send test** button lives inline next to each template's header.
+
+- **From name** and **From email** — what every system email is signed as. The address has to end in `@goldwing.org.au` or email providers will reject it. Edit via the **Edit identity** button.
+- **Reply-to** — where replies actually land if it's different from the From address. Also in the Edit identity dialog.
+- **Admin emails** — comma-separated list of who gets admin-only alerts (new orders, refund alerts, security alerts). Also in the Edit identity dialog.
 - **Weekly digest** — turns on the weekly summary email to admins.
 - **Event reminders** — turns on the automatic reminder cron that emails attendees before each event.
-- **Per-event templates** — for each kind of notification (order paid, refund processed, welcome email, etc.), you can edit the subject and body, change the recipients, or disable it entirely.
+- **Per-event templates** — for each kind of notification (order paid, refund processed, welcome email, etc.), you can edit the subject and body, change the recipients, override the sender, or disable it entirely.
+
+> The "In-app Notifications" card (categories + wrapper template) has been removed from the UI pending the bell-inbox feature being wired end-to-end. The underlying settings keys (`notifications.in_app_categories`, `notifications.template_basic`) still exist but are no longer editable from this page.
 
 A handful of emails are **transactional** — receipts, refund notices, password resets — and ignore the opt-out list. They have to go out regardless. The rest respect each member's notification preferences.
 
@@ -359,8 +363,8 @@ What it controls: the global From/Reply-To, admin recipient list, the in-app not
 | `notifications.admin_emails` | string | "" | Comma-or-newline list of admin recipients used by `NotificationService::getAdminEmails()`. |
 | `notifications.weekly_digest_enabled` | bool | false | Enable the weekly admin digest cron. |
 | `notifications.event_reminders_enabled` | bool | true | Enable the event-reminder cron. |
-| `notifications.in_app_categories` | array | [] | Categories shown in the in-app notification bell. |
-| `notifications.template_basic` | string | "" | Base HTML template wrapped around per-event bodies. |
+| `notifications.in_app_categories` | array | [] | Categories shown in the in-app notification bell. Persisted only — the bell-inbox feature is not yet wired, so the UI for this key is currently hidden. |
+| `notifications.template_basic` | string | "" | Base HTML template wrapped around per-event bodies. Persisted only — UI currently hidden (see above). |
 | `notifications.catalog` | object | (defaults from `NotificationService::definitions()`) | Per-event overrides: `{enabled, recipient_mode, custom_recipients, subject, body, from_name, from_email, reply_to}`. |
 
 #### Security & Authentication

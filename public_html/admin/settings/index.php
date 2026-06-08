@@ -272,8 +272,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SettingsService::setGlobal((int) $user['id'], 'notifications.admin_emails', normalize_text($_POST['notify_admin_emails'] ?? ''));
                 SettingsService::setGlobal((int) $user['id'], 'notifications.weekly_digest_enabled', isset($_POST['notify_weekly_digest']));
                 SettingsService::setGlobal((int) $user['id'], 'notifications.event_reminders_enabled', isset($_POST['notify_event_reminders']));
-                SettingsService::setGlobal((int) $user['id'], 'notifications.in_app_categories', normalize_list($_POST['notify_categories'] ?? ''));
-                SettingsService::setGlobal((int) $user['id'], 'notifications.template_basic', normalize_text($_POST['notify_template_basic'] ?? ''));
+                // In-app notification fields are currently hidden from the UI (the bell-inbox feature isn't wired yet).
+                // Only persist them when the form actually submitted them, so a save from the redesigned page doesn't blank stored values.
+                if (array_key_exists('notify_categories', $_POST)) {
+                    SettingsService::setGlobal((int) $user['id'], 'notifications.in_app_categories', normalize_list($_POST['notify_categories']));
+                }
+                if (array_key_exists('notify_template_basic', $_POST)) {
+                    SettingsService::setGlobal((int) $user['id'], 'notifications.template_basic', normalize_text($_POST['notify_template_basic']));
+                }
                 $definitions = NotificationService::definitions();
                 $currentCatalog = NotificationService::getCatalogSettings();
                 $activeKey = normalize_text($_POST['notification_active_key'] ?? '');
@@ -1664,170 +1670,273 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               });
             </script>
           <?php elseif ($section === 'notifications'): ?>
-            <form method="post" class="space-y-6 pb-24">
+            <?php
+            $notificationDefinitions = NotificationService::definitions();
+            $notificationCatalog = NotificationService::getCatalogSettings();
+            $defaultNotificationKey = array_key_first($notificationDefinitions) ?? '';
+            $recipientLabels = [
+                'primary' => 'Primary recipient',
+                'admin' => 'Admin emails',
+                'both' => 'Primary + admin',
+                'custom' => 'Custom list',
+            ];
+            $categoryMeta = [
+                'security' => ['label' => 'Security & Sign-in', 'icon' => 'lock_outline'],
+                'payments' => ['label' => 'Payments & Membership', 'icon' => 'payments'],
+                'orders'   => ['label' => 'Store Orders', 'icon' => 'shopping_bag'],
+                'admin'    => ['label' => 'Admin & Approvals', 'icon' => 'task_alt'],
+                'general'  => ['label' => 'General', 'icon' => 'mail_outline'],
+            ];
+            $groupedDefinitions = [];
+            foreach ($notificationDefinitions as $key => $definition) {
+                $category = $definition['category'] ?? 'general';
+                if (!isset($categoryMeta[$category])) {
+                    $category = 'general';
+                }
+                $groupedDefinitions[$category][$key] = $definition;
+            }
+            $notifyFromName = SettingsService::getGlobal('notifications.from_name', '');
+            $notifyFromEmail = SettingsService::getGlobal('notifications.from_email', '');
+            $notifyReplyTo = SettingsService::getGlobal('notifications.reply_to', '');
+            $notifyAdminEmails = SettingsService::getGlobal('notifications.admin_emails', '');
+            $notifyWeeklyDigest = SettingsService::getGlobal('notifications.weekly_digest_enabled', false);
+            $notifyEventReminders = SettingsService::getGlobal('notifications.event_reminders_enabled', true);
+            $senderIdentitySummary = trim(($notifyFromName !== '' ? $notifyFromName : 'Australian Goldwing Association') . ($notifyFromEmail !== '' ? ' <' . $notifyFromEmail . '>' : ''));
+            ?>
+            <form method="post" class="space-y-6 pb-24" id="notifications-form">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="save_settings">
               <input type="hidden" name="section" value="notifications">
-              <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
-                  <div class="flex items-start gap-3">
-                    <span class="material-icons-outlined text-slate-500">mark_email_read</span>
-                    <div>
-                      <h2 class="font-display text-lg font-bold text-gray-900">Sender Defaults</h2>
-                      <p class="text-sm text-slate-500">From / reply-to addresses and digest preferences.</p>
-                    </div>
-                  </div>
-                  <div class="space-y-4">
-                    <div>
-                      <label for="notify_from_name" class="text-xs font-semibold uppercase tracking-wider text-slate-500">From name</label>
-                      <input id="notify_from_name" name="notify_from_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_name', '')) ?>">
-                    </div>
-                    <div>
-                      <label for="notify_from_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">From email</label>
-                      <input id="notify_from_email" name="notify_from_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.from_email', '')) ?>">
-                    </div>
-                    <div>
-                      <label for="notify_reply_to" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Reply-to</label>
-                      <input id="notify_reply_to" name="notify_reply_to" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(SettingsService::getGlobal('notifications.reply_to', '')) ?>">
-                    </div>
-                    <p class="text-xs text-amber-600 rounded-lg bg-amber-50 px-3 py-2">SPF/DKIM/DMARC are not configured yet. Expect reduced deliverability until DNS records are added.</p>
-                    <div>
-                      <label for="notify_admin_emails" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Admin notification emails</label>
-                      <textarea id="notify_admin_emails" name="notify_admin_emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('notifications.admin_emails', '')) ?></textarea>
-                    </div>
-                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                      <div>
-                        <div class="text-sm font-medium text-gray-900">Weekly digest</div>
-                        <div class="text-xs text-slate-500">Send a Monday summary to subscribers</div>
-                      </div>
-                      <input type="checkbox" name="notify_weekly_digest" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('notifications.weekly_digest_enabled', false) ? 'checked' : '' ?>>
-                    </label>
-                    <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                      <div>
-                        <div class="text-sm font-medium text-gray-900">Event reminders</div>
-                        <div class="text-xs text-slate-500">Auto-send the day before events</div>
-                      </div>
-                      <input type="checkbox" name="notify_event_reminders" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('notifications.event_reminders_enabled', true) ? 'checked' : '' ?>>
-                    </label>
-                  </div>
-                </div>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
-                  <div class="flex items-start gap-3">
-                    <span class="material-icons-outlined text-slate-500">notifications</span>
-                    <div>
-                      <h2 class="font-display text-lg font-bold text-gray-900">In-app Notifications</h2>
-                      <p class="text-sm text-slate-500">Categories shown in the bell menu and the wrapper template.</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label for="notify_categories" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Categories (comma-separated)</label>
-                    <input id="notify_categories" name="notify_categories" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e(implode(', ', SettingsService::getGlobal('notifications.in_app_categories', []))) ?>">
-                  </div>
-                  <div>
-                    <label for="notify_template_basic" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Template</label>
-                    <textarea id="notify_template_basic" name="notify_template_basic" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><?= e(SettingsService::getGlobal('notifications.template_basic', '')) ?></textarea>
-                    <p class="mt-1 text-xs text-slate-400">Template supports <code>{{body}}</code> for rendered content.</p>
-                  </div>
-                </div>
-              </div>
-              <?php
-              $notificationDefinitions = NotificationService::definitions();
-              $notificationCatalog = NotificationService::getCatalogSettings();
-              $defaultNotificationKey = array_key_first($notificationDefinitions) ?? '';
-              $recipientLabels = [
-                  'primary' => 'Primary recipient',
-                  'admin' => 'Admin emails',
-                  'both' => 'Primary + admin',
-                  'custom' => 'Custom list',
-              ];
-              ?>
               <input type="hidden" name="notification_active_key" id="notification-active-key" value="<?= e($defaultNotificationKey) ?>">
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">edit_note</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Notification Templates</h2>
-                    <p class="text-sm text-slate-500">Pick a template to edit its recipients, subject and body.</p>
+
+              <!-- Sender Identity (compact strip) -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <span class="material-icons-outlined text-slate-500">mark_email_read</span>
+                    <div class="min-w-0">
+                      <h2 class="font-display text-lg font-bold text-gray-900">Sender Identity</h2>
+                      <p class="text-sm text-slate-500">How notification emails appear in the recipient's inbox.</p>
+                      <div class="mt-3 space-y-1 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center gap-x-2">
+                          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">From</span>
+                          <span class="font-medium text-gray-900 truncate" id="sender-identity-from"><?= e($senderIdentitySummary) ?></span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-2">
+                          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Reply-to</span>
+                          <span class="text-slate-700 truncate" id="sender-identity-reply"><?= e($notifyReplyTo !== '' ? $notifyReplyTo : '—') ?></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" id="edit-identity-btn" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-2 text-sm font-medium text-slate-700">
+                    <span class="material-icons-outlined text-base">edit</span>
+                    Edit identity
+                  </button>
+                </div>
+                <div class="flex items-center gap-2 rounded-lg bg-amber-50 text-amber-700 px-3 py-2 text-xs">
+                  <span class="material-icons-outlined text-base">warning_amber</span>
+                  SPF/DKIM/DMARC are not configured yet. Expect reduced deliverability until DNS records are added.
+                </div>
+                <div class="grid gap-3 md:grid-cols-2 pt-1">
+                  <label class="flex items-start justify-between gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Weekly digest</div>
+                      <div class="text-xs text-slate-500">Send a Monday summary to subscribers</div>
+                    </div>
+                    <input type="checkbox" name="notify_weekly_digest" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $notifyWeeklyDigest ? 'checked' : '' ?>>
+                  </label>
+                  <label class="flex items-start justify-between gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50 cursor-pointer">
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">Event reminders</div>
+                      <div class="text-xs text-slate-500">Auto-send the day before events</div>
+                    </div>
+                    <input type="checkbox" name="notify_event_reminders" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $notifyEventReminders ? 'checked' : '' ?>>
+                  </label>
+                </div>
+                <!-- Sender identity inputs live here so they post with the main form; the dialog edits them in place. -->
+                <input type="hidden" id="notify_from_name" name="notify_from_name" value="<?= e($notifyFromName) ?>">
+                <input type="hidden" id="notify_from_email" name="notify_from_email" value="<?= e($notifyFromEmail) ?>">
+                <input type="hidden" id="notify_reply_to" name="notify_reply_to" value="<?= e($notifyReplyTo) ?>">
+                <input type="hidden" id="notify_admin_emails" name="notify_admin_emails" value="<?= e($notifyAdminEmails) ?>">
+              </div>
+
+              <!-- Notification Templates (two-pane editor) -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="flex flex-wrap items-start justify-between gap-3 p-6 border-b border-gray-100">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">edit_note</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Notification Templates</h2>
+                      <p class="text-sm text-slate-500"><?= count($notificationDefinitions) ?> templates across <?= count($groupedDefinitions) ?> categories. Pick one to edit.</p>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label for="notification-selector" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Select notification</label>
-                  <select id="notification-selector" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                <div class="grid lg:grid-cols-[320px_minmax(0,1fr)]">
+                  <!-- LEFT RAIL -->
+                  <aside class="border-r border-gray-100 bg-gray-50/50">
+                    <div class="p-4 border-b border-gray-100">
+                      <div class="relative">
+                        <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-base text-slate-400">search</span>
+                        <input id="notification-search" type="search" placeholder="Search templates…" class="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm">
+                      </div>
+                    </div>
+                    <nav class="max-h-[640px] overflow-y-auto" id="notification-list">
+                      <?php foreach ($groupedDefinitions as $category => $items): ?>
+                        <?php $meta = $categoryMeta[$category]; ?>
+                        <div class="notification-group" data-category="<?= e($category) ?>">
+                          <div class="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-gray-50">
+                            <span class="material-icons-outlined text-base"><?= e($meta['icon']) ?></span>
+                            <span><?= e($meta['label']) ?></span>
+                            <span class="ml-auto text-slate-400 normal-case tracking-normal font-medium"><?= count($items) ?></span>
+                          </div>
+                          <?php foreach ($items as $key => $definition): ?>
+                            <?php $settings = $notificationCatalog[$key] ?? ($definition['defaults'] ?? []); ?>
+                            <?php $isEnabled = !empty($settings['enabled']); ?>
+                            <button type="button" data-notification-target="<?= e($key) ?>" data-search="<?= e(strtolower($definition['label'] . ' ' . ($definition['description'] ?? ''))) ?>" class="notification-list-item w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm border-l-2 border-transparent hover:bg-white">
+                              <span class="notification-status-dot inline-block h-2 w-2 rounded-full <?= $isEnabled ? 'bg-green-500' : 'bg-slate-300' ?>" data-status-for="<?= e($key) ?>"></span>
+                              <span class="flex-1 min-w-0 truncate text-slate-700"><?= e($definition['label']) ?></span>
+                              <span class="material-icons-outlined text-base text-slate-300">chevron_right</span>
+                            </button>
+                          <?php endforeach; ?>
+                        </div>
+                      <?php endforeach; ?>
+                      <div id="notification-empty" class="hidden px-4 py-8 text-center text-sm text-slate-500">No templates match your search.</div>
+                    </nav>
+                  </aside>
+
+                  <!-- RIGHT PANE: all panels rendered, only the selected one is visible -->
+                  <section class="p-6 space-y-5 bg-white">
+                    <?php $firstNotification = true; ?>
                     <?php foreach ($notificationDefinitions as $key => $definition): ?>
-                      <option value="<?= e($key) ?>"><?= e($definition['label']) ?></option>
+                      <?php $settings = $notificationCatalog[$key] ?? ($definition['defaults'] ?? []); ?>
+                      <div class="notification-panel<?= $firstNotification ? '' : ' hidden' ?>" data-notification-key="<?= e($key) ?>">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <h3 class="text-base font-semibold text-gray-900"><?= e($definition['label']) ?></h3>
+                            <p class="text-xs text-slate-500 mt-1"><?= e($definition['description']) ?></p>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <label class="inline-flex items-center gap-2 rounded-full bg-gray-50 border border-gray-200 px-3 py-1.5 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input type="checkbox" name="notification_enabled[<?= e($key) ?>]" class="notification-enabled-toggle h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary" data-key="<?= e($key) ?>" <?= !empty($settings['enabled']) ? 'checked' : '' ?>>
+                              <span>Enabled</span>
+                            </label>
+                            <button type="button" class="notification-send-test inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 text-xs font-medium text-slate-700" data-key="<?= e($key) ?>">
+                              <span class="material-icons-outlined text-sm">outgoing_mail</span>
+                              Send test
+                            </button>
+                          </div>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                          <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-slate-600 px-2.5 py-1">
+                            <span class="material-icons-outlined text-sm">bolt</span>
+                            Trigger: <?= e($definition['trigger']) ?>
+                          </span>
+                          <?php if (!empty($definition['placeholders'])): ?>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-slate-600 px-2.5 py-1">
+                              <span class="material-icons-outlined text-sm">tag</span>
+                              Merge tags: <?= e(implode(', ', array_map(function ($item) { return '{{' . $item . '}}'; }, $definition['placeholders']))) ?>
+                            </span>
+                          <?php endif; ?>
+                        </div>
+
+                        <!-- Tabs -->
+                        <div class="mt-5 border-b border-gray-100 flex gap-4 text-sm">
+                          <button type="button" class="notification-tab-btn -mb-px border-b-2 border-gray-900 px-1 py-2 font-semibold text-gray-900" data-tab="content">Content</button>
+                          <button type="button" class="notification-tab-btn -mb-px border-b-2 border-transparent px-1 py-2 font-medium text-slate-500 hover:text-gray-900" data-tab="recipients">Recipients</button>
+                          <button type="button" class="notification-tab-btn -mb-px border-b-2 border-transparent px-1 py-2 font-medium text-slate-500 hover:text-gray-900" data-tab="sender">Sender overrides</button>
+                        </div>
+
+                        <!-- Tab: Content -->
+                        <div class="notification-tab-panel mt-5 space-y-4" data-tab="content">
+                          <label class="block text-sm">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</span>
+                            <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['subject'] ?? '') ?>">
+                          </label>
+                          <div class="space-y-2">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Body</p>
+                            <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs notification-toolbar" data-target="notification-body-<?= e($key) ?>">
+                              <button type="button" data-command="formatBlock" data-arg="<h1>" class="rounded border border-gray-200 bg-white px-2 py-1">H1</button>
+                              <button type="button" data-command="formatBlock" data-arg="<h2>" class="rounded border border-gray-200 bg-white px-2 py-1">H2</button>
+                              <button type="button" data-command="formatBlock" data-arg="<h3>" class="rounded border border-gray-200 bg-white px-2 py-1">H3</button>
+                              <button type="button" data-command="formatBlock" data-arg="<h4>" class="rounded border border-gray-200 bg-white px-2 py-1">H4</button>
+                              <button type="button" data-command="bold" class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
+                              <button type="button" data-command="italic" class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
+                              <button type="button" data-command="underline" class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
+                              <button type="button" data-command="insertUnorderedList" class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
+                              <button type="button" data-command="createLink" class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
+                              <button type="button" data-command="insertButton" class="rounded border border-gray-200 bg-white px-2 py-1">Button</button>
+                              <button type="button" data-command="insertImage" class="rounded border border-gray-200 bg-white px-2 py-1">Image URL</button>
+                              <label class="rounded border border-gray-200 bg-white px-2 py-1 cursor-pointer">
+                                Upload image
+                                <input type="file" class="hidden notification-image-upload" data-target="notification-body-<?= e($key) ?>" accept="image/*">
+                              </label>
+                            </div>
+                            <textarea id="notification-body-<?= e($key) ?>" name="notification_body[<?= e($key) ?>]" class="hidden"><?= e($settings['body'] ?? '') ?></textarea>
+                            <div class="notification-editor mt-2 min-h-[260px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none" contenteditable="true" data-target="notification-body-<?= e($key) ?>"><?= $settings['body'] ?? '' ?></div>
+                          </div>
+                        </div>
+
+                        <!-- Tab: Recipients -->
+                        <div class="notification-tab-panel mt-5 space-y-4 hidden" data-tab="recipients">
+                          <label class="block text-sm">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Recipient mode</span>
+                            <select name="notification_recipient_mode[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                              <?php foreach ($recipientLabels as $value => $label): ?>
+                                <option value="<?= e($value) ?>" <?= ($settings['recipient_mode'] ?? 'primary') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                              <?php endforeach; ?>
+                            </select>
+                          </label>
+                          <label class="block text-sm">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Custom recipients (comma-separated)</span>
+                            <input name="notification_custom_recipients[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['custom_recipients'] ?? '') ?>" placeholder="addr1@example.com, addr2@example.com">
+                            <span class="mt-1 block text-xs text-slate-400">Used when recipient mode is "Custom list".</span>
+                          </label>
+                        </div>
+
+                        <!-- Tab: Sender overrides -->
+                        <div class="notification-tab-panel mt-5 space-y-4 hidden" data-tab="sender">
+                          <p class="text-xs text-slate-500">Leave blank to inherit the global Sender Identity values above.</p>
+                          <div class="grid gap-4 md:grid-cols-3">
+                            <label class="block text-sm">
+                              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">From name</span>
+                              <input name="notification_from_name[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['from_name'] ?? '') ?>">
+                            </label>
+                            <label class="block text-sm">
+                              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">From email</span>
+                              <input name="notification_from_email[<?= e($key) ?>]" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['from_email'] ?? '') ?>">
+                            </label>
+                            <label class="block text-sm">
+                              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Reply-to</span>
+                              <input name="notification_reply_to[<?= e($key) ?>]" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['reply_to'] ?? '') ?>">
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                      <?php $firstNotification = false; ?>
                     <?php endforeach; ?>
-                  </select>
+                  </section>
                 </div>
               </div>
-              <?php $firstNotification = true; ?>
-              <?php foreach ($notificationDefinitions as $key => $definition): ?>
-                <?php $settings = $notificationCatalog[$key] ?? ($definition['defaults'] ?? []); ?>
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4 notification-panel<?= $firstNotification ? '' : ' hidden' ?>" data-notification-key="<?= e($key) ?>">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 class="text-base font-semibold text-gray-900"><?= e($definition['label']) ?></h3>
-                        <p class="text-xs text-slate-500"><?= e($definition['description']) ?></p>
-                        <p class="text-xs text-slate-500">Trigger: <?= e($definition['trigger']) ?></p>
-                      </div>
-                      <label class="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" name="notification_enabled[<?= e($key) ?>]" class="rounded border-gray-200" <?= !empty($settings['enabled']) ? 'checked' : '' ?>>
-                        Enabled
-                      </label>
-                    </div>
-                    <div class="grid gap-4 lg:grid-cols-2">
-                      <label class="text-sm text-slate-600">Recipients
-                        <select name="notification_recipient_mode[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                          <?php foreach ($recipientLabels as $value => $label): ?>
-                            <option value="<?= e($value) ?>" <?= ($settings['recipient_mode'] ?? 'primary') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
-                          <?php endforeach; ?>
-                        </select>
-                      </label>
-                      <label class="text-sm text-slate-600">Custom recipients (comma-separated)
-                        <input name="notification_custom_recipients[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($settings['custom_recipients'] ?? '') ?>">
-                      </label>
-                    </div>
-                    <div class="grid gap-4 lg:grid-cols-3">
-                      <label class="text-sm text-slate-600">From name
-                        <input name="notification_from_name[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($settings['from_name'] ?? '') ?>">
-                      </label>
-                      <label class="text-sm text-slate-600">From email
-                        <input name="notification_from_email[<?= e($key) ?>]" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($settings['from_email'] ?? '') ?>">
-                      </label>
-                      <label class="text-sm text-slate-600">Reply-to
-                        <input name="notification_reply_to[<?= e($key) ?>]" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($settings['reply_to'] ?? '') ?>">
-                      </label>
-                    </div>
-                    <label class="text-sm text-slate-600">Subject
-                      <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" value="<?= e($settings['subject'] ?? '') ?>">
-                    </label>
-                    <div class="space-y-2">
-                      <p class="text-sm text-slate-600">Body (rich editor)</p>
-                      <div class="flex flex-wrap gap-2 border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 text-xs notification-toolbar" data-target="notification-body-<?= e($key) ?>">
-                        <button type="button" data-command="formatBlock" data-arg="<h1>" class="rounded border border-gray-200 bg-white px-2 py-1">H1</button>
-                        <button type="button" data-command="formatBlock" data-arg="<h2>" class="rounded border border-gray-200 bg-white px-2 py-1">H2</button>
-                        <button type="button" data-command="formatBlock" data-arg="<h3>" class="rounded border border-gray-200 bg-white px-2 py-1">H3</button>
-                        <button type="button" data-command="formatBlock" data-arg="<h4>" class="rounded border border-gray-200 bg-white px-2 py-1">H4</button>
-                        <button type="button" data-command="bold" class="rounded border border-gray-200 bg-white px-2 py-1">Bold</button>
-                        <button type="button" data-command="italic" class="rounded border border-gray-200 bg-white px-2 py-1">Italic</button>
-                        <button type="button" data-command="underline" class="rounded border border-gray-200 bg-white px-2 py-1">Underline</button>
-                        <button type="button" data-command="insertUnorderedList" class="rounded border border-gray-200 bg-white px-2 py-1">List</button>
-                        <button type="button" data-command="createLink" class="rounded border border-gray-200 bg-white px-2 py-1">Link</button>
-                        <button type="button" data-command="insertButton" class="rounded border border-gray-200 bg-white px-2 py-1">Button</button>
-                        <button type="button" data-command="insertImage" class="rounded border border-gray-200 bg-white px-2 py-1">Image URL</button>
-                        <label class="rounded border border-gray-200 bg-white px-2 py-1 cursor-pointer">
-                          Upload image
-                          <input type="file" class="hidden notification-image-upload" data-target="notification-body-<?= e($key) ?>" accept="image/*">
-                        </label>
-                      </div>
-                      <textarea id="notification-body-<?= e($key) ?>" name="notification_body[<?= e($key) ?>]" class="hidden"><?= e($settings['body'] ?? '') ?></textarea>
-                      <div class="notification-editor mt-2 min-h-[180px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none" contenteditable="true" data-target="notification-body-<?= e($key) ?>"><?= $settings['body'] ?? '' ?></div>
-                      <?php if (!empty($definition['placeholders'])): ?>
-                        <p class="text-xs text-slate-500">Merge tags: <?= e(implode(', ', array_map(function ($item) { return '{{' . $item . '}}'; }, $definition['placeholders']))) ?></p>
-                      <?php endif; ?>
+
+              <!-- Scheduled sends (slim collapsed strip) -->
+              <details class="bg-card-light rounded-2xl border border-gray-100 group">
+                <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer list-none">
+                  <div class="flex items-center gap-3">
+                    <span class="material-icons-outlined text-slate-500">schedule_send</span>
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900">Scheduled sends</div>
+                      <div class="text-xs text-slate-500">Weekly digest &amp; event reminders. Configure cadence above.</div>
                     </div>
                   </div>
-                <?php $firstNotification = false; ?>
-              <?php endforeach; ?>
+                  <span class="material-icons-outlined text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+                </summary>
+                <div class="px-4 pb-4 text-sm text-slate-600">
+                  Cadence toggles live in the Sender Identity card. Per-event reminder timing will be managed from the Events settings page.
+                </div>
+              </details>
+
+              <!-- Sticky save bar -->
               <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="text-xs text-slate-500 flex items-center gap-2">
                   <span class="material-icons-outlined text-base text-slate-400">history</span>
@@ -1846,48 +1955,79 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               </div>
             </form>
-            <form method="post" class="mt-6">
+
+            <!-- Edit identity dialog -->
+            <div id="identity-dialog-backdrop" class="hidden fixed inset-0 z-40 bg-black/40 items-center justify-center p-4">
+              <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full">
+                <div class="p-6 border-b border-gray-100 flex items-start justify-between">
+                  <div>
+                    <h3 class="font-display text-lg font-bold text-gray-900">Sender Identity</h3>
+                    <p class="text-sm text-slate-500">Used as the default From / Reply-to for all notification emails.</p>
+                  </div>
+                  <button type="button" id="identity-dialog-close" class="text-slate-400 hover:text-slate-600">
+                    <span class="material-icons-outlined">close</span>
+                  </button>
+                </div>
+                <div class="p-6 space-y-4">
+                  <label class="block text-sm">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">From name</span>
+                    <input id="identity-from-name" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($notifyFromName) ?>">
+                  </label>
+                  <label class="block text-sm">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">From email</span>
+                    <input id="identity-from-email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($notifyFromEmail) ?>">
+                    <span class="mt-1 block text-xs text-slate-400">Must end with @goldwing.org.au.</span>
+                  </label>
+                  <label class="block text-sm">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Reply-to</span>
+                    <input id="identity-reply-to" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($notifyReplyTo) ?>">
+                  </label>
+                  <label class="block text-sm">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Admin notification emails</span>
+                    <textarea id="identity-admin-emails" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" placeholder="One address per line or comma-separated"><?= e($notifyAdminEmails) ?></textarea>
+                  </label>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50 rounded-b-2xl">
+                  <button type="button" id="identity-dialog-cancel" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</button>
+                  <button type="button" id="identity-dialog-apply" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                    <span class="material-icons-outlined text-base">check</span>
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hidden test-send form (one-shot, posts the active template key) -->
+            <form method="post" id="send-test-form" class="hidden">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
               <input type="hidden" name="action" value="send_test_notification">
               <input type="hidden" name="section" value="notifications">
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">send</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Send Test Notification</h2>
-                    <p class="text-sm text-slate-500">Trigger a one-off send to verify recipients and rendering.</p>
-                  </div>
-                </div>
-                <div>
-                  <label for="test_notification_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Notification to test</label>
-                  <select id="test_notification_key" name="test_notification_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
-                    <?php foreach ($notificationDefinitions as $key => $definition): ?>
-                      <option value="<?= e($key) ?>"><?= e($definition['label']) ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                </div>
-                <div>
-                  <label for="test_notification_email" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Send test to (optional)</label>
-                  <input id="test_notification_email" name="test_notification_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" placeholder="you@example.com">
-                  <p class="mt-1 text-xs text-slate-400">Leave blank to use your admin email; admin recipients still apply based on template settings.</p>
-                </div>
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
-                  <span class="material-icons-outlined text-base">outgoing_mail</span>
-                  Send test email
-                </button>
-              </div>
+              <input type="hidden" name="test_notification_key" id="send-test-key" value="">
+              <input type="hidden" name="test_notification_email" value="">
             </form>
+
             <script>
               (() => {
-                const selector = document.getElementById('notification-selector');
                 const activeKeyInput = document.getElementById('notification-active-key');
                 const panels = Array.from(document.querySelectorAll('.notification-panel'));
                 const editors = Array.from(document.querySelectorAll('.notification-editor'));
+                const listItems = Array.from(document.querySelectorAll('.notification-list-item'));
+                const groups = Array.from(document.querySelectorAll('.notification-group'));
+                const searchInput = document.getElementById('notification-search');
+                const emptyState = document.getElementById('notification-empty');
+                const sendTestForm = document.getElementById('send-test-form');
+                const sendTestKey = document.getElementById('send-test-key');
                 let activeEditor = editors[0] || null;
 
-                const showPanel = (key) => {
+                const setActive = (key) => {
                   panels.forEach((panel) => {
                     panel.classList.toggle('hidden', panel.dataset.notificationKey !== key);
+                  });
+                  listItems.forEach((item) => {
+                    const matches = item.dataset.notificationTarget === key;
+                    item.classList.toggle('bg-white', matches);
+                    item.classList.toggle('border-l-amber-500', matches);
+                    item.classList.toggle('font-semibold', matches);
                   });
                   if (activeKeyInput) {
                     activeKeyInput.value = key;
@@ -1898,57 +2038,174 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     if (editor) {
                       activeEditor = editor;
                     }
+                    visible.querySelectorAll('.notification-tab-btn').forEach((btn, i) => {
+                      const active = i === 0;
+                      btn.classList.toggle('border-gray-900', active);
+                      btn.classList.toggle('text-gray-900', active);
+                      btn.classList.toggle('font-semibold', active);
+                      btn.classList.toggle('border-transparent', !active);
+                      btn.classList.toggle('text-slate-500', !active);
+                      btn.classList.toggle('font-medium', !active);
+                    });
+                    visible.querySelectorAll('.notification-tab-panel').forEach((panel) => {
+                      panel.classList.toggle('hidden', panel.dataset.tab !== 'content');
+                    });
                   }
                 };
 
-                if (selector && panels.length) {
-                  showPanel(selector.value);
-                  selector.addEventListener('change', () => showPanel(selector.value));
+                listItems.forEach((item) => {
+                  item.addEventListener('click', () => setActive(item.dataset.notificationTarget));
+                });
+
+                // Initial active state
+                if (listItems.length && activeKeyInput) {
+                  setActive(activeKeyInput.value || listItems[0].dataset.notificationTarget);
                 }
 
+                // Search filter
+                if (searchInput) {
+                  searchInput.addEventListener('input', () => {
+                    const query = searchInput.value.trim().toLowerCase();
+                    let visibleCount = 0;
+                    listItems.forEach((item) => {
+                      const haystack = item.dataset.search || '';
+                      const matches = !query || haystack.includes(query);
+                      item.classList.toggle('hidden', !matches);
+                      if (matches) visibleCount++;
+                    });
+                    groups.forEach((group) => {
+                      const anyVisible = Array.from(group.querySelectorAll('.notification-list-item')).some((item) => !item.classList.contains('hidden'));
+                      group.classList.toggle('hidden', !anyVisible);
+                    });
+                    if (emptyState) emptyState.classList.toggle('hidden', visibleCount > 0);
+                  });
+                }
+
+                // Tab switching (delegated)
+                document.querySelectorAll('.notification-panel').forEach((panel) => {
+                  panel.addEventListener('click', (event) => {
+                    const btn = event.target.closest('.notification-tab-btn');
+                    if (!btn) return;
+                    const tab = btn.dataset.tab;
+                    panel.querySelectorAll('.notification-tab-btn').forEach((b) => {
+                      const active = b.dataset.tab === tab;
+                      b.classList.toggle('border-gray-900', active);
+                      b.classList.toggle('text-gray-900', active);
+                      b.classList.toggle('font-semibold', active);
+                      b.classList.toggle('border-transparent', !active);
+                      b.classList.toggle('text-slate-500', !active);
+                      b.classList.toggle('font-medium', !active);
+                    });
+                    panel.querySelectorAll('.notification-tab-panel').forEach((p) => {
+                      p.classList.toggle('hidden', p.dataset.tab !== tab);
+                    });
+                  });
+                });
+
+                // Live status dot when toggling enabled
+                document.querySelectorAll('.notification-enabled-toggle').forEach((toggle) => {
+                  toggle.addEventListener('change', () => {
+                    const dot = document.querySelector('[data-status-for="' + toggle.dataset.key + '"]');
+                    if (!dot) return;
+                    dot.classList.toggle('bg-green-500', toggle.checked);
+                    dot.classList.toggle('bg-slate-300', !toggle.checked);
+                  });
+                });
+
+                // Send test (posts the hidden form for the active key)
+                document.querySelectorAll('.notification-send-test').forEach((btn) => {
+                  btn.addEventListener('click', () => {
+                    if (!sendTestForm || !sendTestKey) return;
+                    sendTestKey.value = btn.dataset.key;
+                    sendTestForm.submit();
+                  });
+                });
+
+                // Edit-identity dialog
+                const backdrop = document.getElementById('identity-dialog-backdrop');
+                const fromNameInput = document.getElementById('notify_from_name');
+                const fromEmailInput = document.getElementById('notify_from_email');
+                const replyToInput = document.getElementById('notify_reply_to');
+                const adminEmailsInput = document.getElementById('notify_admin_emails');
+                const summaryFrom = document.getElementById('sender-identity-from');
+                const summaryReply = document.getElementById('sender-identity-reply');
+                const dialogFromName = document.getElementById('identity-from-name');
+                const dialogFromEmail = document.getElementById('identity-from-email');
+                const dialogReplyTo = document.getElementById('identity-reply-to');
+                const dialogAdminEmails = document.getElementById('identity-admin-emails');
+
+                const openDialog = () => {
+                  if (!backdrop) return;
+                  // Hydrate dialog from current hidden inputs in case Apply was cancelled previously
+                  if (dialogFromName) dialogFromName.value = fromNameInput.value;
+                  if (dialogFromEmail) dialogFromEmail.value = fromEmailInput.value;
+                  if (dialogReplyTo) dialogReplyTo.value = replyToInput.value;
+                  if (dialogAdminEmails) dialogAdminEmails.value = adminEmailsInput.value;
+                  backdrop.classList.remove('hidden');
+                  backdrop.classList.add('flex');
+                };
+                const closeDialog = () => {
+                  if (!backdrop) return;
+                  backdrop.classList.add('hidden');
+                  backdrop.classList.remove('flex');
+                };
+                const applyDialog = () => {
+                  fromNameInput.value = (dialogFromName && dialogFromName.value || '').trim();
+                  fromEmailInput.value = (dialogFromEmail && dialogFromEmail.value || '').trim();
+                  replyToInput.value = (dialogReplyTo && dialogReplyTo.value || '').trim();
+                  adminEmailsInput.value = (dialogAdminEmails && dialogAdminEmails.value || '').trim();
+                  if (summaryFrom) {
+                    const name = fromNameInput.value || 'Australian Goldwing Association';
+                    summaryFrom.textContent = fromEmailInput.value ? (name + ' <' + fromEmailInput.value + '>') : name;
+                  }
+                  if (summaryReply) {
+                    summaryReply.textContent = replyToInput.value || '—';
+                  }
+                  closeDialog();
+                };
+                const editBtn = document.getElementById('edit-identity-btn');
+                if (editBtn) editBtn.addEventListener('click', openDialog);
+                const closeBtn = document.getElementById('identity-dialog-close');
+                if (closeBtn) closeBtn.addEventListener('click', closeDialog);
+                const cancelBtn = document.getElementById('identity-dialog-cancel');
+                if (cancelBtn) cancelBtn.addEventListener('click', closeDialog);
+                const applyBtn = document.getElementById('identity-dialog-apply');
+                if (applyBtn) applyBtn.addEventListener('click', applyDialog);
+                if (backdrop) {
+                  backdrop.addEventListener('click', (event) => {
+                    if (event.target === backdrop) closeDialog();
+                  });
+                }
+
+                // Rich-text editor wiring (preserved)
                 const syncEditor = (editor) => {
                   const targetId = editor.dataset.target;
                   const target = document.getElementById(targetId);
-                  if (target) {
-                    target.value = editor.innerHTML;
-                  }
+                  if (target) target.value = editor.innerHTML;
                 };
-
                 editors.forEach((editor) => {
                   syncEditor(editor);
-                  editor.addEventListener('focus', () => {
-                    activeEditor = editor;
-                  });
+                  editor.addEventListener('focus', () => { activeEditor = editor; });
                   editor.addEventListener('input', () => syncEditor(editor));
                 });
-
                 const insertHtml = (editor, html) => {
-                  if (!editor) {
-                    return;
-                  }
+                  if (!editor) return;
                   editor.focus();
                   document.execCommand('insertHTML', false, html);
                   syncEditor(editor);
                 };
-
                 document.querySelectorAll('.notification-toolbar').forEach((toolbar) => {
                   toolbar.addEventListener('click', (event) => {
                     const button = event.target.closest('button');
-                    if (!button) {
-                      return;
-                    }
+                    if (!button) return;
                     const command = button.dataset.command;
                     const arg = button.dataset.arg || null;
                     const editor = activeEditor || editors[0];
-                    if (!command) {
-                      return;
-                    }
+                    if (!command) return;
                     if (command === 'createLink') {
                       const url = prompt('Enter link URL');
                       if (url) {
-                        if (editor) {
-                          editor.focus();
-                        }
+                        if (editor) editor.focus();
                         document.execCommand('createLink', false, url);
                         syncEditor(editor);
                       }
@@ -1958,16 +2215,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       const label = prompt('Button label');
                       const url = prompt('Button URL');
                       if (label && url) {
-                        const html = '<a href="' + url + '" style="display:inline-block;background:#f59e0b;color:#111827;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:600;">' + label + '</a>';
+                        const html = '<a href="' + url + '" style="display:inline-block;background:#9e9140;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">' + label + '</a>';
                         insertHtml(editor, html);
                       }
                       return;
                     }
                     if (command === 'insertImage') {
                       const url = prompt('Image URL');
-                      if (url) {
-                        insertHtml(editor, '<img src=\"' + url + '\" alt=\"\" style=\"max-width:100%; height:auto;\">');
-                      }
+                      if (url) insertHtml(editor, '<img src="' + url + '" alt="" style="max-width:100%; height:auto;">');
                       return;
                     }
                     if (command === 'formatBlock') {
@@ -1979,28 +2234,23 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     syncEditor(editor);
                   });
                 });
-
                 document.querySelectorAll('.notification-image-upload').forEach((input) => {
                   input.addEventListener('change', async () => {
                     const file = input.files && input.files[0];
-                    if (!file) {
-                      return;
-                    }
+                    if (!file) return;
                     const form = new FormData();
                     form.append('file', file);
                     form.append('context', 'notifications');
                     const response = await fetch('/api/uploads/image', {
                       method: 'POST',
-                      headers: {
-                        'X-CSRF-TOKEN': '<?= e(Csrf::token()) ?>',
-                      },
+                      headers: { 'X-CSRF-TOKEN': '<?= e(Csrf::token()) ?>' },
                       body: form,
                     });
                     const result = await response.json();
                     if (result && result.url) {
                       const targetId = input.dataset.target;
                       const editor = editors.find((item) => item.dataset.target === targetId) || activeEditor;
-                      insertHtml(editor, '<img src=\"' + result.url + '\" alt=\"\" style=\"max-width:100%; height:auto;\">');
+                      insertHtml(editor, '<img src="' + result.url + '" alt="" style="max-width:100%; height:auto;">');
                     } else {
                       alert(result.error || 'Upload failed.');
                     }
