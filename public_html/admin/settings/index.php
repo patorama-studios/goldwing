@@ -22,7 +22,6 @@ $sections = [
     'store' => ['label' => 'Store Settings', 'permission' => 'admin.store.view'],
     'payments' => ['label' => 'Payments (Stripe)', 'permission' => 'admin.payments.view'],
     'notifications' => ['label' => 'Notifications', 'permission' => 'admin.settings.general.manage'],
-    'accounts' => ['label' => 'Accounts & Roles', 'permission' => 'admin.users.view'],
     'security' => ['label' => 'Security & Authentication', 'permission' => 'admin.settings.general.manage'],
     'integrations' => ['label' => 'Integrations', 'permission' => 'admin.integrations.manage'],
     'media' => ['label' => 'Media & Files', 'permission' => 'admin.media_library.manage'],
@@ -314,13 +313,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$errors) {
                     SettingsService::setGlobal((int) $user['id'], 'notifications.catalog', $updatedCatalog);
                     $toast = 'Notification settings saved.';
-                }
-            } elseif ($section === 'accounts') {
-                if (SettingsService::isFeatureEnabled('accounts.roles')) {
-                    SettingsService::setGlobal((int) $user['id'], 'accounts.user_approval_required', isset($_POST['accounts_user_approval']));
-                    SettingsService::setGlobal((int) $user['id'], 'accounts.membership_status_visibility', normalize_text($_POST['accounts_membership_visibility'] ?? 'member'));
-                    SettingsService::setGlobal((int) $user['id'], 'accounts.audit_role_changes', isset($_POST['accounts_audit_roles']));
-                    $toast = 'Account settings saved.';
                 }
             } elseif ($section === 'security') {
                 SettingsService::setGlobal((int) $user['id'], 'security.force_https', isset($_POST['security_force_https']));
@@ -645,7 +637,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'security.two_factor' => isset($_POST['flag_security_two_factor']),
                     'payments.secondary_stripe' => isset($_POST['flag_payments_secondary']),
                     'integrations.myob' => isset($_POST['flag_integrations_myob']),
-                    'accounts.roles' => isset($_POST['flag_accounts_roles']),
                     'media.folder_taxonomy' => isset($_POST['flag_media_folder_taxonomy']),
                 ];
                 SettingsService::setGlobal((int) $user['id'], 'advanced.feature_flags', $flags);
@@ -723,14 +714,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 'membership.manual_migration_expiry_days',
             ],
             'advanced' => ['advanced.maintenance_mode', 'advanced.feature_flags'],
-            'accounts' => ['accounts.user_approval_required', 'accounts.audit_role_changes'],
         ];
         $sectionLabels = [
             'site' => 'Site',
             'store' => 'Store',
             'payments' => 'Payments &amp; Stripe',
             'notifications' => 'Notifications',
-            'accounts' => 'Accounts &amp; Roles',
             'security' => 'Security &amp; Authentication',
             'integrations' => 'Integrations',
             'media' => 'Media',
@@ -790,10 +779,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   ['label' => 'Events', 'icon' => 'calendar_month', 'desc' => 'Default visibility and event timezone.', 'href' => '/admin/settings/index.php?section=events', 'permission' => 'admin.events.manage'],
                 ],
                 'People & Access' => [
-                  ['label' => 'Accounts & Roles', 'icon' => 'manage_accounts', 'desc' => 'User approval, audit, account policy.', 'href' => '/admin/settings/index.php?section=accounts', 'permission' => 'admin.users.view'],
                   ['label' => 'Security & Authentication', 'icon' => 'shield', 'desc' => 'Login policy, password rules, step-up.', 'href' => '/admin/settings/index.php?section=security', 'permission' => 'admin.settings.general.manage'],
                   ['label' => 'Admin Role Builder', 'icon' => 'engineering', 'desc' => 'Define admin roles and permission sets.', 'href' => '/admin/settings/roles.php', 'permission' => 'admin.roles.view'],
-                  ['label' => 'Access Control', 'icon' => 'lock', 'desc' => 'Map roles to pages and actions.', 'href' => '/admin/settings/access-control.php', 'permission' => 'admin.roles.manage'],
                   ['label' => 'Committee & Leadership Roles', 'icon' => 'workspace_premium', 'desc' => 'Assign members to National and Chapter Rep roles.', 'href' => '/admin/settings/committee-roles.php', 'permission' => 'admin.members.view'],
                   ['label' => 'Membership Settings', 'icon' => 'badge', 'desc' => 'Pricing matrix and member-number format.', 'href' => '/admin/settings/index.php?section=membership_pricing', 'permission' => 'admin.membership_types.manage'],
                 ],
@@ -2022,67 +2009,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 });
               })();
             </script>
-          <?php elseif ($section === 'accounts'): ?>
-            <?php if (!SettingsService::isFeatureEnabled('accounts.roles')): ?>
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 text-sm text-slate-600">
-                Accounts &amp; roles management is planned. Enable the feature flag in Advanced settings to unlock these controls.
-              </div>
-            <?php else: ?>
-              <form method="post" class="space-y-6 pb-24">
-                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                <input type="hidden" name="action" value="save_settings">
-                <input type="hidden" name="section" value="accounts">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
-                  <div class="flex items-start gap-3">
-                    <span class="material-icons-outlined text-slate-500">manage_accounts</span>
-                    <div>
-                      <h2 class="font-display text-lg font-bold text-gray-900">Account Policy</h2>
-                      <p class="text-sm text-slate-500">User approval, visibility, and role auditing rules.</p>
-                    </div>
-                  </div>
-                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                    <div>
-                      <div class="text-sm font-medium text-gray-900">Require admin approval for new users</div>
-                      <div class="text-xs text-slate-500">Block sign-ins until an admin approves the account</div>
-                    </div>
-                    <input type="checkbox" name="accounts_user_approval" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('accounts.user_approval_required', true) ? 'checked' : '' ?>>
-                  </label>
-                  <div>
-                    <label for="accounts_membership_visibility" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Membership status visibility</label>
-                    <select id="accounts_membership_visibility" name="accounts_membership_visibility" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
-                      <?php $visibility = SettingsService::getGlobal('accounts.membership_status_visibility', 'member'); ?>
-                      <option value="public" <?= $visibility === 'public' ? 'selected' : '' ?>>Public</option>
-                      <option value="member" <?= $visibility === 'member' ? 'selected' : '' ?>>Members only</option>
-                      <option value="admin" <?= $visibility === 'admin' ? 'selected' : '' ?>>Admin only</option>
-                    </select>
-                  </div>
-                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                    <div>
-                      <div class="text-sm font-medium text-gray-900">Audit role changes</div>
-                      <div class="text-xs text-slate-500">Log who promoted or demoted each user</div>
-                    </div>
-                    <input type="checkbox" name="accounts_audit_roles" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('accounts.audit_role_changes', true) ? 'checked' : '' ?>>
-                  </label>
-                </div>
-                <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div class="text-xs text-slate-500 flex items-center gap-2">
-                    <span class="material-icons-outlined text-base text-slate-400">history</span>
-                    <?php if ($lastModifiedDisplay !== ''): ?>
-                      Last modified <?= e($lastModifiedDisplay) ?><?php if (!empty($lastMeta['updated_by'])): ?> by <?= e($lastMeta['updated_by']) ?><?php endif; ?>
-                    <?php else: ?>
-                      Not modified yet
-                    <?php endif; ?>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
-                      <span class="material-icons-outlined text-base">save</span>
-                      Save Settings
-                    </button>
-                  </div>
-                </div>
-              </form>
-            <?php endif; ?>
           <?php elseif ($section === 'security'): ?>
             <form method="post" class="space-y-6 pb-24">
               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
@@ -3131,13 +3057,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <div class="text-xs text-slate-500">Toggle the MYOB sync controls</div>
                     </div>
                     <input type="checkbox" name="flag_integrations_myob" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['integrations.myob']) ? 'checked' : '' ?>>
-                  </label>
-                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                    <div>
-                      <div class="text-sm font-medium text-gray-900">Accounts: Roles management</div>
-                      <div class="text-xs text-slate-500">Show the accounts &amp; roles policy tab</div>
-                    </div>
-                    <input type="checkbox" name="flag_accounts_roles" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($flags['accounts.roles']) ? 'checked' : '' ?>>
                   </label>
                   <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
                     <div>

@@ -90,12 +90,6 @@ A handful of emails are **transactional** — receipts, refund notices, password
 
 Full picture: [Chapter 22 — Notifications & email](view.php?slug=22-notifications-email).
 
-### Accounts & Roles
-
-{{link:/admin/settings/?section=accounts|Take me to Accounts & Roles}}
-
-The settings here are small — just whether new signups need approval and how role changes get logged. The real role work happens on the two standalone pages further down (Admin Role Builder and Access Control). See [Chapter 07 — Roles & permissions](view.php?slug=07-roles-permissions).
-
 ### Security & Authentication
 
 {{link:/admin/settings/?section=security|Take me to Security & Authentication}}
@@ -197,7 +191,7 @@ Read-only. Folded out of Settings into its own page at **/admin/audit/**. Shows 
 
 - **Maintenance mode** — when on, anyone who isn't logged in as an admin gets a "be right back" page. Use during deploys or emergency fixes. Don't flip this on without checking you're definitely logged in as an admin first, or you'll lock yourself out of the front end.
 - **Disable password-reset rate limit** — bypasses the throttle on password reset requests. Debug-only — leave off in production.
-- **Feature flags** — toggles for experimental sections (two-factor experiments, secondary Stripe account, MYOB sync, accounts & roles form, media folder taxonomy). These hide UI, not behaviour.
+- **Feature flags** — toggles for experimental sections (two-factor experiments, secondary Stripe account, MYOB sync, media folder taxonomy). These hide UI, not behaviour.
 
 This section also surfaces the system log tail and recent email-log rows, which are handy for diagnosing problems.
 
@@ -214,6 +208,8 @@ This is where you'd give your new Treasurer the refund permission, or let a News
 {{link:/admin/settings/access-control.php|Take me to Access Control}}
 
 The sister page to the Role Builder — instead of "which permissions does this role have", this is "which admin pages does this role see in the sidebar". Useful for hiding sections an admin shouldn't even know exist, rather than just blocking them at the form level. Full picture: [Chapter 07 — Roles & permissions](view.php?slug=07-roles-permissions).
+
+**No longer surfaced as a Hub card** — the defaults are sensible for the current role set, so the matrix UI was hidden to keep the Hub tidy. The underlying URL-to-role gate is still live (enforced on every request by `enforce_page_access()` in `bootstrap.php`); navigate directly to the URL above if you need to tweak it.
 
 ### Who to ask if you're stuck
 
@@ -256,7 +252,6 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 | Store Settings | `/admin/settings/index.php?section=store` | `admin.store.view` |
 | Payments (Stripe) | `/admin/settings/index.php?section=payments` | `admin.payments.view` |
 | Notifications | `/admin/settings/index.php?section=notifications` | `admin.settings.general.manage` |
-| Accounts & Roles | `/admin/settings/index.php?section=accounts` | `admin.users.view` |
 | Security & Authentication | `/admin/settings/index.php?section=security` | `admin.settings.general.manage` |
 | Integrations | `/admin/settings/index.php?section=integrations` | `admin.integrations.manage` |
 | Media & Files | `/admin/settings/index.php?section=media` | `admin.media_library.manage` |
@@ -266,7 +261,7 @@ The full mechanics — JSON storage, caching, encryption flags, audit — are in
 | Audit Hub | `/admin/audit/` (folded out of settings) | `admin.logs.view` |
 | Advanced / Developer | `/admin/settings/index.php?section=advanced` | `admin.settings.general.manage` |
 | Admin Role Builder | `/admin/settings/roles.php` | `admin.roles.view` (view) / `admin.roles.manage` (edit) |
-| Access Control | `/admin/settings/access-control.php` | `admin.roles.manage` |
+| Access Control (hidden from Hub, direct URL only) | `/admin/settings/access-control.php` | `admin.roles.manage` |
 | Committee & Leadership Roles | `/admin/settings/committee-roles.php` | `admin.members.view` |
 
 The permission map lives in `$hubGroups` at the top of `public_html/admin/settings/index.php` (each card declares its `permission` key) and is enforced in the dispatcher's `can_access_section()` check on form save. The sidebar entry for Settings (`app/Views/partials/backend_admin_sidebar.php`) is gated by `$settingsPermissions` — visible to any admin with at least one of the section permissions. Step-up authentication ([Ch 06](view.php?slug=06-2fa-stepup)) is required for every save *except* the Payments section (which uses Stripe's own gating).
@@ -367,18 +362,6 @@ What it controls: the global From/Reply-To, admin recipient list, the in-app not
 | `notifications.in_app_categories` | array | [] | Categories shown in the in-app notification bell. |
 | `notifications.template_basic` | string | "" | Base HTML template wrapped around per-event bodies. |
 | `notifications.catalog` | object | (defaults from `NotificationService::definitions()`) | Per-event overrides: `{enabled, recipient_mode, custom_recipients, subject, body, from_name, from_email, reply_to}`. |
-
-#### Accounts & Roles
-
-What it controls: how new account requests are handled and how role changes get audited. The bulk of role/permission work happens on the two standalone pages — Admin Role Builder and Access Control — see below. Deep dive: [Ch 07 — Roles & permissions](view.php?slug=07-roles-permissions).
-
-| Key | Type | Default | What it does |
-|---|---|---|---|
-| `accounts.user_approval_required` | bool | false | New signups need admin approval before activation. |
-| `accounts.membership_status_visibility` | enum | "member" | Who can see another user's membership status (`public`, `member`, `admin`). |
-| `accounts.audit_role_changes` | bool | true | Log every role assignment to `audit_log`. |
-
-Gated behind the `accounts.roles` feature flag (Advanced section).
 
 #### Security & Authentication
 
@@ -504,7 +487,7 @@ What it controls: maintenance mode, password-reset rate-limit bypass, the featur
 |---|---|---|---|
 | `advanced.maintenance_mode` | bool | false | Non-admin requests get a 503 maintenance page. Enforced in `bootstrap.php`. |
 | `advanced.disable_password_reset_rate_limit` | bool | false | Bypass the password-reset throttle (debug only). |
-| `advanced.feature_flags` | object | (all false) | Map of `{security.two_factor, payments.secondary_stripe, integrations.myob, accounts.roles, media.folder_taxonomy}` → bool. Read by `SettingsService::isFeatureEnabled()`. |
+| `advanced.feature_flags` | object | (all false) | Map of `{security.two_factor, payments.secondary_stripe, integrations.myob, media.folder_taxonomy}` → bool. Read by `SettingsService::isFeatureEnabled()`. |
 
 #### Admin Role Builder (standalone)
 
@@ -512,9 +495,11 @@ What it controls: the per-role permission grid for *admin*-tier roles. Permissio
 
 Owns no `settings_global` keys — its source of truth is the `roles` and `role_permissions` tables.
 
-#### Access Control (standalone)
+#### Access Control (standalone, hidden from Hub)
 
-What it controls: which page each role can access in the admin sidebar. Reads `pages_registry`, joins `page_role_access`, writes back per-role flags. Permission required: `admin.roles.manage`. Deep dive: [Ch 07 — Roles & permissions](view.php?slug=07-roles-permissions).
+What it controls: which page each role can access in the admin sidebar, and the URL-to-role-bucket gate enforced on every request by `enforce_page_access()` in `bootstrap.php`. Reads `pages_registry`, joins `page_role_access`, writes back per-role flags. Permission required: `admin.roles.manage`. Deep dive: [Ch 07 — Roles & permissions](view.php?slug=07-roles-permissions).
+
+The card was removed from the Hub because the defaults from `access_control_default_registry()` cover all current role buckets (public/member/area_rep/store_manager/admin) and are almost never customised. The page still lives at `/admin/settings/access-control.php` for direct access if the matrix ever needs editing — and removing the file would orphan the `page_role_access` table that the runtime middleware reads.
 
 Owns no `settings_global` keys — its source of truth is the `page_role_access` table.
 
@@ -530,7 +515,6 @@ Owns no `settings_global` keys — its sources of truth are `committee_roles` (c
 - **Encrypted keys never round-trip through the form** — `integrations.smtp_password`, `integrations.resend_api_key`, and the Stripe secret keys only get written when the form value is non-empty. Submitting an empty field leaves the stored value untouched. This is deliberate so a re-save of the form doesn't blank out keys you never re-entered.
 - **Two timezone settings exist.** `site.timezone` runs `bootstrap.php`; `events.timezone` is for event display only. They usually agree — but nothing forces them to.
 - **`security.password_min_length` lives in `settings_global` but the rest of the security panel lives in `security_settings`.** That's because the table predates the Hub and was kept for performance — `LoginRateLimiter` and `TwoFactorService` read directly from it without going through `SettingsService`.
-- **Feature flags hide UI, not behaviour.** Toggling off `accounts.roles` only hides the Accounts form; existing role assignments still apply.
 - **Notification "From" must end in `@goldwing.org.au`** — both the global default and per-event overrides are validated by `is_goldwing_sender()` in the dispatcher. Otherwise SPF/DKIM signing fails.
 - **The Advanced section can break the site.** Maintenance mode blocks non-admin requests *immediately* — make sure you're on an admin session before flipping it.
 - **`ai.template_*` keys aren't in the AI form.** They're written elsewhere (page builder template manager) but read by `AiPageBuilderService`. Grepping `ai.template_header_html` from the AI page will turn up nothing.
