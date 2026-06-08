@@ -35,8 +35,19 @@ if (!current_user()) {
 require_permission('admin.members.view');
 
 $q = trim((string) ($_GET['q'] ?? ''));
+$debug = !empty($_GET['debug']);
+
 if (mb_strlen($q) < 2) {
-    echo json_encode(['ok' => true, 'results' => []]);
+    $payload = ['ok' => true, 'results' => []];
+    if ($debug) {
+        $payload['debug'] = [
+            'reason'   => 'query_too_short',
+            'q_raw'    => $_GET['q'] ?? null,
+            'q_trim'   => $q,
+            'q_length' => mb_strlen($q),
+        ];
+    }
+    echo json_encode($payload);
     exit;
 }
 
@@ -47,7 +58,7 @@ try {
 
     // 4 distinct positional placeholders — never relies on named-parameter
     // reuse, which is sensitive to PDO emulation mode and PHP version.
-    $stmt = $pdo->prepare("
+    $sql = "
         SELECT m.id, m.first_name, m.last_name, m.member_number,
                $chapterDisplay AS chapter_name
         FROM members m
@@ -58,9 +69,29 @@ try {
            OR CONCAT_WS(' ', m.first_name, m.last_name) LIKE ?
         ORDER BY m.last_name ASC, m.first_name ASC
         LIMIT 8
-    ");
+    ";
+    $stmt = $pdo->prepare($sql);
     $stmt->execute([$like, $like, $like, $like]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // Optional debug snapshot — append diagnostic facts so we can see why
+    // a search returned empty (DB has 0 members? schema mismatch? wrong DB?).
+    // Hit /admin/settings/committee-roles-search.php?q=foo&debug=1 directly.
+    $debugInfo = null;
+    if ($debug) {
+        $totalMembers = (int) ($pdo->query('SELECT COUNT(*) FROM members')->fetchColumn() ?: 0);
+        $sample = $pdo->query('SELECT id, first_name, last_name, member_number FROM members ORDER BY id ASC LIMIT 3')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $dbName = (string) ($pdo->query('SELECT DATABASE()')->fetchColumn() ?: '');
+        $debugInfo = [
+            'php_version'   => PHP_VERSION,
+            'db_name'       => $dbName,
+            'members_total' => $totalMembers,
+            'sql'           => trim(preg_replace('/\s+/', ' ', $sql)),
+            'bound'         => [$like],
+            'rows_returned' => count($rows),
+            'sample_first3' => $sample,
+        ];
+    }
 } catch (Throwable $e) {
     error_log('committee-roles-search: ' . $e->getMessage());
     http_response_code(500);
@@ -86,4 +117,21 @@ foreach ($rows as $row) {
     ];
 }
 
-echo json_encode(['ok' => true, 'results' => $results]);
+$payload = ['ok' => true, 'results' => $results];
+if ($debugInfo !== null) {
+    $payload['debug'] = $debugInfo;
+}
+// JSON_INVALID_UTF8_SUBSTITUTE protects against a legacy-imported member
+// name with bad encoding silently making json_encode return false (which
+// would echo nothing and look like "no matches").
+$out = json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
+if ($out === false) {
+    http_response_code(500);
+    echo json_encode([
+        'ok'     => false,
+        'error'  => 'encode_failed',
+        'detail' => json_last_error_msg(),
+    ]);
+    exit;
+}
+echo $out;
