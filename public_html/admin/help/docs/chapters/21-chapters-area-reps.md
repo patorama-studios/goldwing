@@ -33,7 +33,7 @@ If an Area Rep needs to cover two chapters (e.g. acting in another chapter's rol
 
 - **Member chapter assignments** — Admin → Members → click the member → **Profile** tab → **Chapter** dropdown.
 - **The list of chapters** — Admin → Settings → **Membership & Pricing** → scroll to the **Chapters** table.
-- **Committee role assignments** — Admin → Settings → **People & Access** → **Committee & Leadership Roles**. Pick the role, search for the member by name or member number, assign. (Each member's profile still shows a read-only summary of what they hold, with a link back to this page.)
+- **Committee role assignments** — Admin sidebar → Membership → **Committee Roles** (or Admin → Settings → People & Access → Committee & Leadership Roles — same page). Pick the role, search for the member by name or member number, assign. (Each member's profile still shows a read-only summary of what they hold, with a link back to this page.)
 - **Pending chapter-change requests** — Admin → **Notification Hub** (the bell icon / `/admin/requests/`) → filter by **Chapter Change**.
 - **Assigning the Area Rep role to a user** — Admin → Settings → **Access Control**.
 

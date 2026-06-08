@@ -14,6 +14,17 @@ use App\Services\CommitteeService;
 use App\Services\Csrf;
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate');
+
+// Force JSON content negotiation so require_permission returns a JSON 401/403
+// rather than a 302 to /login.php (which fetch() would follow into HTML).
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+
+if (!current_user()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
+    exit;
+}
 
 require_permission('admin.members.view');
 

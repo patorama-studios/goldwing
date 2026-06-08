@@ -225,10 +225,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       method: 'POST',
       body,
       headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin',
     });
-    const json = await res.json().catch(() => ({ ok: false, error: 'bad_response' }));
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); }
+    catch (parseErr) {
+      const snippet = text.replace(/\s+/g, ' ').slice(0, 80);
+      throw new Error('Bad response (' + res.status + '): ' + snippet);
+    }
     if (!res.ok || !json.ok) {
-      throw new Error(json.error || 'save_failed');
+      throw new Error(json.detail || json.error || ('HTTP ' + res.status));
     }
     return json;
   }
@@ -275,7 +282,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       showToast('Privacy updated.');
     } catch (e) {
       tgt.checked = !tgt.checked;
-      showToast('Could not update privacy.', 'error');
+      showToast('Could not update privacy: ' + (e.message || 'unknown error'), 'error');
+      console.error('committee-roles privacy error', e);
     }
   });
 
@@ -290,7 +298,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       showToast('Removed.');
       window.location.reload();
     } catch (e) {
-      showToast('Could not remove assignment.', 'error');
+      showToast('Could not remove assignment: ' + (e.message || 'unknown error'), 'error');
+      console.error('committee-roles unassign error', e);
     }
   });
 
@@ -312,12 +321,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       try {
         const res = await fetch('/admin/settings/committee-roles-search.php?q=' + encodeURIComponent(q), {
           headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin',
         });
-        const json = await res.json();
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); }
+        catch (parseErr) {
+          // Server didn't return JSON — show first 80 chars of body so we
+          // can diagnose (likely an HTML error page or login redirect).
+          const snippet = text.replace(/\s+/g, ' ').slice(0, 80);
+          throw new Error('Bad response (' + res.status + '): ' + snippet);
+        }
+        if (!res.ok || json.ok === false) {
+          throw new Error(json.detail || json.error || ('HTTP ' + res.status));
+        }
         renderSearchResults(results, json.results || [], input.dataset.roleId);
       } catch (e) {
-        results.innerHTML = '<div class="px-3 py-2 text-xs text-red-600">Search failed.</div>';
+        results.innerHTML = '<div class="px-3 py-2 text-xs text-red-600">Search failed: '
+          + escapeHtml(e.message || 'unknown error')
+          + '</div>';
         results.classList.remove('hidden');
+        console.error('committee-roles search error', e);
       }
     }, 220);
   });
@@ -355,7 +379,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       showToast('Assigned.');
       window.location.reload();
     } catch (e) {
-      showToast('Could not assign role.', 'error');
+      showToast('Could not assign role: ' + (e.message || 'unknown error'), 'error');
+      console.error('committee-roles assign error', e);
     }
   });
 

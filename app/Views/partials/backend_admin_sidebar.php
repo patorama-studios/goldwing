@@ -38,6 +38,7 @@ $items = [
     // MEMBERSHIP
     ['key' => 'members', 'group' => 'Membership', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],
     ['key' => 'applications', 'group' => 'Membership', 'label' => 'Applications', 'icon' => 'fact_check', 'href' => '/admin/index.php?page=applications', 'permission' => 'admin.members.view'],
+    ['key' => 'committee-roles', 'group' => 'Membership', 'label' => 'Committee Roles', 'icon' => 'workspace_premium', 'href' => '/admin/settings/committee-roles.php', 'permission' => 'admin.members.view'],
     ['key' => 'payments', 'group' => 'Membership', 'label' => 'Payments', 'icon' => 'payments', 'href' => '/admin/index.php?page=payments', 'permission' => 'admin.payments.view'],
 
     // CONTENT
