@@ -756,17 +756,27 @@ if ($user && $user['member_id']) {
           $includePartner = !empty($_POST['include_partner']);
 
           {
-            $renewers = [['member' => $member, 'role' => 'self']];
-            $partner = null;
+            // Partner lookup. `$associates` and `$fullMember` get populated near
+            // line 1220 — well after this POST handler runs — so we have to do
+            // the same queries inline here, otherwise `$includePartner` always
+            // silently drops the partner and Stripe only sees the self total.
+            $renewPartnerForHandler = null;
             if ($includePartner) {
-              if (!empty($associates)) {
-                $partner = $associates[0];
-              } elseif ($fullMember) {
-                $partner = $fullMember;
+              $memberTypeUpper = strtoupper((string) ($member['member_type'] ?? ''));
+              if ($memberTypeUpper === 'FULL' || $memberTypeUpper === 'LIFE') {
+                $partnerStmt = $pdo->prepare('SELECT * FROM members WHERE full_member_id = :id LIMIT 1');
+                $partnerStmt->execute(['id' => $member['id']]);
+                $renewPartnerForHandler = $partnerStmt->fetch() ?: null;
+              } elseif ($memberTypeUpper === 'ASSOCIATE' && !empty($member['full_member_id'])) {
+                $partnerStmt = $pdo->prepare('SELECT * FROM members WHERE id = :id LIMIT 1');
+                $partnerStmt->execute(['id' => $member['full_member_id']]);
+                $renewPartnerForHandler = $partnerStmt->fetch() ?: null;
               }
             }
-            if ($partner && strtoupper((string) ($partner['member_type'] ?? '')) !== 'LIFE') {
-              $renewers[] = ['member' => $partner, 'role' => 'partner'];
+
+            $renewers = [['member' => $member, 'role' => 'self']];
+            if ($renewPartnerForHandler && strtoupper((string) ($renewPartnerForHandler['member_type'] ?? '')) !== 'LIFE') {
+              $renewers[] = ['member' => $renewPartnerForHandler, 'role' => 'partner'];
             }
 
             // Void any prior PENDING_PAYMENT periods + pending/failed orders for
