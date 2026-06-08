@@ -103,6 +103,17 @@ if (!empty($member)) {
       <p class="mt-1 text-[11px] font-medium text-amber-700">Viewing as Member: <?= e($impersonationName) ?></p>
     </div>
   <?php endif; ?>
+  <?php
+    $hasAdminAccess = false;
+    if (!$impersonation && function_exists('current_admin_can') && function_exists('admin_permission_keys')) {
+        foreach (admin_permission_keys() as $permKey) {
+            if (current_admin_can($permKey, $user)) {
+                $hasAdminAccess = true;
+                break;
+            }
+        }
+    }
+  ?>
   <div class="border-b border-gray-100 px-6 py-5">
     <div class="flex flex-col items-center text-center gap-2">
       <img src="/uploads/library/2023/good-logo-cropped.png" alt="Goldwing logo" class="h-36 w-auto">
@@ -111,6 +122,12 @@ if (!empty($member)) {
         <p class="text-sm text-gray-500">Welcome <?= e($user['name'] ?? 'Member') ?></p>
       </div>
     </div>
+    <?php if ($hasAdminAccess): ?>
+      <a href="/admin/index.php" class="mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors bg-primary text-gray-900 hover:bg-primary/90">
+        <span class="material-icons-outlined text-base">admin_panel_settings</span>
+        View as Admin
+      </a>
+    <?php endif; ?>
   </div>
   <?php
     $groups = [];
