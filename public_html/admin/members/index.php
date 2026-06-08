@@ -35,6 +35,7 @@ $filters = [
     'role' => trim((string) ($_GET['role'] ?? '')),
     'directory_prefs' => $_GET['directory_pref'] ?? [],
     'created_range' => trim((string) ($_GET['created_range'] ?? '')),
+    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
     'created_from' => trim((string) ($_GET['created_from'] ?? '')),
     'created_to' => trim((string) ($_GET['created_to'] ?? '')),
     'vehicle_type' => $_GET['vehicle_type'] ?? '',
@@ -301,7 +302,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <span class="material-icons-outlined text-base">hourglass_top</span>
           </div>
         </a>
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-rose-200 transition-colors <?= $stats['expired'] ? 'border-rose-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['status' => 'expired', 'expiring_within' => null, 'page' => 1])) ?>">
           <div>
             <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Expired</p>
             <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['expired']) ?></p>
@@ -309,7 +310,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="h-10 w-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center">
             <span class="material-icons-outlined text-base">cancel</span>
           </div>
-        </div>
+        </a>
+        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-blue-200 transition-colors <?= $stats['expiring_soon'] ? 'border-blue-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['expiring_within' => '60d', 'status' => null, 'page' => 1])) ?>">
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Expiring (60d)</p>
+            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['expiring_soon']) ?></p>
+          </div>
+          <div class="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+            <span class="material-icons-outlined text-base">alarm</span>
+          </div>
+        </a>
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.3em] text-gray-500">New (30d)</p>
@@ -391,6 +401,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               Chapter
               <select name="chapter_id" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" <?= $chapterRestriction !== null ? 'disabled' : '' ?>>
                 <option value="">All chapters</option>
+                <option value="0" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === 0 ? 'selected' : '' ?>>No chapter assigned</option>
                 <?php foreach ($availableChapters as $chapter): ?>
                   <option value="<?= e($chapter['id']) ?>" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === (int) $chapter['id'] ? 'selected' : '' ?>><?= e($chapter['display_label'] ?? $chapter['name']) ?> (<?= e($chapter['state']) ?>)</option>
                 <?php endforeach; ?>
@@ -403,6 +414,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <?php foreach (['pending', 'active', 'expired', 'suspended', 'archived'] as $statusOption): ?>
                   <option value="<?= e($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>><?= $statusOption === 'archived' ? 'Archived' : ucfirst($statusOption) ?></option>
                 <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              Expiring
+              <select name="expiring_within" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <?php $expiringWithin = $filters['expiring_within'] ?? ''; ?>
+                <option value="" <?= $expiringWithin === '' ? 'selected' : '' ?>>Any time</option>
+                <option value="30d" <?= $expiringWithin === '30d' ? 'selected' : '' ?>>Within 30 days</option>
+                <option value="60d" <?= $expiringWithin === '60d' ? 'selected' : '' ?>>Within 60 days</option>
+                <option value="90d" <?= $expiringWithin === '90d' ? 'selected' : '' ?>>Within 90 days</option>
+                <option value="eoy" <?= $expiringWithin === 'eoy' ? 'selected' : '' ?>>Before next 31 July</option>
+                <option value="expired" <?= $expiringWithin === 'expired' ? 'selected' : '' ?>>Already expired</option>
               </select>
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">

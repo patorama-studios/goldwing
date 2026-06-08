@@ -1555,7 +1555,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
 
           <?php /* Lapsed Members */ ?>
-          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+          <a href="/admin/members/?status=expired" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:border-rose-200 transition-colors flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-400">
                 <span class="material-icons-outlined text-[20px]">person_off</span>
@@ -1566,7 +1566,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Lapsed Members</p>
               <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $lapsedCount) ?></p>
             </div>
-          </div>
+          </a>
 
           <?php /* Pending Approvals */ ?>
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3 <?= $pendingCount > 0 ? 'ring-1 ring-amber-300' : '' ?>">
@@ -1585,7 +1585,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
 
           <?php /* Due Soon */ ?>
-          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+          <a href="/admin/members/?expiring_within=60d" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:border-blue-200 transition-colors flex flex-col gap-3">
             <div class="flex items-start justify-between">
               <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-500">
                 <span class="material-icons-outlined text-[20px]">alarm</span>
@@ -1595,7 +1595,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <p class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Due Soon</p>
               <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= e((string) $dueSoon) ?></p>
             </div>
-          </div>
+          </a>
 
           <?php /* Total Users */ ?>
           <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">

@@ -158,6 +158,7 @@ class MemberRepository
             'suspended' => 0,
             'new_last_30_days' => 0,
             'renewals_this_month' => 0,
+            'expiring_soon' => 0,
         ];
 
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -183,14 +184,28 @@ class MemberRepository
         $stmt->execute();
         $result['new_last_30_days'] = (int) $stmt->fetchColumn();
 
+        $expiringSoonSql = 'SELECT COUNT(*) FROM members m WHERE EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY))';
+        $expiringSoonParams = $params;
+        if ($whereClause !== '') {
+            $expiringSoonSql .= ' AND ' . $whereClause;
+        }
+        $stmt = $pdo->prepare($expiringSoonSql);
+        self::bindParams($stmt, $expiringSoonParams);
+        $stmt->execute();
+        $result['expiring_soon'] = (int) $stmt->fetchColumn();
+
         if (self::hasOrderColumn($pdo, 'member_id')) {
             $monthStart = (new DateTimeImmutable('first day of this month'))->setTime(0, 0, 0)->format('Y-m-d H:i:s');
             $monthEnd = (new DateTimeImmutable('last day of this month'))->setTime(23, 59, 59)->format('Y-m-d H:i:s');
             $renewalSql = 'SELECT COUNT(*) FROM orders o JOIN members m ON m.id = o.member_id WHERE o.order_type = \'membership\' AND o.status = \'paid\' AND o.paid_at BETWEEN :start AND :end';
             $renewalParams = ['start' => $monthStart, 'end' => $monthEnd];
-            if ($chapterId !== null) {
-                $renewalSql .= ' AND m.chapter_id = :chapter_id';
-                $renewalParams['chapter_id'] = $chapterId;
+            if ($chapterId !== null && $chapterId !== '') {
+                if ((int) $chapterId === 0) {
+                    $renewalSql .= ' AND m.chapter_id IS NULL';
+                } else {
+                    $renewalSql .= ' AND m.chapter_id = :chapter_id';
+                    $renewalParams['chapter_id'] = (int) $chapterId;
+                }
             }
             $stmt = $pdo->prepare($renewalSql);
             foreach ($renewalParams as $key => $value) {
@@ -547,13 +562,40 @@ class MemberRepository
                 }
             }
         }
-        if (!empty($filters['chapter_id'])) {
-            $parts[] = 'm.chapter_id = :chapter_id';
-            $params['chapter_id'] = (int) $filters['chapter_id'];
+        if (isset($filters['chapter_id']) && $filters['chapter_id'] !== '' && $filters['chapter_id'] !== null) {
+            $chapterFilterId = (int) $filters['chapter_id'];
+            if ($chapterFilterId === 0) {
+                $parts[] = 'm.chapter_id IS NULL';
+            } else {
+                $parts[] = 'm.chapter_id = :chapter_id';
+                $params['chapter_id'] = $chapterFilterId;
+            }
         }
         if (!empty($filters['membership_type_id'])) {
             $parts[] = 'm.membership_type_id = :membership_type_id';
             $params['membership_type_id'] = (int) $filters['membership_type_id'];
+        }
+        if (!empty($filters['expiring_within'])) {
+            $expiringMap = ['30d' => 30, '60d' => 60, '90d' => 90];
+            $expiringKey = (string) $filters['expiring_within'];
+            if (isset($expiringMap[$expiringKey])) {
+                $params['expiring_days'] = $expiringMap[$expiringKey];
+                $parts[] = 'EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :expiring_days DAY))';
+            } elseif ($expiringKey === 'eoy') {
+                $today = new DateTimeImmutable('today');
+                $cutoffYear = (int) $today->format('m') >= 8 ? (int) $today->format('Y') + 1 : (int) $today->format('Y');
+                $params['expiring_cutoff'] = $cutoffYear . '-07-31';
+                $parts[] = 'EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND :expiring_cutoff)';
+            } elseif ($expiringKey === 'expired') {
+                $statusValues = self::expandStatusFilter('expired');
+                $placeholders = [];
+                foreach ($statusValues as $idx => $sv) {
+                    $key = 'expiring_status_' . $idx;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $sv;
+                }
+                $parts[] = 'm.status IN (' . implode(', ', $placeholders) . ')';
+            }
         }
         if (!empty($filters['status'])) {
             $statusValues = self::expandStatusFilter((string) $filters['status']);

@@ -10,7 +10,7 @@ If you ever think "I need to look that member up," this is where you go.
 
 ### What you can do here
 
-- **Search and filter** the full member list (by name, email, member number, chapter, status, membership type, role, directory preferences, vehicles, signup date).
+- **Search and filter** the full member list (by name, email, member number, chapter, status, membership type, role, directory preferences, vehicles, signup date, upcoming expiry).
 - **View a member** — open their record and see everything we know about them.
 - **Edit their profile** — name, contact details, address, date of birth, directory preferences.
 - **See their orders** — every membership renewal, every storefront purchase.
@@ -42,7 +42,7 @@ You'll also land here indirectly from other places — clicking a member name on
 
 The list view is the screen you land on first. Each row is one member. A stats panel at the top shows totals: **ACTIVE**, **LAPSED**, **PENDING** counts. If you're an area rep, those numbers are scoped to your chapter.
 
-**To search**, type into the search box at the top — it matches name, email, and member number. To narrow further use the filter chips: chapter, status, membership type, role, directory preferences (the A–F flags), vehicle type, signup date range.
+**To search**, type into the search box at the top — it matches name, email, and member number. To narrow further use the filter chips: chapter (including a **No chapter assigned** option to surface members who never got placed into one), status, membership type, role, directory preferences (the A–F flags), vehicle type, signup date range, and **Expiring** (within 30 / 60 / 90 days, before the next 31 July renewal, or already expired). The **Expired** and **Expiring (60d)** stat cards above the list are clickable shortcuts to the same filters.
 
 When you click into a member from a filtered list, the **Member Profile** back-arrow on their detail page returns you to the exact same filtered list — so you don't have to re-apply the chapter/status/etc. each time you bounce in and out. (The filter URL is carried via a `return_to` query param on the member link.)
 
@@ -198,7 +198,7 @@ That layering is why `AdminMemberAccess` exists as its own service — every pag
 
 #### List view — `/admin/members/index.php`
 
-Reads filters from the query string (`q`, `status`, `chapter_id`, `membership_type_id`, `role`, `directory_pref[]`, `vehicle_*`, `created_range`, `sort_by`, `sort_dir`, paging), hands them to `MemberRepository::search`, renders a table. A stats panel shows ACTIVE / LAPSED / PENDING counts (scoped to the chapter filter for area reps). Power features:
+Reads filters from the query string (`q`, `status`, `chapter_id` (with the sentinel `0` meaning *no chapter assigned* → `m.chapter_id IS NULL`), `membership_type_id`, `role`, `directory_pref[]`, `vehicle_*`, `created_range`, `expiring_within` (`30d` / `60d` / `90d` / `eoy` = before next 31 July / `expired`), `sort_by`, `sort_dir`, paging), hands them to `MemberRepository::search`, renders a table. The `expiring_within` filter joins via an EXISTS subquery against `membership_periods` where `status='ACTIVE'` and `end_date` falls in the chosen window. A stats panel shows ACTIVE / LAPSED / PENDING / **EXPIRING (60d)** counts (scoped to the chapter filter for area reps); the EXPIRED and EXPIRING cards are anchor tags that link back to the same filter for one-click drill-down. Power features:
 
 - **Inline editing** — full-access admins edit chapter, status, and 2FA flag from the row, POSTing `action=member_inline_update`. Area reps cannot inline-edit.
 - **Bulk actions** — multi-select rows then run `assign_chapter`, `change_status`, `enable_2fa`, `send_reset_link`, `send_welcome_email`, `archive`, or `delete` (delete requires typing `CONFIRM`). Dispatched as `bulk_member_action` → JSON.
