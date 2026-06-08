@@ -228,7 +228,8 @@ All keys are under `payments.stripe.*` in `settings_global`, plus a few `payment
 | `payments.stripe.checkout_enabled` | bool | – | Checkout kill-switch |
 | `payments.stripe.customer_portal_enabled` | bool | – | Billing portal sessions |
 | `payments.stripe.generate_pdf` | bool | – | PDF invoices — see [18](view.php?slug=18-invoices) |
-| `payments.stripe.invoice_prefix` | string | – | Default `INV` |
+| `payments.stripe.invoice_prefix` | string | – | Default `MEM`. Membership invoice number prefix (e.g. `MEM-2026-00001`). |
+| `payments.stripe.invoice_prefix_store` | string | – | Default `STORE`. Store invoice prefix; stamped into Stripe Invoice metadata + description so order type is visible in Stripe dashboard. |
 | `payments.stripe.invoice_email_template` | string | – | Invoice email body |
 | `payments.membership_prices` | array | – | Price IDs per tier — see [14](view.php?slug=14-membership-pricing) |
 | `payments.membership_default_term` | string | – | `12M` or `24M` |

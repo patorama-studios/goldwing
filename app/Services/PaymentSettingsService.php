@@ -33,7 +33,7 @@ class PaymentSettingsService
         $stmt->execute(['channel_id' => $channelId]);
         $settings = $stmt->fetch();
         if (!$settings) {
-            $stmt = $pdo->prepare('INSERT INTO settings_payments (channel_id, mode, invoice_prefix, created_at) VALUES (:channel_id, "test", "INV", NOW())');
+            $stmt = $pdo->prepare('INSERT INTO settings_payments (channel_id, mode, invoice_prefix, invoice_prefix_store, created_at) VALUES (:channel_id, "test", "INV", "STORE", NOW())');
             $stmt->execute(['channel_id' => $channelId]);
             $stmt = $pdo->prepare('SELECT * FROM settings_payments WHERE channel_id = :channel_id LIMIT 1');
             $stmt->execute(['channel_id' => $channelId]);
@@ -61,6 +61,7 @@ class PaymentSettingsService
         $secretKeyPlain = $payload['secret_key'] ?? '';
         $webhookSecretPlain = $payload['webhook_secret'] ?? '';
         $invoicePrefix = $payload['invoice_prefix'] ?? ($current['invoice_prefix'] ?? 'INV');
+        $invoicePrefixStore = $payload['invoice_prefix_store'] ?? ($current['invoice_prefix_store'] ?? 'STORE');
         $generatePdf = isset($payload['generate_pdf']) ? (int) $payload['generate_pdf'] : (int) ($current['generate_pdf'] ?? 1);
         $emailTemplate = $payload['invoice_email_template'] ?? ($current['invoice_email_template'] ?? null);
 
@@ -81,13 +82,14 @@ class PaymentSettingsService
 
         $mode = self::inferMode($secretKeyPlain !== '' ? $secretKeyPlain : ($current['secret_key'] ?? ''));
 
-        $stmt = $pdo->prepare('UPDATE settings_payments SET publishable_key = :publishable_key, secret_key_encrypted = :secret_key_encrypted, webhook_secret_encrypted = :webhook_secret_encrypted, mode = :mode, invoice_prefix = :invoice_prefix, invoice_email_template = :invoice_email_template, generate_pdf = :generate_pdf, updated_at = NOW() WHERE channel_id = :channel_id');
+        $stmt = $pdo->prepare('UPDATE settings_payments SET publishable_key = :publishable_key, secret_key_encrypted = :secret_key_encrypted, webhook_secret_encrypted = :webhook_secret_encrypted, mode = :mode, invoice_prefix = :invoice_prefix, invoice_prefix_store = :invoice_prefix_store, invoice_email_template = :invoice_email_template, generate_pdf = :generate_pdf, updated_at = NOW() WHERE channel_id = :channel_id');
         $stmt->execute([
             'publishable_key' => $publishableKey,
             'secret_key_encrypted' => $secretKeyEncrypted,
             'webhook_secret_encrypted' => $webhookSecretEncrypted,
             'mode' => $mode,
             'invoice_prefix' => $invoicePrefix,
+            'invoice_prefix_store' => $invoicePrefixStore,
             'invoice_email_template' => $emailTemplate,
             'generate_pdf' => $generatePdf,
             'channel_id' => $channelId,
@@ -112,17 +114,26 @@ class PaymentSettingsService
         return 'test';
     }
 
-    public static function nextInvoiceNumber(int $channelId): string
+    public static function nextInvoiceNumber(int $channelId, string $orderType = 'membership'): string
     {
         $pdo = Database::connection();
         $year = (int) (new DateTimeImmutable('now'))->format('Y');
         $manageTransaction = !$pdo->inTransaction();
 
+        // Map order type to its column trio. Anything other than 'store'
+        // (e.g. 'membership', '', null-ish) uses the original sequence so
+        // existing INV-YYYY-NNNNN numbers keep flowing.
+        $isStore = strtolower($orderType) === 'store';
+        $prefixCol = $isStore ? 'invoice_prefix_store' : 'invoice_prefix';
+        $yearCol = $isStore ? 'invoice_counter_year_store' : 'invoice_counter_year';
+        $counterCol = $isStore ? 'invoice_counter_store' : 'invoice_counter';
+        $defaultPrefix = $isStore ? 'STORE' : 'INV';
+
         if ($manageTransaction) {
             $pdo->beginTransaction();
         }
         try {
-            $stmt = $pdo->prepare('SELECT invoice_prefix, invoice_counter_year, invoice_counter FROM settings_payments WHERE channel_id = :channel_id FOR UPDATE');
+            $stmt = $pdo->prepare('SELECT ' . $prefixCol . ' AS prefix, ' . $yearCol . ' AS counter_year, ' . $counterCol . ' AS counter FROM settings_payments WHERE channel_id = :channel_id FOR UPDATE');
             $stmt->execute(['channel_id' => $channelId]);
             $settings = $stmt->fetch();
             if (!$settings) {
@@ -131,14 +142,14 @@ class PaymentSettingsService
                 }
                 return '';
             }
-            $counterYear = (int) ($settings['invoice_counter_year'] ?? 0);
-            $counter = (int) ($settings['invoice_counter'] ?? 0);
+            $counterYear = (int) ($settings['counter_year'] ?? 0);
+            $counter = (int) ($settings['counter'] ?? 0);
             if ($counterYear !== $year) {
                 $counterYear = $year;
                 $counter = 0;
             }
             $counter++;
-            $stmt = $pdo->prepare('UPDATE settings_payments SET invoice_counter_year = :year, invoice_counter = :counter, updated_at = NOW() WHERE channel_id = :channel_id');
+            $stmt = $pdo->prepare('UPDATE settings_payments SET ' . $yearCol . ' = :year, ' . $counterCol . ' = :counter, updated_at = NOW() WHERE channel_id = :channel_id');
             $stmt->execute([
                 'year' => $counterYear,
                 'counter' => $counter,
@@ -154,7 +165,7 @@ class PaymentSettingsService
             return '';
         }
 
-        $prefix = $settings['invoice_prefix'] ?? 'INV';
+        $prefix = !empty($settings['prefix']) ? (string) $settings['prefix'] : $defaultPrefix;
         return sprintf('%s-%04d-%05d', $prefix, $counterYear, $counter);
     }
 }

@@ -340,7 +340,8 @@ What it controls: which Stripe environment is live, the API keys (encrypted), ch
 | `payments.stripe.save_invoice_refs` | bool | true | Persist Stripe invoice IDs to our orders. |
 | `payments.stripe.customer_portal_enabled` | bool | false | Enable Stripe's hosted customer portal. |
 | `payments.stripe.checkout_enabled` | bool | true | Master switch for the storefront checkout. |
-| `payments.stripe.invoice_prefix` | string | "INV" | Prefix used by `InvoiceService`. |
+| `payments.stripe.invoice_prefix` | string | "MEM" | Prefix used by `InvoiceService` for membership invoices. |
+| `payments.stripe.invoice_prefix_store` | string | "STORE" | Prefix stamped on Stripe Invoices created by `StoreInvoiceService`. Lives in metadata + description so order type is filterable in Stripe dashboard. |
 | `payments.stripe.invoice_email_template` | string | "" | Override template for invoice emails. |
 | `payments.stripe.generate_pdf` | bool | true | Attach the FPDF-generated PDF to invoice emails. |
 | `payments.stripe.mode` | enum (legacy) | "test" | Legacy mirror of `use_test_mode`; superseded but still written. |

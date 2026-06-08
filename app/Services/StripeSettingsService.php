@@ -270,7 +270,8 @@ class StripeSettingsService
         $livePublishable = self::normalizeMaskedInput((string) ($payload['stripe_live_publishable_key'] ?? ''));
         $liveSecret = self::normalizeMaskedInput((string) ($payload['stripe_live_secret_key'] ?? ''));
         $webhookSecret = self::normalizeMaskedInput((string) ($payload['stripe_webhook_secret'] ?? ''));
-        $invoicePrefix = trim((string) ($payload['stripe_invoice_prefix'] ?? 'INV'));
+        $invoicePrefix = trim((string) ($payload['stripe_invoice_prefix'] ?? 'MEM'));
+        $invoicePrefixStore = trim((string) ($payload['stripe_invoice_prefix_store'] ?? 'STORE'));
         $invoiceTemplate = trim((string) ($payload['stripe_invoice_email_template'] ?? ''));
         $generatePdf = !empty($payload['stripe_generate_pdf']) ? 1 : 0;
         $bankTransferInstructions = trim((string) ($payload['bank_transfer_instructions'] ?? ''));
@@ -343,12 +344,14 @@ class StripeSettingsService
 
         $channel = PaymentSettingsService::getChannelByCode('primary');
         PaymentSettingsService::updateSettings((int) $channel['id'], [
-            'invoice_prefix' => $invoicePrefix !== '' ? $invoicePrefix : 'INV',
+            'invoice_prefix' => $invoicePrefix !== '' ? $invoicePrefix : 'MEM',
+            'invoice_prefix_store' => $invoicePrefixStore !== '' ? $invoicePrefixStore : 'STORE',
             'invoice_email_template' => $invoiceTemplate,
             'generate_pdf' => $generatePdf,
         ]);
         SettingsService::setGlobal($actorUserId, 'payments.stripe.generate_pdf', $generatePdf === 1);
-        SettingsService::setGlobal($actorUserId, 'payments.stripe.invoice_prefix', $invoicePrefix !== '' ? $invoicePrefix : 'INV');
+        SettingsService::setGlobal($actorUserId, 'payments.stripe.invoice_prefix', $invoicePrefix !== '' ? $invoicePrefix : 'MEM');
+        SettingsService::setGlobal($actorUserId, 'payments.stripe.invoice_prefix_store', $invoicePrefixStore !== '' ? $invoicePrefixStore : 'STORE');
         SettingsService::setGlobal($actorUserId, 'payments.stripe.invoice_email_template', $invoiceTemplate);
     }
 

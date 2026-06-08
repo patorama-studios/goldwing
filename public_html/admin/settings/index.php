@@ -1447,9 +1447,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <input type="checkbox" name="stripe_save_invoice_refs" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= !empty($stripeSettings['save_invoice_refs']) ? 'checked' : '' ?>>
                     </label>
                   </div>
-                  <div class="pt-3 border-t border-gray-100">
-                    <label for="stripe_invoice_prefix" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Invoice Prefix</label>
-                    <input id="stripe_invoice_prefix" name="stripe_invoice_prefix" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($paymentSettings['invoice_prefix'] ?? 'INV') ?>" placeholder="INV">
+                  <div class="pt-3 border-t border-gray-100 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label for="stripe_invoice_prefix" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Membership invoice prefix</label>
+                      <input id="stripe_invoice_prefix" name="stripe_invoice_prefix" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" value="<?= e($paymentSettings['invoice_prefix'] ?? 'MEM') ?>" placeholder="MEM" maxlength="20">
+                      <p class="mt-1 text-xs text-slate-400">Used for new membership renewals. e.g. <code>MEM-2026-00001</code>.</p>
+                    </div>
+                    <div>
+                      <label for="stripe_invoice_prefix_store" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Store invoice prefix</label>
+                      <input id="stripe_invoice_prefix_store" name="stripe_invoice_prefix_store" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" value="<?= e($paymentSettings['invoice_prefix_store'] ?? 'STORE') ?>" placeholder="STORE" maxlength="20">
+                      <p class="mt-1 text-xs text-slate-400">Stamped on Stripe store invoices. e.g. <code>STORE-2026-00001</code>.</p>
+                    </div>
                   </div>
                   <div>
                     <label for="stripe_invoice_email_template" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Invoice email template</label>

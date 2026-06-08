@@ -126,13 +126,16 @@ There is currently **no admin "regenerate invoice" button**. If an invoice is mi
 
 #### Numbering
 
-`PaymentSettingsService::nextInvoiceNumber($channelId)` produces the number. It's:
+`PaymentSettingsService::nextInvoiceNumber($channelId, $orderType = 'membership')` produces the number. It's:
 
 - **Per-channel** — each Stripe channel (default `stripe`, optional `agm` secondary — see [Chapter 13](view.php?slug=13-stripe-overview)) has its own counter row in `settings_payments`.
-- **Per-year** — counter resets to 0 the first time it's read in a new calendar year.
+- **Per-order-type** — membership renewals draw from `invoice_prefix` / `invoice_counter` / `invoice_counter_year` (default prefix `MEM`); store orders draw from `invoice_prefix_store` / `invoice_counter_store` / `invoice_counter_year_store` (default prefix `STORE`). Each sequence is independent so the dashboard shows clean `MEM-2026-00001` ↔ `STORE-2026-00001` numbering side-by-side.
+- **Per-year** — each counter resets to 0 the first time it's read in a new calendar year.
 - **Sequential within a year** — `+1` per call, under `SELECT ... FOR UPDATE` so concurrent webhooks can't grab the same number.
 
-Format: `{prefix}-{YYYY}-{00001}`, e.g. `INV-2026-00042`. Prefix configurable per channel (default `INV`).
+Format: `{prefix}-{YYYY}-{00001}`, e.g. `MEM-2026-00042` or `STORE-2026-00007`.
+
+Membership invoices (via `InvoiceService::createForOrder()`) call `nextInvoiceNumber($channelId)` with the default `'membership'` and store the result in the local `invoices` table. Store invoices (via `StoreInvoiceService::ensureInvoiceForOrder()`) call `nextInvoiceNumber($channelId, 'store')` and stamp the result into the Stripe Invoice's `metadata.goldwing_invoice_number` and `description` (prepended as `[STORE-YYYY-NNNNN]`) so the prefix is visible inside the Stripe dashboard.
 
 #### What `createForOrder` does
 
@@ -155,7 +158,7 @@ What's **missing**: no ABN, no GST registration statement, no club address, no l
 |---|---|
 | Add ABN, logo, footer, or address to the PDF | Edit `PdfInvoiceService::generate()` in `app/Services/PdfInvoiceService.php` — pull values via `SettingsService::getGlobal('site.address', ...)` etc. |
 | Change the invoice number format | `PaymentSettingsService::nextInvoiceNumber()` — the `sprintf('%s-%04d-%05d', ...)` line at the bottom. |
-| Reset or change the prefix | Settings → Payments → Receipts & Invoices → "Invoice prefix" per channel. |
+| Reset or change either prefix | Settings → Payments → Receipts & Invoices → "Membership invoice prefix" / "Store invoice prefix". |
 | Stop generating PDFs (keep DB rows only) | Settings → Payments → uncheck "Generate PDF invoices" per channel. |
 | Customise the email body | Settings → Payments → "Invoice email template" textarea. |
 | Toggle store GST | Settings → Store → "Apply GST to orders" (`store.gst_enabled`). |
@@ -164,8 +167,10 @@ What's **missing**: no ABN, no GST registration statement, no club address, no l
 
 Per-channel, in `settings_payments` (one row per `payment_channels.id`):
 
-- `invoice_prefix` (default `INV`)
-- `invoice_counter_year`, `invoice_counter` (system-managed)
+- `invoice_prefix` (default `MEM`) — membership renewal sequence
+- `invoice_counter_year`, `invoice_counter` (system-managed, membership)
+- `invoice_prefix_store` (default `STORE`) — store order sequence
+- `invoice_counter_year_store`, `invoice_counter_store` (system-managed, store)
 - `generate_pdf` (0/1, default 1)
 - `invoice_email_template` (TEXT, optional)
 

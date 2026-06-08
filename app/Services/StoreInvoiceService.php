@@ -81,6 +81,16 @@ class StoreInvoiceService
         $unifiedOrderId = (int) ($stmt->fetchColumn() ?: 0);
 
         // ── 5. Create the draft invoice ──────────────────────────────────────
+        // Mint a Goldwing-side invoice number off the STORE counter so the
+        // Stripe dashboard shows our prefix (e.g. STORE-2026-00001) alongside
+        // Stripe's own invoice number. Membership uses the MEM-* sequence;
+        // this keeps the two streams clearly distinguishable in Stripe.
+        $goldwingInvoiceNumber = '';
+        $primaryChannel = PaymentSettingsService::getChannelByCode('primary');
+        if (!empty($primaryChannel['id'])) {
+            $goldwingInvoiceNumber = PaymentSettingsService::nextInvoiceNumber((int) $primaryChannel['id'], 'store');
+        }
+
         $invoiceMetadata = [
             'order_type' => 'store',
             'store_order_id' => (string) $storeOrderId,
@@ -90,13 +100,21 @@ class StoreInvoiceService
             'member_id' => (string) ($order['member_id'] ?? ''),
             'cart_id' => (string) ($cartId ?? ''),
         ];
+        if ($goldwingInvoiceNumber !== '') {
+            $invoiceMetadata['goldwing_invoice_number'] = $goldwingInvoiceNumber;
+        }
+
+        $invoiceDescription = 'Store order ' . ($order['order_number'] ?? ('#' . $storeOrderId));
+        if ($goldwingInvoiceNumber !== '') {
+            $invoiceDescription = '[' . $goldwingInvoiceNumber . '] ' . $invoiceDescription;
+        }
 
         $invoicePayload = [
             'customer' => $customerId,
             'collection_method' => 'charge_automatically',
             'auto_advance' => false,
             'pending_invoice_items_behavior' => 'exclude',
-            'description' => 'Store order ' . ($order['order_number'] ?? ('#' . $storeOrderId)),
+            'description' => $invoiceDescription,
             'metadata' => $invoiceMetadata,
         ];
 
