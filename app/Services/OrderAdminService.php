@@ -121,9 +121,53 @@ class OrderAdminService
     public static function deleteMembershipOrder(int $orderId): void
     {
         $pdo = Database::connection();
-        // order_items, invoices use ON DELETE CASCADE on order_id.
-        $stmt = $pdo->prepare('DELETE FROM orders WHERE id = :id');
-        $stmt->execute(['id' => $orderId]);
+        // order_items, invoices use ON DELETE CASCADE on order_id, so the
+        // DELETE below also wipes those child rows.
+        //
+        // Also opportunistically clean up the linked membership_periods row
+        // when it's still in PENDING_PAYMENT and no other orders reference it.
+        // Without this, /member/index.php?page=billing sees the orphan period
+        // on the next page load and auto-creates a fresh pending order (with a
+        // new order_number) via MembershipOrderService::createMembershipOrder,
+        // which makes admin "Delete" feel broken — the order keeps coming back.
+        //
+        // renewal_reminders has a no-action FK to membership_periods.id, so
+        // its rows are wiped first.
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('SELECT membership_period_id FROM orders WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $orderId]);
+            $periodId = (int) ($stmt->fetchColumn() ?: 0);
+
+            $stmt = $pdo->prepare('DELETE FROM orders WHERE id = :id');
+            $stmt->execute(['id' => $orderId]);
+
+            if ($periodId > 0) {
+                $stmt = $pdo->prepare("SELECT status FROM membership_periods WHERE id = :id LIMIT 1");
+                $stmt->execute(['id' => $periodId]);
+                $periodStatus = strtoupper((string) ($stmt->fetchColumn() ?: ''));
+
+                if ($periodStatus === 'PENDING_PAYMENT') {
+                    $stmt = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE membership_period_id = :id');
+                    $stmt->execute(['id' => $periodId]);
+                    $remainingRefs = (int) $stmt->fetchColumn();
+
+                    if ($remainingRefs === 0) {
+                        $stmt = $pdo->prepare('DELETE FROM renewal_reminders WHERE period_id = :id');
+                        $stmt->execute(['id' => $periodId]);
+                        $stmt = $pdo->prepare('DELETE FROM membership_periods WHERE id = :id');
+                        $stmt->execute(['id' => $periodId]);
+                    }
+                }
+            }
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     private static function tableExists(PDO $pdo, string $table): bool
