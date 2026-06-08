@@ -2,9 +2,15 @@
 $sponsors = [
     [
         'name' => 'Honda Motorcycles Australia',
-        'url' => 'https://frasermotorcycles.com.au/',
+        'url' => 'https://motorcycles.honda.com.au/models/onroad/touring',
         'image' => '/assets/img/sponsors/honda.png',
         'alt' => 'Honda Logo'
+    ],
+    [
+        'name' => 'Fraser Motorcycles',
+        'url' => 'https://frasermotorcycles.com.au/',
+        'image' => '/assets/img/sponsors/fraser_motorcycles.webp',
+        'alt' => 'Fraser Motorcycles'
     ],
     [
         'name' => 'Hawkesbury Motorcycles',
