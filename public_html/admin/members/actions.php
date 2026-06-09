@@ -26,6 +26,44 @@ use App\Services\VehicleRepository;
 
 require_permission('admin.members.view');
 
+// TEMPORARY — surface fatal errors and uncaught exceptions to admins so we
+// can diagnose 500s on this endpoint (recent membership_order_refund +
+// Mark-as-Paid work). Remove once the flow is verified working.
+// Gated on the same permission the page already required, so this never
+// shows secrets to non-admins.
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        // No headers may have been sent if a fatal hit early — try to set 500.
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+        }
+        echo "\n=== Fatal error on /admin/members/actions.php ===\n";
+        echo "Type:    {$err['type']}\n";
+        echo "Message: {$err['message']}\n";
+        echo "File:    {$err['file']}:{$err['line']}\n";
+        echo "POST action: " . ($_POST['action'] ?? '(none)') . "\n";
+    }
+});
+set_exception_handler(function (\Throwable $e) {
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+    }
+    echo "\n=== Uncaught exception on /admin/members/actions.php ===\n";
+    echo "Class:   " . get_class($e) . "\n";
+    echo "Message: " . $e->getMessage() . "\n";
+    echo "File:    " . $e->getFile() . ':' . $e->getLine() . "\n";
+    echo "POST action: " . ($_POST['action'] ?? '(none)') . "\n";
+    echo "POST keys:   " . implode(', ', array_keys($_POST)) . "\n";
+    echo "\nTrace:\n" . $e->getTraceAsString() . "\n";
+    exit;
+});
+
 $user = current_user();
 $allowedTabs = ['overview', 'profile', 'roles', 'settings', 'vehicles', 'orders', 'refunds', 'activity'];
 $tab = $_POST['tab'] ?? 'overview';
