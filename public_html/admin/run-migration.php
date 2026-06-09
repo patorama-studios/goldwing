@@ -2683,6 +2683,50 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 033 — Reset notification bodies for payment + receipt templates
+//
+// The "membership_order_created" and "store_order_confirmation" templates
+// had thin default bodies. NotificationService::definitions() now ships
+// nicer defaults (big "Pay Now" button matching the welcome email + a
+// proper itemised receipt structure). This migration JSON_REMOVE-s the
+// saved `body` overrides for those two templates so the new code defaults
+// take effect on production. Subject, from_name, recipient_mode, etc. are
+// preserved.
+//
+// Safe to re-run — JSON_REMOVE is a no-op when the keys are already gone.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_033_reset_payment_receipt_bodies';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 033 — Reset payment + receipt email bodies', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->prepare(
+            "UPDATE site_settings
+                SET value = JSON_REMOVE(
+                    value,
+                    '$.membership_order_created.body',
+                    '$.store_order_confirmation.body'
+                )
+              WHERE category = 'notifications'
+                AND name = 'catalog'"
+        );
+        $stmt->execute();
+        $rowCount = $stmt->rowCount();
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = [
+            'label' => 'Migration 033 — Reset payment + receipt email bodies',
+            'status' => 'applied',
+            'note' => "Cleared saved overrides on {$rowCount} catalog row(s); new defaults from NotificationService now apply.",
+        ];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 033 — Reset payment + receipt email bodies', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

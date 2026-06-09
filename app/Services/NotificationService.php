@@ -107,8 +107,14 @@ class NotificationService
                     'enabled' => true,
                     'recipient_mode' => 'primary',
                     'custom_recipients' => '',
-                    'subject' => 'Membership order #{{order_number}}',
-                    'body' => '<p>Hello {{member_name}},</p><p>Your membership order <strong>#{{order_number}}</strong> is ready.</p><p>Payment method: {{payment_method}}</p><p><a href="{{payment_link}}">Pay now</a></p><p>{{bank_transfer_instructions}}</p>',
+                    'subject' => 'Finish your AGA membership payment — order #{{order_number}}',
+                    'body' => '<p>Hello {{member_name}},</p>'
+                        . '<p>Your Australian Goldwing Association membership order <strong>#{{order_number}}</strong> is ready to finalise. Press the button below to complete your payment and activate your membership:</p>'
+                        . '<p style="text-align:center;margin:28px 0;"><a href="{{payment_link}}" style="display:inline-block;padding:14px 36px;background:#0055ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:16px;">Pay Now</a></p>'
+                        . '<p style="color:#6b7280;font-size:13px;text-align:center;">Or copy and paste this link into your browser:<br><a href="{{payment_link}}" style="color:#0055ff;word-break:break-all;">{{payment_link}}</a></p>'
+                        . '<p style="margin-top:24px;">Payment method on file: <strong>{{payment_method}}</strong></p>'
+                        . '<p>{{bank_transfer_instructions}}</p>'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:13px;">If you have any trouble paying, reply to this email and a webmaster will help.</p>',
                     'from_name' => 'Australian Goldwing Association',
                     'from_email' => 'no-reply@goldwing.org.au',
                     'reply_to' => 'webmaster@goldwing.org.au',
@@ -314,7 +320,7 @@ class NotificationService
             ],
             'store_order_confirmation' => [
                 'label' => 'Store order confirmation',
-                'description' => 'Sent after a paid store order is received.',
+                'description' => 'Sent after a paid store order is received. Includes an itemised receipt with the products purchased, quantities, totals, and the delivery / pickup address.',
                 'trigger' => 'Stripe checkout succeeds.',
                 'category' => 'payments',
                 'is_mandatory' => true,
@@ -323,8 +329,16 @@ class NotificationService
                     'enabled' => true,
                     'recipient_mode' => 'primary',
                     'custom_recipients' => '',
-                    'subject' => 'Order confirmation #{{order_number}}',
-                    'body' => '<p>Thanks for your order <strong>#{{order_number}}</strong>.</p>{{address_html}}{{items_html}}{{totals_html}}',
+                    'subject' => 'Your AGA store receipt — order #{{order_number}}',
+                    'body' => '<p>Thanks for shopping with the Australian Goldwing Association!</p>'
+                        . '<p>This email is your receipt for order <strong>#{{order_number}}</strong>. Below is everything you purchased.</p>'
+                        . '<h3 style="margin-top:24px;margin-bottom:8px;font-size:16px;color:#111827;">Items in your order</h3>'
+                        . '{{items_html}}'
+                        . '<h3 style="margin-top:24px;margin-bottom:8px;font-size:16px;color:#111827;">Order totals</h3>'
+                        . '{{totals_html}}'
+                        . '<h3 style="margin-top:24px;margin-bottom:8px;font-size:16px;color:#111827;">Delivery</h3>'
+                        . '{{address_html}}'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:13px;">If anything in this receipt looks wrong, reply to this email and we\'ll sort it out. Tickets and shipping updates (when applicable) will arrive in separate emails.</p>',
                     'from_name' => 'Australian Goldwing Association',
                     'from_email' => 'no-reply@goldwing.org.au',
                     'reply_to' => 'webmaster@goldwing.org.au',
