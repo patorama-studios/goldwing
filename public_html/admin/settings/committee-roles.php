@@ -81,7 +81,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               Cards on the public Committee &amp; Chapter Reps pages and the member-area Committee page render from these assignments automatically.
             </p>
           </div>
-          <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
             <div class="relative">
               <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">filter_list</span>
               <select id="category-filter" class="min-w-[200px] rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm">
@@ -94,6 +94,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">search</span>
               <input id="role-search" type="search" placeholder="Filter roles or chapters" class="w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm">
             </div>
+            <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm cursor-pointer select-none whitespace-nowrap">
+              <input type="checkbox" id="hide-vacant-toggle" class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+              <span class="text-gray-700">Hide vacant</span>
+            </label>
           </div>
         </div>
       </div>
@@ -113,6 +117,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                  data-role-id="<?= $roleId ?>"
                  data-category="<?= e($role['category'] ?? '') ?>"
                  data-chapter-id="<?= (int) ($role['chapter_id'] ?? 0) ?>"
+                 data-assigned-count="<?= count($members) ?>"
                  data-search="<?= e($searchIndex) ?>">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                 <div>
@@ -243,13 +248,22 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     return json;
   }
 
-  // ── Top filters: category dropdown + role/chapter text filter ─────────
+  // ── Top filters: category dropdown + role/chapter text filter + hide-vacant
   const categoryFilter = document.getElementById('category-filter');
   const roleSearch = document.getElementById('role-search');
+  const hideVacantToggle = document.getElementById('hide-vacant-toggle');
+
+  // Persist the hide-vacant preference across the page reloads triggered by
+  // assign/remove so the admin doesn't have to re-tick it every time.
+  const HIDE_VACANT_KEY = 'committee-roles.hide-vacant';
+  try {
+    hideVacantToggle.checked = localStorage.getItem(HIDE_VACANT_KEY) === '1';
+  } catch (e) { /* private mode etc — fine to ignore */ }
 
   function applyFilters() {
     const cat = categoryFilter.value;
     const term = roleSearch.value.trim().toLowerCase();
+    const hideVacant = hideVacantToggle.checked;
     document.querySelectorAll('[data-category-block]').forEach(block => {
       const blockCat = block.dataset.categoryBlock;
       const catVisible = cat === 'all' || cat === blockCat;
@@ -257,7 +271,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       if (!catVisible) return;
       let anyVisibleInBlock = false;
       block.querySelectorAll('.role-card').forEach(card => {
-        const visible = term === '' || (card.dataset.search || '').includes(term);
+        const matchesTerm = term === '' || (card.dataset.search || '').includes(term);
+        const assigned = parseInt(card.dataset.assignedCount || '0', 10);
+        const passesVacancy = !hideVacant || assigned > 0;
+        const visible = matchesTerm && passesVacancy;
         card.classList.toggle('hidden', !visible);
         if (visible) anyVisibleInBlock = true;
       });
@@ -270,6 +287,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   }
   categoryFilter.addEventListener('change', applyFilters);
   roleSearch.addEventListener('input', applyFilters);
+  hideVacantToggle.addEventListener('change', () => {
+    try { localStorage.setItem(HIDE_VACANT_KEY, hideVacantToggle.checked ? '1' : '0'); }
+    catch (e) { /* ignore */ }
+    applyFilters();
+  });
+
+  // Apply once on load so a persisted "hide vacant" pref takes effect immediately.
+  applyFilters();
 
   // ── Privacy toggle ────────────────────────────────────────────────────
   document.addEventListener('change', async (ev) => {
