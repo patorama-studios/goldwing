@@ -345,12 +345,45 @@ function store_get_open_cart(int $userId): array
             'discount_code' => null,
         ];
     }
-    $stmt = $pdo->prepare('SELECT * FROM store_carts WHERE user_id = :user_id AND status = "open" LIMIT 1');
+    // Newest-open-cart wins. If the user somehow has multiple open carts
+    // (e.g. two tabs simultaneously hit a code path that created carts),
+    // consolidate: move every other open cart's items into the canonical
+    // one and mark the duplicates abandoned. This keeps every caller
+    // (sidebar badge, /store/cart, /checkout) on the same cart and stops
+    // ghost rows from a stale cart appearing on the checkout summary.
+    $stmt = $pdo->prepare('SELECT * FROM store_carts WHERE user_id = :user_id AND status = "open" ORDER BY id DESC');
     $stmt->execute(['user_id' => $userId]);
-    $cart = $stmt->fetch();
-    if ($cart) {
-        return $cart;
+    $openCarts = $stmt->fetchAll();
+
+    if ($openCarts) {
+        $canonical = $openCarts[0];
+        $canonicalId = (int) $canonical['id'];
+
+        if (count($openCarts) > 1) {
+            foreach (array_slice($openCarts, 1) as $duplicate) {
+                $dupId = (int) $duplicate['id'];
+                if ($dupId === $canonicalId) {
+                    continue;
+                }
+                // Move any real items from the duplicate cart into the canonical one.
+                $move = $pdo->prepare('UPDATE store_cart_items SET cart_id = :canonical WHERE cart_id = :dup AND quantity > 0 AND title_snapshot IS NOT NULL AND title_snapshot != ""');
+                $move->execute(['canonical' => $canonicalId, 'dup' => $dupId]);
+                // Drop everything else (ghost rows) from the duplicate.
+                $purge = $pdo->prepare('DELETE FROM store_cart_items WHERE cart_id = :dup');
+                $purge->execute(['dup' => $dupId]);
+                // Mark the duplicate cart abandoned so it can't be selected again.
+                $close = $pdo->prepare('UPDATE store_carts SET status = "abandoned", updated_at = NOW() WHERE id = :dup');
+                $close->execute(['dup' => $dupId]);
+            }
+        }
+
+        // Belt-and-braces: purge ghost rows from the canonical cart itself.
+        $cleanup = $pdo->prepare('DELETE FROM store_cart_items WHERE cart_id = :id AND (quantity <= 0 OR unit_price < 0 OR title_snapshot IS NULL OR title_snapshot = "")');
+        $cleanup->execute(['id' => $canonicalId]);
+
+        return $canonical;
     }
+
     $stmt = $pdo->prepare('INSERT INTO store_carts (user_id, status, created_at) VALUES (:user_id, "open", NOW())');
     $stmt->execute(['user_id' => $userId]);
     $cartId = (int) $pdo->lastInsertId();
