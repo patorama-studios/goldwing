@@ -9,7 +9,7 @@ $checkoutEnabled = !empty($stripeSettings['checkout_enabled']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
-        echo '<div class="alert error">Invalid CSRF token.</div>';
+        echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Invalid CSRF token.</div>';
     } else {
         $action = $_POST['action'] ?? '';
         if ($action === 'add_to_cart') {
@@ -22,13 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $product = $stmt->fetch();
 
             if (!$product) {
-                echo '<div class="alert error">Product not found.</div>';
+                echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Product not found.</div>';
             } else {
                 $variant = null;
                 $variantLabel = '';
                 $skuSnapshot = $product['sku'] ?? '';
                 if ((int) $product['has_variants'] === 1 && $variantId === 0) {
-                    echo '<div class="alert error">Please select a variant.</div>';
+                    echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Please select a variant.</div>';
                     $product = null;
                 }
             }
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute(['id' => $variantId, 'product_id' => $productId]);
                     $variant = $stmt->fetch();
                     if (!$variant) {
-                        echo '<div class="alert error">Variant not found.</div>';
+                        echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Variant not found.</div>';
                         $variantId = 0;
                     } else {
                         $stmt = $pdo->prepare('SELECT o.name as option_name, v.value as option_value FROM store_variant_option_values vov JOIN store_product_option_values v ON v.id = vov.option_value_id JOIN store_product_options o ON o.id = v.option_id WHERE vov.variant_id = :variant_id');
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     if (!$stockOk) {
-                        echo '<div class="alert error">Insufficient stock for this item.</div>';
+                        echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Insufficient stock for this item.</div>';
                     } else {
                         $stmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND product_id = :product_id AND variant_id <=> :variant_id');
                         $stmt->execute(['cart_id' => $cart['id'], 'product_id' => $productId, 'variant_id' => $variantId ?: null]);
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $stmt = $pdo->prepare('UPDATE store_carts SET updated_at = NOW() WHERE id = :id');
                         $stmt->execute(['id' => $cart['id']]);
-                        echo '<div class="alert success">Added to cart.</div>';
+                        echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Added to cart.</div>';
                     }
                 }
             }
@@ -101,17 +101,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'reorder') {
             if (!$userId) {
-                echo '<div class="alert error">Please log in to reorder past purchases.</div>';
+                echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Please log in to reorder past purchases.</div>';
             } else {
                 $orderId = (int) ($_POST['order_id'] ?? 0);
                 if ($orderId <= 0) {
-                    echo '<div class="alert error">Invalid order.</div>';
+                    echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Invalid order.</div>';
                 } else {
                     $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id AND user_id = :user_id');
                     $stmt->execute(['id' => $orderId, 'user_id' => $userId]);
                     $order = $stmt->fetch();
                     if (!$order) {
-                        echo '<div class="alert error">Order not found.</div>';
+                        echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">Order not found.</div>';
                     } else {
                         $stmt = $pdo->prepare('SELECT * FROM store_order_items WHERE order_id = :order_id');
                         $stmt->execute(['order_id' => $orderId]);
@@ -196,10 +196,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute(['id' => $cart['id']]);
 
                         if ($addedCount > 0) {
-                            echo '<div class="alert success">Reorder added ' . $addedCount . ' item(s) to your cart.</div>';
+                            echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Reorder added ' . $addedCount . ' item(s) to your cart.</div>';
                         }
                         if ($skippedCount > 0) {
-                            echo '<div class="alert warning">' . $skippedCount . ' item(s) could not be added.</div>';
+                            echo '<div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm mb-4">' . $skippedCount . ' item(s) could not be added.</div>';
                         }
                     }
                 }
@@ -211,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($removeItem > 0) {
                 $stmt = $pdo->prepare('DELETE FROM store_cart_items WHERE id = :id AND cart_id = :cart_id');
                 $stmt->execute(['id' => $removeItem, 'cart_id' => $cart['id']]);
-                echo '<div class="alert success">Item removed.</div>';
+                echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Item removed.</div>';
             }
             $quantities = $_POST['quantities'] ?? [];
             foreach ($quantities as $itemId => $qty) {
@@ -240,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute(['quantity' => $maxQty, 'id' => $itemId]);
             }
             if ($removeItem === 0) {
-                echo '<div class="alert success">Cart updated.</div>';
+                echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Cart updated.</div>';
             }
         }
 
@@ -253,18 +253,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $result = store_validate_discount_code($code, $subtotal);
             if (!empty($result['error'])) {
-                echo '<div class="alert error">' . e($result['error']) . '</div>';
+                echo '<div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm mb-4">' . e($result['error']) . '</div>';
             } else {
                 $stmt = $pdo->prepare('UPDATE store_carts SET discount_code = :code, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(['code' => strtoupper($code), 'id' => $cart['id']]);
-                echo '<div class="alert success">Discount applied.</div>';
+                echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Discount applied.</div>';
             }
         }
 
         if ($action === 'clear_discount') {
             $stmt = $pdo->prepare('UPDATE store_carts SET discount_code = NULL, updated_at = NOW() WHERE id = :id');
             $stmt->execute(['id' => $cart['id']]);
-            echo '<div class="alert success">Discount removed.</div>';
+            echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Discount removed.</div>';
         }
     }
 }
@@ -285,114 +285,188 @@ if (!empty($cart['discount_code'])) {
 
 $totals = store_calculate_cart_totals($items, $discount, $settings, 'shipping');
 $pageTitle = 'Your Cart';
-?>
-<div class="grid gap-6">
-  <h2>Your cart</h2>
 
-  <?php if (!$items): ?>
-    <p>Your cart is empty.</p>
-    <a class="button" href="/store">Browse products</a>
-  <?php else: ?>
-    <form method="post" class="card">
+$cartProductImages = [];
+if ($items) {
+    $productIds = array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items));
+    if ($productIds) {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $imgStmt = $pdo->prepare("SELECT product_id, image_url FROM store_product_images WHERE product_id IN ($placeholders) ORDER BY product_id, sort_order ASC, id ASC");
+        $imgStmt->execute($productIds);
+        foreach ($imgStmt->fetchAll() as $row) {
+            $pid = (int) $row['product_id'];
+            if (!isset($cartProductImages[$pid])) {
+                $cartProductImages[$pid] = $row['image_url'];
+            }
+        }
+    }
+}
+?>
+
+<?php if (!$items): ?>
+  <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+    <span class="material-icons-outlined text-6xl text-gray-300">shopping_cart</span>
+    <h2 class="mt-4 font-display text-2xl font-bold text-gray-900">Your cart is empty</h2>
+    <p class="mt-2 text-gray-500">Browse the store to add some Goldwing gear.</p>
+    <a href="/store" class="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold transition-colors">
+      <span class="material-icons-outlined">storefront</span>
+      Browse products
+    </a>
+  </section>
+<?php else: ?>
+  <div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
+
+    <form method="post" class="space-y-4">
       <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
       <input type="hidden" name="action" value="update_cart">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Total</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($items as $item): ?>
-            <tr>
-              <td>
-                <strong><?= e($item['title_snapshot']) ?></strong>
-                <?php if (!empty($item['variant_snapshot'])): ?>
-                  <div style="font-size:0.85rem; color: var(--muted);"><?= e($item['variant_snapshot']) ?></div>
+
+      <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 class="font-display text-lg font-semibold text-gray-900">Cart items (<?= count($items) ?>)</h2>
+          <button type="submit" class="text-sm font-semibold text-gray-700 hover:text-gray-900 inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-base">refresh</span>
+            Update
+          </button>
+        </div>
+        <ul class="divide-y divide-gray-100">
+          <?php foreach ($items as $item):
+            $imgUrl = $cartProductImages[(int) $item['product_id']] ?? '';
+            $lineTotal = (float) $item['unit_price'] * (int) $item['quantity'];
+          ?>
+            <li class="flex items-start gap-4 px-6 py-5">
+              <div class="w-20 h-20 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 relative">
+                <?php if ($imgUrl): ?>
+                  <img src="<?= e($imgUrl) ?>" alt="" class="w-full h-full object-cover">
+                <?php else: ?>
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <span class="material-icons-outlined text-gray-300 text-3xl">inventory_2</span>
+                  </div>
                 <?php endif; ?>
-              </td>
-              <td>
-                <input type="number" name="quantities[<?= e((string) $item['id']) ?>]" min="0" value="<?= e((string) $item['quantity']) ?>">
-              </td>
-              <td>$<?= e(store_money((float) $item['unit_price'])) ?></td>
-              <td>$<?= e(store_money((float) $item['unit_price'] * (int) $item['quantity'])) ?></td>
-              <td>
-                <button class="button" type="submit" name="remove_item" value="<?= e((string) $item['id']) ?>">Remove</button>
-              </td>
-            </tr>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-900"><?= e($item['title_snapshot']) ?></p>
+                <?php if (!empty($item['variant_snapshot'])): ?>
+                  <p class="text-xs text-gray-500 mt-0.5"><?= e($item['variant_snapshot']) ?></p>
+                <?php endif; ?>
+                <p class="text-xs text-gray-500 mt-1">$<?= e(store_money((float) $item['unit_price'])) ?> ea</p>
+                <div class="mt-3 flex items-center gap-3">
+                  <div class="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden bg-white">
+                    <button type="button" class="px-2.5 py-1.5 text-gray-600 hover:bg-gray-50" data-qty-step="-1" data-target="qty-<?= e((string) $item['id']) ?>" aria-label="Decrease quantity">
+                      <span class="material-icons-outlined text-base">remove</span>
+                    </button>
+                    <input id="qty-<?= e((string) $item['id']) ?>" type="number" name="quantities[<?= e((string) $item['id']) ?>]" min="0" value="<?= e((string) $item['quantity']) ?>" class="w-12 text-center border-0 focus:ring-0 text-sm font-semibold py-1.5">
+                    <button type="button" class="px-2.5 py-1.5 text-gray-600 hover:bg-gray-50" data-qty-step="1" data-target="qty-<?= e((string) $item['id']) ?>" aria-label="Increase quantity">
+                      <span class="material-icons-outlined text-base">add</span>
+                    </button>
+                  </div>
+                  <button type="submit" name="remove_item" value="<?= e((string) $item['id']) ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700">
+                    <span class="material-icons-outlined text-base">delete_outline</span>
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="text-base font-bold text-gray-900 whitespace-nowrap">$<?= e(store_money($lineTotal)) ?></div>
+            </li>
           <?php endforeach; ?>
-        </tbody>
-      </table>
-      <div class="form-footer">
-        <button class="button primary" type="submit">Update cart</button>
-      </div>
+        </ul>
+      </section>
     </form>
 
-    <div class="grid gap-4 md:grid-cols-[1.2fr_1fr]">
-      <div class="card">
-        <h3>Discount</h3>
+    <aside class="lg:sticky lg:top-6 self-start space-y-4">
+      <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-display text-lg font-semibold text-gray-900 mb-4">Discount code</h2>
         <?php if (!empty($cart['discount_code'])): ?>
-          <p>Applied code: <strong><?= e($cart['discount_code']) ?></strong></p>
-          <form method="post">
-            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-            <input type="hidden" name="action" value="clear_discount">
-            <button class="button" type="submit">Remove discount</button>
-          </form>
+          <div class="flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <span class="text-sm text-green-800">Code <strong><?= e($cart['discount_code']) ?></strong> applied</span>
+            <form method="post">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="clear_discount">
+              <button type="submit" class="text-xs font-semibold text-green-800 hover:text-green-900 underline">Remove</button>
+            </form>
+          </div>
         <?php else: ?>
-          <form method="post" class="form-group">
+          <form method="post" class="flex gap-2">
             <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
             <input type="hidden" name="action" value="apply_discount">
-            <label for="discount_code">Discount code</label>
-            <input id="discount_code" name="discount_code" placeholder="Enter code">
-            <button class="button" type="submit">Apply</button>
+            <input id="discount_code" name="discount_code" placeholder="Enter code" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary">
+            <button type="submit" class="px-4 py-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm font-semibold border border-amber-200 transition-colors">Apply</button>
           </form>
         <?php endif; ?>
-      </div>
+      </section>
 
-      <div class="card">
-        <h3>Order summary</h3>
-        <table class="table">
-          <tr>
-            <td>Subtotal</td>
-            <td>$<?= e(store_money($totals['subtotal'])) ?></td>
-          </tr>
+      <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h2 class="font-display text-lg font-semibold text-gray-900">Order summary</h2>
+        </div>
+        <div class="px-6 py-4 space-y-2 text-sm">
+          <div class="flex justify-between text-gray-700">
+            <span>Subtotal</span>
+            <span>$<?= e(store_money($totals['subtotal'])) ?></span>
+          </div>
           <?php if ($totals['discount_total'] > 0): ?>
-            <tr>
-              <td>Discount</td>
-              <td>-$<?= e(store_money($totals['discount_total'])) ?></td>
-            </tr>
+            <div class="flex justify-between text-green-700">
+              <span>Discount</span>
+              <span>-$<?= e(store_money($totals['discount_total'])) ?></span>
+            </div>
           <?php endif; ?>
+          <div class="flex justify-between text-gray-700">
+            <span>Shipping</span>
+            <span>$<?= e(store_money($totals['shipping_total'])) ?></span>
+          </div>
           <?php if (!empty($totals['tax_total'])): ?>
-            <tr>
-              <td>GST</td>
-              <td>$<?= e(store_money($totals['tax_total'])) ?></td>
-            </tr>
+            <div class="flex justify-between text-gray-700">
+              <span>GST</span>
+              <span>$<?= e(store_money($totals['tax_total'])) ?></span>
+            </div>
           <?php endif; ?>
-          <tr>
-            <td>Shipping</td>
-            <td>$<?= e(store_money($totals['shipping_total'])) ?></td>
-          </tr>
-          <tr>
-            <td>Payment processing fee</td>
-            <td>$<?= e(store_money($totals['processing_fee_total'])) ?></td>
-          </tr>
-          <tr>
-            <td><strong>Total</strong></td>
-            <td><strong>$<?= e(store_money($totals['total'])) ?></strong></td>
-          </tr>
-        </table>
-        <p style="margin-top:1rem;">
+          <?php if ($totals['processing_fee_total'] > 0): ?>
+            <div class="flex justify-between text-gray-700">
+              <span>Processing fee</span>
+              <span>$<?= e(store_money($totals['processing_fee_total'])) ?></span>
+            </div>
+          <?php endif; ?>
+          <div class="flex justify-between pt-3 mt-2 border-t border-gray-200 text-base font-bold text-gray-900">
+            <span>Total</span>
+            <span>$<?= e(store_money($totals['total'])) ?></span>
+          </div>
+        </div>
+        <div class="px-6 py-5 border-t border-gray-100 space-y-3">
           <?php if ($checkoutEnabled): ?>
-            <a class="button primary" href="/checkout">Proceed to checkout</a>
+            <a href="/checkout" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
+              <span class="material-icons-outlined text-lg">lock</span>
+              Proceed to checkout
+            </a>
           <?php else: ?>
-            <span class="text-sm text-gray-500">Checkout is currently unavailable.</span>
+            <div class="text-center text-sm text-gray-500 italic py-2">Checkout is currently unavailable.</div>
           <?php endif; ?>
-        </p>
-      </div>
-    </div>
-  <?php endif; ?>
-</div>
+          <a href="/store" class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors">
+            <span class="material-icons-outlined text-base">storefront</span>
+            Continue shopping
+          </a>
+        </div>
+      </section>
+
+      <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-4 flex items-start gap-3">
+        <span class="material-icons-outlined text-amber-500 mt-0.5">verified</span>
+        <div>
+          <p class="text-sm font-semibold text-gray-900">Members-only store</p>
+          <p class="text-xs text-gray-500 mt-0.5">All gear is officially licensed and exclusive to current members.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+<?php endif; ?>
+
+<script>
+(function () {
+  document.querySelectorAll('[data-qty-step]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var step = parseInt(btn.getAttribute('data-qty-step'), 10);
+      var target = document.getElementById(btn.getAttribute('data-target'));
+      if (!target) return;
+      var next = Math.max(0, (parseInt(target.value, 10) || 0) + step);
+      target.value = next;
+    });
+  });
+})();
+</script>

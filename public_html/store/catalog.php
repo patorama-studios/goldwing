@@ -36,56 +36,77 @@ $stmt->execute($params);
 $products = $stmt->fetchAll();
 
 $pageTitle = $settings['store_name'] ?? 'Store';
-$heroLead = 'Members-only store for official Australian Goldwing Association gear, apparel, and accessories.';
 ?>
-<div class="store-shell">
-  <form class="store-filters" method="get" action="/store">
-    <div class="store-filter search">
-      <label class="sr-only" for="store-search">Search</label>
-      <input id="store-search" name="q" value="<?= e($search) ?>" placeholder="Search products">
+<section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+  <form method="get" action="/store" class="grid grid-cols-1 md:grid-cols-[1fr_200px_200px_auto] gap-3 items-end">
+    <div>
+      <label for="store-search" class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Search</label>
+      <div class="relative">
+        <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
+        <input id="store-search" name="q" value="<?= e($search) ?>" placeholder="Search products" class="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:border-primary focus:ring-primary text-sm">
+      </div>
     </div>
-    <div class="store-filter">
-      <label class="sr-only" for="store-category">Category</label>
-      <select id="store-category" name="category">
+    <div>
+      <label for="store-category" class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Category</label>
+      <select id="store-category" name="category" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:border-primary focus:ring-primary text-sm">
         <option value="">All categories</option>
         <?php foreach ($categories as $category): ?>
           <option value="<?= e((string) $category['id']) ?>" <?= $categoryId === (int) $category['id'] ? 'selected' : '' ?>><?= e($category['name']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="store-filter">
-      <label class="sr-only" for="store-tag">Tag</label>
-      <select id="store-tag" name="tag">
+    <div>
+      <label for="store-tag" class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Tag</label>
+      <select id="store-tag" name="tag" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:border-primary focus:ring-primary text-sm">
         <option value="">All tags</option>
         <?php foreach ($tags as $tag): ?>
           <option value="<?= e((string) $tag['id']) ?>" <?= $tagId === (int) $tag['id'] ? 'selected' : '' ?>><?= e($tag['name']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <button class="button" type="submit">Filters</button>
+    <button type="submit" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold transition-colors">
+      <span class="material-icons-outlined text-base">tune</span>
+      Filter
+    </button>
   </form>
+</section>
 
-  <?php if (!$products): ?>
-    <div class="alert">No products match your filters yet.</div>
-  <?php else: ?>
-    <div class="store-grid">
-      <?php foreach ($products as $product): ?>
-        <article class="store-card">
-          <div class="store-card__media">
-            <?php if (!empty($product['image_url'])): ?>
-              <img src="<?= e($product['image_url']) ?>" alt="<?= e($product['title']) ?>">
-            <?php else: ?>
-              <div class="store-card__placeholder">No image</div>
-            <?php endif; ?>
+<?php if (!$products): ?>
+  <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+    <span class="material-icons-outlined text-5xl text-gray-300">storefront</span>
+    <h2 class="mt-3 text-xl font-semibold text-gray-900">No products match your filters yet</h2>
+    <p class="mt-1 text-gray-500">Try clearing filters or check back soon for new gear.</p>
+    <a href="/store" class="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold transition-colors">Clear filters</a>
+  </section>
+<?php else: ?>
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    <?php foreach ($products as $product):
+      $isTicket = ($product['type'] ?? '') === 'ticket';
+      $typeLabel = $isTicket ? 'Ticket' : 'Apparel';
+    ?>
+      <a href="/store/product/<?= e($product['slug']) ?>" class="group bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div class="aspect-square bg-gray-50 overflow-hidden relative">
+          <?php if (!empty($product['image_url'])): ?>
+            <img src="<?= e($product['image_url']) ?>" alt="<?= e($product['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+          <?php else: ?>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="material-icons-outlined text-6xl text-gray-300"><?= $isTicket ? 'confirmation_number' : 'checkroom' ?></span>
+            </div>
+          <?php endif; ?>
+          <span class="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur text-[11px] font-bold uppercase tracking-wider text-gray-700 shadow-sm">
+            <span class="material-icons-outlined text-sm"><?= $isTicket ? 'confirmation_number' : 'checkroom' ?></span>
+            <?= e($typeLabel) ?>
+          </span>
+        </div>
+        <div class="p-4 flex flex-col flex-1">
+          <h3 class="font-display text-base font-semibold text-gray-900 line-clamp-2"><?= e($product['title']) ?></h3>
+          <p class="mt-2 text-lg font-bold text-gray-900">$<?= e(store_money((float) $product['base_price'])) ?></p>
+          <div class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 group-hover:text-primary-strong transition-colors">
+            View product
+            <span class="material-icons-outlined text-base group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
           </div>
-          <div class="store-card__body">
-            <span class="store-pill"><?= e($product['type']) ?></span>
-            <h3><?= e($product['title']) ?></h3>
-            <p class="store-price">$<?= e(store_money((float) $product['base_price'])) ?></p>
-            <a class="button primary store-card__cta" href="/store/product/<?= e($product['slug']) ?>">View product</a>
-          </div>
-        </article>
-      <?php endforeach; ?>
-    </div>
-  <?php endif; ?>
-</div>
+        </div>
+      </a>
+    <?php endforeach; ?>
+  </section>
+<?php endif; ?>

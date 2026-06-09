@@ -90,9 +90,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
       </section>
 
-      <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
-        <?= $viewContent ?>
-      </section>
+      <?= $viewContent ?>
     </div>
   </main>
 </div>
