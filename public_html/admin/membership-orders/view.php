@@ -22,6 +22,7 @@ use App\Services\AdminMemberAccess;
 use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\MemberRepository;
+use App\Services\RefundService;
 
 require_permission('admin.members.view');
 
@@ -109,6 +110,11 @@ try {
 } catch (Throwable $e) {
     $activityEntries = [];
 }
+
+$orderTotalCents    = (int) round((float) ($order['total'] ?? 0) * 100);
+$refundedCents      = RefundService::getMembershipRefundedCents($orderId);
+$refundableCents    = max(0, $orderTotalCents - $refundedCents);
+$canRefund          = AdminMemberAccess::canRefund($user) && $refundableCents > 0 && !empty($order['stripe_payment_intent_id']);
 
 $paymentMethod      = (string) ($order['payment_method'] ?? '');
 $paymentMethodLabel = $paymentMethod !== '' ? ucwords(str_replace('_', ' ', $paymentMethod)) : '—';
@@ -382,6 +388,72 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="hidden" name="order_id" value="<?= e((string) $orderId) ?>">
                   <button class="w-full rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700" type="submit">Send checkout link</button>
                 </form>
+              </div>
+            <?php endif; ?>
+
+            <!-- Refunds (full + partial) -->
+            <?php if ($paymentStatus === 'accepted' || $paymentStatus === 'partial_refund' || $refunds): ?>
+              <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
+                <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Refunds</h3>
+                <div class="text-sm text-slate-700">
+                  <p>Order total: <span class="font-semibold"><?= e($fmtMoney($order['total'] ?? 0, (string) ($order['currency'] ?? 'AUD'))) ?></span></p>
+                  <p>Already refunded: <span class="font-semibold"><?= e('A$' . number_format($refundedCents / 100, 2)) ?></span></p>
+                  <p class="text-emerald-700">Refundable: <span class="font-semibold"><?= e('A$' . number_format($refundableCents / 100, 2)) ?></span></p>
+                </div>
+                <?php if ($canRefund): ?>
+                  <form method="post" action="/admin/members/actions.php" class="space-y-2" onsubmit="return confirm('Issue this Stripe refund? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                    <input type="hidden" name="member_id" value="<?= e((string) $memberId) ?>">
+                    <input type="hidden" name="tab" value="orders">
+                    <input type="hidden" name="orders_section" value="membership">
+                    <input type="hidden" name="action" value="membership_order_refund">
+                    <input type="hidden" name="order_id" value="<?= e((string) $orderId) ?>">
+                    <div>
+                      <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Amount (AUD)</label>
+                      <input name="refund_amount" type="number" step="0.01" min="0.01" max="<?= e(number_format($refundableCents / 100, 2, '.', '')) ?>" placeholder="Leave blank for full <?= e(number_format($refundableCents / 100, 2)) ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                      <p class="mt-1 text-xs text-slate-500">Partial refunds are supported — anything from 0.01 up to <?= e('A$' . number_format($refundableCents / 100, 2)) ?>.</p>
+                    </div>
+                    <div>
+                      <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Reason (required)</label>
+                      <input name="refund_reason" required placeholder="e.g. duplicate payment" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    </div>
+                    <button class="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" type="submit">Issue Stripe refund</button>
+                  </form>
+                <?php elseif ($refundableCents <= 0): ?>
+                  <p class="text-xs text-slate-500">This order is fully refunded.</p>
+                <?php elseif (empty($order['stripe_payment_intent_id'])): ?>
+                  <p class="text-xs text-amber-700">No Stripe PaymentIntent on file — refund manually outside Stripe.</p>
+                <?php else: ?>
+                  <p class="text-xs text-slate-500">You don't have permission to issue refunds.</p>
+                <?php endif; ?>
+
+                <?php if ($refunds): ?>
+                  <div class="mt-3 pt-3 border-t border-gray-100">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">History</p>
+                    <ul class="space-y-2 text-xs">
+                      <?php foreach ($refunds as $r): ?>
+                        <?php
+                          $rAmount = isset($r['amount_cents']) && $r['amount_cents'] !== null
+                            ? (int) $r['amount_cents']
+                            : null;
+                          $rAmountFmt = $rAmount !== null ? 'A$' . number_format($rAmount / 100, 2) : '(amount n/a)';
+                          $rStripe = (string) ($r['stripe_refund_id'] ?? '');
+                          $rUrl = $rStripe !== '' ? 'https://dashboard.stripe.com/refunds/' . rawurlencode($rStripe) : '';
+                        ?>
+                        <li class="flex flex-wrap items-baseline gap-2 text-slate-700">
+                          <span class="font-semibold"><?= e($rAmountFmt) ?></span>
+                          <span class="text-slate-500"><?= e((string) ($r['refunded_at'] ?? $r['created_at'] ?? '')) ?></span>
+                          <?php if ($rUrl !== ''): ?>
+                            <a class="font-mono text-blue-600 hover:underline break-all" href="<?= e($rUrl) ?>" target="_blank" rel="noopener"><?= e($rStripe) ?> ↗</a>
+                          <?php endif; ?>
+                          <?php if (!empty($r['reason'])): ?>
+                            <span class="block w-full text-slate-500">Reason: <?= e((string) $r['reason']) ?></span>
+                          <?php endif; ?>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  </div>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
 

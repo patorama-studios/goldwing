@@ -2735,6 +2735,63 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 034 — Track refund amounts on the membership `refunds` table
+//
+// The membership refunds table was full-refund-only: one row per refund,
+// no amount column. We now support partial refunds (RefundService::
+// processMembershipRefund) and need per-row amount + status tracking so
+// the "refundable" calculation on the order page works correctly and
+// multiple partial refunds can stack.
+//
+// Adds two nullable columns:
+//   • amount_cents INT NULL — the cents refunded by this row.
+//   • status VARCHAR(20) NULL — 'processed' (default for new rows);
+//     reserved for future 'pending' / 'failed' states.
+//
+// Pre-existing rows stay NULL. RefundService falls back to "full refund
+// of the order total" semantics for any historical rows that have no
+// amount_cents.
+//
+// Idempotent.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_034_refunds_amount_cents';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 034 — Membership refund amounts', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $applied = [];
+
+        $addColumnIfMissing = function (string $table, string $column, string $ddl) use ($pdo, &$applied) {
+            $exists = (bool) $pdo->query("SHOW COLUMNS FROM {$table} LIKE " . $pdo->quote($column))->fetchColumn();
+            if ($exists) {
+                $applied[] = "`{$table}.{$column}` already present";
+                return;
+            }
+            try {
+                $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$ddl}");
+                $applied[] = "`{$table}.{$column}` added";
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false) {
+                    throw $e;
+                }
+                $applied[] = "`{$table}.{$column}` already present (caught duplicate)";
+            }
+        };
+
+        $addColumnIfMissing('refunds', 'amount_cents', 'INT NULL AFTER reason');
+        $addColumnIfMissing('refunds', 'status', "VARCHAR(20) NULL AFTER amount_cents");
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 034 — Membership refund amounts', 'status' => 'applied', 'note' => implode(' · ', $applied)];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 034 — Membership refund amounts', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

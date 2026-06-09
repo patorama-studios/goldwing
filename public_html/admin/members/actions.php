@@ -342,7 +342,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'membership_order_refund', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -1620,6 +1620,55 @@ switch ($action) {
             'actor_roles' => $user['roles'] ?? [],
         ]);
         redirectWithFlash($memberId, $tab, 'Order permanently deleted.');
+        break;
+
+    case 'membership_order_refund':
+        if (!AdminMemberAccess::canRefund($user)) {
+            redirectWithFlash($memberId, $tab, 'Refunds are restricted for your role.', 'error');
+        }
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $amountRaw = trim((string) ($_POST['refund_amount'] ?? ''));
+        $reason = trim((string) ($_POST['refund_reason'] ?? ''));
+        if ($orderId <= 0) {
+            redirectWithFlash($memberId, $tab, 'Order not found.', 'error');
+        }
+        if ($reason === '') {
+            redirectWithFlash($memberId, $tab, 'Refund reason is required.', 'error');
+        }
+        // Resolve refund amount: blank means "refund whatever's left".
+        // RefundService will catch over-refund attempts.
+        if ($amountRaw === '') {
+            $pdo = Database::connection();
+            $totalStmt = $pdo->prepare('SELECT total FROM orders WHERE id = :id LIMIT 1');
+            $totalStmt->execute(['id' => $orderId]);
+            $totalCents = (int) round(((float) ($totalStmt->fetchColumn() ?: 0)) * 100);
+            $alreadyCents = RefundService::getMembershipRefundedCents($orderId);
+            $amountCents = max(0, $totalCents - $alreadyCents);
+        } else {
+            $amountCents = (int) round(((float) $amountRaw) * 100);
+        }
+        if ($amountCents <= 0) {
+            redirectWithFlash($memberId, $tab, 'Refund amount must be greater than zero.', 'error');
+        }
+        // Membership refund path — operates on the unified `orders` table,
+        // writes to the membership `refunds` table, issues the Stripe refund.
+        try {
+            RefundService::processMembershipRefund(
+                $orderId,
+                $amountCents,
+                $reason,
+                (int) ($user['id'] ?? 0)
+            );
+            // Land back on the standalone order page rather than the member's
+            // orders tab so the admin sees the freshly-updated state.
+            $_SESSION['members_flash'] = ['type' => 'success', 'message' => 'Refund processed.'];
+            header('Location: /admin/membership-orders/view.php?id=' . $orderId);
+            exit;
+        } catch (\RuntimeException $e) {
+            $_SESSION['members_flash'] = ['type' => 'error', 'message' => $e->getMessage()];
+            header('Location: /admin/membership-orders/view.php?id=' . $orderId);
+            exit;
+        }
         break;
 
     case 'store_order_void':

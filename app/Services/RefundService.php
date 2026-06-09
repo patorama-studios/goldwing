@@ -179,4 +179,185 @@ class RefundService
     {
         return 'A$' . number_format($cents / 100, 2);
     }
+
+    /**
+     * Membership refund — partial or full. Mirrors processRefund() but works
+     * against the unified `orders` table + the membership `refunds` table.
+     * Requires migration 034 (refunds.amount_cents + refunds.status).
+     *
+     * @return array{refund_id:int, stripe_refund_id:string, remaining_refundable_cents:int}
+     * @throws RuntimeException
+     */
+    public static function processMembershipRefund(int $orderId, int $amountCents, string $reason, int $adminUserId): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND order_type = "membership" LIMIT 1');
+        $stmt->execute(['id' => $orderId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            throw new RuntimeException('Membership order not found.');
+        }
+        $memberId = (int) ($order['member_id'] ?? 0);
+
+        $orderTotalCents = (int) round((float) ($order['total'] ?? 0) * 100);
+
+        // Sum already-processed refund amounts. The amount_cents column was
+        // added in migration 034; older rows pre-migration use the order total.
+        $refundedCents = 0;
+        try {
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount_cents), 0) FROM refunds WHERE order_id = :id AND (status IS NULL OR status = 'processed')");
+            $stmt->execute(['id' => $orderId]);
+            $refundedCents = (int) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            // Pre-migration schema — fall back to row count × full order total.
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM refunds WHERE order_id = :id');
+            $stmt->execute(['id' => $orderId]);
+            if ((int) $stmt->fetchColumn() > 0) {
+                $refundedCents = $orderTotalCents;
+            }
+        }
+
+        $remaining = max(0, $orderTotalCents - $refundedCents);
+        if ($amountCents <= 0) {
+            throw new RuntimeException('Refund amount must be greater than zero.');
+        }
+        if ($amountCents > $remaining) {
+            throw new RuntimeException('Refund exceeds refundable total (remaining ' . self::formatCurrency($remaining) . ').');
+        }
+
+        $paymentIntentId = (string) ($order['stripe_payment_intent_id'] ?? '');
+        if ($paymentIntentId === '') {
+            throw new RuntimeException('Stripe payment intent is not available for this membership order.');
+        }
+
+        ActivityLogger::log('admin', $adminUserId, $memberId, 'membership.refund_requested', [
+            'order_id' => $orderId,
+            'amount_cents' => $amountCents,
+            'reason' => $reason,
+        ]);
+
+        $refund = StripeService::createRefund($paymentIntentId, $amountCents);
+        if (empty($refund) || empty($refund['id'])) {
+            ActivityLogger::log('admin', $adminUserId, $memberId, 'membership.refund_failed', [
+                'order_id' => $orderId,
+                'amount_cents' => $amountCents,
+                'reason' => $reason,
+            ]);
+            throw new RuntimeException('Stripe refund could not be completed.');
+        }
+
+        // Persist — gracefully handle pre-migration schemas where amount_cents
+        // or status columns don't exist yet.
+        try {
+            $stmt = $pdo->prepare("INSERT INTO refunds (order_id, stripe_refund_id, refunded_by_user_id, refunded_at, reason, amount_cents, status, created_at) VALUES (:order_id, :stripe_refund_id, :user_id, NOW(), :reason, :amount_cents, 'processed', NOW())");
+            $stmt->execute([
+                'order_id' => $orderId,
+                'stripe_refund_id' => (string) $refund['id'],
+                'user_id' => $adminUserId > 0 ? $adminUserId : null,
+                'reason' => $reason !== '' ? $reason : null,
+                'amount_cents' => $amountCents,
+            ]);
+        } catch (\Throwable $e) {
+            // Old schema fallback — no amount_cents / status. Insert without.
+            $stmt = $pdo->prepare('INSERT INTO refunds (order_id, stripe_refund_id, refunded_by_user_id, refunded_at, reason, created_at) VALUES (:order_id, :stripe_refund_id, :user_id, NOW(), :reason, NOW())');
+            $stmt->execute([
+                'order_id' => $orderId,
+                'stripe_refund_id' => (string) $refund['id'],
+                'user_id' => $adminUserId > 0 ? $adminUserId : null,
+                'reason' => $reason !== '' ? $reason : null,
+            ]);
+        }
+        $refundId = (int) $pdo->lastInsertId();
+
+        $remainingAfter = max(0, $remaining - $amountCents);
+        $newPaymentStatus = $remainingAfter <= 0 ? 'refunded' : 'partial_refund';
+        $newStatus = $remainingAfter <= 0 ? 'refunded' : 'paid';
+
+        // Update the order. Only touch payment_status if the column exists
+        // (older schemas may not have it).
+        $sql = 'UPDATE orders SET status = :status, updated_at = NOW()';
+        $params = ['status' => $newStatus, 'id' => $orderId];
+        try {
+            $colStmt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_status'");
+            if ($colStmt->fetchColumn()) {
+                $sql = 'UPDATE orders SET status = :status, payment_status = :payment_status, updated_at = NOW()';
+                $params['payment_status'] = $newPaymentStatus;
+            }
+        } catch (\Throwable $e) { /* skip if SHOW fails */ }
+        $sql .= ' WHERE id = :id';
+        $pdo->prepare($sql)->execute($params);
+
+        // On full refund, lapse the linked membership_periods row so the member
+        // doesn't keep an active membership the AGA was paid back for.
+        if ($remainingAfter <= 0 && !empty($order['membership_period_id'])) {
+            try {
+                $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
+                $stmt->execute(['id' => (int) $order['membership_period_id']]);
+            } catch (\Throwable $e) { /* best-effort */ }
+        }
+
+        ActivityLogger::log('admin', $adminUserId, $memberId, 'membership.refund_processed', [
+            'order_id' => $orderId,
+            'refund_id' => $refundId,
+            'stripe_refund_id' => (string) $refund['id'],
+            'amount_cents' => $amountCents,
+            'remaining_refundable_cents' => $remainingAfter,
+        ]);
+
+        $safeRefundId = htmlspecialchars((string) $refundId, ENT_QUOTES, 'UTF-8');
+        $safeAdminId = htmlspecialchars((string) $adminUserId, ENT_QUOTES, 'UTF-8');
+        SecurityAlertService::send('refund_created', 'Security alert: membership refund created', '<p>Membership refund #' . $safeRefundId . ' (order ' . $orderId . ') created by user ID ' . $safeAdminId . '.</p>');
+
+        if ($memberId > 0) {
+            try {
+                $stmt = $pdo->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $memberId]);
+                $member = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($member && !empty($member['email'])) {
+                    NotificationService::dispatch('membership_refund_processed', [
+                        'primary_email' => $member['email'],
+                        'admin_emails' => NotificationService::getAdminEmails(),
+                        'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                        'order_number' => (string) ($order['order_number'] ?? $orderId),
+                        'refund_amount' => NotificationService::escape(self::formatCurrency($amountCents)),
+                        'refund_reason' => NotificationService::escape($reason !== '' ? $reason : 'Refund issued by admin.'),
+                    ]);
+                }
+            } catch (\Throwable $e) { /* notification failure shouldn't block refund */ }
+        }
+
+        return [
+            'refund_id' => $refundId,
+            'stripe_refund_id' => (string) $refund['id'],
+            'remaining_refundable_cents' => $remainingAfter,
+        ];
+    }
+
+    /**
+     * Sum of refunded cents for a membership order. Used by the UI to show
+     * "refundable: $X" alongside the refund form. Pre-migration rows without
+     * amount_cents are treated as full refunds of the order total.
+     */
+    public static function getMembershipRefundedCents(int $orderId): int
+    {
+        $pdo = Database::connection();
+        try {
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount_cents), 0) FROM refunds WHERE order_id = :id AND (status IS NULL OR status = 'processed')");
+            $stmt->execute(['id' => $orderId]);
+            return (int) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            // Pre-migration: every row = full refund of order total.
+            try {
+                $stmt = $pdo->prepare('SELECT o.total FROM orders o WHERE o.id = :id LIMIT 1');
+                $stmt->execute(['id' => $orderId]);
+                $total = (float) ($stmt->fetchColumn() ?: 0);
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM refunds WHERE order_id = :id');
+                $stmt->execute(['id' => $orderId]);
+                if ((int) $stmt->fetchColumn() > 0) {
+                    return (int) round($total * 100);
+                }
+            } catch (\Throwable $e2) { /* nothing useful to report */ }
+            return 0;
+        }
+    }
 }
