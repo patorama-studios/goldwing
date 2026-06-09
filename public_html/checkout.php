@@ -8,7 +8,7 @@ use App\Services\SettingsService;
 require_login();
 
 // Deploy marker so we can verify the right code is running.
-define('CHECKOUT_VERSION', '67c1d7c+marker');
+define('CHECKOUT_VERSION', 'rename-items-to-cartItems');
 
 $pdo = db();
 $user = current_user();
@@ -31,24 +31,24 @@ $cleanup->execute(['cart_id' => $cart['id']]);
 // install, producing 18 phantom <li> rows in the order summary for a
 // cart that only had 2 real items. Fetch cart items alone, then look
 // up product/variant metadata in separate queries and merge by id —
-// guaranteed one $items entry per store_cart_items row.
-$itemsStmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND quantity > 0 AND title_snapshot IS NOT NULL AND title_snapshot != \'\' ORDER BY id ASC');
-$itemsStmt->execute(['cart_id' => $cart['id']]);
-$items = $itemsStmt->fetchAll();
+// guaranteed one $cartItems entry per store_cart_items row.
+$cartItemsStmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND quantity > 0 AND title_snapshot IS NOT NULL AND title_snapshot != \'\' ORDER BY id ASC');
+$cartItemsStmt->execute(['cart_id' => $cart['id']]);
+$cartItems = $cartItemsStmt->fetchAll();
 
 // Capture debug values so we can emit them next to the order summary.
 $DEBUG_user_id_used = (int) ($user['id'] ?? 0);
 $DEBUG_cart_id_used = (int) ($cart['id'] ?? 0);
-$DEBUG_items_count_at_fetch = is_array($items) ? count($items) : -1;
-$DEBUG_first_item_keys = (is_array($items) && !empty($items)) ? implode(',', array_keys($items[0])) : '';
-$DEBUG_first_item_id = (is_array($items) && !empty($items)) ? ($items[0]['id'] ?? 'no-id-key') : '';
-$DEBUG_first_item_title = (is_array($items) && !empty($items)) ? ($items[0]['title_snapshot'] ?? 'no-title') : '';
-$DEBUG_first_item_qty = (is_array($items) && !empty($items)) ? ($items[0]['quantity'] ?? 'no-qty') : '';
+$DEBUG_items_count_at_fetch = is_array($cartItems) ? count($cartItems) : -1;
+$DEBUG_first_item_keys = (is_array($cartItems) && !empty($cartItems)) ? implode(',', array_keys($cartItems[0])) : '';
+$DEBUG_first_item_id = (is_array($cartItems) && !empty($cartItems)) ? ($cartItems[0]['id'] ?? 'no-id-key') : '';
+$DEBUG_first_item_title = (is_array($cartItems) && !empty($cartItems)) ? ($cartItems[0]['title_snapshot'] ?? 'no-title') : '';
+$DEBUG_first_item_qty = (is_array($cartItems) && !empty($cartItems)) ? ($cartItems[0]['quantity'] ?? 'no-qty') : '';
 $DEBUG_user_email = (string) ($user['email'] ?? '');
 
-if ($items) {
-    $productIds = array_values(array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items)));
-    $variantIds = array_values(array_filter(array_unique(array_map(function ($i) { return (int) ($i['variant_id'] ?? 0); }, $items))));
+if ($cartItems) {
+    $productIds = array_values(array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $cartItems)));
+    $variantIds = array_values(array_filter(array_unique(array_map(function ($i) { return (int) ($i['variant_id'] ?? 0); }, $cartItems))));
 
     $productInfo = [];
     if ($productIds) {
@@ -70,7 +70,7 @@ if ($items) {
         }
     }
 
-    foreach ($items as &$item) {
+    foreach ($cartItems as &$item) {
         $pid = (int) $item['product_id'];
         $vid = (int) ($item['variant_id'] ?? 0);
         $p = $productInfo[$pid] ?? [];
@@ -85,7 +85,7 @@ if ($items) {
 }
 
 $requiresShipping = false;
-foreach ($items as $item) {
+foreach ($cartItems as $item) {
     if (($item['type'] ?? 'physical') === 'physical') {
         $requiresShipping = true;
         break;
@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'apply_discount') {
             $code = trim($_POST['discount_code'] ?? '');
             $subtotal = 0.0;
-            foreach ($items as $item) {
+            foreach ($cartItems as $item) {
                 $subtotal += (float) $item['unit_price'] * (int) $item['quantity'];
             }
             $result = store_validate_discount_code($code, $subtotal);
@@ -158,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $discount = null;
 if (!empty($cart['discount_code'])) {
     $subtotal = 0.0;
-    foreach ($items as $item) {
+    foreach ($cartItems as $item) {
         $subtotal += (float) $item['unit_price'] * (int) $item['quantity'];
     }
     $result = store_validate_discount_code($cart['discount_code'], $subtotal);
@@ -167,7 +167,7 @@ if (!empty($cart['discount_code'])) {
     }
 }
 
-$totals = store_calculate_cart_totals($items, $discount, $settings, $fulfillment);
+$totals = store_calculate_cart_totals($cartItems, $discount, $settings, $fulfillment);
 $subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
 $shippingAvailable = false;
 if ($fulfillment === 'shipping') {
@@ -186,8 +186,8 @@ $activeSubPage = 'checkout';
 require __DIR__ . '/../app/Views/partials/backend_head.php';
 
 $cartItemImages = [];
-if ($items) {
-    $productIds = array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items));
+if ($cartItems) {
+    $productIds = array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $cartItems));
     if ($productIds) {
         $placeholders = implode(',', array_fill(0, count($productIds), '?'));
         $imgStmt = $pdo->prepare("SELECT product_id, image_url FROM store_product_images WHERE product_id IN ($placeholders) ORDER BY product_id, sort_order ASC, id ASC");
@@ -247,7 +247,7 @@ if ($items) {
           <h2 class="mt-3 text-xl font-semibold text-gray-900">Checkout is currently unavailable.</h2>
           <p class="mt-1 text-gray-500">Please try again later or contact support.</p>
         </div>
-      <?php elseif (!$items): ?>
+      <?php elseif (!$cartItems): ?>
         <div class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
           <span class="material-icons-outlined text-5xl text-gray-400">shopping_cart</span>
           <h2 class="mt-3 text-xl font-semibold text-gray-900">Your cart is empty.</h2>
@@ -469,14 +469,14 @@ if ($items) {
               <!-- first-item-id: <?= e((string) ($DEBUG_first_item_id ?? '')) ?> -->
               <!-- first-item-title: <?= e((string) ($DEBUG_first_item_title ?? '')) ?> -->
               <!-- first-item-qty: <?= e((string) ($DEBUG_first_item_qty ?? '')) ?> -->
-              <!-- items-count: <?= (int) (is_array($items) ? count($items) : -1) ?> -->
-              <!-- items-keys: <?= e(is_array($items) && !empty($items) ? implode(',', array_keys($items)) : '') ?> -->
+              <!-- items-count: <?= (int) (is_array($cartItems) ? count($cartItems) : -1) ?> -->
+              <!-- items-keys: <?= e(is_array($cartItems) && !empty($cartItems) ? implode(',', array_keys($cartItems)) : '') ?> -->
               <?php
-                // Defensive rebuild: even if something earlier somehow expanded $items,
+                // Defensive rebuild: even if something earlier somehow expanded $cartItems,
                 // collapse it back to one row per unique store_cart_items.id.
-                if (is_array($items)) {
+                if (is_array($cartItems)) {
                     $renderItems = [];
-                    foreach ($items as $rrow) {
+                    foreach ($cartItems as $rrow) {
                         $rid = isset($rrow['id']) ? (int) $rrow['id'] : null;
                         if ($rid === null || $rid <= 0) { continue; }
                         if (((int) ($rrow['quantity'] ?? 0)) <= 0) { continue; }
