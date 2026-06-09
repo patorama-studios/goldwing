@@ -23,9 +23,53 @@ $cart = store_get_open_cart((int) ($user['id'] ?? 0));
 $cleanup = $pdo->prepare('DELETE FROM store_cart_items WHERE cart_id = :cart_id AND (quantity <= 0 OR unit_price < 0 OR title_snapshot IS NULL OR title_snapshot = "")');
 $cleanup->execute(['cart_id' => $cart['id']]);
 
-$itemsStmt = $pdo->prepare('SELECT ci.*, p.type, p.event_name, p.track_inventory, p.stock_quantity, v.stock_quantity as variant_stock FROM store_cart_items ci JOIN store_products p ON p.id = ci.product_id LEFT JOIN store_product_variants v ON v.id = ci.variant_id WHERE ci.cart_id = :cart_id AND ci.quantity > 0 AND ci.title_snapshot IS NOT NULL AND ci.title_snapshot != ""');
+// Bypass the JOIN: the previous query joined store_products and
+// store_product_variants and was returning 9x duplicate rows on this
+// install, producing 18 phantom <li> rows in the order summary for a
+// cart that only had 2 real items. Fetch cart items alone, then look
+// up product/variant metadata in separate queries and merge by id —
+// guaranteed one $items entry per store_cart_items row.
+$itemsStmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart_id AND quantity > 0 AND title_snapshot IS NOT NULL AND title_snapshot != \'\' ORDER BY id ASC');
 $itemsStmt->execute(['cart_id' => $cart['id']]);
 $items = $itemsStmt->fetchAll();
+
+if ($items) {
+    $productIds = array_values(array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items)));
+    $variantIds = array_values(array_filter(array_unique(array_map(function ($i) { return (int) ($i['variant_id'] ?? 0); }, $items))));
+
+    $productInfo = [];
+    if ($productIds) {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $pStmt = $pdo->prepare('SELECT id, type, event_name, track_inventory, stock_quantity FROM store_products WHERE id IN (' . $placeholders . ')');
+        $pStmt->execute($productIds);
+        foreach ($pStmt->fetchAll() as $p) {
+            $productInfo[(int) $p['id']] = $p;
+        }
+    }
+
+    $variantInfo = [];
+    if ($variantIds) {
+        $placeholders = implode(',', array_fill(0, count($variantIds), '?'));
+        $vStmt = $pdo->prepare('SELECT id, stock_quantity FROM store_product_variants WHERE id IN (' . $placeholders . ')');
+        $vStmt->execute($variantIds);
+        foreach ($vStmt->fetchAll() as $v) {
+            $variantInfo[(int) $v['id']] = $v;
+        }
+    }
+
+    foreach ($items as &$item) {
+        $pid = (int) $item['product_id'];
+        $vid = (int) ($item['variant_id'] ?? 0);
+        $p = $productInfo[$pid] ?? [];
+        $v = $variantInfo[$vid] ?? [];
+        $item['type'] = $p['type'] ?? 'physical';
+        $item['event_name'] = $p['event_name'] ?? null;
+        $item['track_inventory'] = $p['track_inventory'] ?? 0;
+        $item['stock_quantity'] = $p['stock_quantity'] ?? null;
+        $item['variant_stock'] = $v['stock_quantity'] ?? null;
+    }
+    unset($item);
+}
 
 $requiresShipping = false;
 foreach ($items as $item) {
