@@ -607,7 +607,17 @@ class PaymentWebhookService
         return $order ?: null;
     }
 
-    private static function markStoreOrderPaid(int $storeOrderId, string $paymentIntentId, ?string $sessionId = null, int $cartId = 0): void
+    /**
+     * Flip a store_order to paid + run the post-payment side effects
+     * (cart conversion, ticket generation, stock decrement, payment.paid
+     * event, downstream `invoices` row + email).
+     *
+     * Public so admin tools can re-use the same code path when Stripe
+     * webhooks didn't reach us (test mode without a test endpoint, manual
+     * cleanup, etc.). Idempotent: a second call on an already-paid order
+     * just back-fills missing Stripe ids and returns.
+     */
+    public static function markStoreOrderPaid(int $storeOrderId, string $paymentIntentId, ?string $sessionId = null, int $cartId = 0): void
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id LIMIT 1');

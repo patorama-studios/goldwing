@@ -4,6 +4,7 @@ use App\Services\Csrf;
 use App\Services\NotificationService;
 use App\Services\OrderAdminService;
 use App\Services\OrderRepository;
+use App\Services\PaymentWebhookService;
 use App\Services\RefundService;
 
 require_once __DIR__ . '/../../../includes/stripe_references.php';
@@ -224,6 +225,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 $alerts[] = ['type' => 'success', 'message' => 'Order cancelled.'];
+            }
+        }
+
+        if ($action === 'mark_paid') {
+            if (!$canManage) {
+                $alerts[] = ['type' => 'error', 'message' => 'You do not have permission to mark orders paid.'];
+            } else {
+                $paidStatus = (string) \App\Services\SettingsService::getGlobal('store.order_paid_status', 'paid');
+                if (($order['status'] ?? '') === $paidStatus) {
+                    $alerts[] = ['type' => 'success', 'message' => 'Order is already marked paid.'];
+                } else {
+                    // Use whatever Stripe ids we already have on the row so the
+                    // event log + downstream invoice link to the real transaction.
+                    $existingPi = (string) ($order['stripe_payment_intent_id'] ?? '');
+                    $existingSession = (string) ($order['stripe_session_id'] ?? '');
+                    // Pull cart_id from the linked unified orders row metadata if present.
+                    $cartId = 0;
+                    try {
+                        $stmt = $pdo->prepare('SELECT shipping_address_json FROM orders WHERE order_number = :n LIMIT 1');
+                        $stmt->execute(['n' => $order['order_number'] ?? '']);
+                        $addr = json_decode((string) ($stmt->fetchColumn() ?: ''), true);
+                        if (is_array($addr) && !empty($addr['cart_id'])) {
+                            $cartId = (int) $addr['cart_id'];
+                        }
+                    } catch (Throwable $e) { /* ignore */ }
+
+                    PaymentWebhookService::markStoreOrderPaid(
+                        (int) $order['id'],
+                        $existingPi,
+                        $existingSession !== '' ? $existingSession : null,
+                        $cartId
+                    );
+
+                    // Also flip the linked unified `orders` row + create the local
+                    // `invoices` row, mirroring what handleInvoicePaid does after the
+                    // store-side hand-off.
+                    try {
+                        $stmt = $pdo->prepare('SELECT * FROM orders WHERE order_number = :n LIMIT 1');
+                        $stmt->execute(['n' => $order['order_number'] ?? '']);
+                        $unifiedOrder = $stmt->fetch();
+                        if ($unifiedOrder && ($unifiedOrder['status'] ?? '') !== 'paid') {
+                            \App\Services\OrderService::markPaid(
+                                (int) $unifiedOrder['id'],
+                                $existingPi,
+                                null
+                            );
+                            // Re-read so InvoiceService sees the freshly-paid row
+                            $stmt->execute(['n' => $order['order_number'] ?? '']);
+                            $unifiedOrder = $stmt->fetch();
+                        }
+                        if ($unifiedOrder) {
+                            $invStmt = $pdo->prepare('SELECT COUNT(*) FROM invoices WHERE order_id = :id');
+                            $invStmt->execute(['id' => (int) $unifiedOrder['id']]);
+                            if ((int) $invStmt->fetchColumn() === 0) {
+                                \App\Services\InvoiceService::createForOrder($unifiedOrder);
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        // Best-effort; the primary mark-paid already ran.
+                    }
+                    $alerts[] = ['type' => 'success', 'message' => 'Order marked paid. Cart converted, stock decremented, tickets generated (if any).'];
+                }
             }
         }
 
@@ -548,6 +611,25 @@ $isPaidOrRefunded = in_array((string) ($order['payment_status'] ?? ''), ['paid',
   </div>
 
   <aside class="space-y-6">
+    <?php
+    // "Mark as paid" — exercises the same code path the invoice.paid webhook
+    // runs, for orders that were paid on Stripe but never got the callback
+    // (test mode without a test webhook endpoint, manual reconciliation, etc).
+    $paymentStatusForActions = strtolower((string) ($order['payment_status'] ?? ''));
+    $canMarkPaid = !in_array($paymentStatusForActions, ['paid', 'partial_refund', 'refunded'], true);
+    ?>
+    <?php if ($canMarkPaid): ?>
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm space-y-3">
+        <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Manual mark-as-paid</h3>
+        <p class="text-xs text-amber-700">Use when Stripe shows the payment succeeded but the webhook didn't reach us (common in test mode). Runs the same flow as <code>invoice.paid</code>: converts the cart, decrements stock, generates tickets, creates the invoice row.</p>
+        <form method="post" onsubmit="return confirm('Mark this order as paid and run the post-payment side effects?');">
+          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+          <input type="hidden" name="action" value="mark_paid">
+          <button class="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="submit" <?= $canManage ? '' : 'disabled' ?>>Mark payment as paid</button>
+        </form>
+      </div>
+    <?php endif; ?>
+
     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
       <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Actions</h3>
       <form method="post" class="space-y-3">

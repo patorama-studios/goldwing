@@ -332,19 +332,28 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
           <?php if ($canManualFix): ?>
 
-            <!-- Bank-transfer / manual approval -->
-            <?php if ($paymentStatus === 'pending' && in_array($paymentMethod, ['bank_transfer', 'manual', 'cash', 'complimentary'], true)): ?>
-              <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
-                <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Approve / reject</h3>
-                <form method="post" action="/admin/members/actions.php" class="space-y-2">
+            <!-- Approve / reject — visible for any pending membership order.
+                 For Stripe-method orders the "Approve" path doubles as
+                 "manual mark-as-paid" when the webhook didn't reach us
+                 (common in test mode). Use the Stripe PI id as the payment
+                 reference if you want it on the audit trail. -->
+            <?php if ($paymentStatus === 'pending'): ?>
+              <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 shadow-sm space-y-3">
+                <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Approve / reject</h3>
+                <?php if ($paymentMethod === 'stripe'): ?>
+                  <p class="text-xs text-emerald-700">Stripe order. Use "Approve payment" only if you've verified the charge succeeded on dashboard.stripe.com but the webhook didn't reach us. Paste the PaymentIntent id as the reference for audit.</p>
+                <?php else: ?>
+                  <p class="text-xs text-emerald-700">Bank transfer / manual flow. Type the reference and approve.</p>
+                <?php endif; ?>
+                <form method="post" action="/admin/members/actions.php" class="space-y-2" onsubmit="return confirm('Approve this membership order and activate the period?');">
                   <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                   <input type="hidden" name="member_id" value="<?= e((string) $memberId) ?>">
                   <input type="hidden" name="tab" value="orders">
                   <input type="hidden" name="orders_section" value="membership">
                   <input type="hidden" name="action" value="membership_order_accept">
                   <input type="hidden" name="order_id" value="<?= e((string) $orderId) ?>">
-                  <input type="text" name="payment_reference" placeholder="Bank transfer reference (optional)" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                  <button class="w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white" type="submit">Approve payment</button>
+                  <input type="text" name="payment_reference" placeholder="<?= $paymentMethod === 'stripe' ? 'Stripe PI id (e.g. pi_…)' : 'Bank transfer reference (optional)' ?>" class="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm" value="<?= e((string) ($order['stripe_payment_intent_id'] ?? '')) ?>">
+                  <button class="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="submit">Approve payment</button>
                 </form>
                 <form method="post" action="/admin/members/actions.php" class="space-y-2">
                   <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
