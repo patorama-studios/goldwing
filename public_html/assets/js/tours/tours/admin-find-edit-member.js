@@ -31,10 +31,13 @@
     },
     {
       element: '[data-tour="admin-find-member-status"]',
+      onHighlightStarted: () => {
+        document.querySelectorAll('#members-filters details').forEach(d => { d.open = true; });
+      },
       popover: {
         title: 'Filter by status',
-        description: "Use this to show only active, pending, or expired members. " +
-                     "Leave it on <strong>All statuses</strong> to see everyone.",
+        description: "Open <strong>Advanced filters</strong> to reveal this. " +
+                     "Use it to show only active, pending, or expired members — leave it on <strong>All statuses</strong> to see everyone.",
         side: 'bottom',
         align: 'start',
       },

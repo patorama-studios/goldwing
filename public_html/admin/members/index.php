@@ -215,6 +215,12 @@ $hasAdvancedFilters = $filters['vehicle_type'] !== ''
     || $filters['vehicle_year_to'] !== ''
     || $filters['created_from'] !== ''
     || $filters['created_to'] !== ''
+    || $filters['created_range'] !== ''
+    || $filters['status'] !== ''
+    || $filters['member_number'] !== ''
+    || $filters['member_id'] !== null
+    || $filters['membership_type_id'] !== null
+    || $filters['role'] !== ''
     || !empty($filters['directory_prefs'])
     || filter_var($filters['has_trike'], FILTER_VALIDATE_BOOLEAN)
     || filter_var($filters['has_trailer'], FILTER_VALIDATE_BOOLEAN)
@@ -388,14 +394,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php if ($chapterRestriction !== null): ?>
             <input type="hidden" name="chapter_id" value="<?= e($chapterRestriction) ?>">
           <?php endif; ?>
-          <div class="grid gap-4 lg:grid-cols-7">
-            <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-search">
-              Member
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            <label class="flex flex-col text-sm font-medium text-gray-700 sm:col-span-2 lg:col-span-2" data-tour="admin-find-member-search">
+              Search
               <input type="search" name="q" value="<?= e($filters['q']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40" placeholder="Name, email, or phone">
-            </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700">
-              Membership #
-              <input type="text" name="member_number" value="<?= e($filters['member_number'] ?? '') ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="e.g. 12345 or 12345.1">
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-chapter">
               Chapter
@@ -404,15 +406,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <option value="0" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === 0 ? 'selected' : '' ?>>No chapter assigned</option>
                 <?php foreach ($availableChapters as $chapter): ?>
                   <option value="<?= e($chapter['id']) ?>" <?= isset($filters['chapter_id']) && (int) $filters['chapter_id'] === (int) $chapter['id'] ? 'selected' : '' ?>><?= e($chapter['display_label'] ?? $chapter['name']) ?> (<?= e($chapter['state']) ?>)</option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-status">
-              Status
-              <select name="status" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                <option value="">All statuses</option>
-                <?php foreach (['pending', 'active', 'expired', 'suspended', 'archived'] as $statusOption): ?>
-                  <option value="<?= e($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>><?= $statusOption === 'archived' ? 'Archived' : ucfirst($statusOption) ?></option>
                 <?php endforeach; ?>
               </select>
             </label>
@@ -426,18 +419,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <option value="90d" <?= $expiringWithin === '90d' ? 'selected' : '' ?>>Within 90 days</option>
                 <option value="eoy" <?= $expiringWithin === 'eoy' ? 'selected' : '' ?>>Before next 31 July</option>
                 <option value="expired" <?= $expiringWithin === 'expired' ? 'selected' : '' ?>>Already expired</option>
-              </select>
-            </label>
-            <label class="flex flex-col text-sm font-medium text-gray-700">
-              Created
-              <select name="created_range" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                <?php $createdRange = $filters['created_range'] ?? ''; ?>
-                <option value="" <?= $createdRange === '' ? 'selected' : '' ?>>Any time</option>
-                <option value="7d" <?= $createdRange === '7d' ? 'selected' : '' ?>>Last 7 days</option>
-                <option value="30d" <?= $createdRange === '30d' ? 'selected' : '' ?>>Last 30 days</option>
-                <option value="90d" <?= $createdRange === '90d' ? 'selected' : '' ?>>Last 90 days</option>
-                <option value="1y" <?= $createdRange === '1y' ? 'selected' : '' ?>>Last 12 months</option>
-                <option value="this_year" <?= $createdRange === 'this_year' ? 'selected' : '' ?>>This year</option>
               </select>
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
@@ -461,6 +442,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined text-base text-primary-strong">tune</span>
               Advanced filters
             </summary>
+            <div class="mt-4 grid gap-4 md:grid-cols-3">
+              <label class="flex flex-col text-sm font-medium text-gray-700" data-tour="admin-find-member-status">
+                Status
+                <select name="status" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">All statuses</option>
+                  <?php foreach (['pending', 'active', 'expired', 'suspended', 'archived'] as $statusOption): ?>
+                    <option value="<?= e($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>><?= $statusOption === 'archived' ? 'Archived' : ucfirst($statusOption) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Created
+                <select name="created_range" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <?php $createdRange = $filters['created_range'] ?? ''; ?>
+                  <option value="" <?= $createdRange === '' ? 'selected' : '' ?>>Any time</option>
+                  <option value="7d" <?= $createdRange === '7d' ? 'selected' : '' ?>>Last 7 days</option>
+                  <option value="30d" <?= $createdRange === '30d' ? 'selected' : '' ?>>Last 30 days</option>
+                  <option value="90d" <?= $createdRange === '90d' ? 'selected' : '' ?>>Last 90 days</option>
+                  <option value="1y" <?= $createdRange === '1y' ? 'selected' : '' ?>>Last 12 months</option>
+                  <option value="this_year" <?= $createdRange === 'this_year' ? 'selected' : '' ?>>This year</option>
+                </select>
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Membership #
+                <input type="text" name="member_number" value="<?= e($filters['member_number'] ?? '') ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="e.g. 12345 or 12345.1">
+              </label>
+            </div>
             <div class="mt-4 grid gap-4 md:grid-cols-3">
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Member ID
