@@ -36,6 +36,16 @@ $itemsStmt = $pdo->prepare('SELECT * FROM store_cart_items WHERE cart_id = :cart
 $itemsStmt->execute(['cart_id' => $cart['id']]);
 $items = $itemsStmt->fetchAll();
 
+// Capture debug values so we can emit them next to the order summary.
+$DEBUG_user_id_used = (int) ($user['id'] ?? 0);
+$DEBUG_cart_id_used = (int) ($cart['id'] ?? 0);
+$DEBUG_items_count_at_fetch = is_array($items) ? count($items) : -1;
+$DEBUG_first_item_keys = (is_array($items) && !empty($items)) ? implode(',', array_keys($items[0])) : '';
+$DEBUG_first_item_id = (is_array($items) && !empty($items)) ? ($items[0]['id'] ?? 'no-id-key') : '';
+$DEBUG_first_item_title = (is_array($items) && !empty($items)) ? ($items[0]['title_snapshot'] ?? 'no-title') : '';
+$DEBUG_first_item_qty = (is_array($items) && !empty($items)) ? ($items[0]['quantity'] ?? 'no-qty') : '';
+$DEBUG_user_email = (string) ($user['email'] ?? '');
+
 if ($items) {
     $productIds = array_values(array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items)));
     $variantIds = array_values(array_filter(array_unique(array_map(function ($i) { return (int) ($i['variant_id'] ?? 0); }, $items))));
@@ -451,6 +461,14 @@ if ($items) {
                 <a href="/store/cart" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit cart</a>
               </div>
               <!-- checkout-version: <?= e(defined('CHECKOUT_VERSION') ? CHECKOUT_VERSION : 'unknown') ?> -->
+              <!-- user-id-used: <?= (int) ($DEBUG_user_id_used ?? -1) ?> -->
+              <!-- user-email: <?= e($DEBUG_user_email ?? '') ?> -->
+              <!-- cart-id-used: <?= (int) ($DEBUG_cart_id_used ?? -1) ?> -->
+              <!-- items-count-at-fetch: <?= (int) ($DEBUG_items_count_at_fetch ?? -1) ?> -->
+              <!-- first-item-keys: <?= e((string) ($DEBUG_first_item_keys ?? '')) ?> -->
+              <!-- first-item-id: <?= e((string) ($DEBUG_first_item_id ?? '')) ?> -->
+              <!-- first-item-title: <?= e((string) ($DEBUG_first_item_title ?? '')) ?> -->
+              <!-- first-item-qty: <?= e((string) ($DEBUG_first_item_qty ?? '')) ?> -->
               <!-- items-count: <?= (int) (is_array($items) ? count($items) : -1) ?> -->
               <!-- items-keys: <?= e(is_array($items) && !empty($items) ? implode(',', array_keys($items)) : '') ?> -->
               <?php
