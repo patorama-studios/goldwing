@@ -7,6 +7,9 @@ use App\Services\SettingsService;
 
 require_login();
 
+// Deploy marker so we can verify the right code is running.
+define('CHECKOUT_VERSION', '67c1d7c+marker');
+
 $pdo = db();
 $user = current_user();
 $settings = store_get_settings();
@@ -447,8 +450,29 @@ if ($items) {
                 <h2 class="font-display text-lg font-semibold text-gray-900">Your order</h2>
                 <a href="/store/cart" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit cart</a>
               </div>
+              <!-- checkout-version: <?= e(defined('CHECKOUT_VERSION') ? CHECKOUT_VERSION : 'unknown') ?> -->
+              <!-- items-count: <?= (int) (is_array($items) ? count($items) : -1) ?> -->
+              <!-- items-keys: <?= e(is_array($items) && !empty($items) ? implode(',', array_keys($items)) : '') ?> -->
+              <?php
+                // Defensive rebuild: even if something earlier somehow expanded $items,
+                // collapse it back to one row per unique store_cart_items.id.
+                if (is_array($items)) {
+                    $renderItems = [];
+                    foreach ($items as $rrow) {
+                        $rid = isset($rrow['id']) ? (int) $rrow['id'] : null;
+                        if ($rid === null || $rid <= 0) { continue; }
+                        if (((int) ($rrow['quantity'] ?? 0)) <= 0) { continue; }
+                        if (trim((string) ($rrow['title_snapshot'] ?? '')) === '') { continue; }
+                        $renderItems[$rid] = $rrow;
+                    }
+                    $renderItems = array_values($renderItems);
+                } else {
+                    $renderItems = [];
+                }
+              ?>
+              <!-- render-items-count: <?= count($renderItems) ?> -->
               <ul class="divide-y divide-gray-100">
-                <?php foreach ($items as $item):
+                <?php foreach ($renderItems as $item):
                   $imgUrl = $cartItemImages[(int) $item['product_id']] ?? '';
                   $lineTotal = (float) $item['unit_price'] * (int) $item['quantity'];
                 ?>
