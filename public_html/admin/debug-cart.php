@@ -175,6 +175,88 @@ if (isset($_GET['purge']) && $_GET['purge'] === '1') {
     echo "\n";
 }
 
+// Run the SAME query checkout.php runs and dump the result.
+echo "\n--- Running checkout-style items query against cart returned by store_get_open_cart ---\n";
+try {
+    $cart = store_get_open_cart($userId);
+    $cartId = (int) $cart['id'];
+    echo "Cart used: #{$cartId}\n";
+
+    $sql = 'SELECT ci.*, p.type, p.event_name, p.track_inventory, p.stock_quantity, v.stock_quantity as variant_stock '
+        . 'FROM store_cart_items ci '
+        . 'JOIN store_products p ON p.id = ci.product_id '
+        . 'LEFT JOIN store_product_variants v ON v.id = ci.variant_id '
+        . 'WHERE ci.cart_id = :cart_id AND ci.quantity > 0 AND ci.title_snapshot IS NOT NULL AND ci.title_snapshot != \'\'';
+    $s = $pdo->prepare($sql);
+    $s->execute(['cart_id' => $cartId]);
+    $rows = $s->fetchAll();
+    echo "Filtered query returned: " . count($rows) . " row(s)\n";
+    foreach ($rows as $r) {
+        echo sprintf(
+            "    qty=%d  price=%.2f  product=%d  variant=%d  title=%s\n",
+            (int) $r['quantity'],
+            (float) $r['unit_price'],
+            (int) $r['product_id'],
+            (int) ($r['variant_id'] ?? 0),
+            json_encode($r['title_snapshot'])
+        );
+    }
+
+    // Also run unfiltered to see if anything's hiding from the filter.
+    $sql2 = 'SELECT ci.*, p.type FROM store_cart_items ci '
+        . 'JOIN store_products p ON p.id = ci.product_id '
+        . 'LEFT JOIN store_product_variants v ON v.id = ci.variant_id '
+        . 'WHERE ci.cart_id = :cart_id';
+    $s2 = $pdo->prepare($sql2);
+    $s2->execute(['cart_id' => $cartId]);
+    $rows2 = $s2->fetchAll();
+    echo "Unfiltered same-JOIN query returned: " . count($rows2) . " row(s)\n";
+
+    // Now fetch the live /checkout HTML and count <li> in the order summary aside.
+    echo "\n--- Fetching /checkout/ and counting <li> in the aside ---\n";
+    $cookies = '';
+    foreach ($_COOKIE as $k => $v) {
+        $cookies .= $k . '=' . $v . '; ';
+    }
+    $ch = curl_init('http://127.0.0.1/checkout/');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Cookie: ' . trim($cookies)],
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10,
+    ]);
+    $html = curl_exec($ch);
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($html === false) {
+        echo "curl error: {$err}\n";
+    } else {
+        $totalLi = substr_count($html, '<li');
+        $asideStart = strpos($html, '<aside');
+        $asideEnd = $asideStart !== false ? strpos($html, '</aside>', $asideStart) : false;
+        $asideLi = 0;
+        if ($asideStart !== false && $asideEnd !== false) {
+            $asideChunk = substr($html, $asideStart, $asideEnd - $asideStart);
+            $asideLi = substr_count($asideChunk, '<li');
+        }
+        echo "Response length: " . strlen($html) . " bytes\n";
+        echo "Total <li in page: {$totalLi}\n";
+        echo "<li inside first <aside>: {$asideLi}\n";
+        $hasMarker = strpos($html, 'ci.title_snapshot') !== false;
+        echo "Contains SQL string literal 'ci.title_snapshot' (should never): " . ($hasMarker ? 'YES' : 'no') . "\n";
+        // Dump the first 600 chars inside the aside that contain the cart items
+        if ($asideStart !== false) {
+            $ulPos = strpos($html, '<ul class="divide-y', $asideStart);
+            if ($ulPos !== false) {
+                echo "\nFirst chunk of <ul class=\"divide-y\"...:\n";
+                echo substr($html, $ulPos, 1200) . "\n";
+            }
+        }
+    }
+} catch (\Throwable $e) {
+    echo "ERROR: " . $e->getMessage() . "\n";
+}
+
 if (!$didSomething) {
-    echo "Hint: add ?consolidate=1 to merge duplicate open carts, or ?purge=1 to delete ghost rows.\n";
+    echo "\nHint: add ?consolidate=1 to merge duplicate open carts, or ?purge=1 to delete ghost rows.\n";
 }
