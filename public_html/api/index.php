@@ -1592,7 +1592,7 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
             ];
         }
 
-        $successUrl = BaseUrlService::buildUrl('/store/orders/' . $orderNumber . '?success=1');
+        $successUrl = BaseUrlService::buildUrl('/order/success?order=' . urlencode($orderNumber));
         $cancelUrl = BaseUrlService::buildUrl('/store/cart?cancel=1');
         $payload = [
             'mode' => 'payment',

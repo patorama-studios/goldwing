@@ -5,42 +5,16 @@ use App\Services\Csrf;
 use App\Services\StripeSettingsService;
 use App\Services\SettingsService;
 
+require_login();
+
 $pdo = db();
 $user = current_user();
 $settings = store_get_settings();
 $stripeSettings = StripeSettingsService::getSettings();
 $checkoutEnabled = !empty($stripeSettings['checkout_enabled']);
-$allowGuestCheckout = !empty($stripeSettings['allow_guest_checkout']);
 $bankTransferInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
 $bankTransferEnabled = $bankTransferInstructions !== '';
 $cardEnabled = $checkoutEnabled;
-
-if (!$user && !$allowGuestCheckout) {
-    $pageTitle = 'Checkout';
-    require __DIR__ . '/../app/Views/partials/header.php';
-    require __DIR__ . '/../app/Views/partials/nav_public.php';
-    ?>
-    <main class="site-main">
-      <section class="hero hero--compact store-hero">
-        <div class="container hero__inner">
-          <span class="hero__eyebrow">Australian Goldwing Association</span>
-          <h1>Checkout</h1>
-          <p class="hero__lead">Guest checkout is currently disabled.</p>
-        </div>
-      </section>
-      <section class="page-section">
-        <div class="container">
-          <div class="page-card">
-            <div class="alert error">Please log in to continue checkout.</div>
-            <a class="button" href="/login.php">Log in</a>
-          </div>
-        </div>
-      </section>
-    </main>
-    <?php
-    require __DIR__ . '/../app/Views/partials/footer.php';
-    exit;
-}
 
 $cart = store_get_open_cart((int) ($user['id'] ?? 0));
 $itemsStmt = $pdo->prepare('SELECT ci.*, p.type, p.event_name, p.track_inventory, p.stock_quantity, v.stock_quantity as variant_stock FROM store_cart_items ci JOIN store_products p ON p.id = ci.product_id LEFT JOIN store_product_variants v ON v.id = ci.variant_id WHERE ci.cart_id = :cart_id');
@@ -144,243 +118,462 @@ if ($fulfillment === 'shipping') {
 }
 
 $pageTitle = 'Checkout';
-require __DIR__ . '/../app/Views/partials/header.php';
-require __DIR__ . '/../app/Views/partials/nav_public.php';
+$activePage = 'store';
+$activeSubPage = 'checkout';
+require __DIR__ . '/../app/Views/partials/backend_head.php';
+
+$cartItemImages = [];
+if ($items) {
+    $productIds = array_unique(array_map(function ($i) { return (int) $i['product_id']; }, $items));
+    if ($productIds) {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $imgStmt = $pdo->prepare("SELECT product_id, image_url FROM store_product_images WHERE product_id IN ($placeholders) ORDER BY product_id, sort_order ASC, id ASC");
+        $imgStmt->execute($productIds);
+        foreach ($imgStmt->fetchAll() as $row) {
+            $pid = (int) $row['product_id'];
+            if (!isset($cartItemImages[$pid])) {
+                $cartItemImages[$pid] = $row['image_url'];
+            }
+        }
+    }
+}
 ?>
-<main class="site-main">
-  <section class="hero hero--compact store-hero">
-    <div class="container hero__inner">
-      <span class="hero__eyebrow">Australian Goldwing Association</span>
-      <h1>Checkout</h1>
-      <p class="hero__lead">Review your order and pay securely with Stripe.</p>
-    </div>
-  </section>
+<div class="flex h-screen overflow-hidden">
+  <?php require __DIR__ . '/../app/Views/partials/backend_member_sidebar.php'; ?>
+  <main class="flex-1 overflow-y-auto bg-background-light relative">
+    <?php require __DIR__ . '/../app/Views/partials/feedback_widget.php'; ?>
+    <?php $topbarTitle = 'Checkout';
+    require __DIR__ . '/../app/Views/partials/backend_mobile_topbar.php'; ?>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-  <section class="page-section">
-    <div class="container">
-      <div class="page-card">
-        <div class="grid gap-6">
-          <h2>Checkout</h2>
-          <?php if (!empty($checkoutError)): ?>
-            <div class="alert error"><?= e($checkoutError) ?></div>
-          <?php endif; ?>
-          <?php if (!empty($checkoutSuccess)): ?>
-            <div class="alert success"><?= e($checkoutSuccess) ?></div>
-          <?php endif; ?>
-
-          <?php if (!$cardEnabled && !$bankTransferEnabled): ?>
-            <div class="alert error">Checkout is currently unavailable.</div>
-          <?php elseif (!$items): ?>
-            <p>Your cart is empty.</p>
-            <a class="button" href="/store">Browse products</a>
-          <?php else: ?>
-            <form id="checkout-form" class="grid gap-6" data-guest-required="<?= $user ? '0' : '1' ?>" data-requires-shipping="<?= $requiresShipping ? '1' : '0' ?>" data-require-shipping="<?= !empty($stripeSettings['require_shipping_for_physical']) ? '1' : '0' ?>" data-digital-minimal="<?= !empty($stripeSettings['digital_only_minimal']) ? '1' : '0' ?>">
-              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-              <input type="hidden" name="fulfillment" value="<?= e($fulfillment) ?>">
-
-              <?php if (!$cardEnabled && $bankTransferEnabled): ?>
-                <div class="alert info">Card payments are unavailable. Please use bank transfer.</div>
-              <?php endif; ?>
-
-              <div class="card">
-                <h3>Contact details</h3>
-                <div class="grid grid-2">
-                  <div class="form-group">
-                    <label for="guest-first-name">First name</label>
-                    <input id="guest-first-name" name="guest_first_name" value="<?= e(trim((string) ($_POST['guest_first_name'] ?? $guestFirst))) ?>">
-                  </div>
-                  <div class="form-group">
-                    <label for="guest-last-name">Last name</label>
-                    <input id="guest-last-name" name="guest_last_name" value="<?= e(trim((string) ($_POST['guest_last_name'] ?? $guestLast))) ?>">
-                  </div>
-                </div>
-                <div class="grid grid-2">
-                  <div class="form-group">
-                    <label for="guest-email">Email</label>
-                    <input id="guest-email" name="guest_email" type="email" value="<?= e(trim((string) ($_POST['guest_email'] ?? ($user['email'] ?? '')))) ?>">
-                  </div>
-                  <div class="form-group">
-                    <label for="guest-phone">Phone (optional)</label>
-                    <input id="guest-phone" name="guest_phone" value="<?= e(trim((string) ($_POST['guest_phone'] ?? ($member['phone'] ?? '')))) ?>">
-                  </div>
-                </div>
-              </div>
-
-              <?php if ($requiresShipping): ?>
-                <div class="card" data-shipping-section>
-                  <h3>Shipping address confirmation</h3>
-                  <input type="hidden" data-shipping-base name="shipping_name" value="<?= e($address['name']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_line1" value="<?= e($address['line1']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_line2" value="<?= e($address['line2']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_city" value="<?= e($address['city']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_state" value="<?= e($address['state']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_postal" value="<?= e($address['postal']) ?>">
-                  <input type="hidden" data-shipping-base name="shipping_country" value="<?= e($address['country']) ?>">
-                  <?php if ($memberHasShipping): ?>
-                    <p class="text-sm text-gray-600">We will ship to the address on your member profile.</p>
-                    <div class="text-sm">
-                      <div><?= e($address['name']) ?></div>
-                      <div><?= e($address['line1']) ?></div>
-                      <?php if ($address['line2'] !== ''): ?>
-                        <div><?= e($address['line2']) ?></div>
-                      <?php endif; ?>
-                      <div><?= e(trim($address['city'] . ' ' . $address['state'] . ' ' . $address['postal'])) ?></div>
-                      <div><?= e($address['country']) ?></div>
-                    </div>
-                    <details class="mt-4">
-                      <summary class="text-sm">Use a different shipping address</summary>
-                      <div class="form-group">
-                        <label for="shipping-name">Name</label>
-                        <input id="shipping-name" data-shipping-override name="shipping_name" value="<?= e($address['name']) ?>">
-                      </div>
-                      <div class="form-group">
-                        <label for="shipping-line1">Address line 1</label>
-                        <input id="shipping-line1" data-shipping-override name="shipping_line1" value="<?= e($address['line1']) ?>">
-                      </div>
-                      <div class="form-group">
-                        <label for="shipping-line2">Address line 2</label>
-                        <input id="shipping-line2" data-shipping-override name="shipping_line2" value="<?= e($address['line2']) ?>">
-                      </div>
-                      <div class="grid grid-3">
-                        <div class="form-group">
-                          <label for="shipping-city">City</label>
-                          <input id="shipping-city" data-shipping-override name="shipping_city" value="<?= e($address['city']) ?>">
-                        </div>
-                        <div class="form-group">
-                          <label for="shipping-state">State</label>
-                          <input id="shipping-state" data-shipping-override name="shipping_state" value="<?= e($address['state']) ?>">
-                        </div>
-                        <div class="form-group">
-                          <label for="shipping-postal">Postcode</label>
-                          <input id="shipping-postal" data-shipping-override name="shipping_postal" value="<?= e($address['postal']) ?>">
-                        </div>
-                      </div>
-                      <div class="form-group">
-                        <label for="shipping-country">Country</label>
-                        <input id="shipping-country" data-shipping-override name="shipping_country" value="<?= e($address['country']) ?>" readonly>
-                      </div>
-                    </details>
-                  <?php else: ?>
-                    <div class="form-group">
-                      <label for="shipping-name">Name</label>
-                      <input id="shipping-name" data-shipping-override name="shipping_name" value="<?= e($address['name']) ?>">
-                    </div>
-                    <div class="form-group">
-                      <label for="shipping-line1">Address line 1</label>
-                      <input id="shipping-line1" data-shipping-override name="shipping_line1" value="<?= e($address['line1']) ?>">
-                    </div>
-                    <div class="form-group">
-                      <label for="shipping-line2">Address line 2</label>
-                      <input id="shipping-line2" data-shipping-override name="shipping_line2" value="<?= e($address['line2']) ?>">
-                    </div>
-                    <div class="grid grid-3">
-                      <div class="form-group">
-                        <label for="shipping-city">City</label>
-                        <input id="shipping-city" data-shipping-override name="shipping_city" value="<?= e($address['city']) ?>">
-                      </div>
-                      <div class="form-group">
-                        <label for="shipping-state">State</label>
-                        <input id="shipping-state" data-shipping-override name="shipping_state" value="<?= e($address['state']) ?>">
-                      </div>
-                      <div class="form-group">
-                        <label for="shipping-postal">Postcode</label>
-                        <input id="shipping-postal" data-shipping-override name="shipping_postal" value="<?= e($address['postal']) ?>">
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label for="shipping-country">Country</label>
-                      <input id="shipping-country" data-shipping-override name="shipping_country" value="<?= e($address['country']) ?>" readonly>
-                    </div>
-                  <?php endif; ?>
-                </div>
-              <?php endif; ?>
-
-              <div class="card">
-                <h3>Payment</h3>
-                <div class="form-group">
-                  <span class="form-label">Payment Method</span>
-                  <div class="form-checkboxes">
-                    <label class="form-checkbox">
-                      <input type="radio" name="payment_method" value="card" data-payment-toggle="card" <?= $cardEnabled ? '' : 'disabled' ?>>
-                      Credit Card (Stripe)
-                    </label>
-                    <label class="form-checkbox">
-                      <input type="radio" name="payment_method" value="bank_transfer" data-payment-toggle="bank_transfer" <?= $bankTransferEnabled ? '' : 'disabled' ?>>
-                      Bank Transfer
-                    </label>
-                  </div>
-                  <div class="form-error" id="payment-method-error" hidden></div>
-                </div>
-                <div class="payment-panel stripe-style" data-payment-panel="card" hidden>
-                  <p id="stripe-payment-note" class="form-helper">Enter your card details below. Apple&nbsp;Pay and Google&nbsp;Pay are also supported by Stripe.</p>
-                  <div id="stripe-payment-element" class="mt-4"></div>
-                  <div class="form-error" id="stripe-payment-error" hidden></div>
-                </div>
-                <div class="payment-panel" data-payment-panel="bank_transfer" hidden>
-                  <div class="bank-transfer-instructions">
-                    <?= nl2br(e($bankTransferInstructions)) ?>
-                  </div>
-                </div>
-              </div>
-
-              <div class="grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                <div class="card">
-                  <h3>Discount</h3>
-                  <?php if (!empty($cart['discount_code'])): ?>
-                    <p>Applied code: <strong><?= e($cart['discount_code']) ?></strong></p>
-                    <button type="submit" name="action" value="clear_discount" class="button">Remove discount</button>
-                  <?php else: ?>
-                    <div class="form-group">
-                      <label for="discount-code">Discount code</label>
-                      <input id="discount-code" name="discount_code" placeholder="Enter code">
-                    </div>
-                    <button type="submit" name="action" value="apply_discount" class="button">Apply</button>
-                  <?php endif; ?>
-                </div>
-
-                <div class="card">
-                  <h3>Order summary</h3>
-                  <table class="table">
-                    <tr>
-                      <td>Subtotal</td>
-                      <td>$<?= e(store_money($totals['subtotal'])) ?></td>
-                    </tr>
-                    <?php if ($totals['discount_total'] > 0): ?>
-                      <tr>
-                        <td>Discount</td>
-                        <td>-$<?= e(store_money($totals['discount_total'])) ?></td>
-                      </tr>
-                    <?php endif; ?>
-                    <?php if (!empty($totals['tax_total'])): ?>
-                      <tr>
-                        <td>GST</td>
-                        <td>$<?= e(store_money($totals['tax_total'])) ?></td>
-                      </tr>
-                    <?php endif; ?>
-                    <tr>
-                      <td>Shipping</td>
-                      <td>$<?= e(store_money($totals['shipping_total'])) ?></td>
-                    </tr>
-                    <tr>
-                      <td>Payment processing fee</td>
-                      <td>$<?= e(store_money($totals['processing_fee_total'])) ?></td>
-                    </tr>
-                    <tr>
-                      <td><strong>Total</strong></td>
-                      <td><strong>$<?= e(store_money($totals['total'])) ?></strong></td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-
-              <button type="button" class="button primary" data-pay-button>Pay now</button>
-            </form>
-          <?php endif; ?>
+      <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900">Checkout</h1>
+            <nav class="mt-2 flex items-center gap-2 text-sm text-gray-500" aria-label="Checkout progress">
+              <a href="/store/cart" class="hover:text-gray-700">Cart</a>
+              <span class="material-icons-outlined text-base">chevron_right</span>
+              <span class="font-semibold text-gray-900">Checkout</span>
+              <span class="material-icons-outlined text-base">chevron_right</span>
+              <span>Confirmation</span>
+            </nav>
+          </div>
+          <a href="/store" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors">
+            <span class="material-icons-outlined">storefront</span>
+            Continue shopping
+          </a>
         </div>
-      </div>
+      </section>
+
+      <?php if (!empty($checkoutError)): ?>
+        <div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-red-600">error_outline</span>
+          <span><?= e($checkoutError) ?></span>
+        </div>
+      <?php endif; ?>
+      <?php if (!empty($checkoutSuccess)): ?>
+        <div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-green-600">check_circle</span>
+          <span><?= e($checkoutSuccess) ?></span>
+        </div>
+      <?php endif; ?>
+
+      <?php if (!$cardEnabled && !$bankTransferEnabled): ?>
+        <div class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+          <span class="material-icons-outlined text-5xl text-red-500">block</span>
+          <h2 class="mt-3 text-xl font-semibold text-gray-900">Checkout is currently unavailable.</h2>
+          <p class="mt-1 text-gray-500">Please try again later or contact support.</p>
+        </div>
+      <?php elseif (!$items): ?>
+        <div class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+          <span class="material-icons-outlined text-5xl text-gray-400">shopping_cart</span>
+          <h2 class="mt-3 text-xl font-semibold text-gray-900">Your cart is empty.</h2>
+          <p class="mt-1 text-gray-500">Browse the store to add gear to your order.</p>
+          <a href="/store" class="inline-flex items-center gap-2 mt-5 px-5 py-3 rounded-lg bg-primary hover:bg-primary/90 text-gray-900 font-semibold text-sm transition-colors">
+            <span class="material-icons-outlined">storefront</span>
+            Browse products
+          </a>
+        </div>
+      <?php else: ?>
+
+        <form id="checkout-form" class="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-start"
+              data-guest-required="0"
+              data-requires-shipping="<?= $requiresShipping ? '1' : '0' ?>"
+              data-require-shipping="<?= !empty($stripeSettings['require_shipping_for_physical']) ? '1' : '0' ?>"
+              data-digital-minimal="<?= !empty($stripeSettings['digital_only_minimal']) ? '1' : '0' ?>">
+          <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+          <input type="hidden" name="fulfillment" value="<?= e($fulfillment) ?>">
+
+          <div class="space-y-4" data-checkout-accordion>
+
+            <?php if (!$cardEnabled && $bankTransferEnabled): ?>
+              <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+                <span class="material-icons-outlined text-amber-700">info</span>
+                <span>Card payments are unavailable. Please use bank transfer.</span>
+              </div>
+            <?php endif; ?>
+
+            <?php
+            $sectionNumber = 0;
+            $renderSection = function (string $key, string $title, callable $summaryFn, callable $bodyFn, bool $open = false) use (&$sectionNumber) {
+                $sectionNumber++;
+                $num = $sectionNumber;
+                ?>
+                <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+                         data-checkout-section="<?= e($key) ?>" <?= $open ? 'data-open="1"' : '' ?>>
+                  <button type="button" class="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-gray-50"
+                          data-section-toggle="<?= e($key) ?>">
+                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-gray-900 font-bold text-sm shrink-0" data-section-badge>
+                      <?= e((string) $num) ?>
+                    </span>
+                    <span class="flex-1 min-w-0">
+                      <span class="block font-display text-lg font-semibold text-gray-900"><?= e($title) ?></span>
+                      <span class="block text-sm text-gray-500 truncate" data-section-summary><?php $summaryFn(); ?></span>
+                    </span>
+                    <span class="material-icons-outlined text-gray-400 transition-transform" data-section-chevron>expand_more</span>
+                  </button>
+                  <div class="px-5 pb-5 pt-1 border-t border-gray-100 <?= $open ? '' : 'hidden' ?>" data-section-body>
+                    <?php $bodyFn(); ?>
+                    <div class="mt-5 flex justify-end">
+                      <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm transition-colors" data-section-continue>
+                        Continue
+                        <span class="material-icons-outlined text-base">arrow_forward</span>
+                      </button>
+                    </div>
+                  </div>
+                </section>
+                <?php
+            };
+            ?>
+
+            <?php $renderSection('contact', 'Contact details',
+              function () use ($guestFirst, $guestLast, $user) {
+                  $name = trim($guestFirst . ' ' . $guestLast);
+                  echo e(($name !== '' ? $name . ' · ' : '') . ($user['email'] ?? ''));
+              },
+              function () use ($guestFirst, $guestLast, $user, $member) { ?>
+                <p class="text-xs uppercase tracking-wider text-gray-500 mb-3">From your member profile — edit if needed</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label for="guest-first-name" class="block text-sm font-medium text-gray-700 mb-1">First name</label>
+                    <input id="guest-first-name" name="guest_first_name" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e(trim((string) ($_POST['guest_first_name'] ?? $guestFirst))) ?>">
+                  </div>
+                  <div>
+                    <label for="guest-last-name" class="block text-sm font-medium text-gray-700 mb-1">Last name</label>
+                    <input id="guest-last-name" name="guest_last_name" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e(trim((string) ($_POST['guest_last_name'] ?? $guestLast))) ?>">
+                  </div>
+                  <div>
+                    <label for="guest-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input id="guest-email" name="guest_email" type="email" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e(trim((string) ($_POST['guest_email'] ?? ($user['email'] ?? '')))) ?>">
+                  </div>
+                  <div>
+                    <label for="guest-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                    <input id="guest-phone" name="guest_phone" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e(trim((string) ($_POST['guest_phone'] ?? ($member['phone'] ?? '')))) ?>">
+                  </div>
+                </div>
+              <?php },
+              true
+            ); ?>
+
+            <?php if ($requiresShipping): ?>
+              <?php $renderSection('shipping', 'Shipping address',
+                function () use ($address) {
+                    $line = trim($address['line1'] . ', ' . $address['city'] . ' ' . $address['state'] . ' ' . $address['postal']);
+                    echo e($line !== ', ' ? $line : 'Enter your shipping address');
+                },
+                function () use ($address, $memberHasShipping) { ?>
+                  <div data-shipping-section>
+                    <input type="hidden" data-shipping-base name="shipping_name" value="<?= e($address['name']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_line1" value="<?= e($address['line1']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_line2" value="<?= e($address['line2']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_city" value="<?= e($address['city']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_state" value="<?= e($address['state']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_postal" value="<?= e($address['postal']) ?>">
+                    <input type="hidden" data-shipping-base name="shipping_country" value="<?= e($address['country']) ?>">
+                    <?php if ($memberHasShipping): ?>
+                      <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        <p class="text-xs uppercase tracking-wider text-gray-500">Shipping to your profile address</p>
+                        <p class="mt-2 text-sm text-gray-900 font-medium"><?= e($address['name']) ?></p>
+                        <p class="text-sm text-gray-700"><?= e($address['line1']) ?><?= $address['line2'] !== '' ? ', ' . e($address['line2']) : '' ?></p>
+                        <p class="text-sm text-gray-700"><?= e(trim($address['city'] . ' ' . $address['state'] . ' ' . $address['postal'])) ?></p>
+                        <p class="text-sm text-gray-500"><?= e($address['country']) ?></p>
+                      </div>
+                      <details class="mt-4" data-shipping-override-toggle>
+                        <summary class="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">Use a different shipping address</summary>
+                        <div class="mt-4 grid grid-cols-1 gap-4">
+                    <?php else: ?>
+                      <div class="grid grid-cols-1 gap-4">
+                    <?php endif; ?>
+                          <div>
+                            <label for="shipping-name" class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+                            <input id="shipping-name" data-shipping-override name="shipping_name" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e($address['name']) ?>">
+                          </div>
+                          <div>
+                            <label for="shipping-line1" class="block text-sm font-medium text-gray-700 mb-1">Address line 1</label>
+                            <input id="shipping-line1" data-shipping-override name="shipping_line1"
+                                   data-google-autocomplete="address"
+                                   data-google-autocomplete-city="#shipping-city"
+                                   data-google-autocomplete-state="#shipping-state"
+                                   data-google-autocomplete-postal="#shipping-postal"
+                                   data-google-autocomplete-country="#shipping-country"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e($address['line1']) ?>">
+                          </div>
+                          <div>
+                            <label for="shipping-line2" class="block text-sm font-medium text-gray-700 mb-1">Address line 2 (optional)</label>
+                            <input id="shipping-line2" data-shipping-override name="shipping_line2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e($address['line2']) ?>">
+                          </div>
+                          <div class="grid grid-cols-3 gap-3">
+                            <div>
+                              <label for="shipping-city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                              <input id="shipping-city" data-shipping-override name="shipping_city" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e($address['city']) ?>">
+                            </div>
+                            <div>
+                              <label for="shipping-state" class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                              <select id="shipping-state" data-shipping-override name="shipping_state" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary">
+                                <?php foreach (['', 'ACT','NSW','NT','QLD','SA','TAS','VIC','WA'] as $st): ?>
+                                  <option value="<?= e($st) ?>" <?= strcasecmp($address['state'], $st) === 0 ? 'selected' : '' ?>><?= $st === '' ? 'Select' : e($st) ?></option>
+                                <?php endforeach; ?>
+                              </select>
+                            </div>
+                            <div>
+                              <label for="shipping-postal" class="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+                              <input id="shipping-postal" data-shipping-override name="shipping_postal" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary" value="<?= e($address['postal']) ?>">
+                            </div>
+                          </div>
+                          <div>
+                            <label for="shipping-country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                            <input id="shipping-country" data-shipping-override name="shipping_country" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-gray-50 text-gray-600" value="<?= e($address['country']) ?>" readonly>
+                          </div>
+                    <?php if ($memberHasShipping): ?>
+                        </div>
+                      </details>
+                    <?php else: ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                <?php }
+              ); ?>
+            <?php endif; ?>
+
+            <?php $renderSection('payment', 'Payment',
+              function () { echo 'Choose how you would like to pay'; },
+              function () use ($cardEnabled, $bankTransferEnabled, $bankTransferInstructions) { ?>
+                <div id="payment-method-error" class="hidden bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2 text-sm mb-3"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Payment method">
+                  <label class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors <?= $cardEnabled ? '' : 'opacity-50 cursor-not-allowed' ?>">
+                    <input type="radio" name="payment_method" value="card" data-payment-toggle="card" class="text-primary focus:ring-primary" <?= $cardEnabled ? '' : 'disabled' ?>>
+                    <span class="material-icons-outlined text-gray-700">credit_card</span>
+                    <span class="flex-1">
+                      <span class="block text-sm font-semibold text-gray-900">Credit or debit card</span>
+                      <span class="block text-xs text-gray-500">Visa, Mastercard, Amex · Apple Pay · Google Pay</span>
+                    </span>
+                  </label>
+                  <label class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors <?= $bankTransferEnabled ? '' : 'opacity-50 cursor-not-allowed' ?>">
+                    <input type="radio" name="payment_method" value="bank_transfer" data-payment-toggle="bank_transfer" class="text-primary focus:ring-primary" <?= $bankTransferEnabled ? '' : 'disabled' ?>>
+                    <span class="material-icons-outlined text-gray-700">account_balance</span>
+                    <span class="flex-1">
+                      <span class="block text-sm font-semibold text-gray-900">Bank transfer</span>
+                      <span class="block text-xs text-gray-500">Manual EFT — order held until received</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="mt-4 hidden" data-payment-panel="card">
+                  <p id="stripe-payment-note" class="text-xs text-gray-500 mb-2">Enter your card details below.</p>
+                  <div id="stripe-payment-element"></div>
+                  <div id="stripe-payment-error" class="hidden mt-2 bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div class="mt-4 hidden" data-payment-panel="bank_transfer">
+                  <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-line"><?= e($bankTransferInstructions) ?></div>
+                </div>
+              <?php }
+            ); ?>
+
+          </div>
+
+          <aside class="lg:sticky lg:top-6 self-start space-y-4">
+            <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 class="font-display text-lg font-semibold text-gray-900">Your order</h2>
+                <a href="/store/cart" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit cart</a>
+              </div>
+              <ul class="divide-y divide-gray-100">
+                <?php foreach ($items as $item):
+                  $imgUrl = $cartItemImages[(int) $item['product_id']] ?? '';
+                  $lineTotal = (float) $item['unit_price'] * (int) $item['quantity'];
+                ?>
+                  <li class="flex items-start gap-3 px-5 py-4">
+                    <div class="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden shrink-0 relative">
+                      <?php if ($imgUrl): ?>
+                        <img src="<?= e($imgUrl) ?>" alt="" class="w-full h-full object-cover">
+                      <?php else: ?>
+                        <span class="material-icons-outlined absolute inset-0 m-auto text-gray-400">image</span>
+                      <?php endif; ?>
+                      <span class="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-gray-900 text-white text-xs font-bold"><?= e((string) (int) $item['quantity']) ?></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold text-gray-900 truncate"><?= e($item['title_snapshot']) ?></p>
+                      <?php if (!empty($item['variant_snapshot'])): ?>
+                        <p class="text-xs text-gray-500 truncate"><?= e($item['variant_snapshot']) ?></p>
+                      <?php endif; ?>
+                      <p class="text-xs text-gray-500 mt-0.5">Qty <?= e((string) (int) $item['quantity']) ?> · $<?= e(store_money((float) $item['unit_price'])) ?> ea</p>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-900 whitespace-nowrap">$<?= e(store_money($lineTotal)) ?></div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+
+              <div class="px-5 py-4 border-t border-gray-100">
+                <?php if (!empty($cart['discount_code'])): ?>
+                  <div class="flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <span class="text-sm text-green-800">Code <strong><?= e($cart['discount_code']) ?></strong> applied</span>
+                    <button type="submit" name="action" value="clear_discount" class="text-xs font-semibold text-green-800 hover:text-green-900 underline">Remove</button>
+                  </div>
+                <?php else: ?>
+                  <div class="flex gap-2">
+                    <input id="discount-code" name="discount_code" placeholder="Discount code" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-primary">
+                    <button type="submit" name="action" value="apply_discount" class="px-4 py-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm font-semibold transition-colors border border-amber-200">Apply</button>
+                  </div>
+                <?php endif; ?>
+              </div>
+
+              <div class="px-5 py-4 border-t border-gray-100 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-700">
+                  <span>Subtotal</span>
+                  <span>$<?= e(store_money($totals['subtotal'])) ?></span>
+                </div>
+                <?php if ($totals['discount_total'] > 0): ?>
+                  <div class="flex justify-between text-green-700">
+                    <span>Discount</span>
+                    <span>-$<?= e(store_money($totals['discount_total'])) ?></span>
+                  </div>
+                <?php endif; ?>
+                <div class="flex justify-between text-gray-700">
+                  <span>Shipping</span>
+                  <span>$<?= e(store_money($totals['shipping_total'])) ?></span>
+                </div>
+                <?php if (!empty($totals['tax_total'])): ?>
+                  <div class="flex justify-between text-gray-700">
+                    <span>GST</span>
+                    <span>$<?= e(store_money($totals['tax_total'])) ?></span>
+                  </div>
+                <?php endif; ?>
+                <?php if ($totals['processing_fee_total'] > 0): ?>
+                  <div class="flex justify-between text-gray-700">
+                    <span>Processing fee</span>
+                    <span>$<?= e(store_money($totals['processing_fee_total'])) ?></span>
+                  </div>
+                <?php endif; ?>
+                <div class="flex justify-between pt-2 mt-2 border-t border-gray-200 text-base font-bold text-gray-900">
+                  <span>Total</span>
+                  <span>$<?= e(store_money($totals['total'])) ?></span>
+                </div>
+              </div>
+
+              <div class="px-5 py-5 border-t border-gray-100 space-y-3">
+                <button type="button" data-pay-button class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
+                  <span class="material-icons-outlined text-lg">lock</span>
+                  Pay $<?= e(store_money($totals['total'])) ?>
+                </button>
+                <p class="flex items-center justify-center gap-1.5 text-xs text-gray-500">
+                  <span class="material-icons-outlined text-sm">lock</span>
+                  Secure checkout · 256-bit SSL · Powered by Stripe
+                </p>
+              </div>
+            </section>
+
+            <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-4 flex items-start gap-3">
+              <span class="material-icons-outlined text-amber-500 mt-0.5">verified</span>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Official member benefit</p>
+                <p class="text-xs text-gray-500 mt-0.5">Your association membership grants you access to limited-run apparel and official patches.</p>
+              </div>
+            </section>
+          </aside>
+        </form>
+
+      <?php endif; ?>
     </div>
-  </section>
-</main>
+  </main>
+</div>
+
+<script>
+(function () {
+  const root = document.querySelector('[data-checkout-accordion]');
+  if (!root) return;
+  const sections = Array.from(root.querySelectorAll('[data-checkout-section]'));
+
+  function setOpen(section, open) {
+    const body = section.querySelector('[data-section-body]');
+    const chev = section.querySelector('[data-section-chevron]');
+    if (!body) return;
+    if (open) {
+      body.classList.remove('hidden');
+      if (chev) chev.style.transform = 'rotate(180deg)';
+      section.dataset.open = '1';
+    } else {
+      body.classList.add('hidden');
+      if (chev) chev.style.transform = '';
+      delete section.dataset.open;
+    }
+  }
+
+  function markComplete(section) {
+    const badge = section.querySelector('[data-section-badge]');
+    if (!badge) return;
+    badge.classList.remove('bg-primary');
+    badge.classList.add('bg-secondary', 'text-white');
+    badge.innerHTML = '<span class="material-icons-outlined text-base">check</span>';
+  }
+
+  function updateSummary(section) {
+    const summary = section.querySelector('[data-section-summary]');
+    const body = section.querySelector('[data-section-body]');
+    if (!summary || !body) return;
+    const key = section.dataset.checkoutSection;
+    if (key === 'contact') {
+      const first = body.querySelector('[name="guest_first_name"]')?.value || '';
+      const last = body.querySelector('[name="guest_last_name"]')?.value || '';
+      const email = body.querySelector('[name="guest_email"]')?.value || '';
+      const name = (first + ' ' + last).trim();
+      summary.textContent = [name, email].filter(Boolean).join(' · ');
+    } else if (key === 'shipping') {
+      const v = (n) => (body.querySelector(`[data-shipping-override][name="${n}"]`)?.value || body.querySelector(`[data-shipping-base][name="${n}"]`)?.value || '');
+      const line = `${v('shipping_line1')}, ${v('shipping_city')} ${v('shipping_state')} ${v('shipping_postal')}`.trim();
+      if (line !== ',  ') summary.textContent = line;
+    } else if (key === 'payment') {
+      const picked = body.querySelector('input[name="payment_method"]:checked');
+      summary.textContent = picked ? (picked.value === 'card' ? 'Credit or debit card' : 'Bank transfer') : 'Choose how you would like to pay';
+    }
+  }
+
+  sections.forEach((section) => {
+    const toggle = section.querySelector('[data-section-toggle]');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        const isOpen = !!section.dataset.open;
+        sections.forEach((s) => setOpen(s, false));
+        if (!isOpen) setOpen(section, true);
+      });
+    }
+    const cont = section.querySelector('[data-section-continue]');
+    if (cont) {
+      cont.addEventListener('click', () => {
+        updateSummary(section);
+        markComplete(section);
+        const idx = sections.indexOf(section);
+        const next = sections[idx + 1];
+        setOpen(section, false);
+        if (next) setOpen(next, true);
+      });
+    }
+    if (section.dataset.open) {
+      const chev = section.querySelector('[data-section-chevron]');
+      if (chev) chev.style.transform = 'rotate(180deg)';
+    }
+  });
+})();
+</script>
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
@@ -638,7 +831,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             }
           }
           const returnPath = currentOrderNumber
-            ? `/store/orders/${encodeURIComponent(currentOrderNumber)}?success=1`
+            ? `/order/success?order=${encodeURIComponent(currentOrderNumber)}`
             : '/store/cart';
           const { error: confirmError } = await stripe.confirmPayment({
             elements,
@@ -659,4 +852,4 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
   });
 </script>
 
-<?php require __DIR__ . '/../app/Views/partials/footer.php'; ?>
+<?php require __DIR__ . '/../app/Views/partials/backend_footer.php'; ?>

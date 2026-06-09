@@ -3,6 +3,24 @@ $mainSiteUrl = \App\Services\BaseUrlService::configuredBaseUrl();
 if ($mainSiteUrl === '') {
   $mainSiteUrl = '/';
 }
+
+$sidebarCartCount = 0;
+if (function_exists('store_get_open_cart') && function_exists('store_get_cart_items')) {
+  $sidebarUser = $user ?? current_user();
+  if (!empty($sidebarUser['id'])) {
+    try {
+      $sidebarCart = store_get_open_cart((int) $sidebarUser['id']);
+      if (!empty($sidebarCart['id'])) {
+        foreach (store_get_cart_items((int) $sidebarCart['id']) as $sidebarItem) {
+          $sidebarCartCount += (int) ($sidebarItem['quantity'] ?? 0);
+        }
+      }
+    } catch (\Throwable $sidebarCartError) {
+      $sidebarCartCount = 0;
+    }
+  }
+}
+
 $items = [
   // HOME
   ['key' => 'dashboard', 'group' => 'Home', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/member/index.php'],
@@ -29,7 +47,7 @@ $items = [
   ['key' => 'directory', 'group' => 'Resources', 'label' => 'Members Directory', 'icon' => 'people', 'href' => '/member/index.php?page=directory'],
   ['key' => 'committee', 'group' => 'Resources', 'label' => 'Committee', 'icon' => 'groups', 'href' => '/member/index.php?page=committee'],
   ['key' => 'dealers', 'group' => 'Resources', 'label' => 'Honda Dealers', 'icon' => 'two_wheeler', 'href' => '/member/index.php?page=dealers'],
-  ['key' => 'store', 'group' => 'Resources', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store'],
+  ['key' => 'store', 'group' => 'Resources', 'label' => 'Store', 'icon' => 'storefront', 'href' => '/store', 'badge' => $sidebarCartCount],
 
   // MY ACCOUNT
   ['key' => 'profile', 'group' => 'My Account', 'label' => 'Profile', 'icon' => 'person', 'href' => '/member/index.php?page=profile'],
@@ -176,10 +194,14 @@ if (!empty($member)) {
               </details>
             <?php else: ?>
               <?php $isActive = $activePage === $item['key']; ?>
+              <?php $itemBadge = (int) ($item['badge'] ?? 0); ?>
               <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>"
                 href="<?= e($item['href']) ?>">
                 <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
-                <?= e($item['label']) ?>
+                <span class="flex-1"><?= e($item['label']) ?></span>
+                <?php if ($itemBadge > 0): ?>
+                  <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-primary text-gray-900 text-xs font-bold"><?= e((string) $itemBadge) ?></span>
+                <?php endif; ?>
               </a>
             <?php endif; ?>
           <?php endforeach; ?>
