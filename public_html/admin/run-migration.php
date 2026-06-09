@@ -2688,12 +2688,18 @@ if ($alreadyRun) {
 // The "membership_order_created" and "store_order_confirmation" templates
 // had thin default bodies. NotificationService::definitions() now ships
 // nicer defaults (big "Pay Now" button matching the welcome email + a
-// proper itemised receipt structure). This migration JSON_REMOVE-s the
-// saved `body` overrides for those two templates so the new code defaults
-// take effect on production. Subject, from_name, recipient_mode, etc. are
-// preserved.
+// proper itemised receipt structure). This migration rewrites the
+// notifications.catalog row in settings_global with the saved `body`
+// override stripped for those two templates, so the new code defaults
+// take effect on production. Every other catalog field (subject,
+// from_name, recipient_mode, custom_recipients, enabled flag, etc.) is
+// preserved exactly as-is.
 //
-// Safe to re-run — JSON_REMOVE is a no-op when the keys are already gone.
+// We do the JSON manipulation in PHP rather than relying on JSON_REMOVE
+// in MySQL so this works on the older MySQL/MariaDB builds that ship
+// with some shared-hosting tiers.
+//
+// Safe to re-run — re-saving the same body-stripped JSON is a no-op.
 // ─────────────────────────────────────────────────────────────────────────────
 $migrationKey = 'migration_033_reset_payment_receipt_bodies';
 $alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
@@ -2702,24 +2708,26 @@ if ($alreadyRun) {
     $results[] = ['label' => 'Migration 033 — Reset payment + receipt email bodies', 'status' => 'skipped', 'note' => 'Already applied.'];
 } else {
     try {
-        $pdo = db();
-        $stmt = $pdo->prepare(
-            "UPDATE site_settings
-                SET value = JSON_REMOVE(
-                    value,
-                    '$.membership_order_created.body',
-                    '$.store_order_confirmation.body'
-                )
-              WHERE category = 'notifications'
-                AND name = 'catalog'"
-        );
-        $stmt->execute();
-        $rowCount = $stmt->rowCount();
+        $catalog = SettingsService::getGlobal('notifications.catalog', []);
+        if (!is_array($catalog)) {
+            $catalog = [];
+        }
+        $stripped = [];
+        foreach (['membership_order_created', 'store_order_confirmation'] as $key) {
+            if (isset($catalog[$key]) && is_array($catalog[$key]) && array_key_exists('body', $catalog[$key])) {
+                unset($catalog[$key]['body']);
+                $stripped[] = $key;
+            }
+        }
+        SettingsService::setGlobal((int) $user['id'], 'notifications.catalog', $catalog);
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $note = $stripped
+            ? 'Cleared saved body override on: ' . implode(', ', $stripped) . '. New defaults from NotificationService now apply.'
+            : 'No saved body overrides found — defaults already in use.';
         $results[] = [
             'label' => 'Migration 033 — Reset payment + receipt email bodies',
             'status' => 'applied',
-            'note' => "Cleared saved overrides on {$rowCount} catalog row(s); new defaults from NotificationService now apply.",
+            'note' => $note,
         ];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 033 — Reset payment + receipt email bodies', 'status' => 'error', 'note' => $e->getMessage()];
