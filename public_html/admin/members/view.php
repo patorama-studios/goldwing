@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../app/bootstrap.php';
+require_once __DIR__ . '/../../../includes/stripe_references.php';
 
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityRepository;
@@ -2410,6 +2411,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             </ul>
                           </div>
                         <?php endif; ?>
+                        <?= render_stripe_references_block($selectedMembershipOrder, 'inline') ?>
                         <?php if (!empty($selectedMembershipOrder['internal_notes'])): ?>
                           <div class="mt-3">
                             <p class="text-xs text-gray-500">Internal notes</p>

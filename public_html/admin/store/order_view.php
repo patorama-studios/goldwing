@@ -6,6 +6,8 @@ use App\Services\OrderAdminService;
 use App\Services\OrderRepository;
 use App\Services\RefundService;
 
+require_once __DIR__ . '/../../../includes/stripe_references.php';
+
 $canManage = store_user_can($user, 'store_orders_manage');
 $canRefund = store_user_can($user, 'store_refunds_manage');
 $hasTable = function (string $table) use ($pdo): bool {
@@ -370,6 +372,31 @@ $isPaidOrRefunded = in_array((string) ($order['payment_status'] ?? ''), ['paid',
         <?php endif; ?>
       </div>
     </div>
+
+    <?php
+    // Stripe references — payment intent / invoice / session links to dashboard.stripe.com.
+    // Pulls from both store_orders columns and the joined orders columns so we surface
+    // whichever ids are populated (the new Invoice flow writes stripe_invoice_id +
+    // stripe_payment_intent_id; older Checkout-Session orders only have stripe_session_id).
+    $stripeRefSource = $order;
+    if (!empty($order['order_number']) && empty($stripeRefSource['stripe_invoice_id'] ?? null)) {
+        try {
+            $stmt = $pdo->prepare('SELECT stripe_invoice_id, stripe_payment_intent_id, stripe_session_id, stripe_subscription_id, stripe_charge_id FROM orders WHERE order_number = :n LIMIT 1');
+            $stmt->execute(['n' => $order['order_number']]);
+            $linked = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($linked) {
+                foreach ($linked as $k => $v) {
+                    if (!empty($v) && empty($stripeRefSource[$k] ?? null)) {
+                        $stripeRefSource[$k] = $v;
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Fall through with just store_orders columns; the helper handles empty.
+        }
+    }
+    echo render_stripe_references_block($stripeRefSource, 'card');
+    ?>
 
     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
       <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">Addresses</h3>

@@ -11,7 +11,14 @@ class InvoiceService
             'invoice_email_template' => (string) SettingsService::getGlobal('payments.stripe.invoice_email_template', ''),
         ];
 
-        $invoiceNumber = PaymentSettingsService::nextInvoiceNumber((int) $order['channel_id']);
+        // Route store orders to the STORE sequence (STORE-YYYY-NNNNN) and
+        // memberships to the MEM/INV sequence. Before this fix nextInvoiceNumber()
+        // was always called without an order_type, so store orders ended up with
+        // membership-prefix invoice numbers — clashing with the goldwing_invoice_number
+        // already stamped on the Stripe invoice by StoreInvoiceService.
+        // See migration 2026_06_09_settings_payments_store_invoice_prefix.sql.
+        $orderType = strtolower((string) ($order['order_type'] ?? 'membership'));
+        $invoiceNumber = PaymentSettingsService::nextInvoiceNumber((int) $order['channel_id'], $orderType);
         if ($invoiceNumber === '') {
             return null;
         }
