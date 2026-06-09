@@ -103,6 +103,20 @@ if ($chapterRestriction !== null && ((int) ($member['chapter_id'] ?? 0)) !== $ch
   exit;
 }
 
+// Legacy ?tab=orders&order_id=N URLs now live at /admin/membership-orders/view.php.
+// The orders TABLE on this page links there directly; this redirect keeps any
+// bookmarks/emails/notifications generated before the move pointing at the
+// right place.
+if (
+  ($_GET['tab'] ?? '') === 'orders'
+  && ($_GET['orders_section'] ?? 'membership') === 'membership'
+  && !empty($_GET['order_id'])
+  && (int) $_GET['order_id'] > 0
+) {
+  header('Location: /admin/membership-orders/view.php?id=' . (int) $_GET['order_id']);
+  exit;
+}
+
 $tabOptions = [
   'overview' => 'Overview',
   'profile' => 'Profile',
@@ -2362,101 +2376,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <h3 class="text-sm font-semibold text-gray-900">Membership orders</h3>
                       <span class="text-xs font-semibold text-gray-500"><?= count($membershipOrders) ?> shown</span>
                     </div>
-                    <?php if ($selectedMembershipOrder): ?>
-                      <?php
-                      $selectedPaymentMethod = $selectedMembershipOrder['payment_method'] ?? '';
-                      $selectedPaymentMethod = $selectedPaymentMethod !== '' ? ucwords(str_replace('_', ' ', $selectedPaymentMethod)) : '—';
-                      $selectedStatus = strtolower((string) ($selectedMembershipOrder['payment_status'] ?? 'pending'));
-                      $selectedItems = $selectedMembershipOrderItems;
-                      $selectedPeriodLabel = '—';
-                      if ($selectedMembershipPeriod) {
-                        $selectedPeriodLabel = formatDate($selectedMembershipPeriod['start_date'] ?? null) . ' → ';
-                        $selectedPeriodLabel .= (($selectedMembershipPeriod['term'] ?? '') === 'LIFE' || empty($selectedMembershipPeriod['end_date'])) ? 'N/A' : formatDate($selectedMembershipPeriod['end_date']);
-                      }
-                      ?>
-                      <div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-700">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Order details</p>
-                            <p class="text-lg font-semibold text-gray-900">
-                              <?= e($selectedMembershipOrder['order_number'] ?? 'M-' . $selectedMembershipOrder['id']) ?>
-                            </p>
-                          </div>
-                          <a class="text-xs font-semibold text-gray-600 underline"
-                            href="<?= e(buildTabUrl($memberId, 'orders', ['orders_section' => 'membership'])) ?>">Clear</a>
-                        </div>
-                        <div class="mt-3 grid gap-3 md:grid-cols-3">
-                          <div>
-                            <p class="text-xs text-gray-500">Status</p>
-                            <span
-                              class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= statusBadgeClasses($selectedStatus) ?>"><?= ucfirst($selectedStatus) ?></span>
-                          </div>
-                          <div>
-                            <p class="text-xs text-gray-500">Payment method</p>
-                            <p class="font-semibold text-gray-900"><?= e($selectedPaymentMethod) ?></p>
-                          </div>
-                          <div>
-                            <p class="text-xs text-gray-500">Period</p>
-                            <p class="font-semibold text-gray-900"><?= e($selectedPeriodLabel) ?></p>
-                          </div>
-                        </div>
-                        <?php if ($selectedItems): ?>
-                          <div class="mt-3">
-                            <p class="text-xs text-gray-500">Items</p>
-                            <ul class="mt-1 space-y-1 text-sm text-gray-700">
-                              <?php foreach ($selectedItems as $item): ?>
-                                <li><?= e($item['name']) ?> <span
-                                    class="text-xs text-gray-500">x<?= e((string) ($item['quantity'] ?? 1)) ?></span></li>
-                              <?php endforeach; ?>
-                            </ul>
-                          </div>
-                        <?php endif; ?>
-                        <?= render_stripe_references_block($selectedMembershipOrder, 'inline') ?>
-                        <?php if (!empty($selectedMembershipOrder['internal_notes'])): ?>
-                          <div class="mt-3">
-                            <p class="text-xs text-gray-500">Internal notes</p>
-                            <p class="text-sm text-gray-700 whitespace-pre-line">
-                              <?= e($selectedMembershipOrder['internal_notes']) ?>
-                            </p>
-                          </div>
-                        <?php endif; ?>
-                        <?php if ($canManualFix): ?>
-                          <div class="mt-3 grid gap-2 md:grid-cols-2">
-                            <form method="post" action="/admin/members/actions.php" class="space-y-2">
-                              <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                              <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                              <input type="hidden" name="tab" value="orders">
-                              <input type="hidden" name="orders_section" value="membership">
-                              <input type="hidden" name="action" value="membership_order_accept">
-                              <input type="hidden" name="order_id" value="<?= e($selectedMembershipOrder['id']) ?>">
-                              <label class="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">Payment reference
-                                (optional)</label>
-                              <input type="text" name="payment_reference"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                placeholder="Bank transfer ref">
-                              <button type="submit"
-                                class="w-full rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white">Approve
-                                payment</button>
-                            </form>
-                            <form method="post" action="/admin/members/actions.php" class="space-y-2">
-                              <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                              <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
-                              <input type="hidden" name="tab" value="orders">
-                              <input type="hidden" name="orders_section" value="membership">
-                              <input type="hidden" name="action" value="membership_order_reject">
-                              <input type="hidden" name="order_id" value="<?= e($selectedMembershipOrder['id']) ?>">
-                              <label class="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">Rejection
-                                reason</label>
-                              <input type="text" name="reject_reason"
-                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Reason">
-                              <button type="submit"
-                                class="w-full rounded-full border border-rose-200 text-rose-700 px-4 py-2 text-xs font-semibold">Reject
-                                order</button>
-                            </form>
-                          </div>
-                        <?php endif; ?>
-                      </div>
-                    <?php endif; ?>
                     <?php if ($membershipOrders): ?>
                       <div class="overflow-x-auto">
                         <table class="w-full text-sm">
@@ -2514,7 +2433,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                 <td class="px-3 py-2 text-gray-600">
                                   <div class="flex flex-wrap gap-2">
                                     <a class="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700"
-                                      href="<?= e(buildTabUrl($memberId, 'orders', ['orders_section' => 'membership', 'order_id' => $order['id']])) ?>">View</a>
+                                      href="/admin/membership-orders/view.php?id=<?= (int) $order['id'] ?>">View &rarr;</a>
                                     <?php if ($canManualFix && in_array($paymentStatus, ['pending', 'failed'], true) && ($paymentMethod === '' || $paymentMethod === 'stripe')): ?>
                                       <form method="post" action="/admin/members/actions.php">
                                         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
