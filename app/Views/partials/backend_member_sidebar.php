@@ -12,7 +12,11 @@ if (function_exists('store_get_open_cart') && function_exists('store_get_cart_it
       $sidebarCart = store_get_open_cart((int) $sidebarUser['id']);
       if (!empty($sidebarCart['id'])) {
         foreach (store_get_cart_items((int) $sidebarCart['id']) as $sidebarItem) {
-          $sidebarCartCount += (int) ($sidebarItem['quantity'] ?? 0);
+          $sidebarQty = (int) ($sidebarItem['quantity'] ?? 0);
+          $sidebarTitle = (string) ($sidebarItem['title_snapshot'] ?? '');
+          if ($sidebarQty > 0 && $sidebarTitle !== '') {
+            $sidebarCartCount += $sidebarQty;
+          }
         }
       }
     } catch (\Throwable $sidebarCartError) {

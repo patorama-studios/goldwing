@@ -17,7 +17,13 @@ $bankTransferEnabled = $bankTransferInstructions !== '';
 $cardEnabled = $checkoutEnabled;
 
 $cart = store_get_open_cart((int) ($user['id'] ?? 0));
-$itemsStmt = $pdo->prepare('SELECT ci.*, p.type, p.event_name, p.track_inventory, p.stock_quantity, v.stock_quantity as variant_stock FROM store_cart_items ci JOIN store_products p ON p.id = ci.product_id LEFT JOIN store_product_variants v ON v.id = ci.variant_id WHERE ci.cart_id = :cart_id');
+
+// Self-heal: remove ghost rows left behind by old update_cart code paths
+// (qty clamped to 0 on out-of-stock items, or orphaned title_snapshots).
+$cleanup = $pdo->prepare('DELETE FROM store_cart_items WHERE cart_id = :cart_id AND (quantity <= 0 OR unit_price < 0 OR title_snapshot IS NULL OR title_snapshot = "")');
+$cleanup->execute(['cart_id' => $cart['id']]);
+
+$itemsStmt = $pdo->prepare('SELECT ci.*, p.type, p.event_name, p.track_inventory, p.stock_quantity, v.stock_quantity as variant_stock FROM store_cart_items ci JOIN store_products p ON p.id = ci.product_id LEFT JOIN store_product_variants v ON v.id = ci.variant_id WHERE ci.cart_id = :cart_id AND ci.quantity > 0 AND ci.title_snapshot IS NOT NULL AND ci.title_snapshot != ""');
 $itemsStmt->execute(['cart_id' => $cart['id']]);
 $items = $itemsStmt->fetchAll();
 

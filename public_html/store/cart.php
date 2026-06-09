@@ -236,8 +236,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stock = $row['variant_id'] ? (int) ($row['variant_stock'] ?? 0) : (int) ($row['stock_quantity'] ?? 0);
                     $maxQty = min($qty, $stock);
                 }
-                $stmt = $pdo->prepare('UPDATE store_cart_items SET quantity = :quantity, updated_at = NOW() WHERE id = :id');
-                $stmt->execute(['quantity' => $maxQty, 'id' => $itemId]);
+                if ($maxQty <= 0) {
+                    $stmt = $pdo->prepare('DELETE FROM store_cart_items WHERE id = :id AND cart_id = :cart_id');
+                    $stmt->execute(['id' => $itemId, 'cart_id' => $cart['id']]);
+                } else {
+                    $stmt = $pdo->prepare('UPDATE store_cart_items SET quantity = :quantity, updated_at = NOW() WHERE id = :id');
+                    $stmt->execute(['quantity' => $maxQty, 'id' => $itemId]);
+                }
             }
             if ($removeItem === 0) {
                 echo '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm mb-4">Cart updated.</div>';
@@ -270,6 +275,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $cart = store_get_open_cart($userId);
+
+// Self-heal: drop ghost rows from this cart so they don't render as empty lines.
+$cleanup = $pdo->prepare('DELETE FROM store_cart_items WHERE cart_id = :cart_id AND (quantity <= 0 OR unit_price < 0 OR title_snapshot IS NULL OR title_snapshot = "")');
+$cleanup->execute(['cart_id' => $cart['id']]);
+
 $items = store_get_cart_items((int) $cart['id']);
 $discount = null;
 if (!empty($cart['discount_code'])) {
