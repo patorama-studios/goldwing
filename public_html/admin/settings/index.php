@@ -1842,41 +1842,53 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         </div>
 
                         <!-- Tab: Content -->
-                        <div class="notification-tab-panel mt-5" data-tab="content">
-                          <div class="grid gap-5 xl:grid-cols-2">
-                            <!-- Editor column -->
-                            <div class="space-y-4 min-w-0">
-                              <label class="block text-sm">
-                                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</span>
-                                <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm notification-subject-input" data-key="<?= e($key) ?>" value="<?= e($settings['subject'] ?? '') ?>">
-                              </label>
-                              <?php if (!empty($definition['placeholders'])): ?>
-                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                  <span class="text-slate-500 font-semibold uppercase tracking-wider">Insert tag:</span>
-                                  <?php foreach ($definition['placeholders'] as $tag): ?>
-                                    <button type="button" class="notification-merge-tag inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 text-amber-800 px-2.5 py-1 font-mono hover:bg-amber-100 transition" data-tag="{{<?= e($tag) ?>}}">
-                                      <span class="material-icons-outlined text-sm">add</span>
-                                      {{<?= e($tag) ?>}}
-                                    </button>
-                                  <?php endforeach; ?>
-                                </div>
-                              <?php endif; ?>
-                              <div class="space-y-2">
-                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Body</p>
-                                <textarea name="notification_body[<?= e($key) ?>]" data-wysiwyg rows="12" placeholder="Write the message body…"><?= e($settings['body'] ?? '') ?></textarea>
-                              </div>
+                        <div class="notification-tab-panel mt-5 space-y-4" data-tab="content">
+                          <!-- Edit / Preview view toggle -->
+                          <div class="flex items-center justify-between gap-3">
+                            <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+                              <button type="button" class="notification-view-btn rounded-md px-3 py-1.5 font-medium bg-white shadow-sm text-gray-900" data-view="edit">
+                                <span class="material-icons-outlined text-sm align-middle">edit</span>
+                                Edit
+                              </button>
+                              <button type="button" class="notification-view-btn rounded-md px-3 py-1.5 font-medium text-slate-500 hover:text-gray-900" data-view="preview">
+                                <span class="material-icons-outlined text-sm align-middle">visibility</span>
+                                Preview
+                              </button>
                             </div>
-                            <!-- Live preview column -->
-                            <div class="space-y-2 min-w-0">
-                              <div class="flex items-center justify-between">
-                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Live preview</p>
-                                <span class="text-xs text-slate-400">Branded email · sample merge values</span>
+                            <span class="notification-view-hint text-xs text-slate-400" data-view-hint="edit">Live preview available — click Preview to switch view</span>
+                          </div>
+                          <!-- Edit view -->
+                          <div class="notification-view-panel space-y-4" data-view="edit">
+                            <label class="block text-sm">
+                              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</span>
+                              <input name="notification_subject[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm notification-subject-input" data-key="<?= e($key) ?>" value="<?= e($settings['subject'] ?? '') ?>">
+                            </label>
+                            <?php if (!empty($definition['placeholders'])): ?>
+                              <div class="flex flex-wrap items-center gap-2 text-xs">
+                                <span class="text-slate-500 font-semibold uppercase tracking-wider">Insert tag:</span>
+                                <?php foreach ($definition['placeholders'] as $tag): ?>
+                                  <button type="button" class="notification-merge-tag inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 text-amber-800 px-2.5 py-1 font-mono hover:bg-amber-100 transition" data-tag="{{<?= e($tag) ?>}}">
+                                    <span class="material-icons-outlined text-sm">add</span>
+                                    {{<?= e($tag) ?>}}
+                                  </button>
+                                <?php endforeach; ?>
                               </div>
-                              <div class="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
-                                <iframe class="notification-preview-iframe w-full h-[640px] bg-white" data-key="<?= e($key) ?>" sandbox="allow-same-origin" title="Email preview"></iframe>
-                              </div>
-                              <p class="text-xs text-slate-400">Preview updates as you type. Real merge tags get filled in when the email is sent.</p>
+                            <?php endif; ?>
+                            <div class="space-y-2">
+                              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Body</p>
+                              <textarea name="notification_body[<?= e($key) ?>]" data-wysiwyg rows="14" placeholder="Write the message body…"><?= e($settings['body'] ?? '') ?></textarea>
                             </div>
+                          </div>
+                          <!-- Preview view -->
+                          <div class="notification-view-panel hidden space-y-2" data-view="preview">
+                            <div class="flex items-center justify-between">
+                              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Branded email preview</p>
+                              <span class="text-xs text-slate-400">Sample merge tag values shown</span>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+                              <iframe class="notification-preview-iframe w-full h-[720px] bg-white" data-key="<?= e($key) ?>" sandbox="allow-same-origin" title="Email preview"></iframe>
+                            </div>
+                            <p class="text-xs text-slate-400">Real merge tags get filled in when the email is sent. Unknown tags stay as <code class="font-mono">{{placeholder}}</code>.</p>
                           </div>
                         </div>
 
@@ -2229,6 +2241,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     const panel = input.closest('.notification-panel');
                     if (panel) schedulePreview(panel);
                   });
+                });
+
+                // Edit / Preview view toggle within Content tab
+                document.querySelectorAll('.notification-panel').forEach((panel) => {
+                  const viewBtns = Array.from(panel.querySelectorAll('.notification-view-btn'));
+                  const viewPanels = Array.from(panel.querySelectorAll('.notification-view-panel'));
+                  const hint = panel.querySelector('.notification-view-hint');
+                  if (!viewBtns.length || !viewPanels.length) return;
+                  const setView = (view) => {
+                    viewBtns.forEach((b) => {
+                      const active = b.dataset.view === view;
+                      b.classList.toggle('bg-white', active);
+                      b.classList.toggle('shadow-sm', active);
+                      b.classList.toggle('text-gray-900', active);
+                      b.classList.toggle('text-slate-500', !active);
+                    });
+                    viewPanels.forEach((p) => {
+                      p.classList.toggle('hidden', p.dataset.view !== view);
+                    });
+                    if (hint) {
+                      hint.textContent = view === 'edit'
+                        ? 'Live preview available — click Preview to switch view'
+                        : 'Showing rendered email with sample merge values — click Edit to keep writing';
+                    }
+                    if (view === 'preview') schedulePreview(panel, 0);
+                  };
+                  viewBtns.forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
                 });
 
                 // Merge-tag chip → insert at Quill cursor
