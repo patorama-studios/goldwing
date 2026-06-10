@@ -1423,6 +1423,21 @@ if ($user && $user['member_id']) {
     $stmt->execute();
     $wingsLatest = $stmt->fetch();
 
+    // AGM Awards for the dashboard trophy card. Empty array if member has no
+    // wins (or the awards tables aren't present yet on older deploys).
+    $memberAwards = [];
+    try {
+      $memberAwards = \App\Services\AwardsService::winnersForMember((int) $member['id']);
+    } catch (\Throwable $awardErr) {
+      $memberAwards = [];
+    }
+    $awardsAreLive = false;
+    try {
+      $awardsAreLive = \App\Services\AwardsService::isLive();
+    } catch (\Throwable $awardErr) {
+      $awardsAreLive = false;
+    }
+
     $membershipOrders = [];
     if ($ordersMemberColumn && $ordersMemberValue) {
       $stmt = $pdo->prepare('SELECT * FROM orders WHERE ' . $ordersMemberColumn . ' = :value AND order_type = "membership" ORDER BY created_at DESC');
@@ -1520,6 +1535,8 @@ if ($user && $user['member_id']) {
         'amount' => $order['total'],
         'items' => $itemList,
         'order_id' => $order['id'],
+        'order_number' => $order['order_number'] ?? null,
+        'payment_method' => $order['payment_method'] ?? null,
       ];
     }
 
@@ -1547,6 +1564,8 @@ if ($user && $user['member_id']) {
           'amount' => number_format((float) $reg['total'], 2),
           'items' => $itemList,
           'order_id' => $reg['id'],
+          'order_number' => $reg['registration_number'] ?? null,
+          'payment_method' => $reg['payment_method'] ?? null,
         ];
       }
     }
@@ -1634,273 +1653,300 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <?php if ($page === 'dashboard'): ?>
-        <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-          <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-            <span class="material-icons-outlined text-9xl text-primary transform rotate-12">verified</span>
-          </div>
-          <div class="relative z-10">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div>
-                <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                  <?php
-                  $welcomeName = trim((string) ($member['first_name'] ?? ''));
-                  if ($welcomeName === '') {
-                    $displayName = trim((string) ($user['name'] ?? ''));
-                    if ($displayName === '' || strcasecmp($displayName, 'member') === 0) {
-                      $displayName = trim((string) ($member['last_name'] ?? ''));
-                    }
-                    $welcomeName = $displayName !== '' ? $displayName : 'there';
-                  }
-                  ?>
-                  Welcome back, <span class="text-primary"><?= e($welcomeName) ?></span>
-                </h1>
-                <p class="text-gray-500">Manage your membership, view events, and stay updated.</p>
-                <?php
-                  // Committee/leadership role pills. Sourced from
-                  // member_committee_assignments via CommitteeService so the
-                  // badge stays in sync with whatever an admin has assigned.
-                  $memberRolePills = $member ? CommitteeService::rolesForMember((int) $member['id']) : [];
-                ?>
-                <?php if ($memberRolePills): ?>
-                  <div class="flex flex-wrap gap-1.5 mt-3">
-                    <?php foreach ($memberRolePills as $rolePill):
-                      $isNational = ($rolePill['category'] ?? '') === 'national';
-                      $pillClass = $isNational ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
-                      $iconName = $isNational ? 'star' : 'place';
-                    ?>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold <?= $pillClass ?>">
-                        <span class="material-icons-outlined text-[14px]"><?= e($iconName) ?></span>
-                        <?= e($rolePill['name']) ?>
-                      </span>
-                    <?php endforeach; ?>
-                  </div>
-                <?php endif; ?>
-              </div>
-              <span
-                class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-gray-900 shadow-sm self-start md:self-center">
-                <?= e($member['member_type'] ?? 'Member') ?> Member
-              </span>
+        <?php
+        // --- Dashboard data prep ------------------------------------------------
+        $welcomeName = trim((string) ($member['first_name'] ?? ''));
+        if ($welcomeName === '') {
+          $displayName = trim((string) ($user['name'] ?? ''));
+          if ($displayName === '' || strcasecmp($displayName, 'member') === 0) {
+            $displayName = trim((string) ($member['last_name'] ?? ''));
+          }
+          $welcomeName = $displayName !== '' ? $displayName : 'there';
+        }
+        // Committee/leadership role pills sourced from member_committee_assignments.
+        $memberRolePills = $member ? CommitteeService::rolesForMember((int) $member['id']) : [];
+        $isLifeMember = ($member['member_type'] ?? '') === 'LIFE';
+        $expiryLabel = $isLifeMember
+          ? 'No expiry'
+          : ($membershipPeriod ? (format_date_au($membershipPeriod['end_date'] ?? null) ?: 'N/A') : 'N/A');
+        $renewalDays = null;
+        if (!$isLifeMember && !empty($membershipPeriod['end_date'])) {
+          $renewalDays = (int) ceil((strtotime($membershipPeriod['end_date']) - time()) / 86400);
+        }
+        $statusKey = strtolower((string) ($member['status'] ?? ''));
+        $statusDot = match ($statusKey) {
+          'active' => 'bg-green-500',
+          'expired', 'inactive' => 'bg-red-500',
+          'pending', 'pending_payment' => 'bg-amber-500',
+          default => 'bg-slate-400',
+        };
+
+        // Partner (associate) card for the hero right-rail. Reuses associate
+        // avatar resolution so it matches the profile household panel.
+        $dashboardPartner = null;
+        if (in_array($member['member_type'] ?? '', ['FULL', 'LIFE'], true)) {
+          $dashboardPartner = !empty($associates) ? $associates[0] : null;
+          $dashboardPartnerType = 'ASSOCIATE';
+        } elseif (($member['member_type'] ?? '') === 'ASSOCIATE' && $fullMember) {
+          $dashboardPartner = $fullMember;
+          $dashboardPartnerType = strtoupper((string) ($fullMember['member_type'] ?? 'FULL'));
+        }
+        $dashboardPartnerAvatar = '';
+        if ($dashboardPartner) {
+          $partnerUserId = (int) ($dashboardPartner['user_id'] ?? 0);
+          $partnerType = strtoupper((string) ($dashboardPartner['member_type'] ?? 'FULL'));
+          if ($partnerType === 'ASSOCIATE' && $partnerUserId > 0) {
+            $dashboardPartnerAvatar = (string) SettingsService::getUser($partnerUserId, 'associate_avatar_url', '');
+            if ($dashboardPartnerAvatar === '') {
+              $dashboardPartnerAvatar = (string) SettingsService::getUser($partnerUserId, 'avatar_url', '');
+            }
+            if ($dashboardPartnerAvatar === '' && !empty($member['user_id'])) {
+              $dashboardPartnerAvatar = (string) SettingsService::getUser((int) $member['user_id'], 'associate_avatar_url', '');
+            }
+          } elseif ($partnerUserId > 0) {
+            $dashboardPartnerAvatar = (string) SettingsService::getUser($partnerUserId, 'avatar_url', '');
+          }
+          if ($dashboardPartnerAvatar === '') {
+            $dashboardPartnerAvatar = (string) ($dashboardPartner['avatar_url'] ?? '');
+          }
+        }
+        $dashboardPartnerTypeLabel = [
+          'FULL' => 'Full Member',
+          'ASSOCIATE' => 'Associate',
+          'LIFE' => 'Life Member',
+        ][strtoupper((string) ($dashboardPartner['member_type'] ?? ''))] ?? 'Member';
+        $dashboardPartnerNumber = $dashboardPartner && !empty($dashboardPartner['member_number_base'])
+          ? MembershipService::displayMembershipNumber((int) $dashboardPartner['member_number_base'], (int) ($dashboardPartner['member_number_suffix'] ?? 0))
+          : '';
+
+        // Primary bike + remaining bikes for the My Garage section.
+        $dashboardPrimaryBike = null;
+        if (!empty($bikes) && !empty($bikeHasPrimary)) {
+          foreach ($bikes as $b) {
+            if ((int) ($b['is_primary'] ?? 0) === 1) {
+              $dashboardPrimaryBike = $b;
+              break;
+            }
+          }
+        }
+        if (!$dashboardPrimaryBike && !empty($bikes)) {
+          $dashboardPrimaryBike = $bikes[0];
+        }
+        $dashboardOtherBikes = array_values(array_filter(
+          $bikes ?? [],
+          fn($b) => $dashboardPrimaryBike === null || (int) ($b['id'] ?? 0) !== (int) ($dashboardPrimaryBike['id'] ?? -1)
+        ));
+
+        // Latest AGM trophy (if any).
+        $latestAward = !empty($memberAwards) ? $memberAwards[0] : null;
+        $awardsHref = $awardsAreLive ? '/members/awards' : '/members/awards';
+
+        // Recent orders for the click-to-expand list.
+        $recentOrders = array_slice($orderHistory, 0, 5);
+        $membershipStatusLabel = strtoupper((string) ($membershipPeriod['status'] ?? ($member['status'] ?? '')));
+        $isMembershipActive = in_array($membershipStatusLabel, ['ACTIVE', 'PAID'], true);
+        ?>
+
+        <!-- HERO: welcome left + partner card right -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+              <span class="material-icons-outlined text-9xl text-primary transform rotate-12">verified</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
-              <div>
-                <p class="text-sm text-gray-500 mb-1">Membership #</p>
-                <p class="text-lg font-semibold text-gray-900">
-                  <?= $member ? e(MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix'])) : 'N/A' ?>
-                </p>
+            <div class="relative z-10">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                    Welcome back, <span class="text-primary"><?= e($welcomeName) ?></span> 👋
+                  </h1>
+                  <p class="text-gray-500">Here's what's happening with your Goldwing membership today.</p>
+                  <?php if ($memberRolePills): ?>
+                    <div class="flex flex-wrap gap-1.5 mt-3">
+                      <?php foreach ($memberRolePills as $rolePill):
+                        $isNational = ($rolePill['category'] ?? '') === 'national';
+                        $pillClass = $isNational ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
+                        $iconName = $isNational ? 'star' : 'place';
+                      ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold <?= $pillClass ?>">
+                          <span class="material-icons-outlined text-[14px]"><?= e($iconName) ?></span>
+                          <?= e($rolePill['name']) ?>
+                        </span>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
+                <span class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-gray-900 shadow-sm self-start md:self-center">
+                  <?= e($member['member_type'] ?? 'Member') ?> Member
+                </span>
               </div>
-              <div>
-                <p class="text-sm text-gray-500 mb-1">Status</p>
-                <div class="flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                  <p class="text-lg font-semibold text-gray-900"><?= e($member['status'] ?? 'N/A') ?></p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Membership #</p>
+                  <p class="text-lg font-semibold text-gray-900">
+                    <?= $member ? e(MembershipService::displayMembershipNumber((int) $member['member_number_base'], (int) $member['member_number_suffix'])) : 'N/A' ?>
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Status</p>
+                  <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full <?= $statusDot ?>"></span>
+                    <p class="text-lg font-semibold text-gray-900"><?= e(ucfirst(strtolower((string) ($member['status'] ?? 'N/A')))) ?></p>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">
+                    <?= $isLifeMember ? 'Tenure' : 'Renews' ?>
+                  </p>
+                  <p class="text-lg font-semibold text-gray-900"><?= e($expiryLabel) ?></p>
+                  <?php if ($renewalDays !== null && $renewalDays <= 60 && $renewalDays > 0): ?>
+                    <p class="text-xs text-red-600 font-semibold mt-0.5">Due in <?= e((string) $renewalDays) ?> days</p>
+                  <?php elseif ($renewalDays !== null && $renewalDays <= 0): ?>
+                    <p class="text-xs text-red-600 font-semibold mt-0.5">Overdue</p>
+                  <?php endif; ?>
                 </div>
               </div>
-              <div>
-                <p class="text-sm text-gray-500 mb-1">Expiry Date</p>
-                <p class="text-lg font-semibold text-gray-900">
-                  <?= ($member && $member['member_type'] === 'LIFE') ? 'No expiry' : e($membershipPeriod ? format_date_au($membershipPeriod['end_date'] ?? null) ?: 'N/A' : 'N/A') ?>
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-green-100 rounded-lg text-green-600">
-                <span class="material-icons-outlined">bolt</span>
-              </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Quick Actions</h2>
-            </div>
-            <div class="space-y-3 flex-1">
-              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                href="/member/index.php?page=profile">
-                <span class="font-medium text-gray-700 group-hover:text-green-700">Edit membership details</span>
-                <span
-                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-              </a>
-              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                href="/member/index.php?page=billing">
-                <span class="font-medium text-gray-700 group-hover:text-green-700">Billing & payments</span>
-                <span
-                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-              </a>
-              <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
-                href="/member/index.php?page=history">
-                <span class="font-medium text-gray-700 group-hover:text-green-700">Membership history</span>
-                <span
-                  class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
-              </a>
               <?php if ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
-                <a class="w-full group flex items-center justify-between p-3 rounded-xl border border-primary bg-primary/10 text-gray-900"
-                  href="/member/index.php?page=billing">
-                  <span class="font-medium">Complete payment</span>
-                  <span class="material-icons-outlined text-sm">payments</span>
-                </a>
-              <?php elseif ($membershipPeriod && $membershipPeriod['end_date'] && strtotime($membershipPeriod['end_date']) <= strtotime('+60 days')): ?>
-                <button type="button" data-renew-trigger
-                  class="w-full group flex items-center justify-between p-3 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg ring-2 ring-red-600/40 transition-all duration-200">
-                  <span class="font-semibold tracking-wide">Renew now</span>
+                <a href="/member/index.php?page=billing"
+                  class="mt-6 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-gray-900 font-semibold text-sm hover:bg-primary/90 transition">
                   <span class="material-icons-outlined text-base">payments</span>
+                  Complete payment
+                </a>
+              <?php elseif ($renewalDays !== null && $renewalDays <= 60): ?>
+                <button type="button" data-renew-trigger
+                  class="mt-6 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md transition">
+                  <span class="material-icons-outlined text-base">payments</span>
+                  Renew membership now
                 </button>
               <?php endif; ?>
             </div>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-            <div class="flex items-center gap-3 mb-6">
+
+          <!-- Partner / associate card -->
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
               <div class="p-2 bg-blue-100 rounded-lg text-blue-600">
-                <span class="material-icons-outlined">group</span>
+                <span class="material-icons-outlined">favorite</span>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Associates</h2>
+              <h2 class="font-display text-lg font-bold text-gray-900">
+                <?= ($member['member_type'] ?? '') === 'ASSOCIATE' ? 'Your Full Member' : 'Your Associate' ?>
+              </h2>
             </div>
-            <div class="bg-gray-50 rounded-xl p-4 flex-1">
-              <?php if ($associates): ?>
-                <ul class="space-y-4">
-                  <?php foreach ($associates as $assoc): ?>
-                    <li class="flex items-start gap-3">
-                      <span class="w-2 h-2 mt-2 rounded-full bg-blue-500"></span>
-                      <div>
-                        <p class="text-sm font-medium text-gray-900">
-                          <?= e($assoc['first_name'] . ' ' . $assoc['last_name']) ?>
-                          (<?= e(MembershipService::displayMembershipNumber((int) $assoc['member_number_base'], (int) $assoc['member_number_suffix'])) ?>)
-                        </p>
-                        <span
-                          class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded"><?= e($assoc['status']) ?></span>
-                      </div>
-                    </li>
-                  <?php endforeach; ?>
-                </ul>
-              <?php elseif ($fullMember): ?>
-                <p class="text-sm text-gray-600">Linked Full member:</p>
-                <p class="text-base font-semibold text-gray-900">
-                  <?= e($fullMember['first_name'] . ' ' . $fullMember['last_name']) ?>
-                </p>
-                <p class="text-sm text-gray-500">Member #:
-                  <?= e(MembershipService::displayMembershipNumber((int) $fullMember['member_number_base'], (int) $fullMember['member_number_suffix'])) ?>
-                </p>
-                <p class="text-sm text-gray-500">Status: <?= e($fullMember['status']) ?></p>
-              <?php else: ?>
-                <p class="text-sm text-gray-500">No associates linked.</p>
-              <?php endif; ?>
-            </div>
-          </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-amber-100 rounded-lg text-amber-600">
-                <span class="material-icons-outlined">receipt_long</span>
+            <?php if ($dashboardPartner):
+              $partnerName = trim(($dashboardPartner['first_name'] ?? '') . ' ' . ($dashboardPartner['last_name'] ?? ''));
+              $partnerEditUrl = '/member/index.php?page=profile&member_id=' . urlencode((string) $dashboardPartner['id']);
+              $partnerStatusKey = strtolower((string) ($dashboardPartner['status'] ?? ''));
+              $partnerStatusClass = $partnerStatusKey === 'active'
+                ? 'bg-green-100 text-green-800'
+                : ($partnerStatusKey === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700');
+            ?>
+              <div class="flex items-center gap-4 flex-1">
+                <div class="h-16 w-16 rounded-full border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+                  <?php if ($dashboardPartnerAvatar !== ''): ?>
+                    <img src="<?= e($dashboardPartnerAvatar) ?>" alt="<?= e($partnerName) ?>" class="h-full w-full object-cover">
+                  <?php else: ?>
+                    <span class="text-gray-400 font-semibold text-lg"><?= e(mb_substr($dashboardPartner['first_name'] ?? '', 0, 1) . mb_substr($dashboardPartner['last_name'] ?? '', 0, 1)) ?></span>
+                  <?php endif; ?>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 truncate"><?= e($partnerName) ?></p>
+                  <p class="text-xs text-gray-500"><?= e($dashboardPartnerTypeLabel) ?><?= $dashboardPartnerNumber !== '' ? ' · #' . e($dashboardPartnerNumber) : '' ?></p>
+                  <span class="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded <?= $partnerStatusClass ?>">
+                    <?= e($dashboardPartner['status'] ?? 'Unknown') ?>
+                  </span>
+                </div>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Billing Summary</h2>
-            </div>
-            <div class="space-y-4 flex-1">
-              <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Last Payment</p>
-                <p class="text-gray-900 font-medium mt-1"><?= e($membershipPeriod['paid_at'] ?? 'N/A') ?></p>
+              <a href="<?= e($partnerEditUrl) ?>"
+                class="mt-4 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:border-blue-300 transition">
+                <span class="material-icons-outlined text-sm">edit</span>
+                Edit their details
+              </a>
+            <?php else: ?>
+              <div class="flex-1 flex flex-col items-center justify-center text-center py-4">
+                <span class="material-icons-outlined text-4xl text-gray-300 mb-2">person_add</span>
+                <p class="text-sm text-gray-500 mb-3">No associate linked to your membership.</p>
+                <?php if (in_array($member['member_type'] ?? '', ['FULL', 'LIFE'], true)): ?>
+                  <a href="/?page=membership" class="text-xs font-semibold text-primary hover:underline">Add an associate →</a>
+                <?php endif; ?>
               </div>
-              <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Status</p>
-                <p class="text-green-600 font-medium mt-1 flex items-center gap-1">
-                  <span class="material-icons-outlined text-sm">check_circle</span>
-                  <?= e($membershipPeriod['status'] ?? 'N/A') ?>
-                </p>
-              </div>
-            </div>
-            <a class="mt-6 w-full py-2.5 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary hover:text-white transition-all font-medium text-sm"
-              href="/member/index.php?page=billing">
-              Update payment method
-            </a>
+            <?php endif; ?>
           </div>
         </section>
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-3 mb-6">
+
+        <!-- SNAPSHOT: full-width member-at-a-glance strip -->
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-3">
               <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
                 <span class="material-icons-outlined">badge</span>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Snapshot</h2>
+              <h2 class="font-display text-xl font-bold text-gray-900">Your Snapshot</h2>
             </div>
-            <?php if ($member): ?>
-              <div class="space-y-3 text-sm">
-                <div class="flex flex-col pb-3 border-b border-gray-100">
-                  <span class="text-gray-500 text-xs uppercase">Email</span>
-                  <span class="font-medium text-gray-900 truncate"><?= e($member['email']) ?></span>
-                </div>
-                <div class="flex flex-col pb-3 border-b border-gray-100">
-                  <span class="text-gray-500 text-xs uppercase">Phone</span>
-                  <span class="font-medium text-gray-900 truncate"><?= e($member['phone'] ?? 'N/A') ?></span>
-                </div>
-                <div class="flex flex-col pb-3 border-b border-gray-100">
-                  <span class="text-gray-500 text-xs uppercase">Chapter</span>
-                  <span class="font-medium text-gray-900"><?= e($member['chapter_name'] ?? 'Unassigned') ?></span>
-                </div>
-                <div class="flex flex-col pb-3 border-b border-gray-100">
-                  <span class="text-gray-500 text-xs uppercase">Wings</span>
-                  <span class="font-medium text-gray-900"><?= e($member['wings_preference']) ?></span>
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-gray-500 text-xs uppercase">Directory</span>
-                  <span class="font-medium text-gray-900"><?= e($member['privacy_level']) ?></span>
-                </div>
-              </div>
-              <a class="mt-6 inline-flex items-center text-sm font-semibold text-secondary"
-                href="/member/index.php?page=profile">
-                Edit profile
-                <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
-              </a>
-            <?php endif; ?>
+            <a class="inline-flex items-center text-sm font-semibold text-secondary hover:text-secondary/80" href="/member/index.php?page=profile">
+              Edit profile <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
+            </a>
           </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                <span class="material-icons-outlined">import_contacts</span>
+          <?php if ($member): ?>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div class="rounded-xl bg-gray-50 px-4 py-3 border border-gray-100">
+                <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold mb-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-[14px]">mail</span> Email
+                </p>
+                <p class="text-sm font-medium text-gray-900 truncate" title="<?= e($member['email']) ?>"><?= e($member['email']) ?></p>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Wings Magazine</h2>
+              <div class="rounded-xl bg-gray-50 px-4 py-3 border border-gray-100">
+                <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold mb-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-[14px]">phone</span> Phone
+                </p>
+                <p class="text-sm font-medium text-gray-900 truncate"><?= e($member['phone'] ?? 'N/A') ?></p>
+              </div>
+              <div class="rounded-xl bg-gray-50 px-4 py-3 border border-gray-100">
+                <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold mb-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-[14px]">groups</span> Chapter
+                </p>
+                <p class="text-sm font-medium text-gray-900 truncate"><?= e($member['chapter_name'] ?? 'Unassigned') ?></p>
+              </div>
+              <div class="rounded-xl bg-gray-50 px-4 py-3 border border-gray-100">
+                <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold mb-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-[14px]">menu_book</span> Wings
+                </p>
+                <p class="text-sm font-medium text-gray-900 truncate"><?= e(ucfirst(strtolower((string) ($member['wings_preference'] ?? '')))) ?></p>
+              </div>
+              <div class="rounded-xl bg-gray-50 px-4 py-3 border border-gray-100">
+                <p class="text-[11px] uppercase tracking-wide text-gray-500 font-semibold mb-1 flex items-center gap-1">
+                  <span class="material-icons-outlined text-[14px]">visibility</span> Directory
+                </p>
+                <p class="text-sm font-medium text-gray-900 truncate"><?= e(ucfirst(strtolower((string) ($member['privacy_level'] ?? '')))) ?></p>
+              </div>
             </div>
-            <?php if ($wingsLatest): ?>
-              <div class="flex items-start gap-4">
-                <div class="w-24 aspect-[3/4] rounded-lg border border-gray-100 bg-white shadow-sm overflow-hidden">
-                  <?php if (!empty($wingsLatest['cover_image_url'])): ?>
-                    <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>"
-                      class="h-full w-full object-cover">
-                  <?php else: ?>
-                    <div class="h-full w-full flex items-center justify-center bg-gray-50 text-gray-300">
-                      <span class="material-icons-outlined text-3xl">auto_stories</span>
-                    </div>
-                  <?php endif; ?>
+          <?php endif; ?>
+        </section>
+
+        <!-- 3-COL: Calendar (left) | Quick Actions | AGM Awards -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Upcoming events / calendar -->
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
+                  <span class="material-icons-outlined">event</span>
                 </div>
-                <div class="flex-1">
-                  <p class="text-sm text-gray-500">Latest issue</p>
-                  <p class="text-lg font-semibold text-gray-900"><?= e($wingsLatest['title']) ?></p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                      <a class="px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                        href="/member/read_wings.php?id=<?= e((string) $wingsLatest['id']) ?>">Read Now</a>
-                    <a class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold"
-                      href="/member/index.php?page=wings">Archive</a>
-                  </div>
-                </div>
+                <h2 class="font-display text-xl font-bold text-gray-900">Upcoming Rides</h2>
               </div>
-            <?php else: ?>
-              <p class="text-sm text-gray-500">No issues uploaded yet.</p>
-            <?php endif; ?>
-          </div>
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
-                <span class="material-icons-outlined">event</span>
-              </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Upcoming Events</h2>
+              <a href="/calendar/" class="text-xs font-semibold text-teal-700 hover:underline">Full calendar →</a>
             </div>
             <?php if ($upcomingEvents): ?>
-              <ul class="space-y-3">
+              <ul class="space-y-2 flex-1">
                 <?php foreach ($upcomingEvents as $event): ?>
                   <li>
-                    <a class="flex items-center justify-between gap-3 rounded-xl border border-transparent hover:border-teal-200 hover:bg-teal-50 px-2 py-2 transition"
+                    <a class="flex items-center justify-between gap-3 rounded-xl border border-transparent hover:border-teal-200 hover:bg-teal-50 px-3 py-2.5 transition"
                       href="<?= e($event['url']) ?>">
-                      <div>
-                        <p class="text-sm font-medium text-gray-900"><?= e($event['title']) ?></p>
-                        <p class="text-xs text-gray-500">
+                      <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate"><?= e($event['title']) ?></p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                          <span class="material-icons-outlined text-[12px] align-middle">schedule</span>
                           <?= e($event['date_label']) ?>
                           <?php if (!empty($event['location'])): ?>
-                            • <?= e($event['location']) ?>
+                            · <?= e($event['location']) ?>
                           <?php endif; ?>
                         </p>
                       </div>
@@ -1910,87 +1956,433 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <?php endforeach; ?>
               </ul>
             <?php else: ?>
-              <p class="text-sm text-gray-500">No upcoming events.</p>
+              <div class="flex-1 flex flex-col items-center justify-center text-center py-6">
+                <span class="material-icons-outlined text-5xl text-teal-200 mb-2">explore</span>
+                <p class="text-sm font-semibold text-gray-700 mb-1">No rides scheduled yet</p>
+                <p class="text-xs text-gray-500 mb-4">Nothing in the next 60 days for your chapter — there may be more on the full calendar.</p>
+                <a href="/calendar/" class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 transition">
+                  <span class="material-icons-outlined text-sm">map</span>
+                  Browse the calendar
+                </a>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <!-- Quick actions -->
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="p-2 bg-green-100 rounded-lg text-green-600">
+                <span class="material-icons-outlined">bolt</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">Quick Actions</h2>
+            </div>
+            <div class="space-y-2 flex-1">
+              <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition"
+                href="/member/index.php?page=profile">
+                <span class="flex items-center gap-2 font-medium text-gray-700 group-hover:text-green-700">
+                  <span class="material-icons-outlined text-[18px] text-gray-400 group-hover:text-green-600">person</span>
+                  Edit my details
+                </span>
+                <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition"
+                href="/member/index.php?page=billing">
+                <span class="flex items-center gap-2 font-medium text-gray-700 group-hover:text-green-700">
+                  <span class="material-icons-outlined text-[18px] text-gray-400 group-hover:text-green-600">credit_card</span>
+                  Payment methods
+                </span>
+                <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition"
+                href="/member/index.php?page=history">
+                <span class="flex items-center gap-2 font-medium text-gray-700 group-hover:text-green-700">
+                  <span class="material-icons-outlined text-[18px] text-gray-400 group-hover:text-green-600">history</span>
+                  Membership history
+                </span>
+                <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+              <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition"
+                href="/member/index.php?page=directory">
+                <span class="flex items-center gap-2 font-medium text-gray-700 group-hover:text-green-700">
+                  <span class="material-icons-outlined text-[18px] text-gray-400 group-hover:text-green-600">groups</span>
+                  Members directory
+                </span>
+                <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- AGM Award trophy card -->
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full relative overflow-hidden">
+            <?php if ($latestAward): ?>
+              <div class="absolute -top-4 -right-4 opacity-10 pointer-events-none">
+                <span class="material-icons text-9xl text-yellow-500">emoji_events</span>
+              </div>
+            <?php endif; ?>
+            <div class="flex items-center gap-3 mb-5 relative z-10">
+              <div class="p-2 bg-yellow-100 rounded-lg text-yellow-700">
+                <span class="material-icons-outlined">emoji_events</span>
+              </div>
+              <h2 class="font-display text-xl font-bold text-gray-900">AGM Awards</h2>
+            </div>
+            <?php if ($latestAward):
+              $awardCount = count($memberAwards);
+              $awardYear = (int) ($latestAward['year'] ?? 0);
+              $awardName = $latestAward['category_name'] ?? 'AGM Award';
+              $awardPhoto = $latestAward['primary_photo'] ?? '';
+              $awardMemorial = $latestAward['memorial_trophy_name'] ?? '';
+            ?>
+              <div class="relative z-10 flex-1 flex flex-col">
+                <div class="flex items-start gap-3">
+                  <div class="h-20 w-20 rounded-xl border-2 border-yellow-300 bg-yellow-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <?php if ($awardPhoto !== ''): ?>
+                      <img src="<?= e($awardPhoto) ?>" alt="<?= e($awardName) ?>" class="h-full w-full object-cover">
+                    <?php else: ?>
+                      <span class="material-icons text-yellow-500 text-4xl">emoji_events</span>
+                    <?php endif; ?>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[11px] uppercase tracking-wide text-yellow-700 font-bold"><?= e((string) $awardYear) ?> Winner</p>
+                    <p class="text-sm font-bold text-gray-900 leading-tight mt-0.5"><?= e($awardName) ?></p>
+                    <?php if ($awardMemorial !== ''): ?>
+                      <p class="text-xs text-gray-500 mt-0.5 italic"><?= e($awardMemorial) ?></p>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <?php if ($awardCount > 1): ?>
+                  <p class="text-xs text-gray-600 mt-3"><span class="font-bold text-yellow-700"><?= e((string) $awardCount) ?></span> trophies in your cabinet 🏆</p>
+                <?php endif; ?>
+                <a href="<?= e($awardsHref) ?>" class="mt-auto pt-4 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-sm font-semibold transition">
+                  View my trophies
+                  <span class="material-icons-outlined text-base">arrow_forward</span>
+                </a>
+              </div>
+            <?php else: ?>
+              <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center">
+                <span class="material-icons text-yellow-300 text-5xl mb-2">emoji_events</span>
+                <p class="text-sm font-semibold text-gray-700">No trophies yet</p>
+                <p class="text-xs text-gray-500 mt-1 mb-4">Take a look at past winners and the memorial trophies awarded each year.</p>
+                <a href="<?= e($awardsHref) ?>" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-yellow-300 text-yellow-800 hover:bg-yellow-50 text-sm font-semibold transition">
+                  Browse past winners
+                  <span class="material-icons-outlined text-base">arrow_forward</span>
+                </a>
+              </div>
             <?php endif; ?>
           </div>
         </section>
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-red-100 rounded-lg text-red-600">
-                <span class="material-icons-outlined">campaign</span>
+
+        <!-- MY GARAGE -->
+        <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-yellow-50 rounded-lg text-yellow-700">
+                <span class="material-icons-outlined">two_wheeler</span>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Notice Board</h2>
+              <div>
+                <h2 class="font-display text-xl font-bold text-gray-900">My Garage</h2>
+                <p class="text-xs text-gray-500"><?= count($bikes ?? []) ?> <?= count($bikes ?? []) === 1 ? 'bike' : 'bikes' ?> in your stable</p>
+              </div>
+            </div>
+            <a href="/member/index.php?page=profile" class="inline-flex items-center text-sm font-semibold text-yellow-700 hover:text-yellow-800">
+              Manage bikes <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
+            </a>
+          </div>
+          <?php if ($dashboardPrimaryBike): ?>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <!-- Primary bike hero card -->
+              <div class="lg:col-span-2 rounded-2xl border border-yellow-200 bg-gradient-to-br from-yellow-50 to-white p-5 flex gap-4">
+                <div class="h-28 w-40 lg:h-32 lg:w-48 rounded-xl bg-white border border-yellow-100 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <?php if (!empty($dashboardPrimaryBike['image_url'])): ?>
+                    <img src="<?= e($dashboardPrimaryBike['image_url']) ?>" alt="<?= e(($dashboardPrimaryBike['make'] ?? '') . ' ' . ($dashboardPrimaryBike['model'] ?? '')) ?>" class="h-full w-full object-cover">
+                  <?php else: ?>
+                    <span class="material-icons-outlined text-yellow-300 text-5xl">two_wheeler</span>
+                  <?php endif; ?>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900 text-[10px] font-bold uppercase tracking-wide">
+                    <span class="material-icons-outlined text-[12px]">star</span> Primary
+                  </span>
+                  <p class="font-display text-xl font-bold text-gray-900 mt-2 leading-tight">
+                    <?= e(trim(($dashboardPrimaryBike['make'] ?? '') . ' ' . ($dashboardPrimaryBike['model'] ?? ''))) ?>
+                  </p>
+                  <p class="text-sm text-gray-600 mt-0.5"><?= e($dashboardPrimaryBike['year'] ?? 'Year not set') ?></p>
+                  <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                    <?php if (!empty($dashboardPrimaryBike['rego'])): ?>
+                      <span class="inline-flex items-center gap-1 rounded-full bg-white border border-yellow-200 px-2.5 py-1 font-semibold text-yellow-800">
+                        <span class="material-icons-outlined text-[12px]">badge</span> <?= e($dashboardPrimaryBike['rego']) ?>
+                      </span>
+                    <?php endif; ?>
+                    <?php $primaryColor = $dashboardPrimaryBike['color'] ?? ($dashboardPrimaryBike['colour'] ?? ''); ?>
+                    <?php if (!empty($primaryColor)): ?>
+                      <span class="inline-flex items-center gap-1 rounded-full bg-white border border-gray-200 px-2.5 py-1 font-semibold text-slate-700">
+                        <span class="material-icons-outlined text-[12px]">palette</span> <?= e($primaryColor) ?>
+                      </span>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+              <!-- Other bikes -->
+              <?php if ($dashboardOtherBikes): ?>
+                <div class="space-y-3">
+                  <?php foreach (array_slice($dashboardOtherBikes, 0, 2) as $bike): ?>
+                    <div class="rounded-xl border border-gray-200 bg-white p-3 flex items-center gap-3">
+                      <div class="h-14 w-16 rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+                        <?php if (!empty($bike['image_url'])): ?>
+                          <img src="<?= e($bike['image_url']) ?>" alt="<?= e($bike['make'] . ' ' . $bike['model']) ?>" class="h-full w-full object-cover">
+                        <?php else: ?>
+                          <span class="material-icons-outlined text-gray-300">two_wheeler</span>
+                        <?php endif; ?>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate"><?= e(trim(($bike['make'] ?? '') . ' ' . ($bike['model'] ?? ''))) ?></p>
+                        <p class="text-xs text-gray-500"><?= e($bike['year'] ?? 'Year not set') ?><?= !empty($bike['rego']) ? ' · ' . e($bike['rego']) : '' ?></p>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                  <?php if (count($dashboardOtherBikes) > 2): ?>
+                    <a href="/member/index.php?page=profile" class="block text-center text-xs font-semibold text-gray-500 hover:text-yellow-700">
+                      + <?= e((string) (count($dashboardOtherBikes) - 2)) ?> more in the garage
+                    </a>
+                  <?php endif; ?>
+                </div>
+              <?php else: ?>
+                <a href="/member/index.php?page=profile" class="rounded-xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 flex flex-col items-center justify-center text-center p-5 transition group">
+                  <span class="material-icons-outlined text-gray-300 group-hover:text-yellow-500 text-4xl mb-1">add_circle</span>
+                  <p class="text-sm font-semibold text-gray-600 group-hover:text-yellow-800">Add another bike</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Keep your stable up to date</p>
+                </a>
+              <?php endif; ?>
+            </div>
+          <?php else: ?>
+            <a href="/member/index.php?page=profile" class="block rounded-2xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 p-8 text-center transition group">
+              <span class="material-icons-outlined text-5xl text-gray-300 group-hover:text-yellow-500 mb-2">two_wheeler</span>
+              <p class="font-semibold text-gray-700 group-hover:text-yellow-800">Tell us about your ride</p>
+              <p class="text-sm text-gray-500 mt-1">Add your first bike to your member profile.</p>
+            </a>
+          <?php endif; ?>
+        </section>
+
+        <!-- NOTICES + ORDERS -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Notice board (clickable list, no inline content) -->
+          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-red-100 rounded-lg text-red-600">
+                  <span class="material-icons-outlined">campaign</span>
+                </div>
+                <h2 class="font-display text-xl font-bold text-gray-900">Notice Board</h2>
+              </div>
+              <a href="/member/index.php?page=notices-view" class="text-xs font-semibold text-red-700 hover:underline">See all →</a>
             </div>
             <?php if ($dashboardNotices): ?>
-              <ul class="space-y-4">
-                <?php foreach ($dashboardNotices as $notice): ?>
-                  <?php
+              <ul class="divide-y divide-gray-100">
+                <?php foreach ($dashboardNotices as $notice):
                   $avatar = $noticeAvatars[$notice['created_by']] ?? '';
                   $categoryLabel = ucfirst($notice['category'] ?? 'notice');
-                  ?>
-                  <li class="rounded-xl border border-gray-100 bg-white p-4">
-                    <div class="flex items-center gap-3 mb-2">
-                      <div
-                        class="h-9 w-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center overflow-hidden">
+                  $isPinned = !empty($notice['is_pinned']);
+                  $noticeDate = !empty($notice['published_at']) ? $notice['published_at'] : ($notice['created_at'] ?? '');
+                  $noticeDateLabel = $noticeDate ? format_date_au($noticeDate) : '';
+                  $noticeHref = '/member/index.php?page=notices-view#notice-' . urlencode((string) $notice['id']);
+                ?>
+                  <li>
+                    <a href="<?= e($noticeHref) ?>" class="flex items-center gap-3 py-3 hover:bg-red-50/40 rounded-lg px-2 -mx-2 transition group">
+                      <div class="h-10 w-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center overflow-hidden flex-shrink-0">
                         <?php if (!empty($avatar)): ?>
-                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>"
-                            class="h-full w-full object-cover">
+                          <img src="<?= e($avatar) ?>" alt="<?= e($notice['created_by_name'] ?? 'Member') ?>" class="h-full w-full object-cover">
                         <?php else: ?>
                           <span class="material-icons-outlined text-sm">person</span>
                         <?php endif; ?>
                       </div>
-                      <div class="flex-1">
-                        <p class="text-sm font-semibold text-gray-900"><?= e($notice['title']) ?></p>
-                        <p class="text-xs text-gray-500"><?= e($categoryLabel) ?> •
-                          <?= e($notice['created_by_name'] ?? 'Member') ?>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <?php if ($isPinned): ?>
+                            <span class="material-icons-outlined text-[14px] text-red-500 flex-shrink-0" title="Pinned">push_pin</span>
+                          <?php endif; ?>
+                          <p class="text-sm font-semibold text-gray-900 truncate group-hover:text-red-700"><?= e($notice['title']) ?></p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-0.5 truncate">
+                          <?= e($categoryLabel) ?> · <?= e($notice['created_by_name'] ?? 'Member') ?>
+                          <?php if ($noticeDateLabel !== ''): ?> · <?= e($noticeDateLabel) ?><?php endif; ?>
                         </p>
                       </div>
-                    </div>
-                    <div class="prose prose-sm text-gray-600"><?= render_media_shortcodes($notice['content']) ?></div>
+                      <span class="material-icons-outlined text-gray-300 group-hover:text-red-500 text-sm flex-shrink-0">arrow_forward_ios</span>
+                    </a>
                   </li>
                 <?php endforeach; ?>
               </ul>
             <?php else: ?>
-              <p class="text-sm text-gray-500">No notices.</p>
+              <div class="text-center py-6">
+                <span class="material-icons-outlined text-5xl text-gray-200 mb-2">campaign</span>
+                <p class="text-sm text-gray-500">No notices on the board.</p>
+              </div>
             <?php endif; ?>
           </div>
+
+          <!-- Order history with merged billing status + expandable rows -->
           <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
-                <span class="material-icons-outlined">receipt</span>
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                  <span class="material-icons-outlined">receipt_long</span>
+                </div>
+                <h2 class="font-display text-xl font-bold text-gray-900">Orders &amp; Billing</h2>
               </div>
-              <h2 class="font-display text-xl font-bold text-gray-900">Order History</h2>
+              <a href="/member/index.php?page=billing" class="text-xs font-semibold text-slate-700 hover:underline">See all →</a>
             </div>
-            <?php $recentOrders = array_slice($orderHistory, 0, 5); ?>
-            <?php if ($recentOrders): ?>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                    <tr>
-                      <th class="py-2 pr-3">Date</th>
-                      <th class="py-2 pr-3">Type</th>
-                      <th class="py-2 pr-3">Amount</th>
-                      <th class="py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y">
-                    <?php foreach ($recentOrders as $order): ?>
-                      <tr>
-                        <td class="py-2 pr-3 text-gray-600"><?= e($order['date']) ?></td>
-                        <td class="py-2 pr-3 text-gray-900"><?= e(ucfirst($order['type'])) ?></td>
-                        <td class="py-2 pr-3 text-gray-900">$<?= e($order['amount']) ?></td>
-                        <td class="py-2 text-gray-600"><?= e(ucfirst($order['status'])) ?></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
+            <!-- Merged billing status pill -->
+            <?php if ($membershipPeriod): ?>
+              <div class="rounded-xl border <?= $isMembershipActive ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50' ?> p-3 mb-4 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="material-icons-outlined <?= $isMembershipActive ? 'text-green-600' : 'text-amber-600' ?> text-base">
+                    <?= $isMembershipActive ? 'verified' : 'schedule' ?>
+                  </span>
+                  <span class="font-semibold <?= $isMembershipActive ? 'text-green-800' : 'text-amber-800' ?>">
+                    Membership <?= e(ucfirst(strtolower((string) ($membershipPeriod['status'] ?? '')))) ?>
+                  </span>
+                  <?php if (!empty($membershipPeriod['paid_at'])): ?>
+                    <span class="text-xs text-gray-600 hidden sm:inline">· Last paid <?= e(format_date_au($membershipPeriod['paid_at'])) ?></span>
+                  <?php endif; ?>
+                </div>
+                <a href="/member/index.php?page=billing" class="text-xs font-semibold text-secondary hover:underline whitespace-nowrap">Update card</a>
               </div>
+            <?php endif; ?>
+
+            <?php if ($recentOrders): ?>
+              <ul class="divide-y divide-gray-100" data-order-list>
+                <?php foreach ($recentOrders as $idx => $order):
+                  $orderUid = 'order-' . (int) $idx;
+                  $orderType = ucfirst($order['type'] ?? '');
+                  $orderStatusKey = strtolower((string) ($order['status'] ?? ''));
+                  $orderStatusClass = match (true) {
+                    in_array($orderStatusKey, ['paid', 'completed', 'active'], true) => 'bg-green-100 text-green-700',
+                    in_array($orderStatusKey, ['pending', 'pending_payment', 'processing'], true) => 'bg-amber-100 text-amber-700',
+                    in_array($orderStatusKey, ['failed', 'cancelled', 'refunded'], true) => 'bg-red-100 text-red-700',
+                    default => 'bg-slate-100 text-slate-700',
+                  };
+                  $typeIcon = match ($order['type'] ?? '') {
+                    'membership' => 'card_membership',
+                    'store' => 'shopping_bag',
+                    'agm' => 'event_available',
+                    default => 'receipt',
+                  };
+                  $typeColor = match ($order['type'] ?? '') {
+                    'membership' => 'bg-green-50 text-green-600',
+                    'store' => 'bg-indigo-50 text-indigo-600',
+                    'agm' => 'bg-purple-50 text-purple-600',
+                    default => 'bg-slate-50 text-slate-500',
+                  };
+                  $paymentMethodLabel = trim((string) ($order['payment_method'] ?? ''));
+                  $paymentMethodLabel = $paymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $paymentMethodLabel)) : '—';
+                ?>
+                  <li>
+                    <button type="button"
+                      data-order-toggle="<?= e($orderUid) ?>"
+                      class="w-full flex items-center gap-3 py-3 px-2 -mx-2 hover:bg-slate-50 rounded-lg transition text-left">
+                      <div class="h-9 w-9 rounded-lg <?= $typeColor ?> flex items-center justify-center flex-shrink-0">
+                        <span class="material-icons-outlined text-[18px]"><?= e($typeIcon) ?></span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm font-semibold text-gray-900 truncate"><?= e($orderType) ?></p>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $orderStatusClass ?>">
+                            <?= e($order['status'] ?? '') ?>
+                          </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-0.5"><?= e(format_date_au($order['date']) ?: $order['date']) ?></p>
+                      </div>
+                      <div class="text-right flex-shrink-0">
+                        <p class="text-sm font-bold text-gray-900">$<?= e($order['amount']) ?></p>
+                      </div>
+                      <span class="material-icons-outlined text-gray-300 text-base flex-shrink-0 transition-transform" data-order-chevron="<?= e($orderUid) ?>">expand_more</span>
+                    </button>
+                    <div id="<?= e($orderUid) ?>" class="hidden px-2 pb-3 -mx-2">
+                      <div class="ml-12 rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-2 text-xs">
+                        <?php if (!empty($order['items'])): ?>
+                          <div>
+                            <p class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold mb-1">Items</p>
+                            <ul class="space-y-0.5 text-gray-700">
+                              <?php foreach ($order['items'] as $item): ?>
+                                <li class="flex justify-between gap-2">
+                                  <span class="truncate"><?= e($item['label']) ?></span>
+                                  <span class="text-gray-500 flex-shrink-0">×<?= e((string) $item['quantity']) ?></span>
+                                </li>
+                              <?php endforeach; ?>
+                            </ul>
+                          </div>
+                        <?php endif; ?>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-slate-200">
+                          <?php if (!empty($order['order_number'])): ?>
+                            <span><span class="text-gray-500">Order #</span> <span class="font-semibold text-gray-900"><?= e((string) $order['order_number']) ?></span></span>
+                          <?php endif; ?>
+                          <span><span class="text-gray-500">Paid via</span> <span class="font-semibold text-gray-900"><?= e($paymentMethodLabel) ?></span></span>
+                          <?php if (!empty($order['days_remaining_label']) && $order['type'] === 'membership'): ?>
+                            <span><span class="text-gray-500">Renewal</span> <span class="font-semibold text-gray-900"><?= e($order['days_remaining_label']) ?></span></span>
+                          <?php endif; ?>
+                        </div>
+                        <div class="pt-1">
+                          <a href="/member/index.php?page=billing#orders" class="inline-flex items-center gap-1 text-secondary font-semibold hover:underline">
+                            Full receipt <span class="material-icons-outlined text-[14px]">arrow_forward</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
             <?php else: ?>
-              <p class="text-sm text-gray-500">No orders yet.</p>
+              <div class="text-center py-6">
+                <span class="material-icons-outlined text-5xl text-gray-200 mb-2">receipt_long</span>
+                <p class="text-sm text-gray-500">No orders yet.</p>
+              </div>
             <?php endif; ?>
           </div>
         </section>
+
+        <!-- WINGS MAGAZINE (slim) -->
+        <?php if ($wingsLatest): ?>
+          <section class="bg-gradient-to-r from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div class="w-20 aspect-[3/4] rounded-lg border border-indigo-100 bg-white shadow-sm overflow-hidden flex-shrink-0">
+                <?php if (!empty($wingsLatest['cover_image_url'])): ?>
+                  <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>" class="h-full w-full object-cover">
+                <?php else: ?>
+                  <div class="h-full w-full flex items-center justify-center text-indigo-300">
+                    <span class="material-icons-outlined text-3xl">auto_stories</span>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <div class="flex-1">
+                <p class="text-[11px] uppercase tracking-wide text-indigo-700 font-bold">Latest Wings issue</p>
+                <p class="font-display text-xl font-bold text-gray-900 mt-1"><?= e($wingsLatest['title']) ?></p>
+                <p class="text-sm text-gray-500 mt-1">Fresh stories, photos and member spotlights — straight from the chapter.</p>
+              </div>
+              <div class="flex gap-2 flex-shrink-0">
+                <a class="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
+                  href="/member/read_wings.php?id=<?= e((string) $wingsLatest['id']) ?>">
+                  <span class="material-icons-outlined text-base">menu_book</span> Read now
+                </a>
+                <a class="inline-flex items-center px-4 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold transition"
+                  href="/member/index.php?page=wings">Archive</a>
+              </div>
+            </div>
+          </section>
+        <?php endif; ?>
+
+        <script>
+          // Click-to-expand order rows on the dashboard.
+          document.querySelectorAll('[data-order-toggle]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const id = btn.getAttribute('data-order-toggle');
+              const panel = document.getElementById(id);
+              const chevron = document.querySelector('[data-order-chevron="' + id + '"]');
+              if (!panel) return;
+              const isOpen = !panel.classList.contains('hidden');
+              panel.classList.toggle('hidden');
+              if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+            });
+          });
+        </script>
       <?php elseif ($page === 'profile'): ?>
         <?php
         $directoryPrefs = MemberRepository::directoryPreferences();
@@ -3377,7 +3769,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $category = $notice['category'] ?? 'notice';
                   $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
                   ?>
-                  <article class="border border-gray-100 rounded-2xl p-5 bg-white">
+                  <article id="notice-<?= e((string) $notice['id']) ?>" class="border border-gray-100 rounded-2xl p-5 bg-white scroll-mt-24">
                     <div class="flex items-center gap-3 mb-3">
                       <div
                         class="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center overflow-hidden">
@@ -3421,7 +3813,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   $category = $notice['category'] ?? 'notice';
                   $categoryLabel = $category === 'announcement' ? 'Important Announcement' : ucfirst($category);
                   ?>
-                  <article class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                  <article id="notice-grid-<?= e((string) $notice['id']) ?>" class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm scroll-mt-24">
                     <div class="relative aspect-[210/297] bg-gray-50">
                       <?php if (!empty($notice['attachment_url'])): ?>
                         <?php if (($notice['attachment_type'] ?? '') === 'pdf'): ?>
