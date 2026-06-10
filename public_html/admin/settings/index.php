@@ -522,8 +522,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $memberNumberFormatAssociate = trim((string) ($_POST['member_number_format_associate'] ?? '{base}.{suffix}'));
                 $memberNumberBasePadding = (int) ($_POST['member_number_base_padding'] ?? 0);
                 $memberNumberSuffixPadding = (int) ($_POST['member_number_suffix_padding'] ?? 0);
-                $manualMigrationEnabled = isset($_POST['manual_migration_enabled']);
-                $manualMigrationExpiryDays = (int) ($_POST['manual_migration_expiry_days'] ?? 14);
+                // Manual migration UI was removed from this page — keep the
+                // stored values untouched on save instead of inferring from
+                // absent form fields.
 
                 $upgradeMode = trim((string) ($_POST['upgrade_mode'] ?? 'standard'));
                 if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
@@ -605,9 +606,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($memberNumberSuffixPadding < 0 || $memberNumberSuffixPadding > 12) {
                     $idFieldErrors['member_number_suffix_padding'] = 'Suffix padding must be between 0 and 12.';
                 }
-                if ($manualMigrationExpiryDays < 1 || $manualMigrationExpiryDays > 60) {
-                    $idFieldErrors['manual_migration_expiry_days'] = 'Expiry must be between 1 and 60 days.';
-                }
                 if (strpos($memberNumberFormatFull, '{base}') === false && strpos($memberNumberFormatFull, '{base_padded}') === false) {
                     $idFieldErrors['member_number_format_full'] = 'Include {base} or {base_padded}.';
                 }
@@ -632,8 +630,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_format_associate', $memberNumberFormatAssociate);
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_base_padding', $memberNumberBasePadding);
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_suffix_padding', $memberNumberSuffixPadding);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.manual_migration_enabled', $manualMigrationEnabled);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.manual_migration_expiry_days', $manualMigrationExpiryDays);
                     SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_mode', $upgradeMode);
                     SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_custom_fee_cents', $upgradeCustomFeeCents);
 
@@ -2953,8 +2949,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $memberNumberFormatAssociate = SettingsService::getGlobal('membership.member_number_format_associate', '{base}.{suffix}');
               $memberNumberBasePadding = (int) SettingsService::getGlobal('membership.member_number_base_padding', 0);
               $memberNumberSuffixPadding = (int) SettingsService::getGlobal('membership.member_number_suffix_padding', 0);
-              $manualMigrationEnabled = (bool) SettingsService::getGlobal('membership.manual_migration_enabled', true);
-              $manualMigrationExpiryDays = (int) SettingsService::getGlobal('membership.manual_migration_expiry_days', 14);
               $upgradeMode = (string) SettingsService::getGlobal('membership.upgrade_mode', 'standard');
               if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
                   $upgradeMode = 'standard';
@@ -2985,312 +2979,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <p class="text-xs text-slate-500"><?= e(MembershipPricingService::pricingNote()) ?></p>
               </div>
 
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">tag</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Member ID Sequencing</h2>
-                    <p class="text-sm text-slate-500">Control the starting number and format for full and associate member IDs.</p>
-                  </div>
-                </div>
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <label class="text-sm text-slate-600">Full member ID start
-                    <input
-                      name="member_number_start"
-                      type="number"
-                      min="1"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $memberNumberStart) ?>"
-                      required
-                    >
-                    <?php if (isset($idFieldErrors['member_number_start'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_start']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                  <label class="text-sm text-slate-600">Associate suffix start
-                    <input
-                      name="associate_suffix_start"
-                      type="number"
-                      min="1"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['associate_suffix_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $associateSuffixStart) ?>"
-                      required
-                    >
-                    <?php if (isset($idFieldErrors['associate_suffix_start'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['associate_suffix_start']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                  <label class="text-sm text-slate-600">Full member ID format
-                    <input
-                      name="member_number_format_full"
-                      type="text"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_full']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $memberNumberFormatFull) ?>"
-                      placeholder="{base}"
-                      required
-                    >
-                    <?php if (isset($idFieldErrors['member_number_format_full'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_full']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                  <label class="text-sm text-slate-600">Associate member ID format
-                    <input
-                      name="member_number_format_associate"
-                      type="text"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_associate']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $memberNumberFormatAssociate) ?>"
-                      placeholder="{base}.{suffix}"
-                      required
-                    >
-                    <?php if (isset($idFieldErrors['member_number_format_associate'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_associate']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                  <label class="text-sm text-slate-600">Base padding digits
-                    <input
-                      name="member_number_base_padding"
-                      type="number"
-                      min="0"
-                      max="12"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_base_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $memberNumberBasePadding) ?>"
-                    >
-                    <?php if (isset($idFieldErrors['member_number_base_padding'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_base_padding']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                  <label class="text-sm text-slate-600">Suffix padding digits
-                    <input
-                      name="member_number_suffix_padding"
-                      type="number"
-                      min="0"
-                      max="12"
-                      class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_suffix_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                      value="<?= e((string) $memberNumberSuffixPadding) ?>"
-                    >
-                    <?php if (isset($idFieldErrors['member_number_suffix_padding'])): ?>
-                      <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_suffix_padding']) ?></div>
-                    <?php endif; ?>
-                  </label>
-                </div>
-                <p class="text-xs text-slate-500">Tokens: {base}, {suffix}, {base_padded}, {suffix_padded}. Use padding digits to left-pad numbers.</p>
-              </div>
-
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">swap_horiz</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Manual Migration</h2>
-                    <p class="text-sm text-slate-500">Control manual migration link availability and expiry windows.</p>
-                  </div>
-                </div>
-                <label class="flex items-center gap-3 text-sm text-slate-600">
-                  <input type="checkbox" name="manual_migration_enabled" class="rounded border-gray-200" <?= $manualMigrationEnabled ? 'checked' : '' ?>>
-                  Enable manual migration links
-                </label>
-                <label class="text-sm text-slate-600">Link expiry (days)
-                  <input
-                    name="manual_migration_expiry_days"
-                    type="number"
-                    min="1"
-                    max="60"
-                    class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['manual_migration_expiry_days']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                    value="<?= e((string) $manualMigrationExpiryDays) ?>"
-                  >
-                  <?php if (isset($idFieldErrors['manual_migration_expiry_days'])): ?>
-                    <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['manual_migration_expiry_days']) ?></div>
-                  <?php endif; ?>
-                </label>
-              </div>
-
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">trending_up</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
-                    <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
-                  </div>
-                </div>
-                <div class="space-y-3">
-                  <label class="flex items-start gap-3 text-sm text-slate-700">
-                    <input type="radio" name="upgrade_mode" value="standard" class="mt-1" <?= $upgradeMode === 'standard' ? 'checked' : '' ?>>
-                    <span>
-                      <span class="font-medium">Standard full-member price</span>
-                      <span class="block text-xs text-slate-500">Charges the 1-year Full member price from the pricing matrix above (Printed or PDF based on the member's Wings preference).</span>
-                    </span>
-                  </label>
-                  <label class="flex items-start gap-3 text-sm text-slate-700">
-                    <input type="radio" name="upgrade_mode" value="custom" class="mt-1" <?= $upgradeMode === 'custom' ? 'checked' : '' ?>>
-                    <span class="flex-1">
-                      <span class="font-medium">Custom upgrade fee</span>
-                      <span class="block text-xs text-slate-500">Charge a flat amount for the upgrade regardless of magazine preference.</span>
-                      <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                        <span class="text-slate-500">$</span>
-                        <input
-                          name="upgrade_custom_fee"
-                          type="text"
-                          inputmode="decimal"
-                          class="w-32 rounded-lg border <?= isset($idFieldErrors['upgrade_custom_fee']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                          value="<?= e($upgradeCustomFeeDisplay) ?>"
-                          placeholder="0.00"
-                        >
-                      </label>
-                      <?php if (isset($idFieldErrors['upgrade_custom_fee'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['upgrade_custom_fee']) ?></div>
-                      <?php endif; ?>
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                <div class="flex items-start gap-3">
-                  <span class="material-icons-outlined text-slate-500">map</span>
-                  <div>
-                    <h2 class="font-display text-lg font-bold text-gray-900">Chapters</h2>
-                    <p class="text-sm text-slate-500">Create chapters and control their display order.</p>
-                  </div>
-                </div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead class="text-left text-xs uppercase text-gray-500 border-b">
-                      <tr>
-                        <?php if ($chaptersHasSortOrder): ?>
-                          <th class="py-2 pr-3">Order</th>
-                        <?php endif; ?>
-                        <th class="py-2 pr-3">Name</th>
-                        <?php if ($chaptersHasAbbreviation): ?>
-                          <th class="py-2 pr-3">Abbreviation</th>
-                        <?php endif; ?>
-                        <?php if ($chaptersHasState): ?>
-                          <th class="py-2 pr-3">State / Region</th>
-                        <?php endif; ?>
-                        <?php if ($chaptersHasActive): ?>
-                          <th class="py-2 pr-3">Active</th>
-                        <?php endif; ?>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                      <?php foreach ($chapters as $chapter): ?>
-                        <tr>
-                          <?php if ($chaptersHasSortOrder): ?>
-                            <td class="py-3 pr-3">
-                              <input
-                                type="number"
-                                name="chapters[<?= e((string) $chapter['id']) ?>][sort_order]"
-                                class="w-20 rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['sort_order']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
-                                value="<?= e((string) ($chapter['sort_order'] ?? 0)) ?>"
-                                min="0"
-                              >
-                              <?php if (isset($chapterFieldErrors[$chapter['id']]['sort_order'])): ?>
-                                <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['sort_order']) ?></div>
-                              <?php endif; ?>
-                            </td>
-                          <?php endif; ?>
-                          <td class="py-3 pr-3">
-                            <input
-                              type="text"
-                              name="chapters[<?= e((string) $chapter['id']) ?>][name]"
-                              class="w-full rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['name']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
-                              value="<?= e((string) ($chapter['name'] ?? '')) ?>"
-                              required
-                            >
-                            <?php if (isset($chapterFieldErrors[$chapter['id']]['name'])): ?>
-                              <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['name']) ?></div>
-                            <?php endif; ?>
-                          </td>
-                          <?php if ($chaptersHasAbbreviation): ?>
-                            <td class="py-3 pr-3">
-                              <input
-                                type="text"
-                                name="chapters[<?= e((string) $chapter['id']) ?>][abbreviation]"
-                                class="w-24 rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['abbreviation']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
-                                value="<?= e((string) ($chapter['abbreviation'] ?? '')) ?>"
-                                maxlength="16"
-                                placeholder="e.g. FCC"
-                              >
-                              <?php if (isset($chapterFieldErrors[$chapter['id']]['abbreviation'])): ?>
-                                <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['abbreviation']) ?></div>
-                              <?php endif; ?>
-                            </td>
-                          <?php endif; ?>
-                          <?php if ($chaptersHasState): ?>
-                            <td class="py-3 pr-3">
-                              <input
-                                type="text"
-                                name="chapters[<?= e((string) $chapter['id']) ?>][state]"
-                                class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
-                                value="<?= e((string) ($chapter['state'] ?? '')) ?>"
-                              >
-                            </td>
-                          <?php endif; ?>
-                          <?php if ($chaptersHasActive): ?>
-                            <td class="py-3 pr-3">
-                              <input
-                                type="checkbox"
-                                name="chapters[<?= e((string) $chapter['id']) ?>][is_active]"
-                                class="rounded border-gray-200"
-                                <?= !empty($chapter['is_active']) ? 'checked' : '' ?>
-                              >
-                            </td>
-                          <?php endif; ?>
-                        </tr>
-                      <?php endforeach; ?>
-                      <tr>
-                        <?php if ($chaptersHasSortOrder): ?>
-                          <td class="py-3 pr-3">
-                            <input
-                              type="number"
-                              name="new_chapter_sort_order"
-                              class="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
-                              placeholder="Auto"
-                              min="0"
-                            >
-                          </td>
-                        <?php endif; ?>
-                        <td class="py-3 pr-3">
-                          <input
-                            type="text"
-                            name="new_chapter_name"
-                            class="w-full rounded-lg border <?= isset($chapterFieldErrors['new']['name']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
-                            placeholder="Add new chapter"
-                          >
-                          <?php if (isset($chapterFieldErrors['new']['name'])): ?>
-                            <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors['new']['name']) ?></div>
-                          <?php endif; ?>
-                        </td>
-                        <?php if ($chaptersHasAbbreviation): ?>
-                          <td class="py-3 pr-3">
-                            <input
-                              type="text"
-                              name="new_chapter_abbreviation"
-                              class="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
-                              placeholder="e.g. FCC"
-                              maxlength="16"
-                            >
-                          </td>
-                        <?php endif; ?>
-                        <?php if ($chaptersHasState): ?>
-                          <td class="py-3 pr-3">
-                            <input
-                              type="text"
-                              name="new_chapter_state"
-                              class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
-                              placeholder="State / Region"
-                            >
-                          </td>
-                        <?php endif; ?>
-                        <?php if ($chaptersHasActive): ?>
-                          <td class="py-3 pr-3">
-                            <input type="checkbox" name="new_chapter_active" class="rounded border-gray-200" checked>
-                          </td>
-                        <?php endif; ?>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p class="text-xs text-slate-500">Order controls the chapter list sequence on member-facing forms.</p>
-              </div>
+              <!-- Member ID, Associate → Full Upgrade, and Chapter Creation are
+                   rendered below the pricing block — see further down this file. -->
 
               <!-- Membership year card with calendar strip -->
               <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4" data-pricing-card="year">
@@ -3643,6 +3333,296 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <li>The dark <strong>"If a member checked out today"</strong> card shows the live quotes — exactly what someone visiting the site this minute would be charged.</li>
                 </ol>
               </div>
+
+              <!-- Member-admin settings: 2-column row (Member ID + Associate Upgrade) -->
+              <div class="grid gap-6 lg:grid-cols-2">
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">tag</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Member ID Sequencing</h2>
+                      <p class="text-sm text-slate-500">Control the starting number and format for full and associate member IDs.</p>
+                    </div>
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="text-sm text-slate-600">Full member ID start
+                      <input
+                        name="member_number_start"
+                        type="number"
+                        min="1"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $memberNumberStart) ?>"
+                        required
+                      >
+                      <?php if (isset($idFieldErrors['member_number_start'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_start']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                    <label class="text-sm text-slate-600">Associate suffix start
+                      <input
+                        name="associate_suffix_start"
+                        type="number"
+                        min="1"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['associate_suffix_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $associateSuffixStart) ?>"
+                        required
+                      >
+                      <?php if (isset($idFieldErrors['associate_suffix_start'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['associate_suffix_start']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                    <label class="text-sm text-slate-600">Full member ID format
+                      <input
+                        name="member_number_format_full"
+                        type="text"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_full']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $memberNumberFormatFull) ?>"
+                        placeholder="{base}"
+                        required
+                      >
+                      <?php if (isset($idFieldErrors['member_number_format_full'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_full']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                    <label class="text-sm text-slate-600">Associate member ID format
+                      <input
+                        name="member_number_format_associate"
+                        type="text"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_associate']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $memberNumberFormatAssociate) ?>"
+                        placeholder="{base}.{suffix}"
+                        required
+                      >
+                      <?php if (isset($idFieldErrors['member_number_format_associate'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_associate']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                    <label class="text-sm text-slate-600">Base padding digits
+                      <input
+                        name="member_number_base_padding"
+                        type="number"
+                        min="0"
+                        max="12"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_base_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $memberNumberBasePadding) ?>"
+                      >
+                      <?php if (isset($idFieldErrors['member_number_base_padding'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_base_padding']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                    <label class="text-sm text-slate-600">Suffix padding digits
+                      <input
+                        name="member_number_suffix_padding"
+                        type="number"
+                        min="0"
+                        max="12"
+                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_suffix_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                        value="<?= e((string) $memberNumberSuffixPadding) ?>"
+                      >
+                      <?php if (isset($idFieldErrors['member_number_suffix_padding'])): ?>
+                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_suffix_padding']) ?></div>
+                      <?php endif; ?>
+                    </label>
+                  </div>
+                  <p class="text-xs text-slate-500">Tokens: {base}, {suffix}, {base_padded}, {suffix_padded}. Use padding digits to left-pad numbers.</p>
+                </div>
+
+                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">trending_up</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
+                      <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
+                    </div>
+                  </div>
+                  <div class="space-y-3">
+                    <label class="flex items-start gap-3 text-sm text-slate-700">
+                      <input type="radio" name="upgrade_mode" value="standard" class="mt-1" <?= $upgradeMode === 'standard' ? 'checked' : '' ?>>
+                      <span>
+                        <span class="font-medium">Standard full-member price</span>
+                        <span class="block text-xs text-slate-500">Charges the 1-year Full member renewal price from the pricing block above (Printed or PDF based on the member's Wings preference).</span>
+                      </span>
+                    </label>
+                    <label class="flex items-start gap-3 text-sm text-slate-700">
+                      <input type="radio" name="upgrade_mode" value="custom" class="mt-1" <?= $upgradeMode === 'custom' ? 'checked' : '' ?>>
+                      <span class="flex-1">
+                        <span class="font-medium">Custom upgrade fee</span>
+                        <span class="block text-xs text-slate-500">Charge a flat amount for the upgrade regardless of magazine preference.</span>
+                        <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                          <span class="text-slate-500">$</span>
+                          <input
+                            name="upgrade_custom_fee"
+                            type="text"
+                            inputmode="decimal"
+                            class="w-32 rounded-lg border <?= isset($idFieldErrors['upgrade_custom_fee']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
+                            value="<?= e($upgradeCustomFeeDisplay) ?>"
+                            placeholder="0.00"
+                          >
+                        </label>
+                        <?php if (isset($idFieldErrors['upgrade_custom_fee'])): ?>
+                          <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['upgrade_custom_fee']) ?></div>
+                        <?php endif; ?>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chapter Creation: native <details> accordion, closed by default
+                   (auto-opens if there are validation errors on chapter inputs) -->
+              <details class="bg-card-light rounded-2xl border border-gray-100 group" <?= !empty($chapterFieldErrors) ? 'open' : '' ?>>
+                <summary class="cursor-pointer list-none p-6 flex items-center justify-between gap-3 select-none">
+                  <div class="flex items-start gap-3">
+                    <span class="material-icons-outlined text-slate-500">map</span>
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Chapter Creation</h2>
+                      <p class="text-sm text-slate-500"><?= (int) count($chapters) ?> chapter<?= count($chapters) === 1 ? '' : 's' ?> configured. Click to add a new chapter or edit display order.</p>
+                    </div>
+                  </div>
+                  <span class="material-icons-outlined text-slate-400 transition-transform group-open:rotate-180">expand_more</span>
+                </summary>
+                <div class="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead class="text-left text-xs uppercase text-gray-500 border-b">
+                        <tr>
+                          <?php if ($chaptersHasSortOrder): ?>
+                            <th class="py-2 pr-3">Order</th>
+                          <?php endif; ?>
+                          <th class="py-2 pr-3">Name</th>
+                          <?php if ($chaptersHasAbbreviation): ?>
+                            <th class="py-2 pr-3">Abbreviation</th>
+                          <?php endif; ?>
+                          <?php if ($chaptersHasState): ?>
+                            <th class="py-2 pr-3">State / Region</th>
+                          <?php endif; ?>
+                          <?php if ($chaptersHasActive): ?>
+                            <th class="py-2 pr-3">Active</th>
+                          <?php endif; ?>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y">
+                        <?php foreach ($chapters as $chapter): ?>
+                          <tr>
+                            <?php if ($chaptersHasSortOrder): ?>
+                              <td class="py-3 pr-3">
+                                <input
+                                  type="number"
+                                  name="chapters[<?= e((string) $chapter['id']) ?>][sort_order]"
+                                  class="w-20 rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['sort_order']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                                  value="<?= e((string) ($chapter['sort_order'] ?? 0)) ?>"
+                                  min="0"
+                                >
+                                <?php if (isset($chapterFieldErrors[$chapter['id']]['sort_order'])): ?>
+                                  <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['sort_order']) ?></div>
+                                <?php endif; ?>
+                              </td>
+                            <?php endif; ?>
+                            <td class="py-3 pr-3">
+                              <input
+                                type="text"
+                                name="chapters[<?= e((string) $chapter['id']) ?>][name]"
+                                class="w-full rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['name']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                                value="<?= e((string) ($chapter['name'] ?? '')) ?>"
+                                required
+                              >
+                              <?php if (isset($chapterFieldErrors[$chapter['id']]['name'])): ?>
+                                <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['name']) ?></div>
+                              <?php endif; ?>
+                            </td>
+                            <?php if ($chaptersHasAbbreviation): ?>
+                              <td class="py-3 pr-3">
+                                <input
+                                  type="text"
+                                  name="chapters[<?= e((string) $chapter['id']) ?>][abbreviation]"
+                                  class="w-24 rounded-lg border <?= isset($chapterFieldErrors[$chapter['id']]['abbreviation']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                                  value="<?= e((string) ($chapter['abbreviation'] ?? '')) ?>"
+                                  maxlength="16"
+                                  placeholder="e.g. FCC"
+                                >
+                                <?php if (isset($chapterFieldErrors[$chapter['id']]['abbreviation'])): ?>
+                                  <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors[$chapter['id']]['abbreviation']) ?></div>
+                                <?php endif; ?>
+                              </td>
+                            <?php endif; ?>
+                            <?php if ($chaptersHasState): ?>
+                              <td class="py-3 pr-3">
+                                <input
+                                  type="text"
+                                  name="chapters[<?= e((string) $chapter['id']) ?>][state]"
+                                  class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
+                                  value="<?= e((string) ($chapter['state'] ?? '')) ?>"
+                                >
+                              </td>
+                            <?php endif; ?>
+                            <?php if ($chaptersHasActive): ?>
+                              <td class="py-3 pr-3">
+                                <input
+                                  type="checkbox"
+                                  name="chapters[<?= e((string) $chapter['id']) ?>][is_active]"
+                                  class="rounded border-gray-200"
+                                  <?= !empty($chapter['is_active']) ? 'checked' : '' ?>
+                                >
+                              </td>
+                            <?php endif; ?>
+                          </tr>
+                        <?php endforeach; ?>
+                        <tr>
+                          <?php if ($chaptersHasSortOrder): ?>
+                            <td class="py-3 pr-3">
+                              <input
+                                type="number"
+                                name="new_chapter_sort_order"
+                                class="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
+                                placeholder="Auto"
+                                min="0"
+                              >
+                            </td>
+                          <?php endif; ?>
+                          <td class="py-3 pr-3">
+                            <input
+                              type="text"
+                              name="new_chapter_name"
+                              class="w-full rounded-lg border <?= isset($chapterFieldErrors['new']['name']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                              placeholder="Add new chapter"
+                            >
+                            <?php if (isset($chapterFieldErrors['new']['name'])): ?>
+                              <div class="text-xs text-red-600 mt-1"><?= e($chapterFieldErrors['new']['name']) ?></div>
+                            <?php endif; ?>
+                          </td>
+                          <?php if ($chaptersHasAbbreviation): ?>
+                            <td class="py-3 pr-3">
+                              <input
+                                type="text"
+                                name="new_chapter_abbreviation"
+                                class="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
+                                placeholder="e.g. FCC"
+                                maxlength="16"
+                              >
+                            </td>
+                          <?php endif; ?>
+                          <?php if ($chaptersHasState): ?>
+                            <td class="py-3 pr-3">
+                              <input
+                                type="text"
+                                name="new_chapter_state"
+                                class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm"
+                                placeholder="State / Region"
+                              >
+                            </td>
+                          <?php endif; ?>
+                          <?php if ($chaptersHasActive): ?>
+                            <td class="py-3 pr-3">
+                              <input type="checkbox" name="new_chapter_active" class="rounded border-gray-200" checked>
+                            </td>
+                          <?php endif; ?>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="text-xs text-slate-500">Order controls the chapter list sequence on member-facing forms.</p>
+                </div>
+              </details>
 
               <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3">
