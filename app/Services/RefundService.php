@@ -181,6 +181,77 @@ class RefundService
     }
 
     /**
+     * Resolve a PaymentIntent ID for a given order row.
+     *
+     * Subscription-created orders only have a `stripe_subscription_id` (and
+     * sometimes a `stripe_session_id`) on the local row — the PaymentIntent
+     * lives on `latest_invoice.payment_intent` over on Stripe. Checkout
+     * Session orders may only have `stripe_session_id` until their
+     * checkout.session.completed webhook fills the PI column.
+     *
+     * Walks the available references in this order:
+     *   1. stripe_payment_intent_id (most direct, no Stripe call)
+     *   2. stripe_session_id        → Checkout Session → payment_intent
+     *   3. stripe_subscription_id   → Subscription → latest_invoice → payment_intent
+     *   4. stripe_invoice_id        → Invoice → payment_intent
+     *
+     * Returns the PI id, or '' if none can be found.
+     */
+    public static function resolvePaymentIntentId(array $order): string
+    {
+        $pi = trim((string) ($order['stripe_payment_intent_id'] ?? ''));
+        if ($pi !== '') {
+            return $pi;
+        }
+
+        // 2) Checkout Session
+        $sessionId = trim((string) ($order['stripe_session_id'] ?? ''));
+        if ($sessionId !== '') {
+            $session = StripeService::retrieveCheckoutSession($sessionId);
+            if (is_array($session) && !empty($session['payment_intent'])) {
+                return is_array($session['payment_intent'])
+                    ? (string) ($session['payment_intent']['id'] ?? '')
+                    : (string) $session['payment_intent'];
+            }
+        }
+
+        // 3) Subscription → latest_invoice → PI
+        $subId = trim((string) ($order['stripe_subscription_id'] ?? ''));
+        if ($subId !== '') {
+            $sub = StripeService::retrieveSubscription($subId, ['latest_invoice.payment_intent']);
+            if (is_array($sub)) {
+                $latest = $sub['latest_invoice'] ?? null;
+                if (is_array($latest)) {
+                    $piRef = $latest['payment_intent'] ?? null;
+                    if (is_array($piRef) && !empty($piRef['id'])) {
+                        return (string) $piRef['id'];
+                    }
+                    if (is_string($piRef) && $piRef !== '') {
+                        return $piRef;
+                    }
+                }
+            }
+        }
+
+        // 4) Invoice → PI
+        $invoiceId = trim((string) ($order['stripe_invoice_id'] ?? ''));
+        if ($invoiceId !== '') {
+            $invoice = StripeService::retrieveInvoice($invoiceId, ['payment_intent']);
+            if (is_array($invoice)) {
+                $piRef = $invoice['payment_intent'] ?? null;
+                if (is_array($piRef) && !empty($piRef['id'])) {
+                    return (string) $piRef['id'];
+                }
+                if (is_string($piRef) && $piRef !== '') {
+                    return $piRef;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * Membership refund — partial or full. Mirrors processRefund() but works
      * against the unified `orders` table + the membership `refunds` table.
      * Requires migration 034 (refunds.amount_cents + refunds.status).
@@ -225,9 +296,25 @@ class RefundService
             throw new RuntimeException('Refund exceeds refundable total (remaining ' . self::formatCurrency($remaining) . ').');
         }
 
-        $paymentIntentId = (string) ($order['stripe_payment_intent_id'] ?? '');
+        // Resolve PaymentIntent for this order. The local column may be empty
+        // when the order was created via Stripe Checkout / Subscription paths
+        // — in that case we walk the session / subscription / invoice on
+        // Stripe to find the PI, then cache it back to the row so future
+        // refunds skip this round-trip.
+        $paymentIntentId = self::resolvePaymentIntentId($order);
         if ($paymentIntentId === '') {
-            throw new RuntimeException('Stripe payment intent is not available for this membership order.');
+            throw new RuntimeException('Could not resolve a Stripe PaymentIntent for this order (no PI / session / subscription / invoice on file).');
+        }
+        // Cache the resolved PI back to the row if it wasn't there before.
+        if ($paymentIntentId !== (string) ($order['stripe_payment_intent_id'] ?? '')) {
+            try {
+                $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
+                $stmt->execute(['pi' => $paymentIntentId, 'id' => $orderId]);
+                $order['stripe_payment_intent_id'] = $paymentIntentId;
+            } catch (\Throwable $e) {
+                // Non-fatal — refund still goes ahead even if caching fails.
+                error_log('[RefundService] PI cache-back failed: ' . $e->getMessage());
+            }
         }
 
         ActivityLogger::log('admin', $adminUserId, $memberId, 'membership.refund_requested', [

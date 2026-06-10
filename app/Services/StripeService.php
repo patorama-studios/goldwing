@@ -485,6 +485,42 @@ class StripeService
         return $invoice->toArray();
     }
 
+    public static function retrieveCheckoutSession(string $sessionId, array $expand = []): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        $options = $expand ? ['expand' => $expand] : [];
+        try {
+            $session = self::client($secret)->checkout->sessions->retrieve($sessionId, $options);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'checkout.session.retrieve', $e, [
+                'session_id' => $sessionId,
+            ]);
+            return null;
+        }
+        return $session->toArray();
+    }
+
+    public static function retrieveSubscription(string $subscriptionId, array $expand = []): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        $options = $expand ? ['expand' => $expand] : [];
+        try {
+            $subscription = self::client($secret)->subscriptions->retrieve($subscriptionId, $options);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'subscription.retrieve', $e, [
+                'subscription_id' => $subscriptionId,
+            ]);
+            return null;
+        }
+        return $subscription->toArray();
+    }
+
     public static function retrieveInvoice(string $invoiceId, array $expand = []): ?array
     {
         $secret = self::activeSecretKey();

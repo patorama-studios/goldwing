@@ -114,7 +114,17 @@ try {
 $orderTotalCents    = (int) round((float) ($order['total'] ?? 0) * 100);
 $refundedCents      = RefundService::getMembershipRefundedCents($orderId);
 $refundableCents    = max(0, $orderTotalCents - $refundedCents);
-$canRefund          = AdminMemberAccess::canRefund($user) && $refundableCents > 0 && !empty($order['stripe_payment_intent_id']);
+
+// Whether this order has ANY Stripe reference we can resolve a PI from at
+// refund time. Subscription-created orders only have stripe_subscription_id
+// locally; the PI lives on Stripe under latest_invoice.payment_intent.
+// RefundService::resolvePaymentIntentId() walks all four references — so
+// allow the refund lightbox whenever any one of them is present.
+$hasStripeRef       = !empty($order['stripe_payment_intent_id'])
+                   || !empty($order['stripe_session_id'])
+                   || !empty($order['stripe_subscription_id'])
+                   || !empty($order['stripe_invoice_id']);
+$canRefund          = AdminMemberAccess::canRefund($user) && $refundableCents > 0 && $hasStripeRef;
 
 $paymentMethod      = (string) ($order['payment_method'] ?? '');
 $paymentMethodLabel = $paymentMethod !== '' ? ucwords(str_replace('_', ' ', $paymentMethod)) : '—';
@@ -391,8 +401,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </div>
             <?php endif; ?>
 
-            <!-- Refunds (full + partial) -->
-            <?php if ($paymentStatus === 'accepted' || $paymentStatus === 'partial_refund' || $refunds): ?>
+            <!-- Refunds (full + partial). Also renders whenever the refund
+                 lightbox is available, so the trigger button in "Database
+                 hygiene" below has the modal markup to open. -->
+            <?php if ($paymentStatus === 'accepted' || $paymentStatus === 'partial_refund' || $refunds || $canRefund): ?>
               <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
                 <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Refunds</h3>
                 <div class="text-sm text-slate-700">
@@ -604,8 +616,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   </script>
                 <?php elseif ($refundableCents <= 0): ?>
                   <p class="text-xs text-slate-500">This order is fully refunded.</p>
-                <?php elseif (empty($order['stripe_payment_intent_id'])): ?>
-                  <p class="text-xs text-amber-700">No Stripe PaymentIntent on file — refund manually outside Stripe.</p>
+                <?php elseif (!$hasStripeRef): ?>
+                  <p class="text-xs text-amber-700">No Stripe reference on file (no PaymentIntent / Checkout Session / Subscription / Invoice). Refund manually outside Stripe.</p>
                 <?php else: ?>
                   <p class="text-xs text-slate-500">You don't have permission to issue refunds.</p>
                 <?php endif; ?>
@@ -643,6 +655,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <!-- Database hygiene -->
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
               <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Database hygiene</h3>
+              <?php if ($canRefund): ?>
+                <!-- Trigger lives here too; the actual modal markup is inside
+                     the Refunds card above. Position-fixed inset-0 means the
+                     trigger can sit anywhere on the page. -->
+                <button type="button" data-refund-open
+                        class="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors">
+                  Refund &amp; cancel membership…
+                </button>
+              <?php endif; ?>
               <?php if ($isVoided): ?>
                 <form method="post" action="/admin/members/actions.php">
                   <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
