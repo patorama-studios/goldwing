@@ -191,6 +191,41 @@ class PageBuilderService
             return $matrix[$magazine][$membership][$period] ?? null;
         };
 
+        // Dynamic config for the public-facing pricing block. Anything below
+        // here reads from the live MembershipPricingService config so changes
+        // in the admin Settings page show up here without code changes.
+        $pricingConfig = MembershipPricingService::getConfig();
+        $renewalPeriods = $pricingConfig['renewal_periods'] ?? [];
+        $renewalPeriods = array_values(array_filter($renewalPeriods, static fn($p) => !empty($p['active'])));
+        usort($renewalPeriods, static fn($a, $b) => (int) $b['duration_months'] <=> (int) $a['duration_months']);
+        $renewalPrices = $pricingConfig['renewal_prices'] ?? [];
+        $proRataEnabled = !empty($pricingConfig['prorata_enabled']);
+        $monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        $anchorMonthName = $monthNames[(int) ($pricingConfig['anchor_month'] ?? 8)] ?? 'August';
+        $expiryMonthName = $monthNames[(int) ($pricingConfig['expiry_month'] ?? 7)] ?? 'July';
+        $anchorDay = (int) ($pricingConfig['anchor_day'] ?? 1);
+        $expiryDay = (int) ($pricingConfig['expiry_day'] ?? 31);
+        $todayProRata = [];
+        $monthsRemainingToday = MembershipPricingService::monthsRemainingUntilExpiry();
+        foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
+            foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
+                $todayProRata[$mt][$tt] = MembershipPricingService::calculateProRataCents($mt, $tt);
+            }
+        }
+        // Flag the shortest annual-or-longer period as "Most popular" so the
+        // featured-card highlight follows the admin's list.
+        $featuredPeriodId = null;
+        foreach (array_reverse($renewalPeriods) as $p) {
+            if ((int) $p['duration_months'] >= 12) {
+                $featuredPeriodId = $p['id'];
+                break;
+            }
+        }
+        if ($featuredPeriodId === null && $renewalPeriods) {
+            $featuredPeriodId = $renewalPeriods[count($renewalPeriods) - 1]['id'];
+        }
+
         ob_start();
         require __DIR__ . '/../Views/partials/membership_content.php';
         return ob_get_clean() ?: '';
