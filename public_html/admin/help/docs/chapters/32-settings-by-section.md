@@ -463,11 +463,12 @@ The actual API key is stored separately in `ai_provider_keys` (encrypted) via `A
 
 #### Membership Settings
 
-What it controls: the pricing matrix (magazine type × membership type × period), member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateMembershipPricing()`. Deep dive: [Ch 14 — Membership pricing matrix](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+What it controls: the membership year anchor + expiry, admin-defined renewal periods + their prices, pro-rata engine config + per-cell annual base prices, member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateConfig()`. Deep dive: [Ch 14 — Membership pricing](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `membership.pricing_matrix` | object | (seeded matrix) | `{magazine_type → membership_type → period → cents}`. |
+| `membership.pricing.config` | object | (seeded config) | Single JSON blob with `anchor_month`/`anchor_day`/`expiry_month`/`expiry_day`, `prorata_enabled`, `prorata_rounding`, `renewal_periods` list (`{id,label,duration_months,sort_order,active}`), `renewal_prices` matrix (`{magazine→type→period_id→cents}`), and `prorata_annual_prices` (`{magazine→type→cents}`). |
+| `membership.pricing_matrix` | object | (legacy seed) | Legacy 24-row matrix `{magazine_type → membership_type → period → cents}`. Read once on first migration and then inert — `getConfig()` migrates it into `membership.pricing.config`. Kept for safety so older installs don't lose data on the first load. |
 | `membership.member_number_start` | int | 1000 | First member number issued. |
 | `membership.associate_suffix_start` | int | 1 | First associate suffix. |
 | `membership.member_number_format_full` | string | "{base}" | Format template — must contain `{base}` or `{base_padded}`. |

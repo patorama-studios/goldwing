@@ -28,6 +28,28 @@ $ajaxRequest = isset($_POST['ajax']) && $_POST['ajax'] === '1';
 $showSubmittedMessage = isset($_GET['submitted']) && $_GET['submitted'] === '1';
 $pricingData = MembershipPricingService::getMembershipPricing();
 $periodDefinitions = MembershipPricingService::periodDefinitions();
+// New-joiner options computed server-side per (magazine × type). The form's
+// JS reads this map to populate the period dropdown with live, accurate
+// pro-rata prices instead of the bucketed legacy keys.
+$joinOptionsMap = [];
+foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType) {
+    foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType) {
+        $joinOptionsMap[$magazineType][$membershipType] = MembershipPricingService::getJoinOptions($magazineType, $membershipType);
+    }
+}
+$validJoinOptionKeys = [];
+foreach ($joinOptionsMap as $byMagazine) {
+    foreach ($byMagazine as $byType) {
+        foreach ($byType as $opt) {
+            $validJoinOptionKeys[$opt['key']] = true;
+        }
+    }
+}
+// Legacy keys remain valid as a fall-through for any cached form submission.
+foreach (array_keys($periodDefinitions) as $legacyKey) {
+    $validJoinOptionKeys[$legacyKey] = true;
+}
+$validJoinOptionKeys = array_keys($validJoinOptionKeys);
 $storeSettings = store_get_settings();
 $chapters = ChapterRepository::listForSelection($pdo, true);
 $requestedChapterId = 0;
@@ -84,7 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!$fullSelected && !$associateSelected) {
       $error = 'Select at least one membership type.';
     } else {
-      $periodKeys = array_keys($periodDefinitions);
       if ($requestedChapterId !== 0) {
         $chapterIds = array_map(static fn($row) => (int) $row['id'], $chapters);
         if (!in_array($requestedChapterId, $chapterIds, true)) {
@@ -94,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($fullSelected) {
         if (!in_array($fullMagazineType, MembershipPricingService::MAGAZINE_TYPES, true)) {
           $error = 'Select a magazine type for Full membership.';
-        } elseif (!in_array($fullPeriodKey, $periodKeys, true)) {
+        } elseif (!in_array($fullPeriodKey, $validJoinOptionKeys, true)) {
           $error = 'Select a membership period for Full membership.';
         }
       }
@@ -103,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $error = 'Choose whether to add an associate member.';
         } elseif ($associateAdd === 'no') {
           $error = 'To include Associate membership, select Yes and provide associate details.';
-        } elseif (!in_array($associatePeriodKey, $periodKeys, true)) {
+        } elseif (!in_array($associatePeriodKey, $validJoinOptionKeys, true)) {
           $error = 'Select a membership period for the associate member.';
         }
       }
@@ -163,20 +184,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $memberNumberBase = max($maxBase, $start - 1) + 1;
       }
 
-      $pricingMatrix = $pricingData['matrix'] ?? [];
       $pricingCurrency = $pricingData['currency'] ?? 'AUD';
       $fullPriceCents = null;
       $associatePriceCents = null;
       $associatePricingMagazine = $fullSelected ? $fullMagazineType : 'PRINTED';
 
       if (!$error && $fullSelected) {
-        $fullPriceCents = $pricingMatrix[$fullMagazineType]['FULL'][$fullPeriodKey] ?? null;
+        $fullPriceCents = MembershipPricingService::resolveJoinPriceCents($fullMagazineType, 'FULL', $fullPeriodKey);
         if ($fullPriceCents === null) {
           $error = 'Unable to locate full membership pricing.';
         }
       }
       if (!$error && $associateSelected && $associateAdd === 'yes') {
-        $associatePriceCents = $pricingMatrix[$associatePricingMagazine]['ASSOCIATE'][$associatePeriodKey] ?? null;
+        $associatePriceCents = MembershipPricingService::resolveJoinPriceCents($associatePricingMagazine, 'ASSOCIATE', $associatePeriodKey);
         if ($associatePriceCents === null) {
           $error = 'Unable to locate associate membership pricing.';
         }
@@ -1049,6 +1069,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       const summaryProcessingFee = document.querySelector('[data-summary-processing-fee]');
       const pricingData = <?= json_encode($pricingData, JSON_UNESCAPED_SLASHES) ?>;
       const periodDefinitions = <?= json_encode($periodDefinitions, JSON_UNESCAPED_SLASHES) ?>;
+      // Pre-computed join options per (magazine × type) — each option has a
+      // ready-to-show label and price, derived server-side from the live
+      // pro-rata engine + renewal periods.
+      const joinOptionsMap = <?= json_encode($joinOptionsMap, JSON_UNESCAPED_SLASHES) ?>;
       const storeSettings = <?= json_encode([
         'stripe_fee_enabled' => (int) ($storeSettings['stripe_fee_enabled'] ?? 0),
         'stripe_fee_percent' => (float) ($storeSettings['stripe_fee_percent'] ?? 0),
@@ -1156,18 +1180,6 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       const isFullSelected = () => Boolean(fullToggle && fullToggle.checked);
       const isAssociateSelected = () => Boolean(associateToggle && associateToggle.checked);
 
-      const periodOrder = ['ONE_THIRD', 'TWO_THIRDS', 'ONE_YEAR', 'TWO_ONE_THIRDS', 'TWO_TWO_THIRDS', 'THREE_YEARS'];
-      const periodOptions = Object.entries(periodDefinitions || {}).map(([key, meta]) => ({
-        key,
-        label: meta.label || key,
-        join_after: meta.join_after || null,
-      })).sort((a, b) => {
-        const aIndex = periodOrder.indexOf(a.key);
-        const bIndex = periodOrder.indexOf(b.key);
-        const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
-        const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
-        return aRank - bRank;
-      });
       const setError = (message) => {
         if (!membershipError) {
           return;
@@ -1179,32 +1191,6 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         }
         membershipError.textContent = message;
         membershipError.hidden = false;
-      };
-
-      const getJoinAfterFilter = () => {
-        const today = new Date();
-        const month = today.getMonth();
-        if (month >= 3 && month <= 6) {
-          return 'april';
-        }
-        if (month >= 11 || month <= 2) {
-          return 'december';
-        }
-        return null;
-      };
-
-      const getAvailablePeriodKeys = (membershipType, magazineType) => {
-        const matrix = pricingData && pricingData.matrix ? pricingData.matrix : {};
-        if (magazineType && matrix[magazineType] && matrix[magazineType][membershipType]) {
-          return Object.keys(matrix[magazineType][membershipType]);
-        }
-        const keys = new Set();
-        Object.values(matrix).forEach((magazine) => {
-          if (magazine && magazine[membershipType]) {
-            Object.keys(magazine[membershipType]).forEach((key) => keys.add(key));
-          }
-        });
-        return Array.from(keys);
       };
 
       const getFullMagazineType = () => {
@@ -1235,32 +1221,27 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           return;
         }
         const magazineType = membershipType === 'FULL' ? getFullMagazineType() : getAssociateMagazineType();
-        const availableKeys = getAvailablePeriodKeys(membershipType, magazineType);
-        const joinAfter = getJoinAfterFilter();
+        const options = (joinOptionsMap && joinOptionsMap[magazineType] && joinOptionsMap[magazineType][membershipType])
+          ? joinOptionsMap[magazineType][membershipType]
+          : [];
         const previousValue = select.value;
-        const filtered = periodOptions.filter((option) => {
-          if (availableKeys.length && !availableKeys.includes(option.key)) {
-            return false;
-          }
-          return !option.join_after || option.join_after === joinAfter;
-        });
         select.innerHTML = '<option value="">Select a period</option>';
-        filtered.forEach((option) => {
+        options.forEach((option) => {
           const opt = document.createElement('option');
           opt.value = option.key;
-          opt.textContent = option.label;
+          const priceStr = option.cents != null ? ` — $${(option.cents / 100).toFixed(2)}` : '';
+          opt.textContent = `${option.label}${priceStr}`;
           select.appendChild(opt);
         });
-        if (previousValue && filtered.some((option) => option.key === previousValue)) {
+        if (previousValue && options.some((option) => option.key === previousValue)) {
           select.value = previousValue;
         }
         if (hintEl) {
-          if (joinAfter === 'december') {
-            hintEl.textContent = 'Pro-rata options shown for joins after 1st December.';
-          } else if (joinAfter === 'april') {
-            hintEl.textContent = 'Pro-rata options shown for joins after 1st April.';
+          const proRataOption = options.find((opt) => opt.kind === 'prorata_only');
+          if (proRataOption) {
+            hintEl.textContent = `Pro-rata: ${proRataOption.duration_months} month${proRataOption.duration_months === 1 ? '' : 's'} until expiry. Or extend with a full renewal period.`;
           } else {
-            hintEl.textContent = 'Standard periods shown for August to November joins.';
+            hintEl.textContent = '';
           }
         }
       };
@@ -1310,8 +1291,23 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         return Math.round(rounded * 100);
       };
 
-      const updateSummary = () => {
+      const lookupOptionPrice = (magazineType, membershipType, key) => {
+        const options = (joinOptionsMap && joinOptionsMap[magazineType] && joinOptionsMap[magazineType][membershipType])
+          ? joinOptionsMap[magazineType][membershipType]
+          : [];
+        const match = options.find((o) => o.key === key);
+        if (match) {
+          return match.cents;
+        }
+        // Legacy keys fall back to the old matrix view.
         const pricingMatrix = pricingData && pricingData.matrix ? pricingData.matrix : {};
+        return pricingMatrix[magazineType]
+          && pricingMatrix[magazineType][membershipType]
+          ? pricingMatrix[magazineType][membershipType][key]
+          : undefined;
+      };
+
+      const updateSummary = () => {
         const fullSelected = isFullSelected();
         const associateSelected = isAssociateSelected();
         const associateAdd = getAssociateAddValue();
@@ -1326,26 +1322,30 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         let fullPrice = null;
         let associatePrice = null;
         if (fullSelected && fullMagazine && fullPeriod) {
-          fullPrice = pricingMatrix[fullMagazine]
-            && pricingMatrix[fullMagazine].FULL
-            ? pricingMatrix[fullMagazine].FULL[fullPeriod]
-            : undefined;
+          fullPrice = lookupOptionPrice(fullMagazine, 'FULL', fullPeriod);
         }
         if (associateSelected && associateAdd === 'yes' && associatePeriod) {
-          associatePrice = pricingMatrix[associateMagazine]
-            && pricingMatrix[associateMagazine].ASSOCIATE
-            ? pricingMatrix[associateMagazine].ASSOCIATE[associatePeriod]
-            : undefined;
+          associatePrice = lookupOptionPrice(associateMagazine, 'ASSOCIATE', associatePeriod);
         }
 
         if (summaryFullPrice) {
           summaryFullPrice.textContent = fullSelected && fullPrice !== undefined ? formatCurrency(fullPrice) : 'Not selected';
         }
+        const lookupOptionLabel = (magazineType, membershipType, key) => {
+          const options = (joinOptionsMap && joinOptionsMap[magazineType] && joinOptionsMap[magazineType][membershipType])
+            ? joinOptionsMap[magazineType][membershipType]
+            : [];
+          const match = options.find((o) => o.key === key);
+          if (match) return match.label;
+          if (periodDefinitions && periodDefinitions[key] && periodDefinitions[key].label) {
+            return periodDefinitions[key].label;
+          }
+          return key;
+        };
+
         if (summaryFullDetail) {
           if (fullSelected && fullPeriod && fullMagazine) {
-            const label = periodDefinitions && periodDefinitions[fullPeriod] && periodDefinitions[fullPeriod].label
-              ? periodDefinitions[fullPeriod].label
-              : fullPeriod;
+            const label = lookupOptionLabel(fullMagazine, 'FULL', fullPeriod);
             const magazineLabel = fullMagazine === 'PDF' ? 'PDF only' : 'Printed Wings';
             summaryFullDetail.textContent = `${magazineLabel} · ${label}`;
           } else {
@@ -1359,10 +1359,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         }
         if (summaryAssociateDetail) {
           if (associateSelected && associateAdd === 'yes' && associatePeriod) {
-            const label = periodDefinitions && periodDefinitions[associatePeriod] && periodDefinitions[associatePeriod].label
-              ? periodDefinitions[associatePeriod].label
-              : associatePeriod;
-            summaryAssociateDetail.textContent = label;
+            summaryAssociateDetail.textContent = lookupOptionLabel(associateMagazine, 'ASSOCIATE', associatePeriod);
           } else {
             summaryAssociateDetail.textContent = 'Not selected';
           }

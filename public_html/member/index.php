@@ -122,13 +122,22 @@ function status_badge_classes(string $status): string
 
 function membership_renewal_amount_cents(string $magazineType, string $memberTypeKey, string $termMonths): int
 {
-  // 24-month renewal has no dedicated row in the pricing matrix, so derive
-  // it as 2 × annual. 12 and 36 map to ONE_YEAR / THREE_YEARS directly.
-  if ($termMonths === '36') {
+  $months = (int) $termMonths;
+  // Prefer an admin-defined renewal period whose duration matches exactly.
+  $period = MembershipPricingService::findRenewalPeriodByMonths($months);
+  if ($period) {
+    $cents = MembershipPricingService::getRenewalPriceCents($magazineType, $memberTypeKey, $period['id']);
+    if ($cents !== null) {
+      return (int) $cents;
+    }
+  }
+  // Fallback: derive from the legacy lookup (which itself falls through to
+  // pro-rata calculations if no exact period match exists).
+  if ($months === 36) {
     return (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'THREE_YEARS') ?? 0);
   }
   $oneYear = (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'ONE_YEAR') ?? 0);
-  if ($termMonths === '24') {
+  if ($months === 24) {
     return $oneYear * 2;
   }
   return $oneYear;
@@ -4862,9 +4871,12 @@ if ($renewModalEligible) {
     $renewPartnerMember = null;
   }
 
-  $renewTerms = ['12' => '1 year', '24' => '2 years', '36' => '3 years'];
+  // Renewal terms are now defined by admin in the pricing config. Show one
+  // option per active renewal period.
+  $renewPeriods = MembershipPricingService::getRenewalPeriods(true);
   $renewOptions = [];
-  foreach ($renewTerms as $months => $label) {
+  foreach ($renewPeriods as $period) {
+    $months = (string) (int) $period['duration_months'];
     $selfCents = membership_renewal_amount_cents($renewMagazine, $renewMemberType, $months);
     $partnerCents = 0;
     if ($renewPartnerMember) {
@@ -4874,11 +4886,24 @@ if ($renewModalEligible) {
     }
     $renewOptions[$months] = [
       'months' => $months,
-      'label' => $label,
+      'label' => (string) $period['label'],
       'self_available' => $selfCents > 0,
       'self_amount' => $selfCents / 100,
       'partner_available' => $renewPartnerMember ? ($partnerCents > 0) : false,
       'partner_amount' => $partnerCents / 100,
+    ];
+  }
+  // Safety net: if the admin somehow disabled all periods, fall back to a
+  // single 12-month option so renewals still work.
+  if (!$renewOptions) {
+    $selfCents = membership_renewal_amount_cents($renewMagazine, $renewMemberType, '12');
+    $renewOptions['12'] = [
+      'months' => '12',
+      'label' => '1 year',
+      'self_available' => $selfCents > 0,
+      'self_amount' => $selfCents / 100,
+      'partner_available' => false,
+      'partner_amount' => 0.0,
     ];
   }
 

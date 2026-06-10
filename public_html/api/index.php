@@ -340,7 +340,7 @@ if ($resource === 'stripe') {
             if ($fullPeriodKey === '') {
                 json_response(['error' => 'Select a membership period for Full membership.'], 422);
             }
-            $fullPriceCents = MembershipPricingService::getPriceCents($fullMagazineType, 'FULL', $fullPeriodKey);
+            $fullPriceCents = MembershipPricingService::resolveJoinPriceCents($fullMagazineType, 'FULL', $fullPeriodKey);
             if ($fullPriceCents === null) {
                 json_response(['error' => 'Unable to locate full membership pricing.'], 422);
             }
@@ -352,7 +352,7 @@ if ($resource === 'stripe') {
                 json_response(['error' => 'Select a membership period for the associate member.'], 422);
             }
             $associateMagazine = $fullSelected ? $fullMagazineType : 'PRINTED';
-            $associatePriceCents = MembershipPricingService::getPriceCents($associateMagazine, 'ASSOCIATE', $associatePeriodKey);
+            $associatePriceCents = MembershipPricingService::resolveJoinPriceCents($associateMagazine, 'ASSOCIATE', $associatePeriodKey);
             if ($associatePriceCents === null) {
                 json_response(['error' => 'Unable to locate associate membership pricing.'], 422);
             }

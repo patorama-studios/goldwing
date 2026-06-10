@@ -34,6 +34,16 @@ class MembershipUpgradeService
         }
         $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital'
             ? 'PDF' : 'PRINTED';
+        // Prefer the 12-month renewal period the admin has configured; fall
+        // back to the legacy ONE_YEAR matrix lookup so existing data still
+        // resolves during the rollout.
+        $period = MembershipPricingService::findRenewalPeriodByMonths(12);
+        if ($period) {
+            $cents = MembershipPricingService::getRenewalPriceCents($magazineType, 'FULL', $period['id']);
+            if ($cents !== null && $cents > 0) {
+                return (int) $cents;
+            }
+        }
         $cents = MembershipPricingService::getPriceCents($magazineType, 'FULL', 'ONE_YEAR');
         return $cents !== null && $cents > 0 ? (int) $cents : null;
     }

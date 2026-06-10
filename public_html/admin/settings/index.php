@@ -410,22 +410,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fieldErrors = [];
                 $idFieldErrors = [];
                 $chapterFieldErrors = [];
-                $matrix = [];
-                $periods = MembershipPricingService::periodDefinitions();
+
+                // ---- Anchor / expiry / pro-rata toggle ----
+                $newConfig = [
+                    'anchor_month' => (int) ($_POST['pricing_anchor_month'] ?? MembershipPricingService::DEFAULT_ANCHOR_MONTH),
+                    'anchor_day' => (int) ($_POST['pricing_anchor_day'] ?? MembershipPricingService::DEFAULT_ANCHOR_DAY),
+                    'expiry_month' => (int) ($_POST['pricing_expiry_month'] ?? MembershipPricingService::DEFAULT_EXPIRY_MONTH),
+                    'expiry_day' => (int) ($_POST['pricing_expiry_day'] ?? MembershipPricingService::DEFAULT_EXPIRY_DAY),
+                    'currency' => 'AUD',
+                    'prorata_enabled' => isset($_POST['prorata_enabled']),
+                    'prorata_minimum_months' => 1,
+                    'prorata_rounding' => 'nearest_dollar',
+                    'renewal_periods' => [],
+                    'renewal_prices' => [],
+                    'prorata_annual_prices' => [],
+                ];
+
+                // ---- Renewal periods ----
+                $rawPeriods = $_POST['renewal_periods'] ?? [];
+                if (!is_array($rawPeriods)) {
+                    $rawPeriods = [];
+                }
+                $seenIds = [];
+                foreach ($rawPeriods as $idx => $period) {
+                    if (!is_array($period)) {
+                        continue;
+                    }
+                    $label = normalize_text($period['label'] ?? '');
+                    $duration = (int) ($period['duration_months'] ?? 0);
+                    $id = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($period['id'] ?? '')) ?? '');
+                    $active = isset($period['active']);
+                    $sortOrder = (int) ($period['sort_order'] ?? (($idx + 1) * 10));
+                    if ($label === '') {
+                        $fieldErrors['period.' . $idx . '.label'] = 'Period name is required.';
+                        continue;
+                    }
+                    if ($duration < 1 || $duration > 120) {
+                        $fieldErrors['period.' . $idx . '.duration'] = 'Length must be between 1 and 120 months.';
+                        continue;
+                    }
+                    if ($id === '' || isset($seenIds[$id])) {
+                        $id = 'P_M' . $duration . '_' . ($idx + 1);
+                    }
+                    $seenIds[$id] = true;
+                    $newConfig['renewal_periods'][] = [
+                        'id' => $id,
+                        'label' => $label,
+                        'duration_months' => $duration,
+                        'sort_order' => max(0, $sortOrder),
+                        'active' => $active,
+                    ];
+                }
+                if (!$newConfig['renewal_periods']) {
+                    $fieldErrors['period.list'] = 'At least one renewal period is required.';
+                }
+
+                // ---- Renewal prices ----
+                $rawPrices = $_POST['renewal_prices'] ?? [];
                 foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType) {
                     foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType) {
-                        foreach (array_keys($periods) as $periodKey) {
-                            $fieldKey = $magazineType . '.' . $membershipType . '.' . $periodKey;
-                            $rawValue = normalize_text($_POST['pricing'][$magazineType][$membershipType][$periodKey] ?? '');
+                        foreach ($newConfig['renewal_periods'] as $period) {
+                            $fieldKey = 'renewal.' . $magazineType . '.' . $membershipType . '.' . $period['id'];
+                            $rawValue = normalize_text($rawPrices[$magazineType][$membershipType][$period['id']] ?? '0');
+                            if ($rawValue === '') {
+                                $rawValue = '0';
+                            }
                             $errorText = null;
                             $amount = parse_money_to_cents($rawValue, $errorText);
                             if ($amount === null) {
                                 $fieldErrors[$fieldKey] = $errorText ?: 'Invalid amount.';
                                 continue;
                             }
-                            $matrix[$magazineType][$membershipType][$periodKey] = $amount;
+                            $newConfig['renewal_prices'][$magazineType][$membershipType][$period['id']] = max(0, $amount);
                         }
                     }
+                }
+
+                // ---- Pro-rata annual base prices ----
+                $rawAnnual = $_POST['prorata_annual_prices'] ?? [];
+                foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType) {
+                    foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType) {
+                        $fieldKey = 'prorata.' . $magazineType . '.' . $membershipType;
+                        $rawValue = normalize_text($rawAnnual[$magazineType][$membershipType] ?? '0');
+                        if ($rawValue === '') {
+                            $rawValue = '0';
+                        }
+                        $errorText = null;
+                        $amount = parse_money_to_cents($rawValue, $errorText);
+                        if ($amount === null) {
+                            $fieldErrors[$fieldKey] = $errorText ?: 'Invalid amount.';
+                            continue;
+                        }
+                        if ($newConfig['prorata_enabled'] && $amount <= 0) {
+                            $fieldErrors[$fieldKey] = 'Set a yearly base price greater than $0, or disable pro-rata.';
+                            continue;
+                        }
+                        $newConfig['prorata_annual_prices'][$magazineType][$membershipType] = max(0, $amount);
+                    }
+                }
+
+                if ($newConfig['anchor_month'] < 1 || $newConfig['anchor_month'] > 12) {
+                    $fieldErrors['anchor_month'] = 'Anchor month must be between 1 and 12.';
+                }
+                if ($newConfig['expiry_month'] < 1 || $newConfig['expiry_month'] > 12) {
+                    $fieldErrors['expiry_month'] = 'Expiry month must be between 1 and 12.';
                 }
 
                 $memberNumberStart = (int) ($_POST['member_number_start'] ?? 1000);
@@ -535,15 +623,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!$fieldErrors && !$idFieldErrors && !$chapterFieldErrors) {
                     if (isset($_POST['reset_defaults']) && $_POST['reset_defaults'] === '1') {
-                        $matrix = [];
-                        foreach (MembershipPricingService::defaultPricingRows() as $row) {
-                            $matrix[$row['magazine_type']][$row['membership_type']][$row['period_key']] = (int) $row['amount_cents'];
-                        }
+                        $newConfig = MembershipPricingService::defaultConfig();
                     }
-                    MembershipPricingService::updateMembershipPricing((int) $user['id'], [
-                        'currency' => 'AUD',
-                        'matrix' => $matrix,
-                    ]);
+                    MembershipPricingService::updateConfig((int) $user['id'], $newConfig);
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_start', $memberNumberStart);
                     SettingsService::setGlobal((int) $user['id'], 'membership.associate_suffix_start', $associateSuffixStart);
                     SettingsService::setGlobal((int) $user['id'], 'membership.member_number_format_full', $memberNumberFormatFull);
@@ -709,6 +791,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             'media' => ['media.allowed_types', 'media.max_upload_mb'],
             'events' => ['events.visibility_default', 'events.timezone'],
             'membership_pricing' => [
+                'membership.pricing.config',
                 'membership.pricing_matrix',
                 'membership.member_number_start',
                 'membership.associate_suffix_start',
@@ -2831,6 +2914,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </form>
           <?php elseif ($section === 'membership_pricing'): ?>
             <?php
+              $pricingConfig = MembershipPricingService::getConfig();
+              $renewalPeriods = $pricingConfig['renewal_periods'];
+              $renewalPrices = $pricingConfig['renewal_prices'];
+              $proRataAnnual = $pricingConfig['prorata_annual_prices'];
+              $proRataEnabled = !empty($pricingConfig['prorata_enabled']);
+              $anchorMonth = (int) $pricingConfig['anchor_month'];
+              $anchorDay = (int) $pricingConfig['anchor_day'];
+              $expiryMonth = (int) $pricingConfig['expiry_month'];
+              $expiryDay = (int) $pricingConfig['expiry_day'];
+              $monthNames = [1=>'January','February','March','April','May','June','July','August','September','October','November','December'];
+              $monthAbbr = [1=>'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              $magazineIcons = ['PRINTED' => ['icon' => 'menu_book', 'label' => 'Printed Wings'], 'PDF' => ['icon' => 'picture_as_pdf', 'label' => 'PDF Wings']];
+              $membershipIcons = ['FULL' => ['icon' => 'person', 'label' => 'Full member'], 'ASSOCIATE' => ['icon' => 'group', 'label' => 'Associate member']];
+              $proRataPreview = [];
+              foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
+                  foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
+                      $proRataPreview[$mt][$tt] = MembershipPricingService::buildProRataPreview($mt, $tt);
+                  }
+              }
+              $todayProRata = [];
+              foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
+                  foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
+                      $todayProRata[$mt][$tt] = MembershipPricingService::calculateProRataCents($mt, $tt);
+                  }
+              }
+              $monthsRemainingToday = MembershipPricingService::monthsRemainingUntilExpiry();
+              // Legacy view kept for any helper references below.
               $pricing = MembershipPricingService::getMembershipPricing();
               $pricingMatrix = $pricing['matrix'] ?? [];
               $periods = MembershipPricingService::periodDefinitions();
@@ -3182,39 +3292,182 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <p class="text-xs text-slate-500">Order controls the chapter list sequence on member-facing forms.</p>
               </div>
 
-              <div class="bg-card-light rounded-2xl border border-gray-100 p-6">
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead class="text-left text-xs uppercase text-gray-500 border-b">
+              <!-- Membership year card with calendar strip -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4" data-pricing-card="year">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">calendar_month</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Membership year</h2>
+                    <p class="text-sm text-slate-500">Every membership is anchored to a single date. New joiners pay pro-rata for the months until the next expiry; renewals run for whole years from the anchor date.</p>
+                  </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <label class="text-sm text-slate-600">Membership year starts on
+                    <div class="mt-2 flex items-center gap-2">
+                      <select name="pricing_anchor_day" class="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm w-20" data-pricing-input="anchor_day">
+                        <?php for ($d = 1; $d <= 28; $d++): ?>
+                          <option value="<?= $d ?>" <?= $d === $anchorDay ? 'selected' : '' ?>><?= $d ?></option>
+                        <?php endfor; ?>
+                      </select>
+                      <select name="pricing_anchor_month" class="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm flex-1" data-pricing-input="anchor_month">
+                        <?php foreach ($monthNames as $num => $name): ?>
+                          <option value="<?= $num ?>" <?= $num === $anchorMonth ? 'selected' : '' ?>><?= e($name) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                  </label>
+                  <label class="text-sm text-slate-600">Membership year ends on
+                    <div class="mt-2 flex items-center gap-2">
+                      <select name="pricing_expiry_day" class="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm w-20" data-pricing-input="expiry_day">
+                        <?php for ($d = 1; $d <= 31; $d++): ?>
+                          <option value="<?= $d ?>" <?= $d === $expiryDay ? 'selected' : '' ?>><?= $d ?></option>
+                        <?php endfor; ?>
+                      </select>
+                      <select name="pricing_expiry_month" class="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm flex-1" data-pricing-input="expiry_month">
+                        <?php foreach ($monthNames as $num => $name): ?>
+                          <option value="<?= $num ?>" <?= $num === $expiryMonth ? 'selected' : '' ?>><?= e($name) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-4">
+                  <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-2">Year timeline</p>
+                  <div class="relative" data-pricing-timeline>
+                    <div class="grid grid-cols-12 gap-1">
+                      <?php
+                        for ($i = 0; $i < 12; $i++):
+                          $monthNum = (($anchorMonth - 1 + $i) % 12) + 1;
+                          $isAnchor = $i === 0;
+                          $isExpiry = $monthNum === $expiryMonth;
+                          $isCurrent = $monthNum === (int) date('n');
+                      ?>
+                        <div class="relative">
+                          <div class="h-12 rounded-lg flex items-end justify-center pb-1 text-[10px] font-semibold border <?= $isAnchor ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : ($isExpiry ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-600') ?>">
+                            <?= e($monthAbbr[$monthNum]) ?>
+                          </div>
+                          <?php if ($isCurrent): ?>
+                            <div class="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase shadow">Today</div>
+                          <?php endif; ?>
+                        </div>
+                      <?php endfor; ?>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+                      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-400"></span> Anchor (year starts)</span>
+                      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm bg-rose-200 border border-rose-400"></span> Expiry (all memberships end)</span>
+                      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm bg-blue-600"></span> Today (<?= e(date('j M')) ?>)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Renewal periods + matrix card -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4" data-pricing-card="renewal">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">replay</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Renewal pricing</h2>
+                    <p class="text-sm text-slate-500">Set the periods existing members can renew for, and the price for each. Renewals always start on the anchor date and run whole years. Drag the handle on the left to reorder periods.</p>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  <table class="w-full text-sm" data-renewal-periods-table>
+                    <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
                       <tr>
-                        <th class="py-2 pr-3">Magazine / Membership</th>
-                        <?php foreach ($periods as $meta): ?>
-                          <th class="py-2 pr-3"><?= e($meta['label']) ?></th>
+                        <th class="px-3 py-2 w-8"></th>
+                        <th class="px-3 py-2">Period name</th>
+                        <th class="px-3 py-2 w-32">Length (months)</th>
+                        <th class="px-3 py-2 w-24 text-center">Active</th>
+                        <th class="px-3 py-2 w-12"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y" data-renewal-periods-body>
+                      <?php foreach ($renewalPeriods as $idx => $period): ?>
+                        <tr data-period-row data-period-id="<?= e($period['id']) ?>">
+                          <td class="px-3 py-3 text-slate-400 cursor-move select-none" data-drag-handle title="Drag to reorder">
+                            <span class="material-icons-outlined">drag_indicator</span>
+                          </td>
+                          <td class="px-3 py-3">
+                            <input type="hidden" name="renewal_periods[<?= $idx ?>][id]" value="<?= e($period['id']) ?>">
+                            <input type="hidden" name="renewal_periods[<?= $idx ?>][sort_order]" value="<?= (int) ($period['sort_order'] ?? ($idx * 10)) ?>" data-sort-order>
+                            <input type="text" name="renewal_periods[<?= $idx ?>][label]" value="<?= e($period['label']) ?>" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" placeholder="e.g. 1 Year">
+                          </td>
+                          <td class="px-3 py-3">
+                            <input type="number" name="renewal_periods[<?= $idx ?>][duration_months]" value="<?= (int) $period['duration_months'] ?>" min="1" max="120" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" data-period-months>
+                          </td>
+                          <td class="px-3 py-3 text-center">
+                            <label class="inline-flex items-center justify-center">
+                              <input type="checkbox" name="renewal_periods[<?= $idx ?>][active]" value="1" <?= !empty($period['active']) ? 'checked' : '' ?> class="rounded border-gray-300 text-emerald-600">
+                            </label>
+                          </td>
+                          <td class="px-3 py-3 text-right">
+                            <button type="button" class="text-rose-500 hover:text-rose-700 inline-flex items-center" data-remove-period title="Remove this period">
+                              <span class="material-icons-outlined text-base">delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                  <div class="px-3 py-2 border-t bg-slate-50">
+                    <button type="button" class="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900" data-add-period>
+                      <span class="material-icons-outlined text-base">add_circle</span>
+                      Add another renewal period
+                    </button>
+                  </div>
+                </div>
+
+                <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold mt-4">Renewal price per period</p>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table class="w-full text-sm" data-renewal-prices-table>
+                    <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                      <tr>
+                        <th class="px-3 py-2">Magazine</th>
+                        <th class="px-3 py-2">Member type</th>
+                        <?php foreach ($renewalPeriods as $period): ?>
+                          <th class="px-3 py-2 text-center" data-price-col-period="<?= e($period['id']) ?>">
+                            <?= e($period['label']) ?>
+                          </th>
                         <?php endforeach; ?>
                       </tr>
                     </thead>
                     <tbody class="divide-y">
                       <?php foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType): ?>
-                        <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType): ?>
-                          <tr>
-                            <td class="py-3 pr-3 text-gray-700 font-semibold">
-                              <?= e($magazineType === 'PRINTED' ? 'Printed — ' : 'PDF Only — ') ?><?= e(ucfirst(strtolower($membershipType))) ?>
+                        <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType):
+                          $magMeta = $magazineIcons[$magazineType];
+                          $memMeta = $membershipIcons[$membershipType];
+                          $magBadge = $magazineType === 'PRINTED' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800';
+                          $memBadge = $membershipType === 'FULL' ? 'bg-violet-100 text-violet-800' : 'bg-teal-100 text-teal-800';
+                        ?>
+                          <tr data-price-row-magazine="<?= e($magazineType) ?>" data-price-row-membership="<?= e($membershipType) ?>">
+                            <td class="px-3 py-3">
+                              <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold <?= e($magBadge) ?>">
+                                <span class="material-icons-outlined text-sm"><?= e($magMeta['icon']) ?></span>
+                                <?= e($magMeta['label']) ?>
+                              </span>
                             </td>
-                            <?php foreach (array_keys($periods) as $periodKey): ?>
-                              <?php
-                                $fieldKey = $magazineType . '.' . $membershipType . '.' . $periodKey;
-                                $valueCents = $pricingMatrix[$magazineType][$membershipType][$periodKey] ?? null;
-                              ?>
-                              <td class="py-3 pr-3 align-top">
-                                <label class="flex items-center gap-2">
-                                  <span class="text-slate-500">$</span>
+                            <td class="px-3 py-3">
+                              <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold <?= e($memBadge) ?>">
+                                <span class="material-icons-outlined text-sm"><?= e($memMeta['icon']) ?></span>
+                                <?= e($memMeta['label']) ?>
+                              </span>
+                            </td>
+                            <?php foreach ($renewalPeriods as $period):
+                              $valueCents = $renewalPrices[$magazineType][$membershipType][$period['id']] ?? 0;
+                              $fieldKey = 'renewal.' . $magazineType . '.' . $membershipType . '.' . $period['id'];
+                            ?>
+                              <td class="px-3 py-3 align-top" data-price-cell-period="<?= e($period['id']) ?>">
+                                <label class="flex items-center gap-1">
+                                  <span class="text-slate-400 text-xs">$</span>
                                   <input
-                                    name="pricing[<?= e($magazineType) ?>][<?= e($membershipType) ?>][<?= e($periodKey) ?>]"
+                                    name="renewal_prices[<?= e($magazineType) ?>][<?= e($membershipType) ?>][<?= e($period['id']) ?>]"
                                     type="text"
                                     inputmode="decimal"
-                                    class="w-24 rounded-lg border <?= isset($fieldErrors[$fieldKey]) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm"
+                                    class="w-24 rounded-lg border <?= isset($fieldErrors[$fieldKey]) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm text-right"
                                     value="<?= e(format_cents_to_dollars($valueCents)) ?>"
-                                    required
                                   >
                                 </label>
                                 <?php if (isset($fieldErrors[$fieldKey])): ?>
@@ -3228,6 +3481,167 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </tbody>
                   </table>
                 </div>
+                <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                  <span class="material-icons-outlined text-sm text-slate-400">info</span>
+                  Add a new period above and a blank price column will appear here. Save the form to lock it in.
+                </p>
+              </div>
+
+              <!-- Pro-rata for new joins card -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4" data-pricing-card="prorata">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">trending_down</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Pro-rata for new joiners</h2>
+                    <p class="text-sm text-slate-500">When someone joins mid-year, they only pay for the months between now and the next expiry. Set the full-year base price; the system calculates the rest automatically.</p>
+                  </div>
+                </div>
+
+                <label class="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" name="prorata_enabled" value="1" <?= $proRataEnabled ? 'checked' : '' ?> class="rounded border-gray-300 text-emerald-600" data-pricing-input="prorata_enabled">
+                  Enable pro-rata pricing for new joiners
+                </label>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <?php foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType):
+                    $magMeta = $magazineIcons[$magazineType];
+                    $magBadge = $magazineType === 'PRINTED' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800';
+                  ?>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4">
+                      <div class="flex items-center gap-2 mb-3">
+                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold <?= e($magBadge) ?>">
+                          <span class="material-icons-outlined text-sm"><?= e($magMeta['icon']) ?></span>
+                          <?= e($magMeta['label']) ?>
+                        </span>
+                        <span class="text-xs text-slate-500">full-year base price</span>
+                      </div>
+                      <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType):
+                        $memMeta = $membershipIcons[$membershipType];
+                        $memBadge = $membershipType === 'FULL' ? 'text-violet-700' : 'text-teal-700';
+                        $valueCents = $proRataAnnual[$magazineType][$membershipType] ?? 0;
+                        $fieldKey = 'prorata.' . $magazineType . '.' . $membershipType;
+                      ?>
+                        <label class="flex items-center gap-3 py-2">
+                          <span class="material-icons-outlined text-base <?= e($memBadge) ?>"><?= e($memMeta['icon']) ?></span>
+                          <span class="text-sm text-slate-700 flex-1"><?= e($memMeta['label']) ?></span>
+                          <span class="text-slate-400 text-xs">$</span>
+                          <input
+                            name="prorata_annual_prices[<?= e($magazineType) ?>][<?= e($membershipType) ?>]"
+                            type="text"
+                            inputmode="decimal"
+                            class="w-24 rounded-lg border <?= isset($fieldErrors[$fieldKey]) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm text-right"
+                            value="<?= e(format_cents_to_dollars($valueCents)) ?>"
+                            data-prorata-input="<?= e($magazineType) ?>.<?= e($membershipType) ?>"
+                          >
+                          <span class="text-xs text-slate-400">/yr</span>
+                        </label>
+                        <?php if (isset($fieldErrors[$fieldKey])): ?>
+                          <div class="text-xs text-red-600 mt-1 pl-8"><?= e($fieldErrors[$fieldKey]) ?></div>
+                        <?php endif; ?>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+
+                <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold mt-2">Calendar preview — what a Full Printed joiner would pay each month</p>
+                <div class="rounded-xl border border-slate-200 bg-white p-3 overflow-x-auto">
+                  <div class="grid grid-cols-12 gap-1 min-w-[640px]">
+                    <?php foreach ($proRataPreview['PRINTED']['FULL'] as $row):
+                      $isCurrent = !empty($row['is_current']);
+                      $heightPct = max(15, min(100, ($row['months_remaining'] / 12) * 100));
+                    ?>
+                      <div class="relative">
+                        <div class="h-24 rounded-lg border <?= $isCurrent ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50' ?> flex flex-col items-center justify-end p-1">
+                          <div class="w-full rounded-md bg-gradient-to-t from-emerald-500 to-emerald-300" style="height: <?= e((string) round($heightPct)) ?>%"></div>
+                          <div class="text-[10px] font-semibold text-slate-700 mt-1"><?= e($monthAbbr[$row['month']]) ?></div>
+                          <div class="text-[10px] font-bold text-emerald-700">$<?= e(number_format(($row['amount_cents'] ?? 0) / 100, 0)) ?></div>
+                        </div>
+                        <?php if ($isCurrent): ?>
+                          <div class="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase shadow">Now</div>
+                        <?php endif; ?>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                    <span class="material-icons-outlined text-sm text-slate-400">timeline</span>
+                    Bar height = portion of the year the joiner gets. Joiners closer to expiry pay less because they get less.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Live preview card -->
+              <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white rounded-2xl p-6 space-y-4" data-pricing-card="preview">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-emerald-300">visibility</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold">If a member checked out today…</h2>
+                    <p class="text-sm text-slate-300">These are the live prices the public site would quote right now (<?= e(date('j M Y')) ?>). Edit prices above and save to update.</p>
+                  </div>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div class="rounded-xl bg-white/10 backdrop-blur p-4 space-y-3">
+                    <p class="text-xs uppercase tracking-wide text-emerald-300 font-semibold flex items-center gap-1">
+                      <span class="material-icons-outlined text-sm">person_add</span> New joiner — pro-rata
+                    </p>
+                    <p class="text-xs text-slate-300"><?= (int) $monthsRemainingToday ?> months remaining until <?= (int) $expiryDay ?> <?= e($monthNames[$expiryMonth]) ?>.</p>
+                    <table class="w-full text-sm">
+                      <tbody class="divide-y divide-white/10">
+                        <?php foreach (MembershipPricingService::MAGAZINE_TYPES as $mt): ?>
+                          <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt):
+                            $cents = (int) ($todayProRata[$mt][$tt] ?? 0);
+                          ?>
+                            <tr>
+                              <td class="py-1.5"><?= e($magazineIcons[$mt]['label']) ?> · <?= e($membershipIcons[$tt]['label']) ?></td>
+                              <td class="py-1.5 text-right font-bold text-emerald-300">$<?= e(number_format($cents / 100, 2)) ?></td>
+                            </tr>
+                          <?php endforeach; ?>
+                        <?php endforeach; ?>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="rounded-xl bg-white/10 backdrop-blur p-4 space-y-3">
+                    <p class="text-xs uppercase tracking-wide text-emerald-300 font-semibold flex items-center gap-1">
+                      <span class="material-icons-outlined text-sm">autorenew</span> Renewer — fixed periods
+                    </p>
+                    <p class="text-xs text-slate-300">Whole-year renewals starting <?= (int) $anchorDay ?> <?= e($monthNames[$anchorMonth]) ?>.</p>
+                    <?php foreach ($renewalPeriods as $period): ?>
+                      <?php if (empty($period['active'])) continue; ?>
+                      <div>
+                        <p class="text-xs font-semibold uppercase text-white/70 mt-2"><?= e($period['label']) ?> (<?= (int) $period['duration_months'] ?> months)</p>
+                        <table class="w-full text-sm">
+                          <tbody class="divide-y divide-white/10">
+                            <?php foreach (MembershipPricingService::MAGAZINE_TYPES as $mt): ?>
+                              <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt):
+                                $cents = (int) ($renewalPrices[$mt][$tt][$period['id']] ?? 0);
+                              ?>
+                                <tr>
+                                  <td class="py-1"><?= e($magazineIcons[$mt]['label']) ?> · <?= e($membershipIcons[$tt]['label']) ?></td>
+                                  <td class="py-1 text-right font-bold text-emerald-300">$<?= e(number_format($cents / 100, 2)) ?></td>
+                                </tr>
+                              <?php endforeach; ?>
+                            <?php endforeach; ?>
+                          </tbody>
+                        </table>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Help / explainer card -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-3">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">help_outline</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">How this works</h2>
+                  </div>
+                </div>
+                <ol class="text-sm text-slate-600 list-decimal pl-5 space-y-2">
+                  <li><strong>Membership year</strong> sets the anchor (when new memberships start) and the expiry date (when every membership ends, all at once).</li>
+                  <li><strong>Renewal periods</strong> are the options existing members see at renewal time. Each one runs in whole years from the anchor — no pro-rata. Add, rename, reorder or disable any of them.</li>
+                  <li><strong>Pro-rata</strong> only applies to brand-new joiners. The system charges a fair fraction of the annual price based on how many months remain until expiry. The preview above shows what every month of the year would cost.</li>
+                  <li>The dark <strong>"If a member checked out today"</strong> card shows the live quotes — exactly what someone visiting the site this minute would be charged.</li>
+                </ol>
               </div>
 
               <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
@@ -3293,6 +3707,190 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   resetInput.value = '1';
                   form.submit();
                 });
+              })();
+            </script>
+
+            <script>
+              // Membership pricing — add/remove/drag renewal periods + keep
+              // the price-matrix columns in sync. Vanilla JS, no deps.
+              (function () {
+                const body = document.querySelector('[data-renewal-periods-body]');
+                const addBtn = document.querySelector('[data-add-period]');
+                const pricesTable = document.querySelector('[data-renewal-prices-table]');
+                if (!body || !addBtn || !pricesTable) return;
+
+                const magazineTypes = <?= json_encode(MembershipPricingService::MAGAZINE_TYPES) ?>;
+                const membershipTypes = <?= json_encode(MembershipPricingService::MEMBERSHIP_TYPES) ?>;
+                const magazineMeta = <?= json_encode(['PRINTED' => ['icon' => 'menu_book', 'label' => 'Printed Wings'], 'PDF' => ['icon' => 'picture_as_pdf', 'label' => 'PDF Wings']]) ?>;
+                const membershipMeta = <?= json_encode(['FULL' => ['icon' => 'person', 'label' => 'Full member'], 'ASSOCIATE' => ['icon' => 'group', 'label' => 'Associate member']]) ?>;
+
+                let counter = body.querySelectorAll('[data-period-row]').length;
+
+                function reindex() {
+                  Array.from(body.querySelectorAll('[data-period-row]')).forEach((row, idx) => {
+                    row.querySelectorAll('input[name^="renewal_periods["]').forEach((input) => {
+                      input.name = input.name.replace(/^renewal_periods\[\d+\]/, `renewal_periods[${idx}]`);
+                    });
+                    const sortInput = row.querySelector('[data-sort-order]');
+                    if (sortInput) sortInput.value = (idx + 1) * 10;
+                  });
+                }
+
+                function genId(months) {
+                  const yrs = Math.floor(months / 12);
+                  const rem = months % 12;
+                  const base = (rem === 0 && yrs >= 1) ? `P_${yrs}Y` : `P_M${months}`;
+                  let id = base;
+                  let n = 1;
+                  while (body.querySelector(`[data-period-id="${CSS.escape(id)}"]`)) {
+                    id = `${base}_${++n}`;
+                  }
+                  return id;
+                }
+
+                function addPeriodColumn(period) {
+                  // Header
+                  const headRow = pricesTable.querySelector('thead tr');
+                  const th = document.createElement('th');
+                  th.className = 'px-3 py-2 text-center';
+                  th.dataset.priceColPeriod = period.id;
+                  th.textContent = period.label || '';
+                  headRow.appendChild(th);
+
+                  // Body cells
+                  pricesTable.querySelectorAll('tbody tr').forEach((tr) => {
+                    const mag = tr.dataset.priceRowMagazine || magazineTypes[0];
+                    const mem = tr.dataset.priceRowMembership || membershipTypes[0];
+
+                    const td = document.createElement('td');
+                    td.className = 'px-3 py-3 align-top';
+                    td.dataset.priceCellPeriod = period.id;
+                    td.innerHTML = `
+                      <label class="flex items-center gap-1">
+                        <span class="text-slate-400 text-xs">$</span>
+                        <input
+                          name="renewal_prices[${mag}][${mem}][${period.id}]"
+                          type="text"
+                          inputmode="decimal"
+                          class="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-right"
+                          value="0.00"
+                        >
+                      </label>`;
+                    tr.appendChild(td);
+                  });
+                }
+
+                function removePeriodColumn(periodId) {
+                  pricesTable.querySelectorAll(`[data-price-col-period="${CSS.escape(periodId)}"]`).forEach((el) => el.remove());
+                  pricesTable.querySelectorAll(`[data-price-cell-period="${CSS.escape(periodId)}"]`).forEach((el) => el.remove());
+                }
+
+                function updatePriceColumnHeader(periodId, label) {
+                  const th = pricesTable.querySelector(`[data-price-col-period="${CSS.escape(periodId)}"]`);
+                  if (th) th.textContent = label;
+                }
+
+                addBtn.addEventListener('click', () => {
+                  const idx = body.querySelectorAll('[data-period-row]').length;
+                  counter++;
+                  const id = genId(12);
+                  const sortOrder = (idx + 1) * 10;
+                  const tr = document.createElement('tr');
+                  tr.dataset.periodRow = '';
+                  tr.dataset.periodId = id;
+                  tr.innerHTML = `
+                    <td class="px-3 py-3 text-slate-400 cursor-move select-none" data-drag-handle title="Drag to reorder">
+                      <span class="material-icons-outlined">drag_indicator</span>
+                    </td>
+                    <td class="px-3 py-3">
+                      <input type="hidden" name="renewal_periods[${idx}][id]" value="${id}">
+                      <input type="hidden" name="renewal_periods[${idx}][sort_order]" value="${sortOrder}" data-sort-order>
+                      <input type="text" name="renewal_periods[${idx}][label]" value="New period" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" placeholder="e.g. 1 Year">
+                    </td>
+                    <td class="px-3 py-3">
+                      <input type="number" name="renewal_periods[${idx}][duration_months]" value="12" min="1" max="120" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" data-period-months>
+                    </td>
+                    <td class="px-3 py-3 text-center">
+                      <label class="inline-flex items-center justify-center">
+                        <input type="checkbox" name="renewal_periods[${idx}][active]" value="1" checked class="rounded border-gray-300 text-emerald-600">
+                      </label>
+                    </td>
+                    <td class="px-3 py-3 text-right">
+                      <button type="button" class="text-rose-500 hover:text-rose-700 inline-flex items-center" data-remove-period title="Remove this period">
+                        <span class="material-icons-outlined text-base">delete</span>
+                      </button>
+                    </td>`;
+                  body.appendChild(tr);
+                  addPeriodColumn({ id, label: 'New period' });
+                  attachRowHandlers(tr);
+                  reindex();
+                });
+
+                function attachRowHandlers(row) {
+                  const removeBtn = row.querySelector('[data-remove-period]');
+                  const labelInput = row.querySelector('input[name$="[label]"]');
+                  const periodId = row.dataset.periodId;
+                  if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                      if (body.querySelectorAll('[data-period-row]').length <= 1) {
+                        alert('Keep at least one renewal period.');
+                        return;
+                      }
+                      if (!confirm('Remove this renewal period? Members will no longer be able to renew for this length.')) return;
+                      removePeriodColumn(periodId);
+                      row.remove();
+                      reindex();
+                    });
+                  }
+                  if (labelInput) {
+                    labelInput.addEventListener('input', () => updatePriceColumnHeader(periodId, labelInput.value));
+                  }
+                  // Drag-to-reorder
+                  const handle = row.querySelector('[data-drag-handle]');
+                  if (handle) {
+                    handle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+                    row.addEventListener('mouseup', () => row.removeAttribute('draggable'));
+                  }
+                  row.addEventListener('dragstart', (e) => {
+                    row.classList.add('opacity-50');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', row.dataset.periodId);
+                  });
+                  row.addEventListener('dragend', () => {
+                    row.classList.remove('opacity-50');
+                    row.removeAttribute('draggable');
+                  });
+                  row.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    const rect = row.getBoundingClientRect();
+                    const before = (e.clientY - rect.top) < rect.height / 2;
+                    row.classList.toggle('border-t-2', before);
+                    row.classList.toggle('border-b-2', !before);
+                    row.classList.add('border-emerald-400');
+                  });
+                  row.addEventListener('dragleave', () => {
+                    row.classList.remove('border-t-2', 'border-b-2', 'border-emerald-400');
+                  });
+                  row.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    row.classList.remove('border-t-2', 'border-b-2', 'border-emerald-400');
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    if (!draggedId || draggedId === row.dataset.periodId) return;
+                    const dragged = body.querySelector(`[data-period-id="${CSS.escape(draggedId)}"]`);
+                    if (!dragged) return;
+                    const rect = row.getBoundingClientRect();
+                    const before = (e.clientY - rect.top) < rect.height / 2;
+                    if (before) {
+                      body.insertBefore(dragged, row);
+                    } else {
+                      body.insertBefore(dragged, row.nextSibling);
+                    }
+                    reindex();
+                  });
+                }
+
+                body.querySelectorAll('[data-period-row]').forEach(attachRowHandlers);
               })();
             </script>
           <?php elseif ($section === 'advanced'): ?>
