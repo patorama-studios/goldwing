@@ -1,4 +1,12 @@
 <?php
+// Direct hits to /store/orders.php (legacy bookmarks) used to 500 because this
+// file is a fragment included by /store/index.php and assumes $pdo / $user
+// from the parent scope. Redirect to the clean URL instead.
+if (!isset($pdo)) {
+    header('Location: /store/orders', true, 301);
+    exit;
+}
+
 $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE user_id = :user_id ORDER BY created_at DESC');
 $stmt->execute(['user_id' => $user['id']]);
 $orders = $stmt->fetchAll();

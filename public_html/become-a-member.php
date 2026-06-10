@@ -23,13 +23,37 @@ if (!empty($user['member_id'])) {
   $member = $stmt->fetch();
 }
 
-$primaryName = $user['name'] ?? '';
-if ($primaryName === '' && $member) {
-  $primaryName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+// Existing-member guard: if the logged-in user already has an ACTIVE
+// membership period that hasn't ended yet, send them to the member dashboard
+// instead of letting them start a brand new subscription (which would create
+// a duplicate Stripe subscription + double-charge them).
+if ($member && !empty($user['member_id'])) {
+  $stmt = $pdo->prepare(
+    "SELECT COUNT(*) FROM membership_periods
+     WHERE member_id = :id
+       AND status = 'ACTIVE'
+       AND (end_date IS NULL OR end_date >= CURDATE())"
+  );
+  $stmt->execute(['id' => (int) $user['member_id']]);
+  if ((int) $stmt->fetchColumn() > 0) {
+    header('Location: /member/?notice=already_member', true, 302);
+    exit;
+  }
 }
-$nameParts = preg_split('/\s+/', trim((string) $primaryName));
-$firstDefault = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
-$lastDefault = $nameParts && count($nameParts) > 1 ? implode(' ', $nameParts) : '';
+
+// Prefer structured first/last from the members table when available — the
+// users.name field can include the admin role label (e.g. "Pat Lindley -
+// MASTER ADMIN") which would otherwise pre-fill the join form's last name.
+if ($member && (!empty($member['first_name']) || !empty($member['last_name']))) {
+  $firstDefault = trim((string) ($member['first_name'] ?? ''));
+  $lastDefault  = trim((string) ($member['last_name'] ?? ''));
+  $primaryName  = trim($firstDefault . ' ' . $lastDefault);
+} else {
+  $primaryName = $user['name'] ?? '';
+  $nameParts = preg_split('/\s+/', trim((string) $primaryName));
+  $firstDefault = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
+  $lastDefault  = $nameParts && count($nameParts) > 1 ? implode(' ', $nameParts) : '';
+}
 
 $pageTitle = 'Become a Member';
 require __DIR__ . '/../app/Views/partials/header.php';

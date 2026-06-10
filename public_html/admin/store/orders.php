@@ -28,9 +28,12 @@ if (!in_array($voidedView, ['hide', 'show', 'only'], true)) {
     $voidedView = 'hide';
 }
 
-$page = max(1, (int) ($_GET['page'] ?? 1));
+// IMPORTANT: do not name this $page — the parent router (index.php) uses
+// $page to look up the breadcrumb / H1 title. Shadowing it here makes the
+// header render "Store > Store" instead of "Store > Store Orders".
+$pageNum = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 25;
-$offset = ($page - 1) * $perPage;
+$offset = ($pageNum - 1) * $perPage;
 
 $conditions = [];
 $params = [];
@@ -419,13 +422,13 @@ $pageSubtitle = 'Review and manage store orders.';
 
   <?php if ($totalPages > 1): ?>
     <div class="flex items-center justify-between text-sm">
-      <div class="text-slate-500">Page <?= e((string) $page) ?> of <?= e((string) $totalPages) ?></div>
+      <div class="text-slate-500">Page <?= e((string) $pageNum) ?> of <?= e((string) $totalPages) ?></div>
       <div class="flex gap-2">
-        <?php if ($page > 1): ?>
-          <a class="rounded-lg border border-gray-200 px-3 py-1" href="?<?= e(http_build_query(array_merge($_GET, ['page' => $page - 1]))) ?>">Previous</a>
+        <?php if ($pageNum > 1): ?>
+          <a class="rounded-lg border border-gray-200 px-3 py-1" href="?<?= e(http_build_query(array_merge($_GET, ['page' => $pageNum - 1]))) ?>">Previous</a>
         <?php endif; ?>
-        <?php if ($page < $totalPages): ?>
-          <a class="rounded-lg border border-gray-200 px-3 py-1" href="?<?= e(http_build_query(array_merge($_GET, ['page' => $page + 1]))) ?>">Next</a>
+        <?php if ($pageNum < $totalPages): ?>
+          <a class="rounded-lg border border-gray-200 px-3 py-1" href="?<?= e(http_build_query(array_merge($_GET, ['page' => $pageNum + 1]))) ?>">Next</a>
         <?php endif; ?>
       </div>
     </div>

@@ -1,4 +1,11 @@
 <?php
+// Direct hits to /store/product.php (legacy) fall back to the catalog instead
+// of rendering a broken half-page (this file is normally included by index.php).
+if (!isset($pdo)) {
+    header('Location: /store/', true, 301);
+    exit;
+}
+
 use App\Services\Csrf;
 
 $slug = $subPage ?? '';

@@ -40,10 +40,15 @@ if (!file_exists($viewFile)) {
     $page = 'catalog';
 }
 
+// The view file may set $pageTitle (e.g. product.php uses the product name).
+// Default it to null first so we can detect a view-supplied override below.
+$pageTitle = null;
+
 ob_start();
 require $viewFile;
 $viewContent = ob_get_clean();
 
+// Fall back to a generic per-page title only if the view didn't set one.
 $pageTitles = [
     'catalog'  => 'Store',
     'product'  => 'Product',
@@ -52,7 +57,9 @@ $pageTitles = [
     'orders'   => 'Order History',
     'order'    => 'Order',
 ];
-$pageTitle = $pageTitles[$page] ?? ($settings['store_name'] ?? 'Store');
+if (!$pageTitle) {
+    $pageTitle = $pageTitles[$page] ?? ($settings['store_name'] ?? 'Store');
+}
 $activePage = 'store';
 $activeSubPage = $page;
 

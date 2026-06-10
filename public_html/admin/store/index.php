@@ -23,6 +23,17 @@ if (!empty($segments) && $segments[0] === 'index.php') {
 $page = $segments[0] ?? 'settings';
 $subPage = $segments[1] ?? null;
 
+// Friendly redirects for direct hits to internal file names (no id given).
+// e.g. /admin/store/product_form with no segment → product list, not settings.
+$fileNameAliases = [
+    'product_form' => '/admin/store/products',
+    'order_view'   => '/admin/store/orders',
+];
+if (isset($fileNameAliases[$page]) && $subPage === null && !isset($_GET['id']) && !isset($_GET['order'])) {
+    header('Location: ' . $fileNameAliases[$page], true, 302);
+    exit;
+}
+
 $validPages = [
     'settings',
     'categories',

@@ -873,6 +873,15 @@ textarea:focus {
   margin-top: 1.5rem;
 }
 
+/* The `hidden` HTML attribute used on .form-section / .form-field by
+   conditional UI (e.g. /become-a-member.php associate toggles) gets
+   overridden by the `display: flex` / `display: grid` rules above.
+   Force `display: none` so [hidden] wins, matching .form-step[hidden]. */
+.form-section[hidden],
+.form-field[hidden] {
+  display: none;
+}
+
 .form-grid {
   display: grid;
   gap: 1.25rem;

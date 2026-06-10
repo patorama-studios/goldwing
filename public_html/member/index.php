@@ -1686,10 +1686,17 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         if (!$isLifeMember && !empty($membershipPeriod['end_date'])) {
           $renewalDays = (int) ceil((strtotime($membershipPeriod['end_date']) - time()) / 86400);
         }
-        $statusKey = strtolower((string) ($member['status'] ?? ''));
+        // Prefer the live membership_period status (e.g. ACTIVE / PENDING_PAYMENT)
+        // over the cached members.status field, which can be stale after a
+        // renewal (showing "Lapsed" even when the period is currently active).
+        $statusKey = strtolower((string) ($membershipPeriod['status'] ?? $member['status'] ?? ''));
+        if ($statusKey === '' && !empty($membershipPeriod['end_date'])
+            && strtotime($membershipPeriod['end_date']) >= strtotime('today')) {
+            $statusKey = 'active';
+        }
         $statusDot = match ($statusKey) {
-          'active' => 'bg-green-500',
-          'expired', 'inactive' => 'bg-red-500',
+          'active', 'paid' => 'bg-green-500',
+          'expired', 'inactive', 'lapsed' => 'bg-red-500',
           'pending', 'pending_payment' => 'bg-amber-500',
           default => 'bg-slate-400',
         };
@@ -1803,7 +1810,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Status</p>
                   <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full <?= $statusDot ?>"></span>
-                    <p class="text-lg font-semibold text-gray-900"><?= e(ucfirst(strtolower((string) ($member['status'] ?? 'N/A')))) ?></p>
+                    <?php
+                      // Same source as $statusKey above — prefer live period
+                      // status, fall back to cached members.status. Avoids the
+                      // "Lapsed" label appearing when the period is active.
+                      $statusDisplay = (string) ($membershipPeriod['status'] ?? $member['status'] ?? 'N/A');
+                      $statusDisplay = str_replace('_', ' ', $statusDisplay);
+                    ?>
+                    <p class="text-lg font-semibold text-gray-900"><?= e(ucfirst(strtolower($statusDisplay))) ?></p>
                   </div>
                 </div>
                 <div>
@@ -2059,7 +2073,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full relative overflow-hidden">
             <?php if ($latestAward): ?>
               <div class="absolute -top-4 -right-4 opacity-10 pointer-events-none">
-                <span class="material-icons text-9xl text-yellow-500">emoji_events</span>
+                <span class="material-icons-outlined text-9xl text-yellow-500">emoji_events</span>
               </div>
             <?php endif; ?>
             <div class="flex items-center gap-3 mb-5 relative z-10">
@@ -2081,7 +2095,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <?php if ($awardPhoto !== ''): ?>
                       <img src="<?= e($awardPhoto) ?>" alt="<?= e($awardName) ?>" class="h-full w-full object-cover">
                     <?php else: ?>
-                      <span class="material-icons text-yellow-500 text-4xl">emoji_events</span>
+                      <span class="material-icons-outlined text-yellow-500 text-4xl">emoji_events</span>
                     <?php endif; ?>
                   </div>
                   <div class="min-w-0 flex-1">
@@ -2102,7 +2116,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               </div>
             <?php else: ?>
               <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center">
-                <span class="material-icons text-yellow-300 text-5xl mb-2">emoji_events</span>
+                <span class="material-icons-outlined text-yellow-300 text-5xl mb-2">emoji_events</span>
                 <p class="text-sm font-semibold text-gray-700">No trophies yet</p>
                 <p class="text-xs text-gray-500 mt-1 mb-4">Take a look at past winners and the memorial trophies awarded each year.</p>
                 <a href="<?= e($awardsHref) ?>" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-yellow-300 text-yellow-800 hover:bg-yellow-50 text-sm font-semibold transition">

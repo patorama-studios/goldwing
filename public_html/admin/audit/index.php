@@ -22,11 +22,26 @@ if (!in_array($limit, $allowedLimits, true)) {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $offset = ($page - 1) * $limit;
 
-$result = AuditHubService::query($filters, $limit, $offset);
-$rows = $result['rows'];
-$total = $result['total'];
-$stats = AuditHubService::stats();
-$actions = AuditHubService::distinctActions();
+// Wrap all three service calls in a single try/catch so a schema mismatch
+// (e.g. a column missing on the live DB after a partial migration) renders
+// a friendly empty state with an error banner instead of a 500. The actual
+// exception is logged via PHP's error_log so it shows up in cPanel's error
+// log + LogViewer for follow-up.
+$rows = [];
+$total = 0;
+$stats = ['today' => 0, 'week' => 0, 'total' => 0, 'by_source' => []];
+$actions = [];
+$auditError = null;
+try {
+    $result = AuditHubService::query($filters, $limit, $offset);
+    $rows = $result['rows'];
+    $total = $result['total'];
+    $stats = AuditHubService::stats();
+    $actions = AuditHubService::distinctActions();
+} catch (Throwable $e) {
+    $auditError = $e->getMessage();
+    error_log('[AuditHub] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+}
 
 $hasAnyFilter = $filters['search'] !== ''
     || $filters['source'] !== ''
@@ -70,6 +85,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   <main class="flex-1 overflow-y-auto bg-background-light relative">
     <?php $topbarTitle = 'Audit Hub'; require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+      <?php if ($auditError !== null): ?>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+          <p class="font-semibold">Audit log temporarily unavailable</p>
+          <p class="text-sm mt-1">A backend query failed: <code class="text-xs"><?= e($auditError) ?></code></p>
+          <p class="text-xs mt-2 opacity-80">This page is showing empty stats so it doesn't crash. The exception is logged for follow-up.</p>
+        </div>
+      <?php endif; ?>
 
       <!-- Stats cards -->
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

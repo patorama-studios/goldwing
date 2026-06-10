@@ -1,4 +1,12 @@
 <?php
+// Direct hits to /store/catalog.php used to 500 because this file is a fragment
+// included by /store/index.php and assumes $pdo / $user from the parent scope.
+// Redirect to the clean URL instead.
+if (!isset($pdo)) {
+    header('Location: /store/', true, 301);
+    exit;
+}
+
 $search = trim($_GET['q'] ?? '');
 $categoryId = (int) ($_GET['category'] ?? 0);
 $tagId = (int) ($_GET['tag'] ?? 0);

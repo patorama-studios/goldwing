@@ -1,4 +1,12 @@
 <?php
+// Direct hits to /store/cart.php (legacy bookmarks/emails) used to 500 because
+// this file is a fragment included by /store/index.php and assumes $pdo / $user
+// from the parent scope. Redirect to the clean URL instead.
+if (!isset($pdo)) {
+    header('Location: /store/cart', true, 301);
+    exit;
+}
+
 use App\Services\Csrf;
 use App\Services\StripeSettingsService;
 

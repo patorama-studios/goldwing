@@ -1,4 +1,11 @@
 <?php
+// Direct hits to /store/order_view.php (legacy) redirect back to the orders
+// list (this file is a fragment included by /store/index.php).
+if (!isset($pdo)) {
+    header('Location: /store/orders', true, 301);
+    exit;
+}
+
 $orderNumber = $subPage ?? '';
 if (isset($_GET['order'])) {
     $orderNumber = $_GET['order'];

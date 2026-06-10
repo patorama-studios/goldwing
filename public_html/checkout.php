@@ -99,13 +99,20 @@ if (!empty($user['member_id'])) {
     $member = $stmt->fetch();
 }
 
-$primaryName = $user['name'] ?? '';
-if ($primaryName === '' && $member) {
-    $primaryName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+// Prefer the structured first/last from the members table when available —
+// $user['name'] can include the admin role label (e.g. "Pat Lindley - MASTER
+// ADMIN") which would otherwise leak into the checkout last_name field and
+// onto the order / shipping label.
+if ($member && (!empty($member['first_name']) || !empty($member['last_name']))) {
+    $guestFirst = trim((string) ($member['first_name'] ?? ''));
+    $guestLast  = trim((string) ($member['last_name'] ?? ''));
+    $primaryName = trim($guestFirst . ' ' . $guestLast);
+} else {
+    $primaryName = $user['name'] ?? '';
+    $nameParts = preg_split('/\s+/', trim((string) $primaryName));
+    $guestFirst = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
+    $guestLast  = $nameParts && count($nameParts) > 1 ? implode(' ', $nameParts) : '';
 }
-$nameParts = preg_split('/\s+/', trim((string) $primaryName));
-$guestFirst = $nameParts && count($nameParts) > 1 ? array_shift($nameParts) : (string) $primaryName;
-$guestLast = $nameParts && count($nameParts) > 1 ? implode(' ', $nameParts) : '';
 
 $fulfillment = 'shipping';
 
