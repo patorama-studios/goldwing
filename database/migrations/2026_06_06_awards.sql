@@ -65,10 +65,12 @@ SELECT * FROM (
   SELECT 10  AS sort_order, 'Best Original Classic Goldwing GL1000, GL1100, GL1200' AS name, 'Best Original Goldwing' AS group_label, NULL AS memorial_trophy_name, NULL AS description UNION ALL
   SELECT 20,  'Best Original GL1500',                                  'Best Original Goldwing', NULL, NULL UNION ALL
   SELECT 30,  'Best Original GL1800',                                  'Best Original Goldwing', NULL, NULL UNION ALL
+  SELECT 35,  'Best Original GL1800 Gen 3 (2018+)',                    'Best Original Goldwing', NULL, NULL UNION ALL
   SELECT 40,  'Best Original F6B',                                     'Best Original Goldwing', NULL, NULL UNION ALL
   SELECT 50,  'Best Custom Classic Goldwing GL1000, GL1100, GL1200',   'Best Custom Goldwing',   NULL, NULL UNION ALL
   SELECT 60,  'Best Custom Goldwing GL1500',                           'Best Custom Goldwing',   NULL, NULL UNION ALL
   SELECT 70,  'Best Custom Goldwing GL1800',                           'Best Custom Goldwing',   NULL, NULL UNION ALL
+  SELECT 75,  'Best Custom Goldwing GL1800 Gen 3 (2018+)',             'Best Custom Goldwing',   NULL, NULL UNION ALL
   SELECT 80,  'Best Custom F6B',                                       'Best Custom Goldwing',   NULL, NULL UNION ALL
   SELECT 90,  'Best Goldwing and Trailer',                             NULL, 'Burden Memorial Trophy',          NULL UNION ALL
   SELECT 100, 'Best Goldwing Trike',                                   NULL, NULL,                              NULL UNION ALL

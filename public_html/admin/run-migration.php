@@ -1869,10 +1869,12 @@ if ($alreadyRun) {
                 [ 10, 'Best Original Classic Goldwing GL1000, GL1100, GL1200', 'Best Original Goldwing', null],
                 [ 20, 'Best Original GL1500',                                  'Best Original Goldwing', null],
                 [ 30, 'Best Original GL1800',                                  'Best Original Goldwing', null],
+                [ 35, 'Best Original GL1800 Gen 3 (2018+)',                    'Best Original Goldwing', null],
                 [ 40, 'Best Original F6B',                                     'Best Original Goldwing', null],
                 [ 50, 'Best Custom Classic Goldwing GL1000, GL1100, GL1200',   'Best Custom Goldwing',   null],
                 [ 60, 'Best Custom Goldwing GL1500',                           'Best Custom Goldwing',   null],
                 [ 70, 'Best Custom Goldwing GL1800',                           'Best Custom Goldwing',   null],
+                [ 75, 'Best Custom Goldwing GL1800 Gen 3 (2018+)',             'Best Custom Goldwing',   null],
                 [ 80, 'Best Custom F6B',                                       'Best Custom Goldwing',   null],
                 [ 90, 'Best Goldwing and Trailer',                             null,                     'Burden Memorial Trophy'],
                 [100, 'Best Goldwing Trike',                                   null,                     null],
@@ -2850,6 +2852,288 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 033 — Historic-rego backfill', 'status' => 'applied', 'note' => $note];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 033 — Historic-rego backfill', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 024 — Historical trophy winners import (2005–2026)
+//
+// Loads the 130 winners scraped from the Wings magazine archive
+// (scripts/data/wings_trophy_winners.csv) plus 16 winners from the 2026
+// Bunbury AGM (transcribed from the trophy-winners slide). For each row we:
+//
+//   1. Decide the final category — most rows map 1:1 to the seeded list,
+//      but 2024 + 2026 split GL1800 into "up to 2017" and "Gen 3 (2018+)"
+//      sub-categories. Those need two extra category rows so the unique
+//      (category_id, year) constraint doesn't reject the second winner.
+//
+//   2. Fuzzy-match member_name against members.first_name + last_name
+//      (LOWER, exact match). If we find a unique match, set member_id; if
+//      multiple ACTIVE matches, pick the first; if none, fall back to
+//      member_name_override so the historical record is preserved either
+//      way.
+//
+//   3. Insert with ON DUPLICATE KEY UPDATE so re-running this migration
+//      after a server replay is safe — already-imported rows are touched
+//      (updated_at bumps) but not duplicated.
+//
+// Skip heuristics: names containing "1st " / "2nd ", names < 3 chars, or
+// names that don't look like a person ("the", "male'", body-text fragments).
+// The CSV's source_pdf + source_page columns are kept in the notes field
+// so admins can find the original magazine page if a row needs editing.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_024_historical_winners_import';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 024 — Historical winners import', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // ── 1. Add the 2 Gen 3 sub-categories ─────────────────────────────
+        $genCats = [
+            ['Best Original GL1800 Gen 3 (2018+)',        35,  null],
+            ['Best Custom Goldwing GL1800 Gen 3 (2018+)', 75,  null],
+        ];
+        $existsCat = $pdo->prepare('SELECT id FROM award_categories WHERE name = :name LIMIT 1');
+        $insertCat = $pdo->prepare('INSERT INTO award_categories (sort_order, name, group_label, memorial_trophy_name, is_active) VALUES (:sort_order, :name, :group_label, NULL, 1)');
+        $genAdded = 0;
+        foreach ($genCats as [$name, $sort, $group]) {
+            $existsCat->execute(['name' => $name]);
+            if ($existsCat->fetchColumn()) {
+                continue;
+            }
+            $insertCat->execute([
+                'sort_order'  => $sort,
+                'name'        => $name,
+                'group_label' => 'Best Original Goldwing', // routes them under the right group on the wall
+            ]);
+            $genAdded++;
+        }
+        // Fix the Custom Gen 3 group label to "Best Custom Goldwing" after insert
+        // (the loop above puts both under Original because both share the prefix).
+        $pdo->exec("UPDATE award_categories SET group_label = 'Best Custom Goldwing' WHERE name = 'Best Custom Goldwing GL1800 Gen 3 (2018+)'");
+
+        // ── 2. Build a name → member_id lookup for fuzzy matching ─────────
+        // We index by lower-case "first last" so each insert is a single
+        // O(1) hash lookup instead of an N+1 query against the members
+        // table. Active members win ties.
+        $nameLookup = [];
+        $memberRows = $pdo->query("
+            SELECT id, first_name, last_name, status
+            FROM members
+            ORDER BY (status = 'ACTIVE') DESC, id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($memberRows as $mr) {
+            $key = strtolower(trim(($mr['first_name'] ?? '') . ' ' . ($mr['last_name'] ?? '')));
+            if ($key === '' || isset($nameLookup[$key])) {
+                continue;
+            }
+            $nameLookup[$key] = (int) $mr['id'];
+        }
+
+        // ── 3. Get the category lookup ────────────────────────────────────
+        $catLookup = [];
+        foreach ($pdo->query('SELECT id, name FROM award_categories')->fetchAll(PDO::FETCH_ASSOC) ?: [] as $cr) {
+            $catLookup[$cr['name']] = (int) $cr['id'];
+        }
+        $resolveCat = function (string $name) use ($catLookup): ?int {
+            return $catLookup[$name] ?? null;
+        };
+
+        // Categories used by the importer — make sure they all resolved.
+        $required = [
+            'Best Original Classic Goldwing GL1000, GL1100, GL1200',
+            'Best Original GL1500',
+            'Best Original GL1800',
+            'Best Original GL1800 Gen 3 (2018+)',
+            'Best Original F6B',
+            'Best Custom Classic Goldwing GL1000, GL1100, GL1200',
+            'Best Custom Goldwing GL1500',
+            'Best Custom Goldwing GL1800',
+            'Best Custom Goldwing GL1800 Gen 3 (2018+)',
+            'Best Custom F6B',
+            'Best Goldwing and Trailer',
+            'Best Goldwing Trike',
+            'Best Goldwing and Sidecar',
+            'Best non-Goldwing',
+            'Longest Distance Travelled by an AGA Member over 65',
+            'Longest Distance Travelled by an AGA Member',
+            'Longest Distance Pillion',
+            'Peoples Choice Award',
+            'Member of the Year',
+        ];
+        $missing = [];
+        foreach ($required as $r) {
+            if (!isset($catLookup[$r])) {
+                $missing[] = $r;
+            }
+        }
+        if ($missing) {
+            throw new RuntimeException('Award categories not seeded: ' . implode(', ', $missing));
+        }
+
+        // ── 4. Helpers ────────────────────────────────────────────────────
+        // Heuristics for filtering out the handful of garbage rows the
+        // PDF scraper couldn't fully clean up.
+        $isLikelyName = function (string $name): bool {
+            $n = trim($name);
+            if (mb_strlen($n) < 3) return false;
+            if (preg_match('/^\d/', $n)) return false;                  // starts with number
+            if (stripos($n, '1st ') !== false || stripos($n, '2nd ') !== false) return false;
+            $junk = ['the', 'male', 'female', 'rider', 'pillion', 'award', 'and', 'trophy', 'a g'];
+            if (in_array(strtolower($n), $junk, true)) return false;
+            if (!preg_match('/^[A-Z]/', $n)) return false;              // names start capital
+            // Need at least one space (first + last) OR be a known single-word
+            // last-name-only edge case — we just require the space here.
+            if (strpos($n, ' ') === false) return false;
+            return true;
+        };
+
+        $genThreeFromRaw = function (string $rawLine): bool {
+            // Detects the "2018+" / "Gen 3" sub-category marker that the
+            // scraper saw in the raw line but couldn't route on its own.
+            return (bool) preg_match('/2018\+|gen\s*3/i', $rawLine);
+        };
+
+        // Insert/upsert prepared statement — ON DUPLICATE so re-runs are safe.
+        $insertWinner = $pdo->prepare("
+            INSERT INTO award_winners
+                (category_id, year, member_id, member_name_override, bike_description, notes, created_by_user_id)
+            VALUES
+                (:category_id, :year, :member_id, :override, :bike, :notes, :actor)
+            ON DUPLICATE KEY UPDATE
+                member_id = COALESCE(VALUES(member_id), member_id),
+                member_name_override = COALESCE(VALUES(member_name_override), member_name_override),
+                bike_description = COALESCE(NULLIF(VALUES(bike_description), ''), bike_description),
+                notes = COALESCE(NULLIF(VALUES(notes), ''), notes),
+                updated_at = NOW()
+        ");
+
+        // ── 5. Process CSV ────────────────────────────────────────────────
+        $csvPath = __DIR__ . '/../../scripts/data/wings_trophy_winners.csv';
+        $stats = ['csv_total' => 0, 'csv_imported' => 0, 'csv_matched' => 0, 'csv_override' => 0, 'csv_skipped' => 0];
+        $skipped = [];
+
+        if (!is_file($csvPath)) {
+            throw new RuntimeException('CSV not found at expected path: ' . $csvPath);
+        }
+        $fh = fopen($csvPath, 'r');
+        if (!$fh) {
+            throw new RuntimeException('Could not open CSV: ' . $csvPath);
+        }
+        $header = fgetcsv($fh);
+        // Map column names → indices so we don't hard-code positions.
+        $col = array_flip($header);
+
+        while (($row = fgetcsv($fh)) !== false) {
+            $stats['csv_total']++;
+            $year     = (int) ($row[$col['year']] ?? 0);
+            $catName  = trim((string) ($row[$col['category_name']] ?? ''));
+            $name     = trim((string) ($row[$col['member_name']] ?? ''));
+            $bike     = trim((string) ($row[$col['bike_description']] ?? ''));
+            $notes    = trim((string) ($row[$col['notes']] ?? ''));
+            $sourcePdf  = trim((string) ($row[$col['source_pdf']] ?? ''));
+            $sourcePage = trim((string) ($row[$col['source_page']] ?? ''));
+            $rawLine  = trim((string) ($row[$col['raw_line']] ?? ''));
+
+            if ($year < 1990 || $year > 2030 || $catName === '' || $name === '') {
+                $stats['csv_skipped']++; $skipped[] = "$year $catName: missing field";
+                continue;
+            }
+            if (!$isLikelyName($name)) {
+                $stats['csv_skipped']++; $skipped[] = "$year $catName: not a name ($name)";
+                continue;
+            }
+
+            // Re-route GL1800 winners to Gen 3 sub-categories when the raw
+            // line had a "2018+" or "Gen 3" marker.
+            $effectiveCat = $catName;
+            if (in_array($catName, ['Best Original GL1800', 'Best Custom Goldwing GL1800'], true) && $genThreeFromRaw($rawLine)) {
+                $effectiveCat = $catName . ' Gen 3 (2018+)';
+                $effectiveCat = ($catName === 'Best Original GL1800')
+                    ? 'Best Original GL1800 Gen 3 (2018+)'
+                    : 'Best Custom Goldwing GL1800 Gen 3 (2018+)';
+            }
+
+            $catId = $resolveCat($effectiveCat);
+            if (!$catId) {
+                $stats['csv_skipped']++; $skipped[] = "$year $catName: unknown category";
+                continue;
+            }
+
+            $lookupKey = strtolower($name);
+            $memberId = $nameLookup[$lookupKey] ?? null;
+
+            // Annotate notes with source so an admin can find the original page.
+            $sourceTag = $sourcePdf !== '' ? 'src: ' . basename($sourcePdf) . ($sourcePage !== '' ? ' p' . $sourcePage : '') : '';
+            $finalNotes = trim($notes . ($notes !== '' && $sourceTag !== '' ? ' · ' : '') . $sourceTag);
+
+            $insertWinner->execute([
+                'category_id' => $catId,
+                'year'        => $year,
+                'member_id'   => $memberId,
+                'override'    => $memberId ? null : $name,
+                'bike'        => $bike !== '' ? $bike : null,
+                'notes'       => $finalNotes !== '' ? $finalNotes : null,
+                'actor'       => (int) $user['id'],
+            ]);
+            $stats['csv_imported']++;
+            $memberId ? $stats['csv_matched']++ : $stats['csv_override']++;
+        }
+        fclose($fh);
+
+        // ── 6. Inline 2026 winners from the AGM trophy slide ──────────────
+        // Year is 2026 because the screenshot heading says "2026 AGM".
+        // Rows with "-" mean no winner — those are skipped intentionally.
+        $winners2026 = [
+            // [category_name,                                            member_name,       bike_description,         notes]
+            ['Best Original Classic Goldwing GL1000, GL1100, GL1200',     'Peter Wilkinson', 'GL1000',                 ''],
+            ['Best Original GL1800',                                      'Julie Collins',   '',                       ''],
+            ['Best Original GL1800 Gen 3 (2018+)',                        'Rob Watson',      '',                       ''],
+            ['Best Custom Goldwing GL1800',                               'Greg Naylor',     '',                       ''],
+            ['Best Custom Goldwing GL1800 Gen 3 (2018+)',                 'Ian Kennedy',     '',                       ''],
+            ['Best Goldwing and Sidecar',                                 'Les Sorenson',    'GL1500',                 ''],
+            ['Best Goldwing and Trailer',                                 'Mark Johannesen', 'GL1800D + Shadow',       ''],
+            ['Best Goldwing Trike',                                       'David Goodchild', 'GL1800 CSC',             ''],
+            ['Best non-Goldwing',                                         'Marty Vesperman', 'Honda ST1300 2003',      ''],
+            ['Longest Distance Travelled by an AGA Member',               'Stephen Veitch',  'GL1800',                 '4362 km'],
+            ['Longest Distance Travelled by an AGA Member over 65',       'Rob Watson',      'GL1800D',                '4380 km'],
+            ['Longest Distance Pillion',                                  'Gail Jones',      'GL1800 Trike',           '4263 km'],
+            ['Member of the Year',                                        'Colin Strong',    '',                       ''],
+            ['Peoples Choice Award',                                      'Peter Wilkinson', 'GL1000',                 ''],
+        ];
+        $stats2026 = ['imported' => 0, 'matched' => 0, 'override' => 0];
+        foreach ($winners2026 as [$cn, $nm, $bd, $nt]) {
+            $cid = $resolveCat($cn);
+            if (!$cid) { continue; }
+            $key = strtolower($nm);
+            $mid = $nameLookup[$key] ?? null;
+            $insertWinner->execute([
+                'category_id' => $cid,
+                'year'        => 2026,
+                'member_id'   => $mid,
+                'override'    => $mid ? null : $nm,
+                'bike'        => $bd !== '' ? $bd : null,
+                'notes'       => $nt !== '' ? $nt : null,
+                'actor'       => (int) $user['id'],
+            ]);
+            $stats2026['imported']++;
+            $mid ? $stats2026['matched']++ : $stats2026['override']++;
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $note = sprintf(
+            'gen3 cats added: %d · CSV: %d/%d imported (matched %d, override %d, skipped %d) · 2026: %d imported (matched %d, override %d)',
+            $genAdded,
+            $stats['csv_imported'], $stats['csv_total'],
+            $stats['csv_matched'], $stats['csv_override'], $stats['csv_skipped'],
+            $stats2026['imported'], $stats2026['matched'], $stats2026['override']
+        );
+        $results[] = ['label' => 'Migration 024 — Historical winners import', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 024 — Historical winners import', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 
