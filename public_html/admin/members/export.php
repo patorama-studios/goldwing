@@ -32,6 +32,7 @@ $filters = [
     'has_trike' => $_GET['has_trike'] ?? null,
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
+    'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
 ];
 if (isset($_GET['sort_by'])) {
     $filters['sort_by'] = $_GET['sort_by'];

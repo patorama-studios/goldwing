@@ -47,6 +47,7 @@ $filters = [
     'has_trike' => $_GET['has_trike'] ?? null,
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
+    'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
 ];
 
 $sortOptions = [
@@ -224,7 +225,8 @@ $hasAdvancedFilters = $filters['vehicle_type'] !== ''
     || !empty($filters['directory_prefs'])
     || filter_var($filters['has_trike'], FILTER_VALIDATE_BOOLEAN)
     || filter_var($filters['has_trailer'], FILTER_VALIDATE_BOOLEAN)
-|| filter_var($filters['has_sidecar'], FILTER_VALIDATE_BOOLEAN);
+    || filter_var($filters['has_sidecar'], FILTER_VALIDATE_BOOLEAN)
+|| filter_var($filters['has_historic_rego'], FILTER_VALIDATE_BOOLEAN);
 
 $membersListConfig = [
     'csrf' => Csrf::token(),
@@ -543,6 +545,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   Has <?= ucfirst($type) ?>
                 </label>
               <?php endforeach; ?>
+              <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" name="has_historic_rego" value="1" <?= filter_var($filters['has_historic_rego'] ?? null, FILTER_VALIDATE_BOOLEAN) ? 'checked' : '' ?> class="rounded border-gray-200 text-primary focus:ring-2 focus:ring-primary">
+                Has Historic Rego
+              </label>
             </div>
             <div class="mt-4 grid gap-4 md:grid-cols-3">
               <?php foreach ($directoryPrefs as $letter => $info): ?>

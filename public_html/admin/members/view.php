@@ -2104,6 +2104,33 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 not have permission to manage vehicles.</div>
             <?php else: ?>
               <div class="space-y-6">
+                <!-- Member-level historic-rego flag (members.is_historic). Applies to the
+                     household, not a specific bike — used by the "Has Historic Rego" filter
+                     on the all-members list and surfaced as a badge in the profile header. -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+                  <form method="post" action="/admin/members/actions.php" class="flex items-start justify-between gap-4">
+                    <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                    <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                    <input type="hidden" name="tab" value="vehicles">
+                    <input type="hidden" name="action" value="set_historic">
+                    <div class="flex items-start gap-3">
+                      <div class="p-2 bg-stone-100 rounded-lg text-stone-600">
+                        <span class="material-icons-outlined">history</span>
+                      </div>
+                      <div>
+                        <h2 class="font-display text-base font-bold text-gray-900">Has Historic Rego</h2>
+                        <p class="text-sm text-gray-500">Tick if this member's bike is registered as a historical vehicle (25+ yrs).</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                      <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <input type="checkbox" name="is_historic" value="1" <?= !empty($member['is_historic']) ? 'checked' : '' ?> class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
+                        Historic
+                      </label>
+                      <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save</button>
+                    </div>
+                  </form>
+                </div>
                 <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
                   <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-3">

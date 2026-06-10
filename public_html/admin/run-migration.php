@@ -2792,6 +2792,68 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 033 — Backfill members.is_historic from legacy xlsx Historic flags
+//
+// The legacy "Current AGA Members.xlsx" carries a Historic(M) / Historic(A)
+// boolean per row. The original CSV import dropped this field (everyone came
+// in with is_historic = 0). This migration sets is_historic = 1 for the 8 main
+// + 12 associate members the xlsx flags as True. Per-member-number lists are
+// embedded directly because the dataset is tiny and stable; no CSV needed.
+//
+// Match strategy: member_number_base = X AND member_number_suffix = 0 for the
+// main, AND member_number_suffix > 0 for the associate. Idempotent (UPDATE
+// re-runs are no-ops; the migration key also guards re-runs).
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_033_backfill_is_historic';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 033 — Historic-rego backfill', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // Source-of-truth lists extracted from the xlsx (Historic(M) / Historic(A) = True).
+        $mainNumbers  = [790, 795, 863, 949, 1312, 1457, 1560, 1707];
+        $assocNumbers = [148, 795, 863, 949, 1352, 1372, 1376, 1457, 1569, 1601, 1687, 1698];
+
+        $updateMain = $pdo->prepare(
+            'UPDATE members SET is_historic = 1, updated_at = NOW()
+             WHERE member_number_base = :base AND member_number_suffix = 0'
+        );
+        $updateAssoc = $pdo->prepare(
+            'UPDATE members SET is_historic = 1, updated_at = NOW()
+             WHERE member_number_base = :base AND member_number_suffix > 0'
+        );
+
+        $mainHits = 0; $mainMisses = []; $assocHits = 0; $assocMisses = [];
+        foreach ($mainNumbers as $n) {
+            $updateMain->execute([':base' => $n]);
+            if ($updateMain->rowCount() > 0) { $mainHits++; } else { $mainMisses[] = $n; }
+        }
+        foreach ($assocNumbers as $n) {
+            $updateAssoc->execute([':base' => $n]);
+            if ($updateAssoc->rowCount() > 0) { $assocHits++; } else { $assocMisses[] = $n; }
+        }
+
+        $note = sprintf(
+            'main flagged: %d/%d · assoc flagged: %d/%d',
+            $mainHits, count($mainNumbers), $assocHits, count($assocNumbers)
+        );
+        if ($mainMisses || $assocMisses) {
+            $note .= ' · misses:';
+            if ($mainMisses)  { $note .= ' main=' . implode(',', $mainMisses); }
+            if ($assocMisses) { $note .= ' assoc=' . implode(',', $assocMisses); }
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 033 — Historic-rego backfill', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 033 — Historic-rego backfill', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

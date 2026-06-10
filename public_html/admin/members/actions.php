@@ -1186,6 +1186,28 @@ switch ($action) {
         redirectWithFlash($memberId, $tab, 'Bike removed.');
         break;
 
+    case 'set_historic':
+        // Toggle the member-level "has historic rego" flag (members.is_historic).
+        // Same permission as bike management — admins who can manage vehicles can flag.
+        if (!AdminMemberAccess::canManageVehicles($user)) {
+            redirectWithFlash($memberId, $tab, 'Vehicle management not permitted.', 'error');
+        }
+        $newValue = isset($_POST['is_historic']) && $_POST['is_historic'] === '1' ? 1 : 0;
+        $previousValue = (int) ($member['is_historic'] ?? 0);
+        if ($newValue === $previousValue) {
+            redirectWithFlash($memberId, $tab, $newValue ? 'Already flagged as historic.' : 'Historic flag already off.');
+        }
+        if (!MemberRepository::update($memberId, ['is_historic' => $newValue])) {
+            redirectWithFlash($memberId, $tab, 'Could not update historic flag.', 'error');
+        }
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.historic_flag_updated', [
+            'from' => $previousValue,
+            'to' => $newValue,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+        redirectWithFlash($memberId, $tab, $newValue ? 'Marked as historic.' : 'Historic flag removed.');
+        break;
+
     case 'send_migration_link':
         if (!AdminMemberAccess::canEditFullProfile($user)) {
             redirectWithFlash($memberId, $tab, 'Manual migration links are restricted.', 'error');

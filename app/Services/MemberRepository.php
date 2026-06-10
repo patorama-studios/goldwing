@@ -738,6 +738,14 @@ class MemberRepository
             }
         }
 
+        // Historic rego is a member-level flag (members.is_historic) — no JOIN to vehicles needed.
+        if (isset($filters['has_historic_rego'])) {
+            $value = filter_var($filters['has_historic_rego'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($value === true) {
+                $parts[] = 'm.is_historic = 1';
+            }
+        }
+
         return implode(' AND ', $parts);
     }
 
