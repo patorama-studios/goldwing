@@ -401,24 +401,207 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <p class="text-emerald-700">Refundable: <span class="font-semibold"><?= e('A$' . number_format($refundableCents / 100, 2)) ?></span></p>
                 </div>
                 <?php if ($canRefund): ?>
-                  <form method="post" action="/admin/members/actions.php" class="space-y-2" onsubmit="return confirm('Issue this Stripe refund? This cannot be undone.');">
-                    <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                    <input type="hidden" name="member_id" value="<?= e((string) $memberId) ?>">
-                    <input type="hidden" name="tab" value="orders">
-                    <input type="hidden" name="orders_section" value="membership">
-                    <input type="hidden" name="action" value="membership_order_refund">
-                    <input type="hidden" name="order_id" value="<?= e((string) $orderId) ?>">
-                    <div>
-                      <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Amount (AUD)</label>
-                      <input name="refund_amount" type="number" step="0.01" min="0.01" max="<?= e(number_format($refundableCents / 100, 2, '.', '')) ?>" placeholder="Leave blank for full <?= e(number_format($refundableCents / 100, 2)) ?>" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                      <p class="mt-1 text-xs text-slate-500">Partial refunds are supported — anything from 0.01 up to <?= e('A$' . number_format($refundableCents / 100, 2)) ?>.</p>
-                    </div>
-                    <div>
-                      <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Reason (required)</label>
-                      <input name="refund_reason" required placeholder="e.g. duplicate payment" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                    </div>
-                    <button class="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" type="submit">Issue Stripe refund</button>
-                  </form>
+                  <?php
+                    // Pro-rata calculation for the modal. If we have a period
+                    // with start/end dates, compute days_remaining/days_total
+                    // and prefill the proRata cents.
+                    $proRataCents = 0;
+                    $periodTotalDays = 0;
+                    $periodRemainingDays = 0;
+                    if ($period && !empty($period['start_date']) && !empty($period['end_date'])) {
+                        $startTs = strtotime((string) $period['start_date']);
+                        $endTs   = strtotime((string) $period['end_date']);
+                        $todayTs = strtotime(date('Y-m-d'));
+                        $periodTotalDays = max(1, (int) round(($endTs - $startTs) / 86400));
+                        $periodRemainingDays = max(0, (int) round(($endTs - $todayTs) / 86400));
+                        if ($periodRemainingDays > $periodTotalDays) {
+                            $periodRemainingDays = $periodTotalDays;
+                        }
+                        $proRataCents = (int) round($refundableCents * ($periodRemainingDays / $periodTotalDays));
+                        if ($proRataCents > $refundableCents) {
+                            $proRataCents = $refundableCents;
+                        }
+                    } else {
+                        // No period dates → pro-rata falls back to the full
+                        // refundable amount, with a note shown in the modal.
+                        $proRataCents = $refundableCents;
+                    }
+                  ?>
+                  <button type="button" data-refund-open
+                          class="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors">
+                    Refund this membership…
+                  </button>
+
+                  <!-- Refund lightbox -->
+                  <div id="refund-lightbox" class="fixed inset-0 z-[9000] hidden items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="refund-title">
+                    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-refund-close></div>
+                    <form method="post" action="/admin/members/actions.php"
+                          class="relative bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto"
+                          onsubmit="return refundConfirm(this);">
+                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                      <input type="hidden" name="member_id" value="<?= e((string) $memberId) ?>">
+                      <input type="hidden" name="tab" value="orders">
+                      <input type="hidden" name="orders_section" value="membership">
+                      <input type="hidden" name="action" value="membership_order_refund">
+                      <input type="hidden" name="order_id" value="<?= e((string) $orderId) ?>">
+
+                      <div class="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                          <h2 id="refund-title" class="font-display text-2xl font-bold text-gray-900">Refund membership</h2>
+                          <p class="text-sm text-slate-500 mt-1">Choose how much to refund. The membership will be terminated immediately by default.</p>
+                        </div>
+                        <button type="button" data-refund-close class="text-slate-400 hover:text-slate-600" aria-label="Close">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+
+                      <p class="text-xs text-slate-500 mb-3">Refundable on this order: <strong class="text-emerald-700">A$<?= e(number_format($refundableCents / 100, 2)) ?></strong></p>
+
+                      <!-- 3 option cards -->
+                      <div class="space-y-2 mb-4">
+                        <!-- Pro-rata -->
+                        <label class="block border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-red-300 has-[:checked]:border-red-500 has-[:checked]:bg-red-50/40">
+                          <div class="flex items-start gap-3">
+                            <input type="radio" name="refund_mode" value="prorata" class="mt-1" checked data-refund-radio data-amount="<?= e(number_format($proRataCents / 100, 2, '.', '')) ?>">
+                            <div class="flex-1">
+                              <div class="flex items-baseline justify-between">
+                                <span class="font-semibold text-gray-900">Pro-rata</span>
+                                <span class="text-lg font-bold text-red-700">A$<?= e(number_format($proRataCents / 100, 2)) ?></span>
+                              </div>
+                              <?php if ($periodTotalDays > 0): ?>
+                                <p class="text-xs text-slate-500 mt-1"><?= e((string) $periodRemainingDays) ?> of <?= e((string) $periodTotalDays) ?> days remaining (<?= e(number_format($periodRemainingDays / $periodTotalDays * 100, 1)) ?>% of period).</p>
+                              <?php else: ?>
+                                <p class="text-xs text-amber-700 mt-1">No period dates on file — falls back to full refundable amount.</p>
+                              <?php endif; ?>
+                            </div>
+                          </div>
+                        </label>
+
+                        <!-- Full -->
+                        <label class="block border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-red-300 has-[:checked]:border-red-500 has-[:checked]:bg-red-50/40">
+                          <div class="flex items-start gap-3">
+                            <input type="radio" name="refund_mode" value="full" class="mt-1" data-refund-radio data-amount="<?= e(number_format($refundableCents / 100, 2, '.', '')) ?>">
+                            <div class="flex-1">
+                              <div class="flex items-baseline justify-between">
+                                <span class="font-semibold text-gray-900">Full refund</span>
+                                <span class="text-lg font-bold text-red-700">A$<?= e(number_format($refundableCents / 100, 2)) ?></span>
+                              </div>
+                              <p class="text-xs text-slate-500 mt-1">Refund everything that's still refundable on this order.</p>
+                            </div>
+                          </div>
+                        </label>
+
+                        <!-- Custom -->
+                        <label class="block border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-red-300 has-[:checked]:border-red-500 has-[:checked]:bg-red-50/40">
+                          <div class="flex items-start gap-3">
+                            <input type="radio" name="refund_mode" value="custom" class="mt-1" data-refund-radio data-amount="">
+                            <div class="flex-1">
+                              <span class="font-semibold text-gray-900">Custom amount</span>
+                              <div class="mt-2 flex items-center gap-2">
+                                <span class="text-sm text-slate-500">A$</span>
+                                <input id="refund-custom-amount" type="number" step="0.01" min="0.01" max="<?= e(number_format($refundableCents / 100, 2, '.', '')) ?>" placeholder="0.00" class="w-32 rounded-lg border border-gray-200 px-2 py-1 text-sm" disabled>
+                                <span class="text-xs text-slate-500">max A$<?= e(number_format($refundableCents / 100, 2)) ?></span>
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+
+                      <!-- The amount that actually posts is set by the JS below
+                           to the resolved cents from whichever mode is picked. -->
+                      <input type="hidden" name="refund_amount" id="refund-amount-hidden" value="<?= e(number_format($proRataCents / 100, 2, '.', '')) ?>">
+
+                      <!-- Reason -->
+                      <div class="mb-4">
+                        <label class="text-xs uppercase tracking-[0.2em] text-slate-500">Reason (required)</label>
+                        <input name="refund_reason" required placeholder="e.g. member requested cancellation"
+                               class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                      </div>
+
+                      <!-- Terminate -->
+                      <div class="mb-5">
+                        <label class="flex items-start gap-2 cursor-pointer">
+                          <input type="checkbox" name="terminate_period" value="1" checked class="mt-0.5">
+                          <span class="text-sm text-gray-700">
+                            <strong>Terminate this membership now</strong><br>
+                            <span class="text-xs text-slate-500">Sets the period to LAPSED and the expiry to today. Uncheck only if you want the member to keep using the membership until its original end date.</span>
+                          </span>
+                        </label>
+                      </div>
+
+                      <div class="flex gap-2">
+                        <button type="button" data-refund-close class="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="flex-1 rounded-lg bg-red-600 hover:bg-red-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm">Issue refund</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <script>
+                    (function () {
+                      const lightbox = document.getElementById('refund-lightbox');
+                      if (!lightbox) return;
+                      const customInput = document.getElementById('refund-custom-amount');
+                      const hiddenAmount = document.getElementById('refund-amount-hidden');
+                      const radios = lightbox.querySelectorAll('[data-refund-radio]');
+                      const refundableMax = <?= json_encode(number_format($refundableCents / 100, 2, '.', '')) ?>;
+
+                      document.querySelectorAll('[data-refund-open]').forEach((el) => {
+                        el.addEventListener('click', () => {
+                          lightbox.classList.remove('hidden');
+                          lightbox.classList.add('flex');
+                        });
+                      });
+                      lightbox.querySelectorAll('[data-refund-close]').forEach((el) => {
+                        el.addEventListener('click', closeLightbox);
+                      });
+                      document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox();
+                      });
+                      function closeLightbox () {
+                        lightbox.classList.add('hidden');
+                        lightbox.classList.remove('flex');
+                      }
+                      function syncAmount () {
+                        const picked = lightbox.querySelector('[data-refund-radio]:checked');
+                        if (!picked) return;
+                        const mode = picked.value;
+                        if (mode === 'custom') {
+                          customInput.disabled = false;
+                          customInput.focus();
+                          hiddenAmount.value = customInput.value || '';
+                        } else {
+                          customInput.disabled = true;
+                          hiddenAmount.value = picked.getAttribute('data-amount') || '';
+                        }
+                      }
+                      radios.forEach((r) => r.addEventListener('change', syncAmount));
+                      customInput.addEventListener('input', () => {
+                        let v = parseFloat(customInput.value || '0');
+                        const max = parseFloat(refundableMax);
+                        if (v > max) {
+                          v = max;
+                          customInput.value = v.toFixed(2);
+                        }
+                        hiddenAmount.value = customInput.value;
+                      });
+                      syncAmount();
+                    })();
+                    function refundConfirm (form) {
+                      const amount = form.querySelector('#refund-amount-hidden').value;
+                      const mode = form.querySelector('[data-refund-radio]:checked')?.value || 'custom';
+                      if (!amount || parseFloat(amount) <= 0) {
+                        alert('Enter a refund amount greater than zero.');
+                        return false;
+                      }
+                      const terminate = form.querySelector('input[name="terminate_period"]').checked
+                        ? '\nThe membership WILL be terminated immediately (expiry set to today).'
+                        : '\nThe membership will keep its original end date.';
+                      return confirm(
+                        'Issue a ' + mode + ' refund of A$' + parseFloat(amount).toFixed(2) + '?\n' +
+                        'This sends the refund through Stripe and cannot be undone.' + terminate
+                      );
+                    }
+                  </script>
                 <?php elseif ($refundableCents <= 0): ?>
                   <p class="text-xs text-slate-500">This order is fully refunded.</p>
                 <?php elseif (empty($order['stripe_payment_intent_id'])): ?>
