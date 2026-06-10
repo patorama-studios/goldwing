@@ -89,13 +89,16 @@ if ($orderNumber !== '') {
 if ($memberIdArg <= 0 && $memberSearch !== '') {
     echo "--- 1b. member_search lookup ---\n";
     try {
+        // Native PDO prepares forbid binding :q three times — split into
+        // three placeholders bound to the same value.
         $stmt = $pdo->prepare(
             "SELECT id, first_name, last_name, status, member_type, user_id
                FROM members
-              WHERE first_name LIKE :q OR last_name LIKE :q OR CONCAT(first_name, ' ', last_name) LIKE :q
+              WHERE first_name LIKE :q1 OR last_name LIKE :q2 OR CONCAT(first_name, ' ', last_name) LIKE :q3
               ORDER BY id DESC LIMIT 20"
         );
-        $stmt->execute(['q' => '%' . $memberSearch . '%']);
+        $like = '%' . $memberSearch . '%';
+        $stmt->execute(['q1' => $like, 'q2' => $like, 'q3' => $like]);
         $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (!$matches) {
             echo "  (no members match '{$memberSearch}')\n\n";

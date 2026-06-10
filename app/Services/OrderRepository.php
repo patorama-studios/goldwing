@@ -145,8 +145,10 @@ class OrderRepository
         if (!self::hasOrdersTable($pdo) || !self::hasOrderColumn($pdo, 'admin_notes')) {
             return;
         }
-        $stmt = $pdo->prepare("UPDATE store_orders SET admin_notes = CASE WHEN admin_notes IS NULL OR admin_notes = '' THEN :note ELSE CONCAT(admin_notes, '\n', :note) END, updated_at = NOW() WHERE id = :id");
-        $stmt->execute(['note' => $note, 'id' => $orderId]);
+        // Two distinct placeholders for the same value — native PDO prepares
+        // can't bind one named placeholder twice (HY093).
+        $stmt = $pdo->prepare("UPDATE store_orders SET admin_notes = CASE WHEN admin_notes IS NULL OR admin_notes = '' THEN :note_first ELSE CONCAT(admin_notes, '\n', :note_append) END, updated_at = NOW() WHERE id = :id");
+        $stmt->execute(['note_first' => $note, 'note_append' => $note, 'id' => $orderId]);
     }
 
     public static function calculateRefundableCents(int $orderId): int

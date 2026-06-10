@@ -1456,9 +1456,14 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Unable to activate membership for this order.', 'error');
         }
         if ($paymentReference !== '') {
-            $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END, updated_at = NOW() WHERE id = :id');
+            // Native PDO prepares forbid binding the same placeholder twice,
+            // which is why this used to throw HY093 "Invalid parameter number".
+            // Pass the same note value into two distinct placeholders instead.
+            $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note_when ELSE CONCAT(internal_notes, "\n", :note_else) END, updated_at = NOW() WHERE id = :id');
+            $noteValue = 'Payment reference: ' . $paymentReference;
             $stmt->execute([
-                'note' => 'Payment reference: ' . $paymentReference,
+                'note_when' => $noteValue,
+                'note_else' => $noteValue,
                 'id' => $orderId,
             ]);
         }
@@ -1589,9 +1594,12 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Order note requires text and an order.', 'error');
         }
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END, updated_at = NOW() WHERE id = :id AND member_id = :member_id');
+        // Native PDO prepares forbid binding the same placeholder twice
+        // (error HY093). Use two distinct placeholders for the same value.
+        $stmt = $pdo->prepare('UPDATE orders SET internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note_when ELSE CONCAT(internal_notes, "\n", :note_else) END, updated_at = NOW() WHERE id = :id AND member_id = :member_id');
         $stmt->execute([
-            'note' => $note,
+            'note_when' => $note,
+            'note_else' => $note,
             'id' => $orderId,
             'member_id' => $memberId,
         ]);

@@ -55,10 +55,13 @@ class SecurityPolicyService
         }
         $pdo = Database::connection();
         try {
-            $stmt = $pdo->prepare('INSERT INTO user_security_overrides (user_id, twofa_override, updated_at) VALUES (:user_id, :override, NOW()) ON DUPLICATE KEY UPDATE twofa_override = :override, updated_at = NOW()');
+            // Two distinct placeholders for the same value — native PDO
+            // prepares can't bind one named placeholder twice (HY093).
+            $stmt = $pdo->prepare('INSERT INTO user_security_overrides (user_id, twofa_override, updated_at) VALUES (:user_id, :override_insert, NOW()) ON DUPLICATE KEY UPDATE twofa_override = :override_update, updated_at = NOW()');
             $stmt->execute([
                 'user_id' => $userId,
-                'override' => $override,
+                'override_insert' => $override,
+                'override_update' => $override,
             ]);
         } catch (\PDOException $e) {
             if (self::isTableMissing($e)) {

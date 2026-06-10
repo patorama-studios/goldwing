@@ -214,24 +214,20 @@ class MembershipOrderService
 
     public static function markOrderRejected(int $orderId, ?string $reason = null): void
     {
-        $pdo = Database::connection();
-        $internal = self::sanitizeNotes($reason);
-        $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "rejected", updated_at = NOW(), internal_notes = CASE WHEN :note IS NULL OR :note = "" THEN internal_notes WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END WHERE id = :id');
-        $stmt->execute([
-            'note' => $internal,
-            'id' => $orderId,
-        ]);
+        self::updateOrderStatusWithNote(
+            $orderId,
+            'UPDATE orders SET status = "cancelled", payment_status = "rejected", updated_at = NOW()',
+            $reason
+        );
     }
 
     public static function markOrderFailed(int $orderId, ?string $reason = null): void
     {
-        $pdo = Database::connection();
-        $internal = self::sanitizeNotes($reason);
-        $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "failed", updated_at = NOW(), internal_notes = CASE WHEN :note IS NULL OR :note = "" THEN internal_notes WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END WHERE id = :id');
-        $stmt->execute([
-            'note' => $internal,
-            'id' => $orderId,
-        ]);
+        self::updateOrderStatusWithNote(
+            $orderId,
+            'UPDATE orders SET status = "cancelled", payment_status = "failed", updated_at = NOW()',
+            $reason
+        );
     }
 
     public static function markOrderRefunded(array $order, ?string $reason = null): void
@@ -240,20 +236,45 @@ class MembershipOrderService
         if ($orderId <= 0) {
             return;
         }
-        $pdo = Database::connection();
-        $internal = self::sanitizeNotes($reason);
-        $stmt = $pdo->prepare('UPDATE orders SET status = "refunded", payment_status = "refunded", fulfillment_status = "expired", refunded_at = NOW(), updated_at = NOW(), internal_notes = CASE WHEN :note IS NULL OR :note = "" THEN internal_notes WHEN internal_notes IS NULL OR internal_notes = "" THEN :note ELSE CONCAT(internal_notes, "\n", :note) END WHERE id = :id');
-        $stmt->execute([
-            'note' => $internal,
-            'id' => $orderId,
-        ]);
+        self::updateOrderStatusWithNote(
+            $orderId,
+            'UPDATE orders SET status = "refunded", payment_status = "refunded", fulfillment_status = "expired", refunded_at = NOW(), updated_at = NOW()',
+            $reason
+        );
 
         $periodId = (int) ($order['membership_period_id'] ?? 0);
         $memberId = (int) ($order['member_id'] ?? 0);
         if ($periodId > 0 && $memberId > 0) {
+            $pdo = Database::connection();
             $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
             $stmt->execute(['id' => $periodId]);
         }
+    }
+
+    /**
+     * Apply a status-change UPDATE to an order, optionally appending an
+     * internal_notes line. Splits the old inline CASE-with-:note-four-times
+     * SQL — native PDO prepares can't bind the same placeholder twice and
+     * was throwing HY093 "Invalid parameter number".
+     */
+    private static function updateOrderStatusWithNote(int $orderId, string $baseSetClause, ?string $reason): void
+    {
+        $pdo = Database::connection();
+        $internal = self::sanitizeNotes($reason);
+        if ($internal === null || $internal === '') {
+            $stmt = $pdo->prepare($baseSetClause . ' WHERE id = :id');
+            $stmt->execute(['id' => $orderId]);
+            return;
+        }
+        // The CASE handles "first note" vs "append to existing" without
+        // reusing a named placeholder.
+        $sql = $baseSetClause . ', internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" THEN :note_first ELSE CONCAT(internal_notes, "\n", :note_append) END WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'note_first' => $internal,
+            'note_append' => $internal,
+            'id' => $orderId,
+        ]);
     }
 
     public static function nextOrderNumber(?int $actorUserId = null): string
