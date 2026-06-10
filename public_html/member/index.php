@@ -1653,6 +1653,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <?php if ($page === 'dashboard'): ?>
+        <?php if ($profileMessage): ?>
+          <div class="rounded-xl bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm flex items-center gap-2">
+            <span class="material-icons-outlined text-base">check_circle</span><?= e($profileMessage) ?>
+          </div>
+        <?php endif; ?>
+        <?php if ($profileError): ?>
+          <div class="rounded-xl bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm flex items-center gap-2">
+            <span class="material-icons-outlined text-base">error_outline</span><?= e($profileError) ?>
+          </div>
+        <?php endif; ?>
         <?php
         // --- Dashboard data prep ------------------------------------------------
         $welcomeName = trim((string) ($member['first_name'] ?? ''));
@@ -1872,6 +1882,36 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
 
+        <!-- WINGS MAGAZINE (slim, directly under the welcome) -->
+        <?php if ($wingsLatest): ?>
+          <section class="bg-gradient-to-r from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div class="w-20 aspect-[3/4] rounded-lg border border-indigo-100 bg-white shadow-sm overflow-hidden flex-shrink-0">
+                <?php if (!empty($wingsLatest['cover_image_url'])): ?>
+                  <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>" class="h-full w-full object-cover">
+                <?php else: ?>
+                  <div class="h-full w-full flex items-center justify-center text-indigo-300">
+                    <span class="material-icons-outlined text-3xl">auto_stories</span>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <div class="flex-1">
+                <p class="text-[11px] uppercase tracking-wide text-indigo-700 font-bold">Latest Wings issue</p>
+                <p class="font-display text-xl font-bold text-gray-900 mt-1"><?= e($wingsLatest['title']) ?></p>
+                <p class="text-sm text-gray-500 mt-1">Fresh stories, photos and member spotlights — straight from the chapter.</p>
+              </div>
+              <div class="flex gap-2 flex-shrink-0">
+                <a class="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
+                  href="/member/read_wings.php?id=<?= e((string) $wingsLatest['id']) ?>">
+                  <span class="material-icons-outlined text-base">menu_book</span> Read now
+                </a>
+                <a class="inline-flex items-center px-4 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold transition"
+                  href="/member/index.php?page=wings">Archive</a>
+              </div>
+            </div>
+          </section>
+        <?php endif; ?>
+
         <!-- SNAPSHOT: full-width member-at-a-glance strip -->
         <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
           <div class="flex items-center justify-between mb-5">
@@ -2083,9 +2123,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <p class="text-xs text-gray-500"><?= count($bikes ?? []) ?> <?= count($bikes ?? []) === 1 ? 'bike' : 'bikes' ?> in your stable</p>
               </div>
             </div>
-            <a href="/member/index.php?page=profile" class="inline-flex items-center text-sm font-semibold text-yellow-700 hover:text-yellow-800">
-              Manage bikes <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
-            </a>
+            <div class="flex items-center gap-2">
+              <button type="button" data-bike-modal-open
+                class="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-sm font-semibold transition">
+                <span class="material-icons-outlined text-base">add</span> Add bike
+              </button>
+              <a href="/member/index.php?page=profile" class="inline-flex items-center text-sm font-semibold text-yellow-700 hover:text-yellow-800">
+                Manage <span class="material-icons-outlined text-base ml-1">arrow_forward</span>
+              </a>
+            </div>
           </div>
           <?php if ($dashboardPrimaryBike): ?>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2146,19 +2192,21 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </div>
               <?php else: ?>
-                <a href="/member/index.php?page=profile" class="rounded-xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 flex flex-col items-center justify-center text-center p-5 transition group">
+                <button type="button" data-bike-modal-open
+                  class="w-full rounded-xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 flex flex-col items-center justify-center text-center p-5 transition group">
                   <span class="material-icons-outlined text-gray-300 group-hover:text-yellow-500 text-4xl mb-1">add_circle</span>
                   <p class="text-sm font-semibold text-gray-600 group-hover:text-yellow-800">Add another bike</p>
                   <p class="text-xs text-gray-400 mt-0.5">Keep your stable up to date</p>
-                </a>
+                </button>
               <?php endif; ?>
             </div>
           <?php else: ?>
-            <a href="/member/index.php?page=profile" class="block rounded-2xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 p-8 text-center transition group">
+            <button type="button" data-bike-modal-open
+              class="w-full block rounded-2xl border-2 border-dashed border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 p-8 text-center transition group">
               <span class="material-icons-outlined text-5xl text-gray-300 group-hover:text-yellow-500 mb-2">two_wheeler</span>
               <p class="font-semibold text-gray-700 group-hover:text-yellow-800">Tell us about your ride</p>
-              <p class="text-sm text-gray-500 mt-1">Add your first bike to your member profile.</p>
-            </a>
+              <p class="text-sm text-gray-500 mt-1">Add your first bike to start your garage.</p>
+            </button>
           <?php endif; ?>
         </section>
 
@@ -2339,35 +2387,85 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         </section>
 
-        <!-- WINGS MAGAZINE (slim) -->
-        <?php if ($wingsLatest): ?>
-          <section class="bg-gradient-to-r from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              <div class="w-20 aspect-[3/4] rounded-lg border border-indigo-100 bg-white shadow-sm overflow-hidden flex-shrink-0">
-                <?php if (!empty($wingsLatest['cover_image_url'])): ?>
-                  <img src="<?= e($wingsLatest['cover_image_url']) ?>" alt="<?= e($wingsLatest['title']) ?>" class="h-full w-full object-cover">
-                <?php else: ?>
-                  <div class="h-full w-full flex items-center justify-center text-indigo-300">
-                    <span class="material-icons-outlined text-3xl">auto_stories</span>
-                  </div>
-                <?php endif; ?>
+        <!-- Add-bike lightbox modal. Posts to the existing add_bike handler;
+             after success the POST handler redirects back to ?page=dashboard. -->
+        <div id="bike-add-modal"
+          class="hidden fixed inset-0 z-50 items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4">
+          <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 mt-12 mb-12">
+            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-yellow-100 rounded-lg text-yellow-700">
+                  <span class="material-icons-outlined">two_wheeler</span>
+                </div>
+                <div>
+                  <h3 class="font-display text-lg font-bold text-gray-900">Add a bike to your garage</h3>
+                  <p class="text-xs text-gray-500">Tell us what you ride. You can edit details later from your profile.</p>
+                </div>
               </div>
-              <div class="flex-1">
-                <p class="text-[11px] uppercase tracking-wide text-indigo-700 font-bold">Latest Wings issue</p>
-                <p class="font-display text-xl font-bold text-gray-900 mt-1"><?= e($wingsLatest['title']) ?></p>
-                <p class="text-sm text-gray-500 mt-1">Fresh stories, photos and member spotlights — straight from the chapter.</p>
-              </div>
-              <div class="flex gap-2 flex-shrink-0">
-                <a class="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
-                  href="/member/read_wings.php?id=<?= e((string) $wingsLatest['id']) ?>">
-                  <span class="material-icons-outlined text-base">menu_book</span> Read now
-                </a>
-                <a class="inline-flex items-center px-4 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold transition"
-                  href="/member/index.php?page=wings">Archive</a>
-              </div>
+              <button type="button" data-bike-modal-close class="text-gray-400 hover:text-gray-600">
+                <span class="material-icons-outlined">close</span>
+              </button>
             </div>
-          </section>
-        <?php endif; ?>
+            <form method="post" action="/member/index.php?page=dashboard" class="p-6 space-y-3">
+              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+              <input type="hidden" name="action" value="add_bike">
+              <input type="hidden" name="profile_member_id" value="<?= e((string) $member['id']) ?>">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="block">
+                  <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Make *</span>
+                  <input type="text" name="bike_make" placeholder="Honda" required
+                    class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Model *</span>
+                  <input type="text" name="bike_model" placeholder="GL1800" required
+                    class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Year</span>
+                  <input type="number" name="bike_year" placeholder="2023" min="1970" max="2030"
+                    class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Colour</span>
+                  <input type="text" name="bike_color" placeholder="Black Metallic"
+                    class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+                </label>
+              </div>
+              <label class="block">
+                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Rego / Registration Number</span>
+                <input type="text" name="bike_rego" placeholder="ABC123"
+                  class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+              </label>
+              <div>
+                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide block mb-1">Photo</span>
+                <div class="flex items-center gap-3">
+                  <div id="bike-modal-image-preview"
+                    class="h-16 w-20 rounded-lg bg-gray-50 text-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
+                    <span class="material-icons-outlined">image</span>
+                  </div>
+                  <input type="hidden" name="bike_image_url" id="bike-modal-image-url-input">
+                  <button type="button"
+                    class="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    data-upload-trigger data-upload-target="bike-modal-image-url-input"
+                    data-upload-preview="bike-modal-image-preview" data-upload-context="bikes">
+                    <span class="material-icons-outlined text-sm">cloud_upload</span> Upload photo
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button type="button" data-bike-modal-close
+                  class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="submit"
+                  class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-sm font-semibold shadow-sm">
+                  <span class="material-icons-outlined text-base">add</span> Add to garage
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
 
         <script>
           // Click-to-expand order rows on the dashboard.
@@ -2382,6 +2480,18 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
             });
           });
+
+          // Add-bike lightbox open/close.
+          (() => {
+            const modal = document.getElementById('bike-add-modal');
+            if (!modal) return;
+            const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); document.body.style.overflow = 'hidden'; };
+            const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); document.body.style.overflow = ''; };
+            document.querySelectorAll('[data-bike-modal-open]').forEach(b => b.addEventListener('click', open));
+            modal.querySelectorAll('[data-bike-modal-close]').forEach(b => b.addEventListener('click', close));
+            modal.addEventListener('click', e => { if (e.target === modal) close(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+          })();
         </script>
       <?php elseif ($page === 'profile'): ?>
         <?php
