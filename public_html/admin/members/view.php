@@ -2106,26 +2106,32 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <div class="space-y-6">
                 <!-- Member-level historic-rego flag (members.is_historic). Applies to the
                      household, not a specific bike — used by the "Has Historic Rego" filter
-                     on the all-members list and surfaced as a badge in the profile header. -->
-                <div class="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+                     on the all-members list and surfaced as a badge in the profile header.
+                     Light-yellow card to stand apart from the white "My Bikes" card below. -->
+                <div class="bg-yellow-50 rounded-2xl p-5 shadow-sm border border-yellow-200">
                   <form method="post" action="/admin/members/actions.php" class="flex items-start justify-between gap-4">
                     <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
                     <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
                     <input type="hidden" name="tab" value="vehicles">
                     <input type="hidden" name="action" value="set_historic">
                     <div class="flex items-start gap-3">
-                      <div class="p-2 bg-stone-100 rounded-lg text-stone-600">
+                      <div class="p-2 bg-yellow-100 rounded-lg text-yellow-700">
                         <span class="material-icons-outlined">history</span>
                       </div>
                       <div>
                         <h2 class="font-display text-base font-bold text-gray-900">Has Historic Rego</h2>
-                        <p class="text-sm text-gray-500">Tick if this member's bike is registered as a historical vehicle (25+ yrs).</p>
+                        <p class="text-sm text-gray-600">Toggle on if this member's bike is registered as a historical vehicle (25+ yrs).</p>
                       </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
-                      <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
-                        <input type="checkbox" name="is_historic" value="1" <?= !empty($member['is_historic']) ? 'checked' : '' ?> class="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary">
-                        Historic
+                      <!-- Toggle switch — matches the pattern used in settings/index.php
+                           (Stripe Test/Live toggle). Input, track, and thumb are all direct
+                           siblings inside the label so Tailwind's peer-checked: modifier
+                           reaches them. The switch position is the on/off indicator. -->
+                      <label class="relative inline-flex h-6 w-11 cursor-pointer" title="Toggle historic rego flag">
+                        <input type="checkbox" name="is_historic" value="1" class="sr-only peer" <?= !empty($member['is_historic']) ? 'checked' : '' ?>>
+                        <span class="absolute inset-0 rounded-full bg-gray-300 peer-checked:bg-amber-500 transition-colors"></span>
+                        <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
                       </label>
                       <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save</button>
                     </div>
