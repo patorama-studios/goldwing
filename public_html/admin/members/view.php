@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../includes/stripe_references.php';
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityRepository;
 use App\Services\AuditHubService;
+use App\Services\AwardsService;
 use App\Services\CommitteeService;
 use App\Services\Csrf;
 use App\Services\Database;
@@ -1055,6 +1056,83 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               </div>
               <div class="space-y-6">
+                <?php
+                  // ── AGM Awards trophy cabinet ─────────────────────────────
+                  // Pulls every award this member has won across all years.
+                  // Skips silently if the awards tables haven't been migrated
+                  // yet so old installs don't blow up.
+                  $memberAwards = AwardsService::winnersForMember((int) $member['id']);
+                ?>
+                <div class="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+                  <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-br from-amber-50/50 to-white">
+                    <div class="flex items-center gap-3">
+                      <div class="bg-amber-500/10 p-2 rounded-lg text-amber-700">
+                        <span class="material-icons-outlined">workspace_premium</span>
+                      </div>
+                      <div>
+                        <h2 class="text-sm font-bold text-gray-900">AGM Awards</h2>
+                        <p class="text-xs text-gray-500">
+                          <?php if ($memberAwards): ?>
+                            <?= count($memberAwards) ?> trophy<?= count($memberAwards) === 1 ? '' : 'ies' ?>
+                            across <?= count(array_unique(array_column($memberAwards, 'year'))) ?> year<?= count(array_unique(array_column($memberAwards, 'year'))) === 1 ? '' : 's' ?>
+                          <?php else: ?>
+                            No trophies recorded yet
+                          <?php endif; ?>
+                        </p>
+                      </div>
+                    </div>
+                    <?php if (function_exists('current_admin_can') && current_admin_can('admin.awards.manage', $user)): ?>
+                      <a href="/admin/awards/" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-900">
+                        Awards
+                        <span class="material-icons-outlined text-sm">arrow_forward</span>
+                      </a>
+                    <?php endif; ?>
+                  </div>
+                  <?php if ($memberAwards): ?>
+                    <ul class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                      <?php foreach ($memberAwards as $aw): ?>
+                        <li class="px-5 py-3 flex items-start gap-3">
+                          <?php if (!empty($aw['primary_photo'])): ?>
+                            <img src="<?= e($aw['primary_photo']) ?>" alt="" class="w-12 h-12 rounded-lg object-cover border border-gray-200 shrink-0">
+                          <?php else: ?>
+                            <div class="w-12 h-12 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                              <span class="material-icons-outlined text-amber-400 text-xl">emoji_events</span>
+                            </div>
+                          <?php endif; ?>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 truncate"><?= e($aw['category_name']) ?></p>
+                            <?php if (!empty($aw['memorial_trophy_name'])): ?>
+                              <p class="text-[10px] uppercase tracking-wider font-bold text-amber-700"><?= e($aw['memorial_trophy_name']) ?></p>
+                            <?php endif; ?>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                              <?= (int) $aw['year'] ?>
+                              <?php if (!empty($aw['bike_description'])): ?>
+                                · <?= e($aw['bike_description']) ?>
+                              <?php endif; ?>
+                            </p>
+                          </div>
+                          <?php if (function_exists('current_admin_can') && current_admin_can('admin.awards.manage', $user)): ?>
+                            <a href="/admin/awards/edit.php?id=<?= (int) $aw['id'] ?>" class="text-xs text-gray-400 hover:text-primary shrink-0" title="Edit winner record">
+                              <span class="material-icons-outlined text-base">edit</span>
+                            </a>
+                          <?php endif; ?>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php else: ?>
+                    <div class="p-6 text-center">
+                      <span class="material-icons-outlined text-amber-300 text-4xl">emoji_events</span>
+                      <p class="text-sm text-gray-500 mt-2">This member hasn't won an AGM trophy yet.</p>
+                      <?php if (function_exists('current_admin_can') && current_admin_can('admin.awards.manage', $user)): ?>
+                        <a href="/admin/awards/" class="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-amber-700 hover:text-amber-900">
+                          Browse the trophy wall
+                          <span class="material-icons-outlined text-sm">arrow_forward</span>
+                        </a>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
+
                 <div class="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
                   <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
                     <span class="material-icons-outlined text-primary">bolt</span>

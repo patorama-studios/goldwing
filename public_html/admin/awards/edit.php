@@ -103,26 +103,67 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label class="block">
-              <span class="text-sm font-semibold text-gray-700">Member (current member)</span>
-              <select name="member_id" id="member-picker" <?= $canManage ? '' : 'disabled' ?>
-                      class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-                <option value="">— none / use override below —</option>
-                <?php if ($winner && !empty($winner['member_id'])): ?>
-                  <option value="<?= (int) $winner['member_id'] ?>" selected>
-                    <?= e(trim(($winner['member_first_name'] ?? '') . ' ' . ($winner['member_last_name'] ?? ''))) ?>
-                  </option>
-                <?php endif; ?>
-              </select>
-              <p class="text-xs text-gray-500 mt-1">Type to search the members directory.</p>
-            </label>
+            <div class="block" data-member-picker>
+              <span class="text-sm font-semibold text-gray-700">Assign Member</span>
+              <input type="hidden" name="member_id" id="member-id-input"
+                     value="<?= (int) ($winner['member_id'] ?? 0) > 0 ? (int) $winner['member_id'] : '' ?>">
+
+              <!-- Currently assigned chip — only shown when a member is selected -->
+              <div id="member-chip-wrap" class="mt-1 <?= !empty($winner['member_id']) ? '' : 'hidden' ?>">
+                <div class="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2.5">
+                  <?php
+                    $chipAvatar = $winner['member_avatar_url'] ?? '';
+                    $chipName = trim(($winner['member_first_name'] ?? '') . ' ' . ($winner['member_last_name'] ?? ''));
+                    $chipInitials = strtoupper(substr($chipName !== '' ? $chipName : '?', 0, 2));
+                    $chipNumber = $winner['member_number'] ?? '';
+                  ?>
+                  <div id="member-chip-avatar">
+                    <?php if ($chipAvatar): ?>
+                      <img src="<?= e($chipAvatar) ?>" alt="" class="w-10 h-10 rounded-full object-cover border border-white shadow-sm">
+                    <?php else: ?>
+                      <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                        <?= e($chipInitials) ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-900" id="member-chip-name"><?= e($chipName !== '' ? $chipName : 'Unknown member') ?></p>
+                    <p class="text-xs text-gray-500" id="member-chip-meta">
+                      <?php if ($chipNumber): ?>Member #<?= e($chipNumber) ?><?php endif; ?>
+                    </p>
+                  </div>
+                  <?php if ($canManage): ?>
+                    <button type="button" id="member-chip-remove"
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                      <span class="material-icons-outlined text-base">close</span> Remove
+                    </button>
+                  <?php endif; ?>
+                </div>
+              </div>
+
+              <!-- Search input — shown when no member is selected -->
+              <?php if ($canManage): ?>
+                <div id="member-search-wrap" class="relative mt-1 <?= !empty($winner['member_id']) ? 'hidden' : '' ?>" data-search-box>
+                  <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-base">person_search</span>
+                  <input type="search" id="member-search-input"
+                         placeholder="Search by name, member number, or email"
+                         class="w-full rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2.5 text-sm shadow-sm"
+                         autocomplete="off">
+                  <div id="member-search-results"
+                       class="search-results hidden absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-72 overflow-y-auto"></div>
+                </div>
+              <?php endif; ?>
+
+              <p class="text-xs text-gray-500 mt-1">Pick a current AGA member, or use the override below for past winners not yet in the directory.</p>
+            </div>
+
             <label class="block">
               <span class="text-sm font-semibold text-gray-700">Winner Name Override</span>
               <input type="text" name="member_name_override" maxlength="200"
                      value="<?= e($winner['member_name_override'] ?? '') ?>"
                      <?= $canManage ? '' : 'readonly' ?>
                      placeholder="For past winners not in the member directory"
-                     class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                     class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
               <p class="text-xs text-gray-500 mt-1">Used only when no current member is selected.</p>
             </label>
           </div>
@@ -243,76 +284,142 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 </div>
 
 <script>
-// Lightweight member typeahead: load matches as you type. The select keeps the
-// already-selected option above the live results so picking a member doesn't
-// wipe the form value if you click outside the field.
+// Member picker — same UX pattern as Committee & Leadership Roles:
+//   search input → result rows with avatar + name + meta → click to assign,
+//   shown as a removable chip until the form is saved or Remove is clicked.
 (function () {
-  var picker = document.getElementById('member-picker');
-  if (!picker) return;
-  // Replace the select with a combo: text input + hidden select. Keep the
-  // existing <option selected> wired so the saved value persists on reload.
-  var wrap = document.createElement('div');
-  wrap.className = 'relative';
-  picker.parentNode.insertBefore(wrap, picker);
-  wrap.appendChild(picker);
-  picker.style.display = 'none';
+  var pickerRoot = document.querySelector('[data-member-picker]');
+  if (!pickerRoot) return;
 
-  var search = document.createElement('input');
-  search.type = 'text';
-  search.placeholder = 'Search members by name or email...';
-  search.className = 'mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm';
-  var sel = picker.options[picker.selectedIndex];
-  if (sel && sel.value !== '') {
-    search.value = sel.textContent.trim() + ' (member #' + sel.value + ')';
+  var idInput = document.getElementById('member-id-input');
+  var chipWrap = document.getElementById('member-chip-wrap');
+  var chipAvatar = document.getElementById('member-chip-avatar');
+  var chipName = document.getElementById('member-chip-name');
+  var chipMeta = document.getElementById('member-chip-meta');
+  var chipRemove = document.getElementById('member-chip-remove');
+  var searchWrap = document.getElementById('member-search-wrap');
+  var searchInput = document.getElementById('member-search-input');
+  var results = document.getElementById('member-search-results');
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
   }
-  wrap.insertBefore(search, picker);
 
-  var results = document.createElement('div');
-  results.className = 'absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg hidden';
-  wrap.appendChild(results);
+  function initials(name) {
+    var clean = (name || '').trim();
+    if (!clean) return '?';
+    var parts = clean.split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
 
-  var debounce;
-  search.addEventListener('input', function () {
-    clearTimeout(debounce);
-    var q = search.value.trim();
+  function avatarMarkup(avatarUrl, name) {
+    if (avatarUrl) {
+      return '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="w-10 h-10 rounded-full object-cover border border-white shadow-sm">';
+    }
+    return '<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">'
+      + escapeHtml(initials(name)) + '</div>';
+  }
+
+  function renderChip(member) {
+    chipAvatar.innerHTML = avatarMarkup(member.avatar_url, member.name);
+    chipName.textContent = member.name || 'Unknown member';
+    var metaParts = [];
+    if (member.member_number) metaParts.push('Member #' + member.member_number);
+    if (member.chapter) metaParts.push(member.chapter);
+    chipMeta.textContent = metaParts.join(' · ');
+    chipWrap.classList.remove('hidden');
+    if (searchWrap) searchWrap.classList.add('hidden');
+    if (searchInput) searchInput.value = '';
+    if (results) { results.innerHTML = ''; results.classList.add('hidden'); }
+  }
+
+  function clearChip() {
+    idInput.value = '';
+    chipWrap.classList.add('hidden');
+    if (searchWrap) searchWrap.classList.remove('hidden');
+    if (searchInput) { searchInput.focus(); }
+  }
+
+  if (chipRemove) {
+    chipRemove.addEventListener('click', clearChip);
+  }
+
+  if (!searchInput) return; // Read-only viewers don't have the search field.
+
+  var searchTimer = null;
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = searchInput.value.trim();
     if (q.length < 2) {
       results.innerHTML = '';
       results.classList.add('hidden');
       return;
     }
-    debounce = setTimeout(function () {
-      fetch('/admin/awards/search-members.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          results.innerHTML = '';
-          if (!Array.isArray(data) || data.length === 0) {
-            results.innerHTML = '<div class="px-3 py-2 text-sm text-gray-500">No matches.</div>';
-          } else {
-            data.forEach(function (m) {
-              var btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'block w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
-              btn.textContent = (m.first_name || '') + ' ' + (m.last_name || '') + ' — ' + (m.email || '');
-              btn.addEventListener('click', function () {
-                // Replace select options so the form submits the right value.
-                picker.innerHTML = '';
-                var opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = (m.first_name || '') + ' ' + (m.last_name || '');
-                opt.selected = true;
-                picker.appendChild(opt);
-                search.value = (m.first_name || '') + ' ' + (m.last_name || '') + ' (member #' + m.id + ')';
-                results.classList.add('hidden');
-              });
-              results.appendChild(btn);
-            });
+    searchTimer = setTimeout(function () {
+      fetch('/admin/awards/search-members.php?q=' + encodeURIComponent(q), {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin',
+      })
+        .then(function (r) { return r.text(); })
+        .then(function (text) {
+          var json;
+          try { json = JSON.parse(text); }
+          catch (e) {
+            results.innerHTML = '<div class="px-3 py-2 text-xs text-red-600">Search error.</div>';
+            results.classList.remove('hidden');
+            return;
           }
+          if (!json.ok) {
+            results.innerHTML = '<div class="px-3 py-2 text-xs text-red-600">'
+              + escapeHtml(json.detail || json.error || 'Lookup failed.') + '</div>';
+            results.classList.remove('hidden');
+            return;
+          }
+          var rows = json.results || [];
+          if (!rows.length) {
+            results.innerHTML = '<div class="px-3 py-2 text-xs text-slate-500">No matches.</div>';
+            results.classList.remove('hidden');
+            return;
+          }
+          results.innerHTML = rows.map(function (m) {
+            var meta = [m.member_number ? 'Member #' + m.member_number : '', m.chapter]
+              .filter(Boolean).join(' · ');
+            return '<button type="button"'
+              + ' class="result-row flex items-center gap-3 w-full text-left px-3 py-2.5 hover:bg-primary/5 border-b border-gray-100 last:border-0"'
+              + ' data-member-json=\'' + escapeHtml(JSON.stringify(m)) + '\'>'
+              + '<span class="shrink-0">' + avatarMarkup(m.avatar_url, m.name) + '</span>'
+              + '<span class="flex-1 min-w-0">'
+              + '<span class="block text-sm font-semibold text-gray-900 truncate">' + escapeHtml(m.name) + '</span>'
+              + (meta ? '<span class="block text-xs text-slate-500 truncate">' + escapeHtml(meta) + '</span>' : '')
+              + '</span>'
+              + '</button>';
+          }).join('');
+          results.classList.remove('hidden');
+        })
+        .catch(function () {
+          results.innerHTML = '<div class="px-3 py-2 text-xs text-red-600">Network error.</div>';
           results.classList.remove('hidden');
         });
-    }, 200);
+    }, 220);
   });
-  document.addEventListener('click', function (e) {
-    if (!wrap.contains(e.target)) results.classList.add('hidden');
+
+  results.addEventListener('click', function (ev) {
+    var row = ev.target.closest('.result-row');
+    if (!row) return;
+    try {
+      var member = JSON.parse(row.getAttribute('data-member-json'));
+      idInput.value = member.id;
+      renderChip(member);
+    } catch (e) { /* ignore */ }
+  });
+
+  document.addEventListener('click', function (ev) {
+    if (!pickerRoot.contains(ev.target)) {
+      results.classList.add('hidden');
+    }
   });
 })();
 </script>

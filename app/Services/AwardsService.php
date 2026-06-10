@@ -139,6 +139,7 @@ final class AwardsService
                        w.id AS winner_id, w.member_id, w.member_name_override,
                        w.bike_description, w.notes, w.awarded_at,
                        m.first_name AS member_first_name, m.last_name AS member_last_name,
+                       m.avatar_url AS member_avatar_url,
                        p.media_path AS primary_photo
                 FROM award_categories c
                 LEFT JOIN award_winners w ON w.category_id = c.id AND w.year = :year
@@ -157,7 +158,9 @@ final class AwardsService
             return null;
         }
         $stmt = Database::connection()->prepare('SELECT w.*, c.name AS category_name, c.memorial_trophy_name, c.group_label,
-                                                        m.first_name AS member_first_name, m.last_name AS member_last_name
+                                                        m.first_name AS member_first_name, m.last_name AS member_last_name,
+                                                        m.avatar_url AS member_avatar_url,
+                                                        CONCAT_WS(\'.\', m.member_number_base, NULLIF(m.member_number_suffix, 0)) AS member_number
                                                  FROM award_winners w
                                                  JOIN award_categories c ON c.id = w.category_id
                                                  LEFT JOIN members m ON m.id = w.member_id
