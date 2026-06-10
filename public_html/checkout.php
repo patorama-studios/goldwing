@@ -571,11 +571,21 @@ if ($cartItems) {
 
               <div class="px-5 py-5 border-t border-gray-100 space-y-3">
                 <button type="button" data-pay-button class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
-                  <span class="material-icons-outlined text-lg">lock</span>
+                  <!-- Inline SVG instead of icon font: the Material Icons
+                       Outlined font occasionally renders the word "lock" as
+                       text on this button (FOUC during late font load).
+                       SVG is bulletproof. -->
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
                   Pay $<?= e(store_money($totals['total'])) ?>
                 </button>
                 <p class="flex items-center justify-center gap-1.5 text-xs text-gray-500">
-                  <span class="material-icons-outlined text-sm">lock</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
                   Secure checkout · 256-bit SSL · Powered by Stripe
                 </p>
               </div>

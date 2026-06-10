@@ -121,6 +121,28 @@ class AuthService
             'user_id' => $userId,
             'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
         ]);
+
+        // Also touch member_auth.last_login_at so the admin Members page no
+        // longer reads "Last login: Never" for everyone. Wrapped in try/catch
+        // because member_auth may not exist on older deployments.
+        try {
+            $hasTable = $pdo->query("SHOW TABLES LIKE 'member_auth'")->fetchColumn();
+            if (!$hasTable) return;
+            $stmt = $pdo->prepare(
+                'UPDATE member_auth ma
+                   JOIN users u ON u.member_id = ma.member_id
+                  SET ma.last_login_at = NOW(),
+                      ma.last_login_ip = :ip,
+                      ma.failed_login_count = 0
+                  WHERE u.id = :user_id'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[AuthService] recordLogin member_auth touch failed: ' . $e->getMessage());
+        }
     }
 
     private static function completeLogin(array $user): void

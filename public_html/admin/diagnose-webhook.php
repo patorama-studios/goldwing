@@ -16,12 +16,20 @@ header('Content-Type: text/plain; charset=utf-8');
 
 $pdo = db();
 
-echo "=== payment_channels ===\n";
+echo "=== payment_channels + settings_payments ===\n";
 try {
-    $rows = $pdo->query('SELECT id, code, mode, last_webhook_status, last_webhook_at FROM payment_channels ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $pdo->query(
+        'SELECT pc.id, pc.code, pc.label, pc.is_active, sp.mode, sp.last_webhook_received_at, sp.last_webhook_error
+         FROM payment_channels pc
+         LEFT JOIN settings_payments sp ON sp.channel_id = pc.id
+         ORDER BY pc.id ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
-        echo sprintf("#%d code=%s mode=%s last_status=%s last_at=%s\n",
-            $r['id'], $r['code'], $r['mode'] ?? '-', $r['last_webhook_status'] ?? '(none)', $r['last_webhook_at'] ?? '(never)');
+        echo sprintf("#%d code=%s mode=%s active=%s last_wh=%s\n  last_err=%s\n",
+            $r['id'], $r['code'], $r['mode'] ?? '(none)',
+            $r['is_active'] ? 'yes' : 'no',
+            $r['last_webhook_received_at'] ?? '(never)',
+            $r['last_webhook_error'] ?? '(none)');
     }
     if (!$rows) echo "(no channels)\n";
 } catch (Throwable $e) {
@@ -51,14 +59,30 @@ try {
     echo "ERROR: " . $e->getMessage() . "\n";
 }
 
-echo "\n=== last 5 store_orders ===\n";
+echo "\n=== last 10 store_orders ===\n";
 try {
-    $rows = $pdo->query('SELECT id, order_number, order_status, payment_status, total_cents, stripe_session_id, stripe_payment_intent_id, created_at FROM store_orders ORDER BY id DESC LIMIT 5')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $pdo->query('SELECT id, order_number, order_status, payment_status, fulfillment_status, total_amount, stripe_session_id, stripe_payment_intent_id, created_at FROM store_orders ORDER BY id DESC LIMIT 10')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
-        echo sprintf("#%d %s status=%s/%s total=%d session=%s pi=%s created=%s\n",
-            $r['id'], $r['order_number'], $r['order_status'], $r['payment_status'] ?? '-',
-            $r['total_cents'], substr((string)($r['stripe_session_id'] ?? ''), 0, 30),
-            substr((string)($r['stripe_payment_intent_id'] ?? ''), 0, 30), $r['created_at']);
+        echo sprintf("#%d %s order=%s pay=%s fulfill=%s total=$%s\n  session=%s pi=%s created=%s\n",
+            $r['id'], $r['order_number'],
+            $r['order_status'], $r['payment_status'] ?? '-', $r['fulfillment_status'] ?? '-',
+            $r['total_amount'],
+            substr((string)($r['stripe_session_id'] ?? '(none)'), 0, 40),
+            substr((string)($r['stripe_payment_intent_id'] ?? '(none)'), 0, 40),
+            $r['created_at']);
+    }
+} catch (Throwable $e) {
+    echo "ERROR: " . $e->getMessage() . "\n";
+}
+
+echo "\n=== orders that have a Stripe session id but are still unpaid ===\n";
+try {
+    $rows = $pdo->query("SELECT id, order_number, payment_status, stripe_session_id, created_at FROM store_orders WHERE stripe_session_id IS NOT NULL AND stripe_session_id <> '' AND payment_status = 'unpaid' ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) echo "(none — every order with a Stripe session has been paid or was abandoned with no session)\n";
+    foreach ($rows as $r) {
+        echo sprintf("#%d %s pay=%s session=%s created=%s\n",
+            $r['id'], $r['order_number'], $r['payment_status'],
+            substr((string)$r['stripe_session_id'], 0, 40), $r['created_at']);
     }
 } catch (Throwable $e) {
     echo "ERROR: " . $e->getMessage() . "\n";

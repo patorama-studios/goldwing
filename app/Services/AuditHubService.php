@@ -265,21 +265,29 @@ class AuditHubService
         $params = [];
         $available = [];
 
+        // The three log tables can have different collations on their text
+        // columns (a long-lived schema). MySQL refuses to UNION columns of
+        // mismatched collations (error 1271 "Illegal mix of collations").
+        // Force every text expression into one canonical collation so the
+        // UNION succeeds on any historical DB. utf8mb4_unicode_ci is the
+        // safe default for our schema.
+        $coll = ' COLLATE utf8mb4_unicode_ci';
+
         // ---- settings: audit_log -----------------------------------------
         if (in_array('settings', $allowedSources, true) && self::tableExists('audit_log')) {
             $available[] = 'settings';
-            $parts[] = "SELECT 'settings' AS source,
+            $parts[] = "SELECT CAST('settings' AS CHAR)$coll AS source,
                               al.id AS source_id,
                               al.created_at AS created_at,
                               al.actor_user_id AS actor_user_id,
-                              u.name AS actor_name,
-                              u.email AS actor_email,
-                              al.action AS action,
-                              al.entity_type AS target_type,
+                              CONVERT(u.name USING utf8mb4)$coll AS actor_name,
+                              CONVERT(u.email USING utf8mb4)$coll AS actor_email,
+                              CONVERT(al.action USING utf8mb4)$coll AS action,
+                              CONVERT(al.entity_type USING utf8mb4)$coll AS target_type,
                               al.entity_id AS target_id,
-                              CAST(NULL AS CHAR) AS details_text,
-                              al.diff_json AS metadata_json,
-                              al.ip_address AS ip_address
+                              CAST(NULL AS CHAR)$coll AS details_text,
+                              CONVERT(al.diff_json USING utf8mb4)$coll AS metadata_json,
+                              CONVERT(al.ip_address USING utf8mb4)$coll AS ip_address
                        FROM audit_log al
                        LEFT JOIN users u ON u.id = al.actor_user_id";
         }
@@ -287,18 +295,18 @@ class AuditHubService
         // ---- admin: audit_logs -------------------------------------------
         if (in_array('admin', $allowedSources, true) && self::tableExists('audit_logs')) {
             $available[] = 'admin';
-            $parts[] = "SELECT 'admin' AS source,
+            $parts[] = "SELECT CAST('admin' AS CHAR)$coll AS source,
                               alg.id AS source_id,
                               alg.created_at AS created_at,
                               alg.user_id AS actor_user_id,
-                              u.name AS actor_name,
-                              u.email AS actor_email,
-                              alg.action AS action,
-                              CAST(NULL AS CHAR) AS target_type,
+                              CONVERT(u.name USING utf8mb4)$coll AS actor_name,
+                              CONVERT(u.email USING utf8mb4)$coll AS actor_email,
+                              CONVERT(alg.action USING utf8mb4)$coll AS action,
+                              CAST(NULL AS CHAR)$coll AS target_type,
                               CAST(NULL AS UNSIGNED) AS target_id,
-                              alg.details AS details_text,
-                              CAST(NULL AS CHAR) AS metadata_json,
-                              alg.ip_address AS ip_address
+                              CONVERT(alg.details USING utf8mb4)$coll AS details_text,
+                              CAST(NULL AS CHAR)$coll AS metadata_json,
+                              CONVERT(alg.ip_address USING utf8mb4)$coll AS ip_address
                        FROM audit_logs alg
                        LEFT JOIN users u ON u.id = alg.user_id";
         }
@@ -308,20 +316,22 @@ class AuditHubService
             $available[] = 'activity';
             $hasTarget = self::columnExists('activity_log', 'target_type');
             $hasTargetId = self::columnExists('activity_log', 'target_id');
-            $targetTypeExpr = $hasTarget ? 'act.target_type' : "CAST(NULL AS CHAR)";
+            $targetTypeExpr = $hasTarget
+                ? "CONVERT(act.target_type USING utf8mb4)$coll"
+                : "CAST(NULL AS CHAR)$coll";
             $targetIdExpr = $hasTargetId ? 'act.target_id' : "CAST(NULL AS UNSIGNED)";
-            $parts[] = "SELECT 'activity' AS source,
+            $parts[] = "SELECT CAST('activity' AS CHAR)$coll AS source,
                               act.id AS source_id,
                               act.created_at AS created_at,
                               act.actor_id AS actor_user_id,
-                              u.name AS actor_name,
-                              u.email AS actor_email,
-                              act.action AS action,
+                              CONVERT(u.name USING utf8mb4)$coll AS actor_name,
+                              CONVERT(u.email USING utf8mb4)$coll AS actor_email,
+                              CONVERT(act.action USING utf8mb4)$coll AS action,
                               $targetTypeExpr AS target_type,
                               $targetIdExpr AS target_id,
-                              CAST(NULL AS CHAR) AS details_text,
-                              act.metadata AS metadata_json,
-                              act.ip_address AS ip_address
+                              CAST(NULL AS CHAR)$coll AS details_text,
+                              CONVERT(act.metadata USING utf8mb4)$coll AS metadata_json,
+                              CONVERT(act.ip_address USING utf8mb4)$coll AS ip_address
                        FROM activity_log act
                        LEFT JOIN users u ON u.id = act.actor_id";
         }
