@@ -1,1 +1,9 @@
 ErrorDocument 404 /404.php
+
+# Private Patorama Studios pitch document — block all search engines
+<Files "patorama-pitch.html">
+    Header set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+</Files>
+<FilesMatch "^pitch-assets/">
+    Header set X-Robots-Tag "noindex, nofollow"
+</FilesMatch>

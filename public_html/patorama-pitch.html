@@ -1,0 +1,2267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Private pitch — not for public discovery -->
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="bingbot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="referrer" content="no-referrer">
+<title>Australian Goldwing Association · Strategic Roadmap 2026–2028 · Patorama Studios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Goldwing design system tokens */
+    --black: #0b0b0b;
+    --coal: #111111;
+    --ink: #1c1a17;
+    --cream: #f4f1e8;
+    --paper: #ffffff;
+    --sand: #e8e3d7;
+    --gold: #9e9140;
+    --gold-light: #cbbd6c;
+    --green: #4a9114;
+    --green-dark: #2f6a0f;
+    --muted: #5a5a55;
+    --shadow: 0 24px 50px rgba(0,0,0,0.18);
+    --shadow-soft: 0 12px 30px rgba(0,0,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    line-height: 1.7;
+    font-weight: 400;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background:
+      radial-gradient(900px 500px at 5% 0%, rgba(158, 145, 64, 0.18), transparent 60%),
+      radial-gradient(800px 500px at 95% 10%, rgba(74, 145, 20, 0.18), transparent 65%),
+      linear-gradient(135deg, #f6f2ea 0%, #f1eee5 45%, #ebe6db 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  /* ───────── NAVBAR-STYLE TOP STRIP ───────── */
+  .top-strip {
+    background: var(--black);
+    border-bottom: 4px solid var(--green);
+    color: var(--cream);
+    padding: 1.1rem 0;
+  }
+
+  .top-strip .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .top-strip-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .top-strip-brand .patorama-mark { width: 38px; height: auto; }
+
+  .top-strip-brand .wordmark {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--cream);
+  }
+  .top-strip-brand .wordmark .accent { color: var(--gold-light); }
+
+  .top-strip-meta {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+  }
+
+  /* ───────── HERO ───────── */
+  .hero {
+    background:
+      radial-gradient(800px 600px at 15% 20%, rgba(158, 145, 64, 0.25), transparent 60%),
+      radial-gradient(700px 500px at 85% 80%, rgba(74, 145, 20, 0.22), transparent 65%),
+      linear-gradient(135deg, var(--black) 0%, var(--coal) 60%, #1a1815 100%);
+    color: var(--cream);
+    padding: 5.5rem 0 4.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(203,189,108,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(203,189,108,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .hero-eyebrow {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+  }
+
+  .hero h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.6rem, 5vw, 4.6rem);
+    line-height: 1.02;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cream);
+    margin-bottom: 1.5rem;
+    font-weight: 400;
+  }
+
+  .hero h1 .gold {
+    color: var(--gold-light);
+    display: block;
+  }
+
+  .hero-lead {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: rgba(244,241,232,0.85);
+    max-width: 36rem;
+    font-weight: 300;
+    margin-bottom: 2.5rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+  }
+
+  .button {
+    display: inline-block;
+    padding: 0.75rem 1.6rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 999px;
+    border: 1.5px solid var(--green);
+    color: var(--green);
+    background: var(--paper);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .button.primary {
+    background: var(--green);
+    color: var(--paper);
+    box-shadow: 0 6px 18px rgba(74,145,20,0.4);
+  }
+
+  .button.primary:hover { background: var(--green-dark); border-color: var(--green-dark); }
+
+  .button.ghost {
+    background: transparent;
+    color: var(--cream);
+    border-color: rgba(244,241,232,0.4);
+  }
+
+  .button.ghost:hover { border-color: var(--gold-light); color: var(--gold-light); }
+
+  .hero-side {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(203,189,108,0.2);
+    border-radius: 18px;
+    padding: 2rem 1.75rem;
+    backdrop-filter: blur(6px);
+  }
+
+  .hero-side-eyebrow {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  .hero-side .goldwing-logo {
+    width: 100%;
+    max-width: 240px;
+    height: auto;
+    display: block;
+    margin: 0 auto 1rem;
+  }
+
+  .hero-side h4 {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+    font-size: 1.3rem;
+    color: var(--cream);
+    margin-bottom: 0.25rem;
+    font-weight: 400;
+  }
+
+  .hero-side .sub {
+    text-align: center;
+    font-size: 0.78rem;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid rgba(203,189,108,0.25);
+    padding-top: 2.25rem;
+    position: relative;
+    z-index: 1;
+    margin-top: 1rem;
+  }
+
+  .hero-stat {
+    border-right: 1px solid rgba(203,189,108,0.2);
+    padding: 0 1.75rem;
+  }
+  .hero-stat:first-child { padding-left: 0; }
+  .hero-stat:last-child { border-right: none; padding-right: 0; }
+
+  .hero-stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    color: var(--gold-light);
+    line-height: 1;
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.02em;
+  }
+
+  .hero-stat-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(244,241,232,0.7);
+    font-weight: 500;
+  }
+
+  /* ───────── PAGE-CARD WRAPPER (overlaps hero) ───────── */
+  .page-shell {
+    margin-top: -2.5rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .page-card {
+    background: var(--paper);
+    border-radius: 18px;
+    padding: 4rem 3.5rem;
+    box-shadow: var(--shadow);
+    border-top: 8px solid var(--gold);
+    margin-bottom: 3rem;
+  }
+
+  .page-card.dark {
+    background: var(--coal);
+    color: var(--cream);
+    border-top-color: var(--green);
+  }
+
+  .page-card.sand {
+    background: linear-gradient(180deg, rgba(244,241,232,0.6) 0%, var(--paper) 100%);
+    border-top-color: var(--gold);
+  }
+
+  /* ───────── SECTION TITLES ───────── */
+  .section-eyebrow {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--green-dark);
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+  .page-card.dark .section-eyebrow { color: var(--gold-light); }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.2rem, 4vw, 3.6rem);
+    line-height: 1.04;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    color: var(--ink);
+    font-weight: 400;
+  }
+  .page-card.dark .section-title { color: var(--cream); }
+
+  .section-title .gold { color: var(--gold); display: block; }
+  .page-card.dark .section-title .gold { color: var(--gold-light); }
+
+  .section-lead {
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 46rem;
+    line-height: 1.6;
+    font-weight: 400;
+  }
+  .page-card.dark .section-lead { color: rgba(244,241,232,0.8); }
+
+  /* ───────── BIG NUMBER FEATURE ───────── */
+  .opportunity-grid {
+    display: grid;
+    grid-template-columns: 0.7fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    margin-top: 3rem;
+  }
+
+  .big-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(11rem, 18vw, 18rem);
+    line-height: 0.85;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-shadow: 0 12px 30px rgba(158,145,64,0.18);
+  }
+
+  .opportunity-text h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    line-height: 1.15;
+    margin-bottom: 1.25rem;
+    font-weight: 400;
+  }
+
+  .opportunity-text p {
+    font-size: 1.05rem;
+    color: var(--ink);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+
+  .opportunity-text strong { color: var(--green-dark); font-weight: 700; }
+
+  .source-line {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--sand);
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+    line-height: 1.55;
+  }
+
+  /* ───────── THREE PILLARS ───────── */
+  .pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 3rem;
+  }
+
+  .pillar {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(203,189,108,0.2);
+    border-radius: 16px;
+    padding: 2.2rem 1.75rem;
+    border-top: 6px solid var(--gold);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+  }
+
+  .pillar:hover {
+    transform: translateY(-4px);
+    border-color: var(--gold-light);
+  }
+
+  .pillar-tag {
+    display: inline-block;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--black);
+    background: var(--gold);
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    margin-bottom: 1.25rem;
+    font-weight: 700;
+  }
+
+  .pillar h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cream);
+    margin-bottom: 1rem;
+    line-height: 1.15;
+    font-weight: 400;
+  }
+
+  .pillar p {
+    font-size: 0.95rem;
+    color: rgba(244,241,232,0.78);
+    line-height: 1.65;
+    margin-bottom: 1rem;
+  }
+
+  .pillar-source {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(203,189,108,0.18);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    color: var(--gold-light);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* ───────── CURRENT STATE / CREDIBILITY ───────── */
+  .current-state-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    margin-top: 3rem;
+    align-items: start;
+  }
+
+  .feature-list { list-style: none; }
+
+  .feature-list li {
+    padding: 0.9rem 0 0.9rem 2rem;
+    border-bottom: 1px solid var(--sand);
+    font-size: 1rem;
+    color: var(--ink);
+    position: relative;
+  }
+
+  .feature-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1.2rem;
+    width: 8px;
+    height: 8px;
+    background: var(--gold);
+    border-radius: 50%;
+  }
+
+  .feature-list li:last-child { border-bottom: none; }
+
+  .credibility-card {
+    background: var(--ink);
+    color: var(--cream);
+    padding: 2.5rem 2.25rem;
+    border-radius: 16px;
+    position: relative;
+    box-shadow: var(--shadow);
+    border-top: 6px solid var(--gold-light);
+  }
+
+  .credibility-card h4 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    line-height: 1.2;
+    color: var(--cream);
+    font-weight: 400;
+  }
+
+  .credibility-card p {
+    font-size: 0.95rem;
+    color: rgba(244,241,232,0.85);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+
+  .quote-pull {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: rgba(203,189,108,0.08);
+    border-left: 3px solid var(--gold-light);
+    border-radius: 6px;
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--gold-light);
+    line-height: 1.55;
+  }
+
+  /* ───────── TIER / ROADMAP ───────── */
+  .tier-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    margin-top: 3rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  .page-card.dark .tier-header { border-bottom-color: var(--gold-light); }
+
+  .tier-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--green-dark);
+    font-weight: 700;
+  }
+  .page-card.dark .tier-label { color: var(--gold-light); }
+
+  .tier-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    line-height: 1;
+    margin-top: 0.4rem;
+    font-weight: 400;
+  }
+  .page-card.dark .tier-title { color: var(--cream); }
+
+  .tier-cost {
+    margin-left: auto;
+    text-align: right;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .page-card.dark .tier-cost { color: rgba(244,241,232,0.6); }
+
+  .tier-cost strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.7rem;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+    margin-top: 0.3rem;
+    font-weight: 400;
+  }
+  .page-card.dark .tier-cost strong { color: var(--gold-light); }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    background: var(--paper);
+    border: 1px solid var(--sand);
+    border-radius: 16px;
+    padding: 1.75rem;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .page-card.dark .feature-card { background: rgba(244,241,232,0.04); border-color: rgba(203,189,108,0.18); }
+
+  .feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-soft);
+    border-color: var(--gold);
+  }
+
+  .feature-card.differentiator { border-top: 6px solid var(--gold); }
+  .feature-card.revenue { border-top: 6px solid var(--green); }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    background: var(--gold);
+    color: var(--black);
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-weight: 700;
+    margin-bottom: 0.85rem;
+  }
+  .badge.green { background: var(--green); color: var(--paper); }
+
+  .feature-card h4 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.45rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 0.75rem;
+    line-height: 1.15;
+    font-weight: 400;
+  }
+  .page-card.dark .feature-card h4 { color: var(--cream); }
+
+  .feature-card .desc {
+    font-size: 0.92rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+  }
+  .page-card.dark .feature-card .desc { color: rgba(244,241,232,0.7); }
+
+  .feature-card .meta {
+    display: flex;
+    gap: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sand);
+  }
+  .page-card.dark .feature-card .meta { border-top-color: rgba(203,189,108,0.15); }
+
+  .meta-item { flex: 1; }
+
+  .meta-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+  .page-card.dark .meta-label { color: rgba(244,241,232,0.5); }
+
+  .meta-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    font-weight: 400;
+  }
+  .page-card.dark .meta-value { color: var(--cream); }
+
+  .meta-value.revenue-num { color: var(--green-dark); }
+  .page-card.dark .meta-value.revenue-num { color: #8bca54; }
+
+  /* ───────── TIMELINE ───────── */
+  .timeline {
+    position: relative;
+    margin-top: 3rem;
+    padding-left: 2.5rem;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.65rem;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    width: 3px;
+    background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 50%, rgba(158,145,64,0.2) 100%);
+    border-radius: 2px;
+  }
+
+  .timeline-item { position: relative; margin-bottom: 3rem; }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -2.25rem;
+    top: 0.4rem;
+    width: 18px;
+    height: 18px;
+    background: var(--gold-light);
+    border: 3px solid var(--black);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(158,145,64,0.2);
+  }
+
+  .timeline-phase {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+
+  .timeline-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cream);
+    margin-bottom: 0.75rem;
+    line-height: 1.15;
+    font-weight: 400;
+  }
+
+  .timeline-desc {
+    color: rgba(244,241,232,0.78);
+    font-size: 0.98rem;
+    line-height: 1.65;
+    margin-bottom: 1.25rem;
+    max-width: 38rem;
+  }
+
+  .timeline-stats {
+    display: flex;
+    gap: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(203,189,108,0.18);
+    max-width: 38rem;
+  }
+
+  .timeline-stat {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    font-weight: 600;
+  }
+
+  .timeline-stat strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    color: var(--cream);
+    margin-top: 0.3rem;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+  }
+
+  /* ───────── INVESTMENT TABLE ───────── */
+  .investment-table {
+    margin-top: 3rem;
+    background: var(--paper);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--sand);
+  }
+
+  .investment-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    padding: 1.4rem 2rem;
+    border-bottom: 1px solid var(--sand);
+    align-items: center;
+  }
+
+  .investment-row:last-child { border-bottom: none; }
+
+  .investment-row.header {
+    background: var(--black);
+    color: var(--cream);
+    padding: 1rem 2rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .investment-row.total {
+    background: var(--cream);
+    border-top: 4px solid var(--gold);
+  }
+
+  .investment-row .label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.25rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    font-weight: 400;
+  }
+
+  .investment-row.total .label { font-size: 1.45rem; }
+
+  .investment-row .cell { font-size: 0.92rem; color: var(--muted); }
+
+  .investment-row .cell strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.35rem;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    font-weight: 400;
+    margin-bottom: 0.15rem;
+  }
+
+  .investment-row.total .cell strong { color: var(--green-dark); }
+
+  .investment-row .cell .sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* ───────── ROI BLOCK ───────── */
+  .roi-block {
+    margin-top: 3rem;
+    padding: 3rem 2.5rem;
+    background:
+      radial-gradient(700px 400px at 80% 20%, rgba(158,145,64,0.18), transparent 60%),
+      radial-gradient(500px 300px at 10% 80%, rgba(74,145,20,0.15), transparent 65%),
+      linear-gradient(135deg, var(--black) 0%, var(--coal) 100%);
+    color: var(--cream);
+    border-radius: 18px;
+    border-top: 8px solid var(--green);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .roi-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1.4fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .roi-text h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    font-weight: 400;
+  }
+
+  .roi-text h3 .gold { color: var(--gold-light); display: block; }
+
+  .roi-text p {
+    color: rgba(244,241,232,0.8);
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .roi-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.5rem;
+    height: 240px;
+    padding: 1rem 0;
+  }
+
+  .roi-bar-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+    height: 100%;
+  }
+
+  .roi-bar-stack {
+    display: flex;
+    flex-direction: column-reverse;
+    width: 100%;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .roi-bar-cost {
+    background: var(--gold);
+    border-radius: 2px 2px 0 0;
+    box-shadow: inset 0 -8px 16px rgba(0,0,0,0.15);
+  }
+
+  .roi-bar-revenue {
+    background: linear-gradient(180deg, #8bca54 0%, var(--green) 100%);
+    border-radius: 2px 2px 0 0;
+    box-shadow: inset 0 -8px 16px rgba(0,0,0,0.15);
+  }
+
+  .roi-bar-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.78rem;
+    color: var(--gold-light);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .roi-legend {
+    display: flex;
+    gap: 1.75rem;
+    margin-top: 1.5rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(244,241,232,0.75);
+    font-weight: 600;
+  }
+
+  .legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    border-radius: 3px;
+  }
+
+  .legend-cost .legend-swatch { background: var(--gold); }
+  .legend-revenue .legend-swatch { background: var(--green); }
+
+  /* ───────── WHY PATORAMA ───────── */
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin-top: 3rem;
+  }
+
+  .why-card { text-align: left; }
+
+  .why-num {
+    width: 56px;
+    height: 56px;
+    border: 2px solid var(--gold);
+    background: rgba(158,145,64,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+    border-radius: 50%;
+    font-weight: 400;
+  }
+
+  .why-card h4 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 0.85rem;
+    line-height: 1.15;
+    font-weight: 400;
+  }
+
+  .why-card p {
+    font-size: 0.97rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* ───────── PARTNER STAMP ───────── */
+  .partner-stamp {
+    margin-top: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 2rem 2.5rem;
+    background: linear-gradient(135deg, var(--cream) 0%, #ede8d8 100%);
+    border-radius: 14px;
+    border: 1px solid var(--sand);
+  }
+
+  .partner-stamp .text {
+    flex: 1;
+  }
+
+  .partner-stamp .eyebrow {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--green-dark);
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+  }
+
+  .partner-stamp h5 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 0.3rem;
+    font-weight: 400;
+  }
+
+  .partner-stamp p {
+    font-size: 0.92rem;
+    color: var(--muted);
+    max-width: 32rem;
+  }
+
+  .partner-stamp .logo-mark {
+    flex-shrink: 0;
+    width: 90px;
+    height: 90px;
+  }
+
+  /* ───────── CTA ───────── */
+  .cta-block {
+    text-align: center;
+    padding: 3rem 0 2rem;
+  }
+
+  .cta-block h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.2rem, 4vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    font-weight: 400;
+  }
+
+  .cta-block h3 .gold { color: var(--gold-light); display: block; }
+
+  .cta-block .lead {
+    color: rgba(244,241,232,0.8);
+    font-size: 1.1rem;
+    max-width: 38rem;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .cta-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    max-width: 60rem;
+    margin: 0 auto;
+  }
+
+  .cta-option {
+    background: rgba(244,241,232,0.04);
+    border: 1px solid rgba(203,189,108,0.25);
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    text-align: left;
+    transition: border-color 0.3s ease, transform 0.3s ease;
+    border-top: 4px solid var(--gold);
+  }
+
+  .cta-option:hover {
+    border-color: var(--gold-light);
+    transform: translateY(-3px);
+  }
+
+  .cta-step {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    color: var(--gold-light);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+
+  .cta-option h5 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cream);
+    margin-bottom: 0.7rem;
+    font-weight: 400;
+  }
+
+  .cta-option p {
+    font-size: 0.88rem;
+    color: rgba(244,241,232,0.72);
+    line-height: 1.55;
+    font-weight: 400;
+  }
+
+  /* ───────── FOOTER ───────── */
+  footer {
+    background: var(--black);
+    color: rgba(244,241,232,0.6);
+    padding: 3rem 0;
+    border-top: 4px solid var(--green);
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+  }
+
+  footer .footer-marks {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  footer .footer-marks .patorama-mark { width: 48px; height: auto; }
+
+  footer .footer-marks .separator {
+    width: 1px;
+    height: 36px;
+    background: rgba(203,189,108,0.3);
+  }
+
+  footer .footer-marks .gw-mark {
+    width: 70px;
+    height: auto;
+    filter: brightness(0) invert(1) sepia(0.3) saturate(2) hue-rotate(15deg);
+    opacity: 0.85;
+  }
+
+  footer p {
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  footer .small {
+    font-size: 0.72rem;
+    margin-top: 1rem;
+    color: rgba(244,241,232,0.4);
+    text-transform: none;
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+  }
+
+  /* ───────── RESPONSIVE ───────── */
+  @media (max-width: 880px) {
+    .hero-content { grid-template-columns: 1fr; gap: 2rem; }
+    .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+    .hero-stat { border-right: none; border-bottom: 1px solid rgba(203,189,108,0.18); padding: 1rem 0; }
+    .opportunity-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .pillars-grid { grid-template-columns: 1fr; }
+    .current-state-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .investment-row { grid-template-columns: 1fr; gap: 0.6rem; padding: 1.25rem 1.5rem; }
+    .investment-row.header { display: none; }
+    .roi-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .why-grid { grid-template-columns: 1fr; }
+    .cta-options { grid-template-columns: 1fr; }
+    .tier-header { flex-wrap: wrap; }
+    .tier-cost { margin-left: 0; text-align: left; width: 100%; margin-top: 0.6rem; }
+    .partner-stamp { flex-direction: column; text-align: center; }
+    .page-card { padding: 2.5rem 1.75rem; }
+    .roi-block { padding: 2rem 1.5rem; }
+    .container { padding: 0 1.25rem; }
+  }
+
+  @media print {
+    body { background: var(--paper); }
+    .hero, .page-card.dark, .roi-block, footer {
+      background: var(--paper) !important;
+      color: var(--ink) !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .hero h1, .pillar h3, .timeline-title, .cta-block h3, .feature-card h4 { color: var(--ink) !important; }
+    .pillar, .feature-card, .cta-option, .timeline-item { break-inside: avoid; page-break-inside: avoid; }
+    .page-card { padding: 2rem; box-shadow: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════ TOP STRIP ═════════ -->
+<div class="top-strip">
+  <div class="container">
+    <div class="top-strip-brand">
+      <!-- Patorama aperture icon -->
+      <svg class="patorama-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305.48 293.21">
+        <path fill="#fff" d="M285.87,37.47l-21.42-15.1-98.14,8.83.17-7.49c.15-6.16-4.83-11.23-10.99-11.2h-.03c-5.94.03-10.77,4.8-10.88,10.74l-.09,7.15-99.55-5.93-21.12,15.52,26.34,9.97,94.19-8.14-.4,32.02s6.3-.85,10.56-.85,10.83.85,10.83.85l.71-31.11,93.7,5.24,26.14-10.49Z"/>
+        <g>
+          <path fill="#6dbe45" d="M59.82,177.6c.62-4.25,1.18-8.52,1.89-12.76.37-2.21,1.01-4.38,1.53-6.6h69.44c-16.75,28.47-33.41,56.77-50.23,85.34-1.88-2.48-3.7-4.68-5.31-7.02-4.76-6.91-8.63-14.28-11.54-22.16-3-8.13-4.81-16.52-5.5-25.15-.04-.5-.19-.99-.28-1.49,0-3.39,0-6.78,0-10.16Z"/>
+          <path fill="#b92025" d="M252.63,187.15c-.62,4.15-1.19,8.32-1.89,12.45-.38,2.21-1.01,4.38-1.52,6.57h-69.08c16.72-28.41,33.34-56.64,50.14-85.17,2.43,3.43,4.77,6.59,6.95,9.84,5.32,7.95,9.28,16.58,11.73,25.78,1.58,5.92,2.27,12.07,3.36,18.12.12.64.21,1.29.32,1.94v10.47Z"/>
+          <path fill="#52b7e8" d="M150.37,278.63c-2.22-.3-4.45-.62-6.67-.9-10.01-1.26-19.52-4.16-28.61-8.53-8.61-4.14-16.42-9.44-23.48-15.86-.15-.14-.28-.29-.55-.58,11.47-19.48,22.95-38.98,34.55-58.69,16.33,27.62,32.55,55.03,48.89,82.66-.73.16-1.25.3-1.78.37-3.65.52-7.29,1.03-10.94,1.54h-11.4Z"/>
+          <path fill="#f49b1e" d="M162.07,85.9c12.31.74,24.65,4.13,35.64,9.5,2.92,1.43,5.78,3,8.54,4.71,5.16,3.18,9.98,6.82,14.48,10.88.71.64.8,1.08.3,1.93-7.91,13.36-15.79,26.74-23.67,40.12-3.02,5.12-6.01,10.25-9.03,15.38-.25.43-.54.84-1,1.55-16.25-27.52-32.38-54.82-48.66-82.39,5.45-.73,10.9-1.67,16.41-1.8,2.32-.06,4.65-.01,6.98.13Z"/>
+          <path fill="#f8e612" d="M66.94,145.83c1.77-3.57,3.29-6.98,5.1-10.23,5.6-10.03,12.81-18.77,21.57-26.21,7.8-6.63,16.42-11.89,25.89-15.76,1.99-.81,4.04-1.49,6.02-2.31.83-.34,1.26-.2,1.73.59,3.44,5.88,6.93,11.74,10.39,17.61,4.9,8.29,9.8,16.59,14.7,24.89,2.21,3.74,4.41,7.49,6.73,11.44h-92.13Z"/>
+          <path fill="#b11f77" d="M186.53,273.34c-10.81-18.28-21.53-36.42-32.38-54.77h91.3c-11.73,26.96-31.41,44.94-58.91,54.77Z"/>
+        </g>
+      </svg>
+      <div class="wordmark">Patorama <span class="accent">Studios</span></div>
+    </div>
+    <div class="top-strip-meta">Strategic Roadmap · June 2026</div>
+  </div>
+</div>
+
+<!-- ═════════ HERO ═════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <div>
+        <div class="hero-eyebrow">Prepared for the Committee · Australian Goldwing Association</div>
+        <h1>From Association Website<br><span class="gold">To Association Platform.</span></h1>
+        <p class="hero-lead">
+          A three-year strategic roadmap to make the Australian Goldwing Association the most exciting motorcycle membership platform in the country — backed by independent competitive research across 26 Australian and international clubs.
+        </p>
+        <div class="hero-actions">
+          <a href="#opportunity" class="button primary">Read the Roadmap</a>
+          <a href="#investment" class="button ghost">Skip to Investment</a>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="hero-side-eyebrow">Prepared For</div>
+        <img src="pitch-assets/goldwing-logo-white.png" alt="Australian Goldwing Association" class="goldwing-logo">
+        <h4>The Committee</h4>
+        <div class="sub">Australian Goldwing Association</div>
+      </div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">26</div>
+        <div class="hero-stat-label">Clubs Surveyed</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">0</div>
+        <div class="hero-stat-label">AU Clubs With Paid Tiers</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">$32k</div>
+        <div class="hero-stat-label">Year 2 Revenue Target</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">24 mo</div>
+        <div class="hero-stat-label">To Category Leadership</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="page-shell">
+  <div class="container">
+
+    <!-- ═════════ THE OPPORTUNITY ═════════ -->
+    <div class="page-card" id="opportunity">
+      <div class="section-eyebrow">The Opportunity</div>
+      <h2 class="section-title">You're already ahead. <span class="gold">The competition just hasn't noticed yet.</span></h2>
+      <p class="section-lead">
+        Independent research across the Australian motorcycle club landscape uncovered something unexpected — and very, very good news for the Association.
+      </p>
+
+      <div class="opportunity-grid">
+        <div class="big-number">0</div>
+        <div class="opportunity-text">
+          <h3>Australian Clubs Offer Feature-Gated Paid Tiers.</h3>
+          <p>
+            Ulysses Club runs a <strong>single tier</strong>. BMW Motorcycle Club of Victoria runs three eligibility tiers — not feature tiers. Triumph Owners Motorcycle Club Australia runs two. Oz HOG mirrors its global parent.
+          </p>
+          <p>
+            None has built a true premium experience for members willing to pay more for more. That is your opening.
+          </p>
+          <div class="source-line">
+            Source: 2026 competitive survey of Ulysses Club Australia, BMW Motorcycle Club of Victoria, Triumph Owners Motorcycle Club Australia, Harley Owners Group Australia, Gold Wing Owners Club Great Britain, REVER, MCC of NSW, VMC, MMCAA.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ THREE PILLARS ═════════ -->
+    <div class="page-card dark">
+      <div class="section-eyebrow">The Strategy</div>
+      <h2 class="section-title">Three Pillars. <span class="gold">One Destination.</span></h2>
+      <p class="section-lead">
+        Goldwing's existing platform already exceeds every comparable Australian club on portal sophistication. The growth opportunity isn't more features — it's three specific gaps where international peers like GWOCGB (UK) and BMWMCV's training programs are clearly ahead.
+      </p>
+
+      <div class="pillars-grid">
+        <div class="pillar">
+          <span class="pillar-tag">Pillar 01</span>
+          <h3>Commercial Monetisation</h3>
+          <p>
+            Build an 8–11 partner sponsor roster across insurance, parts, trailers, touring gear and Honda Australia — directly modelled on the UK Gold Wing Owners Club's 11-partner program (Bike Sure, Carole Nash, Howden, Honda UK, David Silver Spares).
+          </p>
+          <p>
+            Layered with member-discount codes, lead-gen forms and tiered sponsor placements — the website stops being a cost and starts being a revenue engine.
+          </p>
+          <div class="pillar-source">Modelled on GWOCGB · UK</div>
+        </div>
+
+        <div class="pillar">
+          <span class="pillar-tag">Pillar 02</span>
+          <h3>Signature Content</h3>
+          <p>
+            A hand-curated library of Australian Goldwing-friendly touring routes — sealed roads, smooth twisties, motel parking, fuel and coffee stops — built into the portal with planner-to-app sync.
+          </p>
+          <p>
+            REVER built a 3,000-route global library that became their signature asset. No Australian motorcycle club owns the equivalent. The Association can.
+          </p>
+          <div class="pillar-source">Modelled on REVER × Butler Maps</div>
+        </div>
+
+        <div class="pillar">
+          <span class="pillar-tag">Pillar 03</span>
+          <h3>Training &amp; Safety Benefits</h3>
+          <p>
+            A rider-training subsidy program ($50–$80 every three years), a marque-aligned touring-skills training partnership, and a club-owned satellite phone for members heading into remote country.
+          </p>
+          <p>
+            Ulysses, BMWMCV and BMW Canberra all run versions of these. They are universal table-stakes that the Association currently lacks — and they cost almost nothing per member to deliver.
+          </p>
+          <div class="pillar-source">Modelled on Ulysses · BMWMCV · Touratech</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ CURRENT STATE / CREDIBILITY ═════════ -->
+    <div class="page-card">
+      <div class="section-eyebrow">Where You Are Today</div>
+      <h2 class="section-title">A Foundation <span class="gold">Most Associations Envy.</span></h2>
+      <p class="section-lead">
+        Patorama Studios has spent the past 18 months building the Australian Goldwing Association a bespoke member platform that the competitive research found already exceeds every comparable Australian club. The work below isn't a list of features — it's a structural advantage.
+      </p>
+
+      <div class="current-state-grid">
+        <ul class="feature-list">
+          <li>Member portal with secure login and personalised dashboard</li>
+          <li>My Garage — bike tracking and rider profile</li>
+          <li>Events calendar with ride RSVP and admin management</li>
+          <li>Membership checkout via Stripe (cards, recurring, refunds)</li>
+          <li>Admin dashboard for committee operations</li>
+          <li>AGM page builder for the annual meeting</li>
+          <li>Blog and content management system</li>
+          <li>Wing magazine integration</li>
+          <li>Wings preference filter and member-portal lockdown</li>
+          <li>Audit-grade activity logging and member directory</li>
+        </ul>
+
+        <div class="credibility-card">
+          <h4>The Research Finding That Matters Most.</h4>
+          <p>
+            Ulysses Club's digital offering is materially thinner than its reputation. The Triumph Owners Motorcycle Club Australia has no member portal at all — just a PDF membership form and Facebook. BMW Motorcycle Club of Victoria runs on off-the-shelf WildApricot SaaS.
+          </p>
+          <p>
+            The Association's bespoke stack — garage tracking, Stripe checkout, AGM builder, custom CMS — is already a category-leading foundation among Australian marque memberships.
+          </p>
+          <div class="quote-pull">
+            "On portal features the Australian Goldwing Association is already ahead of every comparable Australian club surveyed. The opportunity is not to build more — it is to monetise and differentiate what already exists."
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ PHASE 1 — QUICK WINS ═════════ -->
+    <div class="page-card sand">
+      <div class="section-eyebrow">The Roadmap · Phase One</div>
+      <h2 class="section-title">Quick Wins. <span class="gold">Q3 2026.</span></h2>
+      <p class="section-lead">
+        Six near-zero-build moves that competitors already do and the Association doesn't. Combined build cost under $2,800. Substantial member-perceived value, deliverable inside one quarter.
+      </p>
+
+      <div class="tier-header">
+        <div>
+          <div class="tier-label">Phase 01 · Foundation</div>
+          <div class="tier-title">Close the Table-Stakes Gap</div>
+        </div>
+        <div class="tier-cost">
+          Combined Build
+          <strong>$1,800 – $2,800</strong>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card revenue">
+          <span class="badge green">Member Benefit</span>
+          <h4>Rider Training Subsidy Program</h4>
+          <p class="desc">Members upload accredited rider-skills or first aid course receipts via the portal, admin approves, refund issued (capped at $50–$80 per 3-year period). Universal pattern across Ulysses, BMWMCV and BMW Canberra.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$400 – $700</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Member Impact</div>
+              <div class="meta-value">High</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Differentiator</span>
+          <h4>Club-Owned Satellite Phone for Loan</h4>
+          <p class="desc">Association owns one or two sat phones, members borrow for remote-area touring via a portal-managed booking calendar. Modelled on BMWMCV. Perfect demographic fit for Goldwing touring riders.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$300 – $500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Equipment</div>
+              <div class="meta-value">$1.5k + Plan</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Cashflow</span>
+          <h4>Multi-Year Membership Pricing</h4>
+          <p class="desc">Add a 3-year membership option alongside annual (Ulysses model: $45/yr vs $120/3yr). Locks in revenue, reduces churn admin, zero ongoing cost.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$400 – $600</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Cashflow Lift</div>
+              <div class="meta-value">Immediate</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Recognition</span>
+          <h4>Life Membership Recognition</h4>
+          <p class="desc">Annual AGM ceremony awarding honorary/life membership to long-standing contributors. Drives storytelling content for the magazine and blog. Costs nothing to run.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$300 – $500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Content Value</div>
+              <div class="meta-value">Recurring</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Conversion</span>
+          <h4>Historical Rego Explainer at Checkout</h4>
+          <p class="desc">Inline panel on the membership checkout flow explaining historical-rego benefits, RMS criteria, and which garage bikes qualify. Lifts perceived membership value at the moment of purchase.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$600 – $900</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Conversion Lift</div>
+              <div class="meta-value">Est. +5–10%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Admin</span>
+          <h4>Wing Magazine Print-Label Maker</h4>
+          <p class="desc">Admin generates Avery L7160 PDF labels (21 per A4) for print subscribers, sorted by postcode for AusPost presort. "Mark batch as posted" creates an audit trail per issue.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$600 – $900</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Admin Saved</div>
+              <div class="meta-value">2–4 hrs/issue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ PHASE 2 — COMMERCIAL ═════════ -->
+    <div class="page-card">
+      <div class="section-eyebrow">The Roadmap · Phase Two</div>
+      <h2 class="section-title">Commercial Year. <span class="gold">2026–27.</span></h2>
+      <p class="section-lead">
+        Build the revenue engine. By year-end the website is generating more recurring revenue than the cumulative build cost — turning IT from an expense line into a profit centre.
+      </p>
+
+      <div class="tier-header">
+        <div>
+          <div class="tier-label">Phase 02 · Monetisation</div>
+          <div class="tier-title">The Revenue Engine</div>
+        </div>
+        <div class="tier-cost">
+          Phase Build
+          <strong>$8,500 – $12,500</strong>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card revenue">
+          <span class="badge green">Revenue</span>
+          <h4>Insurance Affinity Partnerships</h4>
+          <p class="desc">Sign 2 of Shannons, Swann or QBE Motorcycle (Australian equivalents of GWOCGB's Bike Sure / Carole Nash / Howden). Branded landing pages, tracked referral links, member discount + automatic cover at Association rallies.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,600 – $2,400</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Yearly Revenue</div>
+              <div class="meta-value revenue-num">$3k – $10k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Revenue</span>
+          <h4>Sponsor Directory v2 — Tiered Listings</h4>
+          <p class="desc">Three sponsor tiers: Bronze (logo + contact, $200/yr), Silver (profile page + offer, $500/yr), Gold (homepage banner + newsletter slot, $1.5–3k/yr). Self-serve renewal via Stripe. Sponsor dashboard shows impressions and click-throughs.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Yearly Revenue</div>
+              <div class="meta-value revenue-num">$2k – $8k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Revenue</span>
+          <h4>Member Offers / Discount Portal</h4>
+          <p class="desc">Members log in and see "Goldwing member discounts" — accessories, tyres, gear, transport. Each sponsor pays a slot fee ($150–400/yr). Unique discount codes track redemptions and prove ROI to sponsors.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Yearly Revenue</div>
+              <div class="meta-value revenue-num">$1k – $4k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Engagement</span>
+          <h4>Email Newsletter + In-Portal Inbox</h4>
+          <p class="desc">Admin composes once, delivers to both email and the member portal inbox. Templated header/footer, open-rate tracking, segmented sends (all members, Wings, chapter, custom). Members see unread badge in portal nav.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$2,500 – $4,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Sponsor Slot</div>
+              <div class="meta-value">$200–500/send</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Retention</span>
+          <h4>My Garage v2 — Rego Tracking</h4>
+          <p class="desc">Each bike gets its own card with rego type (full / historical / unregistered), expiry, VIN, primary-rider flag. Renewal-reminder email 4 weeks out. Foundation for the curated routes library and gamified rides.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$2,000 – $3,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Retention Lift</div>
+              <div class="meta-value">Est. +8–12%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Community</span>
+          <h4>Association Events Gallery</h4>
+          <p class="desc">Per-event photo galleries with member uploads, lightbox, EXIF strip, drag-reorder for admins. Cross-links to member profiles. Reuses existing image-upload pipeline.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,200 – $2,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Member Uploads</div>
+              <div class="meta-value">Self-Sustaining</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ PHASE 3 — DISCOVERY & SEO ═════════ -->
+    <div class="page-card">
+      <div class="section-eyebrow">The Roadmap · Phase Three</div>
+      <h2 class="section-title">Discovery &amp; SEO. <span class="gold">The Acquisition Engine.</span></h2>
+      <p class="section-lead">
+        Every Australian considering a Goldwing types the same questions into Google. Right now the Association doesn't own those searches. This phase builds the content that puts the Association at the top of every Goldwing-buyer's research journey — and captures their email on the way through.
+      </p>
+
+      <div class="tier-header">
+        <div>
+          <div class="tier-label">Phase 03 · Acquisition</div>
+          <div class="tier-title">Own the Goldwing Search</div>
+        </div>
+        <div class="tier-cost">
+          Phase Build
+          <strong>$8,300 – $12,800</strong>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card differentiator">
+          <span class="badge">Foundation</span>
+          <h4>SEO Technical Foundation</h4>
+          <p class="desc">Site-wide audit, Core Web Vitals fixes, structured data (Organisation, Event, Article, FAQ, LocalBusiness schema), XML sitemap automation, canonical tag review, internal linking strategy. The plumbing that makes everything else rank.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Outcome</div>
+              <div class="meta-value">Indexable Site</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Signature Hub</span>
+          <h4>Goldwing Buyer's Guide Hub</h4>
+          <p class="desc">Hub landing page plus six dedicated model pages: GL1500, GL1800, GL1800 Tour, F6B, Goldwing Trike, pre-GL1500 legacy. Each one: specs, common issues, fair-price range, what to look for, where to find one. The single biggest search-volume opportunity in the entire Australian Goldwing space.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$3,000 – $4,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Pages Added</div>
+              <div class="meta-value">7 Hub Pages</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">High Intent</span>
+          <h4>Goldwing Comparison Pages</h4>
+          <p class="desc">"Goldwing vs Harley Ultra Classic," "Goldwing vs BMW K1600," "Goldwing vs Indian Roadmaster," "Goldwing vs Kawasaki Voyager." Long-tail, high-intent search traffic — every visitor is mid-purchase-decision. Low competition in the AU market.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,200 – $2,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Pages Added</div>
+              <div class="meta-value">4–6 Pages</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Lead Magnets</span>
+          <h4>Free Downloadable Resources</h4>
+          <p class="desc">Three flagship PDFs gated for email capture: the "Used Goldwing Pre-Purchase Inspection Checklist," the "First-Time Goldwing Owner Welcome Pack," and the "Goldwing Annual Maintenance Schedule." Every download feeds the newsletter list and becomes a future member.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,200 – $1,800</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Output</div>
+              <div class="meta-value revenue-num">Email List</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Long Tail</span>
+          <h4>Goldwing Glossary &amp; Wiki</h4>
+          <p class="desc">Thirty to forty Goldwing-specific terms with definitions, photos and cross-links — final drive, neutral safety switch, reverse motor, ECM, throttle-by-wire. Each becomes its own indexable long-tail SEO page, slowly accumulating organic traffic for years.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$700 – $1,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Pages Added</div>
+              <div class="meta-value">30–40 Entries</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Local SEO</span>
+          <h4>Chapter Local SEO Pages</h4>
+          <p class="desc">Per-state chapter pages optimised for "Goldwing riders Sydney," "Goldwing club Melbourne," "Goldwing Brisbane," etc. LocalBusiness schema markup, state-specific content, meet-up details. Captures the rider already in your area looking for community.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$700 – $1,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Pages Added</div>
+              <div class="meta-value">8 State Pages</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="partner-stamp" style="margin-top:2.5rem;">
+        <div class="text">
+          <div class="eyebrow">The Compounding Effect</div>
+          <h5>50+ New Indexable Pages. Built Once. Ranking Forever.</h5>
+          <p>Unlike paid ads, SEO compounds. Every page built in Phase 3 keeps ranking and keeps bringing visitors year after year — many of whom become members, newsletter subscribers and Wing magazine readers. The buyer's guide hub alone is estimated to drive 3–5x the Association's current organic traffic within 12 months of launch.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ PHASE 4 — CONTENT & TRAINING ═════════ -->
+    <div class="page-card sand">
+      <div class="section-eyebrow">The Roadmap · Phase Four</div>
+      <h2 class="section-title">Signature Content. <span class="gold">2027–28.</span></h2>
+      <p class="section-lead">
+        Build the content moat. The curated Australian Goldwing touring routes library will be the single most-shared, most-quoted member-facing asset in the AU motorcycle community — paired with the marque-aligned training partnership and a Honda Australia rally sponsorship.
+      </p>
+
+      <div class="tier-header">
+        <div>
+          <div class="tier-label">Phase 04 · Differentiation</div>
+          <div class="tier-title">The Content &amp; Training Year</div>
+        </div>
+        <div class="tier-cost">
+          Phase Build
+          <strong>$10,500 – $15,500</strong>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card differentiator">
+          <span class="badge">Signature Asset</span>
+          <h4>Curated AU Goldwing Touring Routes</h4>
+          <p class="desc">Phase 1: 50–100 hand-curated routes with photos, fuel/coffee stops, accommodation, Goldwing-specific accessibility notes (sealed only, smooth twisties, motel parking). Phase 2: ratings, member submissions with moderation. Phase 3: planner-to-app sync.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$4,000 – $6,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">SEO &amp; Acquisition</div>
+              <div class="meta-value">Category-First</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Training</span>
+          <h4>Marque-Aligned Touring Training</h4>
+          <p class="desc">Partner with a specialist touring/skills trainer (Stay Upright, HART or Goldwing specialist) for branded "Goldwing Touring Skills" course, recurring 2–3x/year. Stacks with the rider-training subsidy from Phase 1.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Yearly Revenue</div>
+              <div class="meta-value revenue-num">$1k – $3k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Partnership</span>
+          <h4>Honda Australia Rally Partnership</h4>
+          <p class="desc">Sponsorship deck pitched to Honda Australia for the annual National Rally — new-model preview, test rides, factory stand. Direct analogue of GWOCGB's Honda UK partnership at British Treffen.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$2,000 – $3,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Sponsorship</div>
+              <div class="meta-value revenue-num">$5k – $15k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Community</span>
+          <h4>Member Profile Pages</h4>
+          <p class="desc">Public-facing profiles per member: bio, garage bikes, awards/badges, ride memories, mini-blog. Privacy toggles per section. Slug-based URLs. Becomes the destination for member directory click-throughs.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$3,000 – $4,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Engagement</div>
+              <div class="meta-value">Profile Completion</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Content</span>
+          <h4>Maintenance Tutorial Library</h4>
+          <p class="desc">Members-only how-to library: oil changes, tyre pressures, final-drive grease, valve intervals, battery swap. Difficulty, tools, parts, photos, video, printable PDF. Filterable by GL1500/1800/F6B/Tour.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Renewal Lift</div>
+              <div class="meta-value">Est. +6–10%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card revenue">
+          <span class="badge green">Premium Tier</span>
+          <h4>"Goldwing Plus" Membership Tier</h4>
+          <p class="desc">$40–60/yr uplift on standard membership. Includes free Wing print delivery, priority event spots, exclusive tutorial content, early RSVP, embroidered name on Association shirt. Category-first move in AU.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$1,500 – $2,500</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Yearly Revenue</div>
+              <div class="meta-value revenue-num">$2k – $6k</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ PHASE 5 — ENGAGEMENT ═════════ -->
+    <div class="page-card dark">
+      <div class="section-eyebrow">The Roadmap · Phase Five</div>
+      <h2 class="section-title">Engagement Layer. <span class="gold">2028+.</span></h2>
+      <p class="section-lead">
+        The REVER-style ride community, built on top of everything Phases One through Three put in place. Gamification, live tracking, leaderboards — features no Australian motorcycle club currently offers.
+      </p>
+
+      <div class="tier-header">
+        <div>
+          <div class="tier-label">Phase 05 · Premium</div>
+          <div class="tier-title">The Community Engine</div>
+        </div>
+        <div class="tier-cost">
+          Phase Build
+          <strong>$7,500 – $12,000</strong>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card differentiator">
+          <span class="badge">Gamification</span>
+          <h4>Distance / KM Tracker + Leaderboard</h4>
+          <p class="desc">Members log rides (manual entry or GPX upload). Monthly and yearly leaderboards, milestone badges at 1k / 5k / 10k km, per-bike totals. Phase 2: mini PWA you open on the bike to start/stop a ride.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$4,000 – $6,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Engagement</div>
+              <div class="meta-value">Daily Use</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Gamification</span>
+          <h4>Gamified Ride Challenges</h4>
+          <p class="desc">Named challenges members complete: "Big Lap of Australia," "Every Capital," "Coastal 1000," state-by-state badge sets. Plugs into the km tracker. Modelled on REVER's global Challenges platform.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$800 – $1,200</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Position</div>
+              <div class="meta-value">Category-First</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Safety</span>
+          <h4>Live Ride-Tracking</h4>
+          <p class="desc">During sanctioned Association rides, members opt in to share live position with the ride captain and an emergency contact. Doubles as safety (lost-rider recovery) and premium-tier exclusivity feature.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$2,500 – $4,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Safety Value</div>
+              <div class="meta-value">Insurance Lever</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card differentiator">
+          <span class="badge">Admin</span>
+          <h4>Custom Form Builder</h4>
+          <p class="desc">Admin drag-builds forms (text, select, file upload, signature, payment). Attach to events, membership, incident reports. Replaces a stack of one-off forms across the site.</p>
+          <div class="meta">
+            <div class="meta-item">
+              <div class="meta-label">Build Cost</div>
+              <div class="meta-value">$5,000 – $7,000</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Admin Saved</div>
+              <div class="meta-value">10+ hrs/mo</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ TIMELINE ═════════ -->
+    <div class="page-card dark">
+      <div class="section-eyebrow">Three-Year Rollout</div>
+      <h2 class="section-title">A Plan You Can <span class="gold">Actually Deliver.</span></h2>
+      <p class="section-lead">
+        Drip-fed across quarters, paced for committee budget cycles, sequenced so each phase builds on the last. No big-bang risk. No wasted spend.
+      </p>
+
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-phase">Q3 2026 · Foundation</div>
+          <div class="timeline-title">Quick Wins, Close the Table-Stakes Gap</div>
+          <div class="timeline-desc">
+            Rider training subsidy, sat phone, multi-year membership, life recognition, rego explainer, magazine label maker. Six small builds, deliverable inside one quarter.
+          </div>
+          <div class="timeline-stats">
+            <div class="timeline-stat">Build Investment<strong>$1.8k – $2.8k</strong></div>
+            <div class="timeline-stat">Member Impact<strong>Immediate</strong></div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-phase">Year 1 · 2026–27 · Monetisation</div>
+          <div class="timeline-title">Build the Revenue Engine</div>
+          <div class="timeline-desc">
+            Insurance affinity, sponsor directory v2, member offers portal, newsletter + inbox, garage v2, events gallery. By end of year the website is recurring-revenue positive.
+          </div>
+          <div class="timeline-stats">
+            <div class="timeline-stat">Build Investment<strong>$8.5k – $12.5k</strong></div>
+            <div class="timeline-stat">Recurring Revenue<strong>$6k – $22k/yr</strong></div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-phase">Year 1 H2 · 2027 · Discovery &amp; SEO</div>
+          <div class="timeline-title">Own the Goldwing Search</div>
+          <div class="timeline-desc">
+            SEO technical foundation, Goldwing buyer's guide hub (7 model pages), comparison pages, free downloadable resources (lead magnets), glossary &amp; wiki, chapter local SEO. 50+ new indexable pages, compounding organic traffic.
+          </div>
+          <div class="timeline-stats">
+            <div class="timeline-stat">Build Investment<strong>$8.3k – $12.8k</strong></div>
+            <div class="timeline-stat">Traffic Lift<strong>Est. 3–5× in 12 mo</strong></div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-phase">Year 2 · 2027–28 · Content &amp; Training</div>
+          <div class="timeline-title">Build the Content Moat</div>
+          <div class="timeline-desc">
+            Curated AU touring routes, marque-aligned training partnership, Honda Australia rally sponsorship, member profile pages, maintenance tutorials, Premium membership tier launch.
+          </div>
+          <div class="timeline-stats">
+            <div class="timeline-stat">Build Investment<strong>$10.5k – $15.5k</strong></div>
+            <div class="timeline-stat">Cumulative Revenue<strong>$15k – $32k/yr</strong></div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-phase">Year 3+ · 2028 Onward · Premium</div>
+          <div class="timeline-title">The Community Engine</div>
+          <div class="timeline-desc">
+            Distance tracker, gamified challenges, live ride-tracking, custom form builder. Features no Australian motorcycle club currently offers — the moment the Association becomes the category leader.
+          </div>
+          <div class="timeline-stats">
+            <div class="timeline-stat">Build Investment<strong>$7.5k – $12k</strong></div>
+            <div class="timeline-stat">Position<strong>Category Leader</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ INVESTMENT SUMMARY ═════════ -->
+    <div class="page-card" id="investment">
+      <div class="section-eyebrow">Investment Summary</div>
+      <h2 class="section-title">What It Costs. <span class="gold">What It Returns.</span></h2>
+      <p class="section-lead">
+        A clear picture of what the committee is approving — and when it pays for itself. All figures in Australian dollars, build only (excluding hosting, payment processing and ongoing content).
+      </p>
+
+      <div class="investment-table">
+        <div class="investment-row header">
+          <div>Phase</div>
+          <div>Build Investment</div>
+          <div>Yearly Revenue (Mature)</div>
+          <div>Payback Period</div>
+        </div>
+
+        <div class="investment-row">
+          <div class="label">Phase 1 · Foundation</div>
+          <div class="cell"><strong>$2,400</strong><span class="sub">Q3 2026</span></div>
+          <div class="cell"><strong>—</strong><span class="sub">Member Benefit</span></div>
+          <div class="cell"><strong>n/a</strong><span class="sub">Retention Lift</span></div>
+        </div>
+
+        <div class="investment-row">
+          <div class="label">Phase 2 · Monetisation</div>
+          <div class="cell"><strong>$10,500</strong><span class="sub">Year 1</span></div>
+          <div class="cell"><strong>$14,000</strong><span class="sub">$6k–22k Range</span></div>
+          <div class="cell"><strong>9–18 Months</strong><span class="sub">Cumulative</span></div>
+        </div>
+
+        <div class="investment-row">
+          <div class="label">Phase 3 · Discovery &amp; SEO</div>
+          <div class="cell"><strong>$10,500</strong><span class="sub">Year 1 H2</span></div>
+          <div class="cell"><strong>Indirect</strong><span class="sub">Traffic + Leads</span></div>
+          <div class="cell"><strong>Compounding</strong><span class="sub">Year 1+</span></div>
+        </div>
+
+        <div class="investment-row">
+          <div class="label">Phase 4 · Content &amp; Training</div>
+          <div class="cell"><strong>$13,000</strong><span class="sub">Year 2</span></div>
+          <div class="cell"><strong>$23,500</strong><span class="sub">Cumulative</span></div>
+          <div class="cell"><strong>Year 2 End</strong><span class="sub">Net Positive</span></div>
+        </div>
+
+        <div class="investment-row">
+          <div class="label">Phase 5 · Premium</div>
+          <div class="cell"><strong>$9,750</strong><span class="sub">Year 3+</span></div>
+          <div class="cell"><strong>$28,000+</strong><span class="sub">Cumulative</span></div>
+          <div class="cell"><strong>Year 3 End</strong><span class="sub">Profit Centre</span></div>
+        </div>
+
+        <div class="investment-row total">
+          <div class="label">3-Year Total</div>
+          <div class="cell"><strong>$46,150</strong><span class="sub">Across 36 Months</span></div>
+          <div class="cell"><strong>$28k – $40k/yr</strong><span class="sub">+ Compounding Traffic</span></div>
+          <div class="cell"><strong>Self-Funding</strong><span class="sub">End of Year 2</span></div>
+        </div>
+      </div>
+
+      <div class="roi-block">
+        <div class="roi-grid">
+          <div class="roi-text">
+            <h3>By End of Year 2 <span class="gold">The Platform Pays for Itself.</span></h3>
+            <p>
+              Cumulative recurring revenue overtakes cumulative build investment in Q3 of Year 2. From there, the website transitions from a committee cost line into a small profit centre — funding its own ongoing development and delivering surplus back to the Association.
+            </p>
+          </div>
+
+          <div>
+            <div class="roi-bars">
+              <div class="roi-bar-group">
+                <div class="roi-bar-stack">
+                  <div class="roi-bar-cost" style="height: 25%;"></div>
+                </div>
+                <div class="roi-bar-label">Q3 26</div>
+              </div>
+              <div class="roi-bar-group">
+                <div class="roi-bar-stack">
+                  <div class="roi-bar-cost" style="height: 55%;"></div>
+                  <div class="roi-bar-revenue" style="height: 28%;"></div>
+                </div>
+                <div class="roi-bar-label">Yr 1</div>
+              </div>
+              <div class="roi-bar-group">
+                <div class="roi-bar-stack">
+                  <div class="roi-bar-cost" style="height: 78%;"></div>
+                  <div class="roi-bar-revenue" style="height: 72%;"></div>
+                </div>
+                <div class="roi-bar-label">Yr 2</div>
+              </div>
+              <div class="roi-bar-group">
+                <div class="roi-bar-stack">
+                  <div class="roi-bar-cost" style="height: 90%;"></div>
+                  <div class="roi-bar-revenue" style="height: 100%;"></div>
+                </div>
+                <div class="roi-bar-label">Yr 3</div>
+              </div>
+            </div>
+            <div class="roi-legend">
+              <div class="legend-cost"><span class="legend-swatch"></span>Cumulative Build</div>
+              <div class="legend-revenue"><span class="legend-swatch"></span>Cumulative Revenue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ WHY PATORAMA ═════════ -->
+    <div class="page-card sand">
+      <div class="section-eyebrow">The Strategic Partner</div>
+      <h2 class="section-title">Why Patorama Studios. <span class="gold">Why Now.</span></h2>
+      <p class="section-lead">
+        You don't need a generalist agency learning your platform from scratch. You need the team that already built it — and is willing to commit to a multi-year strategic partnership rather than a one-off engagement.
+      </p>
+
+      <div class="why-grid">
+        <div class="why-card">
+          <div class="why-num">01</div>
+          <h4>We Already Know the Codebase</h4>
+          <p>
+            Eighteen months of bespoke development on the Association's member portal, admin system, Stripe checkout, AGM builder and Wing magazine integration. No discovery phase. No ramp-up. New features ship in days, not months.
+          </p>
+        </div>
+
+        <div class="why-card">
+          <div class="why-num">02</div>
+          <h4>Strategic, Not Transactional</h4>
+          <p>
+            The competitive research powering this roadmap was independently commissioned and adversarially verified across 26 sources. We bring the strategy alongside the build — most agencies just build what you ask for.
+          </p>
+        </div>
+
+        <div class="why-card">
+          <div class="why-num">03</div>
+          <h4>Aligned on Outcomes</h4>
+          <p>
+            Patorama Studios is structured to win when the Australian Goldwing Association wins. We propose retainer arrangements tied to delivered revenue features — not hourly billing for indeterminate work.
+          </p>
+        </div>
+      </div>
+
+      <div class="partner-stamp">
+        <div class="text">
+          <div class="eyebrow">Branded Property &amp; Strategy Marketing · Canberra</div>
+          <h5>Patorama Studios</h5>
+          <p>Marketing Through Storytelling. Patorama Studios is an Australian-owned Canberra-based marketing firm specialising in branded campaigns, web platforms and strategic creative.</p>
+        </div>
+        <!-- Patorama color aperture icon (lock-up) -->
+        <svg class="logo-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305.48 293.21">
+          <path fill="#003b50" d="M285.87,37.47l-21.42-15.1-98.14,8.83.17-7.49c.15-6.16-4.83-11.23-10.99-11.2h-.03c-5.94.03-10.77,4.8-10.88,10.74l-.09,7.15-99.55-5.93-21.12,15.52,26.34,9.97,94.19-8.14-.4,32.02s6.3-.85,10.56-.85,10.83.85,10.83.85l.71-31.11,93.7,5.24,26.14-10.49Z"/>
+          <g>
+            <path fill="#6dbe45" d="M59.82,177.6c.62-4.25,1.18-8.52,1.89-12.76.37-2.21,1.01-4.38,1.53-6.6h69.44c-16.75,28.47-33.41,56.77-50.23,85.34-1.88-2.48-3.7-4.68-5.31-7.02-4.76-6.91-8.63-14.28-11.54-22.16-3-8.13-4.81-16.52-5.5-25.15-.04-.5-.19-.99-.28-1.49,0-3.39,0-6.78,0-10.16Z"/>
+            <path fill="#b92025" d="M252.63,187.15c-.62,4.15-1.19,8.32-1.89,12.45-.38,2.21-1.01,4.38-1.52,6.57h-69.08c16.72-28.41,33.34-56.64,50.14-85.17,2.43,3.43,4.77,6.59,6.95,9.84,5.32,7.95,9.28,16.58,11.73,25.78,1.58,5.92,2.27,12.07,3.36,18.12.12.64.21,1.29.32,1.94v10.47Z"/>
+            <path fill="#52b7e8" d="M150.37,278.63c-2.22-.3-4.45-.62-6.67-.9-10.01-1.26-19.52-4.16-28.61-8.53-8.61-4.14-16.42-9.44-23.48-15.86-.15-.14-.28-.29-.55-.58,11.47-19.48,22.95-38.98,34.55-58.69,16.33,27.62,32.55,55.03,48.89,82.66-.73.16-1.25.3-1.78.37-3.65.52-7.29,1.03-10.94,1.54h-11.4Z"/>
+            <path fill="#f49b1e" d="M162.07,85.9c12.31.74,24.65,4.13,35.64,9.5,2.92,1.43,5.78,3,8.54,4.71,5.16,3.18,9.98,6.82,14.48,10.88.71.64.8,1.08.3,1.93-7.91,13.36-15.79,26.74-23.67,40.12-3.02,5.12-6.01,10.25-9.03,15.38-.25.43-.54.84-1,1.55-16.25-27.52-32.38-54.82-48.66-82.39,5.45-.73,10.9-1.67,16.41-1.8,2.32-.06,4.65-.01,6.98.13Z"/>
+            <path fill="#f8e612" d="M66.94,145.83c1.77-3.57,3.29-6.98,5.1-10.23,5.6-10.03,12.81-18.77,21.57-26.21,7.8-6.63,16.42-11.89,25.89-15.76,1.99-.81,4.04-1.49,6.02-2.31.83-.34,1.26-.2,1.73.59,3.44,5.88,6.93,11.74,10.39,17.61,4.9,8.29,9.8,16.59,14.7,24.89,2.21,3.74,4.41,7.49,6.73,11.44h-92.13Z"/>
+            <path fill="#b11f77" d="M186.53,273.34c-10.81-18.28-21.53-36.42-32.38-54.77h91.3c-11.73,26.96-31.41,44.94-58.91,54.77Z"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ═════════ CTA / NEXT STEPS ═════════ -->
+    <div class="page-card dark">
+      <div class="cta-block">
+        <div class="section-eyebrow">Next Steps</div>
+        <h3>Three Ways Forward. <span class="gold">Pick the One That Fits.</span></h3>
+        <p class="lead">
+          The committee doesn't have to commit to the full 3-year roadmap today. Pick the entry point that matches your appetite and budget — every option is a step toward the same destination.
+        </p>
+
+        <div class="cta-options">
+          <div class="cta-option">
+            <div class="cta-step">Option 01 · Lightest</div>
+            <h5>Phase 1 Only</h5>
+            <p>
+              Approve the six Quick Win builds for Q3 2026 ($1.8k–2.8k total). No commitment beyond that. See how the engagement works before scoping further.
+            </p>
+          </div>
+
+          <div class="cta-option">
+            <div class="cta-step">Option 02 · Recommended</div>
+            <h5>Annual Retainer</h5>
+            <p>
+              A 12-month commitment covering Phase 1 + Phase 2 + Phase 3 SEO ($21k–28k total). Monthly check-ins, quarterly delivery, revenue + traffic tracking against forecast. The fastest path to revenue-positive and a compounding organic audience.
+            </p>
+          </div>
+
+          <div class="cta-option">
+            <div class="cta-step">Option 03 · Boldest</div>
+            <h5>3-Year Strategic Partnership</h5>
+            <p>
+              Lock in the full roadmap at a fixed monthly retainer. Smoothest cashflow for the Association, deepest commitment from Patorama, fastest path to category leadership in AU.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═════════ FOOTER ═════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-marks">
+      <!-- Patorama aperture icon -->
+      <svg class="patorama-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305.48 293.21">
+        <path fill="#fff" d="M285.87,37.47l-21.42-15.1-98.14,8.83.17-7.49c.15-6.16-4.83-11.23-10.99-11.2h-.03c-5.94.03-10.77,4.8-10.88,10.74l-.09,7.15-99.55-5.93-21.12,15.52,26.34,9.97,94.19-8.14-.4,32.02s6.3-.85,10.56-.85,10.83.85,10.83.85l.71-31.11,93.7,5.24,26.14-10.49Z"/>
+        <g>
+          <path fill="#6dbe45" d="M59.82,177.6c.62-4.25,1.18-8.52,1.89-12.76.37-2.21,1.01-4.38,1.53-6.6h69.44c-16.75,28.47-33.41,56.77-50.23,85.34-1.88-2.48-3.7-4.68-5.31-7.02-4.76-6.91-8.63-14.28-11.54-22.16-3-8.13-4.81-16.52-5.5-25.15-.04-.5-.19-.99-.28-1.49,0-3.39,0-6.78,0-10.16Z"/>
+          <path fill="#b92025" d="M252.63,187.15c-.62,4.15-1.19,8.32-1.89,12.45-.38,2.21-1.01,4.38-1.52,6.57h-69.08c16.72-28.41,33.34-56.64,50.14-85.17,2.43,3.43,4.77,6.59,6.95,9.84,5.32,7.95,9.28,16.58,11.73,25.78,1.58,5.92,2.27,12.07,3.36,18.12.12.64.21,1.29.32,1.94v10.47Z"/>
+          <path fill="#52b7e8" d="M150.37,278.63c-2.22-.3-4.45-.62-6.67-.9-10.01-1.26-19.52-4.16-28.61-8.53-8.61-4.14-16.42-9.44-23.48-15.86-.15-.14-.28-.29-.55-.58,11.47-19.48,22.95-38.98,34.55-58.69,16.33,27.62,32.55,55.03,48.89,82.66-.73.16-1.25.3-1.78.37-3.65.52-7.29,1.03-10.94,1.54h-11.4Z"/>
+          <path fill="#f49b1e" d="M162.07,85.9c12.31.74,24.65,4.13,35.64,9.5,2.92,1.43,5.78,3,8.54,4.71,5.16,3.18,9.98,6.82,14.48,10.88.71.64.8,1.08.3,1.93-7.91,13.36-15.79,26.74-23.67,40.12-3.02,5.12-6.01,10.25-9.03,15.38-.25.43-.54.84-1,1.55-16.25-27.52-32.38-54.82-48.66-82.39,5.45-.73,10.9-1.67,16.41-1.8,2.32-.06,4.65-.01,6.98.13Z"/>
+          <path fill="#f8e612" d="M66.94,145.83c1.77-3.57,3.29-6.98,5.1-10.23,5.6-10.03,12.81-18.77,21.57-26.21,7.8-6.63,16.42-11.89,25.89-15.76,1.99-.81,4.04-1.49,6.02-2.31.83-.34,1.26-.2,1.73.59,3.44,5.88,6.93,11.74,10.39,17.61,4.9,8.29,9.8,16.59,14.7,24.89,2.21,3.74,4.41,7.49,6.73,11.44h-92.13Z"/>
+          <path fill="#b11f77" d="M186.53,273.34c-10.81-18.28-21.53-36.42-32.38-54.77h91.3c-11.73,26.96-31.41,44.94-58.91,54.77Z"/>
+        </g>
+      </svg>
+      <div class="separator"></div>
+      <img src="pitch-assets/goldwing-logo-white.png" alt="Australian Goldwing Association" class="gw-mark">
+    </div>
+    <p>Patorama Studios × Australian Goldwing Association</p>
+    <p>Strategic Roadmap · June 2026</p>
+    <p class="small">
+      All figures in AUD. Competitive research conducted June 2026 across 26 Australian and international motorcycle clubs and platforms.<br>
+      Prepared for committee review. Confidential.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
