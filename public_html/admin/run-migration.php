@@ -3138,6 +3138,68 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 034 — Backfill members.wings_preference from legacy xlsx eDirectory
+//
+// The legacy "Current AGA Members.xlsx" carries an eDirectory boolean per row:
+//   eDirectory = True   → member wants the digital edition (= 'digital')
+//   eDirectory = False  → member wants the printed edition (= 'print')
+// The xlsx has no rows with both formats, so this migration only sets 'print'.
+// The schema default for wings_preference is 'digital', so digital members are
+// already correct.
+//
+// For each print-only Member#, sets wings_preference = 'print' on every member
+// row sharing that member_number_base (main + associate, since one magazine is
+// posted to the household). Only updates rows whose current value is still
+// 'digital' — this way any admin who has already manually set someone to
+// 'print' or 'both' via the profile dropdown won't be clobbered.
+//
+// Once-off, idempotent (migration key guards re-runs).
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_034_backfill_wings_preference';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 034 — Wings preference backfill', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        // Member#s where the xlsx eDirectory column is False (print-only).
+        $printNumbers = [1076, 1472, 1530, 1531, 1601, 1624, 1625, 1659, 1675, 1687, 1689, 1703, 1708, 1711];
+
+        // Only flip rows still on the schema default ('digital'). Won't clobber
+        // any admin-set 'print' or 'both' values made via the profile dropdown.
+        $update = $pdo->prepare(
+            "UPDATE members
+             SET wings_preference = 'print', updated_at = NOW()
+             WHERE member_number_base = :base
+               AND LOWER(COALESCE(wings_preference, 'digital')) = 'digital'"
+        );
+
+        $totalRows = 0; $matched = 0; $misses = [];
+        foreach ($printNumbers as $n) {
+            $update->execute([':base' => $n]);
+            $rows = $update->rowCount();
+            if ($rows > 0) { $matched++; $totalRows += $rows; }
+            else           { $misses[] = $n; }
+        }
+
+        $note = sprintf(
+            'print households flipped: %d/%d · member rows updated: %d',
+            $matched, count($printNumbers), $totalRows
+        );
+        if ($misses) {
+            $note .= ' · misses (no rows, or already non-default): ' . implode(',', $misses);
+        }
+
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 034 — Wings preference backfill', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 034 — Wings preference backfill', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

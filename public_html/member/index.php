@@ -289,7 +289,10 @@ if ($user && $user['member_id']) {
               'state' => trim($_POST['state'] ?? ''),
               'postcode' => trim($_POST['postal_code'] ?? ''),
               'country' => trim($_POST['country'] ?? ''),
-              'wings_preference' => $_POST['wings_preference'] ?? $targetMember['wings_preference'],
+              // wings_preference is intentionally NOT taken from POST — it determines
+              // membership cost (printed-magazine surcharge applied via MembershipUpgradeService
+              // and the apply/renew flows), so members must contact admin to change it.
+              // The admin Vehicles/Profile view is the only place this flag can be flipped.
               'privacy_level' => $_POST['privacy_level'] ?? $targetMember['privacy_level'],
               'is_historic' => isset($_POST['is_historic']) ? 1 : 0,
             ];
@@ -2831,17 +2834,26 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         </div>
                       </div>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label class="text-sm font-medium text-gray-700">
+                        <?php
+                          // Wings preference is read-only for members — it controls the
+                          // printed-magazine surcharge on their membership cost, so only
+                          // admins can change it. Members see their current value with a
+                          // helper note pointing them at the webmaster.
+                          $wp = strtolower((string) ($profileMember['wings_preference'] ?? 'digital'));
+                          $wpLabel = match ($wp) {
+                            'print' => 'Print',
+                            'both'  => 'Both (Digital + Print)',
+                            default => 'Digital',
+                          };
+                        ?>
+                        <div class="text-sm font-medium text-gray-700">
                           Wings preference
-                          <select name="wings_preference"
-                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            <option value="digital" <?= $profileMember['wings_preference'] === 'digital' ? 'selected' : '' ?>>Digital</option>
-                            <option value="print" <?= $profileMember['wings_preference'] === 'print' ? 'selected' : '' ?>>
-                              Print</option>
-                            <option value="both" <?= $profileMember['wings_preference'] === 'both' ? 'selected' : '' ?>>Both
-                            </option>
-                          </select>
-                        </label>
+                          <div class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 flex items-center gap-2">
+                            <span class="material-icons-outlined text-gray-400 text-base">lock</span>
+                            <span class="font-semibold"><?= e($wpLabel) ?></span>
+                          </div>
+                          <p class="mt-1 text-xs text-gray-500">Affects your membership cost — contact the webmaster to change.</p>
+                        </div>
                         <label class="text-sm font-medium text-gray-700">
                           Directory privacy
                           <select name="privacy_level"

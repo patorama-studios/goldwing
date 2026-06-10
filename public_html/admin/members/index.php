@@ -48,6 +48,7 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
     'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
+    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both'], true) ? $_GET['wings_preference'] : '',
 ];
 
 $sortOptions = [
@@ -226,7 +227,8 @@ $hasAdvancedFilters = $filters['vehicle_type'] !== ''
     || filter_var($filters['has_trike'], FILTER_VALIDATE_BOOLEAN)
     || filter_var($filters['has_trailer'], FILTER_VALIDATE_BOOLEAN)
     || filter_var($filters['has_sidecar'], FILTER_VALIDATE_BOOLEAN)
-|| filter_var($filters['has_historic_rego'], FILTER_VALIDATE_BOOLEAN);
+    || filter_var($filters['has_historic_rego'], FILTER_VALIDATE_BOOLEAN)
+|| $filters['wings_preference'] !== '';
 
 $membersListConfig = [
     'csrf' => Csrf::token(),
@@ -526,6 +528,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <input type="number" min="1900" max="2100" name="vehicle_year_from" value="<?= e($filters['vehicle_year_from']) ?>" class="rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="From">
                   <input type="number" min="1900" max="2100" name="vehicle_year_to" value="<?= e($filters['vehicle_year_to']) ?>" class="rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="To">
                 </div>
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Wings preference
+                <select name="wings_preference" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
+                  <option value="" <?= $filters['wings_preference'] === '' ? 'selected' : '' ?>>All</option>
+                  <option value="digital" <?= $filters['wings_preference'] === 'digital' ? 'selected' : '' ?>>Digital only</option>
+                  <option value="print" <?= $filters['wings_preference'] === 'print' ? 'selected' : '' ?>>Print only</option>
+                  <option value="both" <?= $filters['wings_preference'] === 'both' ? 'selected' : '' ?>>Both</option>
+                </select>
               </label>
             </div>
             <div class="mt-4 grid gap-4 md:grid-cols-2">

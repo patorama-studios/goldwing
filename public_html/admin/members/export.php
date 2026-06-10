@@ -33,6 +33,7 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
     'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
+    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both'], true) ? $_GET['wings_preference'] : '',
 ];
 if (isset($_GET['sort_by'])) {
     $filters['sort_by'] = $_GET['sort_by'];
