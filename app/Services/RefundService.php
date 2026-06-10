@@ -181,6 +181,63 @@ class RefundService
     }
 
     /**
+     * Terminate the membership associated with a given order RIGHT NOW.
+     *
+     *   - membership_periods.status   → 'LAPSED'
+     *   - membership_periods.end_date → CURDATE() (so any code that checks
+     *       end_date instead of status — e.g. "is the member current?" —
+     *       sees them as expired immediately).
+     *   - members.status              → 'LAPSED' if the member has no
+     *       other ACTIVE period left.
+     *
+     * Best-effort: never throws (each step in its own try/catch). Callers
+     * are expected to log their own activity event after.
+     *
+     * Used by:
+     *   • processMembershipRefund() on full refund (auto)
+     *   • /admin/members/actions.php membership_order_refund handler when
+     *     the admin ticks "Terminate this membership now" in the lightbox
+     *     (default ON, also works for partial refunds).
+     */
+    public static function terminateMembershipForOrder(PDO $pdo, array $order): void
+    {
+        $periodId = (int) ($order['membership_period_id'] ?? 0);
+        $memberId = (int) ($order['member_id'] ?? 0);
+
+        if ($periodId > 0) {
+            try {
+                $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED", end_date = CURDATE() WHERE id = :id');
+                $stmt->execute(['id' => $periodId]);
+            } catch (\Throwable $e) {
+                error_log('[RefundService] terminateMembershipForOrder period update failed: ' . $e->getMessage());
+            }
+        }
+
+        if ($memberId > 0) {
+            try {
+                // Only flip members.status if there's no other ACTIVE period
+                // still in date. Catches the case where this order paid for
+                // a renewal period AND the member also has e.g. an associate
+                // period that's still valid — that other period keeps them
+                // active.
+                $stmt = $pdo->prepare(
+                    "SELECT COUNT(*) FROM membership_periods
+                       WHERE member_id = :mid
+                         AND status = 'ACTIVE'
+                         AND (end_date IS NULL OR end_date >= CURDATE())"
+                );
+                $stmt->execute(['mid' => $memberId]);
+                if ((int) $stmt->fetchColumn() === 0) {
+                    $stmt = $pdo->prepare('UPDATE members SET status = "LAPSED", updated_at = NOW() WHERE id = :id');
+                    $stmt->execute(['id' => $memberId]);
+                }
+            } catch (\Throwable $e) {
+                error_log('[RefundService] terminateMembershipForOrder member status update failed: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Resolve a PaymentIntent ID for a given order row.
      *
      * Subscription-created orders only have a `stripe_subscription_id` (and
@@ -374,13 +431,15 @@ class RefundService
         $sql .= ' WHERE id = :id';
         $pdo->prepare($sql)->execute($params);
 
-        // On full refund, lapse the linked membership_periods row so the member
-        // doesn't keep an active membership the AGA was paid back for.
-        if ($remainingAfter <= 0 && !empty($order['membership_period_id'])) {
-            try {
-                $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
-                $stmt->execute(['id' => (int) $order['membership_period_id']]);
-            } catch (\Throwable $e) { /* best-effort */ }
+        // On full refund, terminate the linked membership: lapse the period,
+        // set its end_date to today (so the member is treated as expired
+        // immediately, not just status=LAPSED with a future end_date), and
+        // flip members.status to LAPSED if they have no other active
+        // periods. The /admin/members/actions.php membership_order_refund
+        // handler exposes the same termination as a checkbox for partial
+        // refunds.
+        if ($remainingAfter <= 0) {
+            self::terminateMembershipForOrder($pdo, $order);
         }
 
         ActivityLogger::log('admin', $adminUserId, $memberId, 'membership.refund_processed', [

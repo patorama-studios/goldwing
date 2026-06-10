@@ -1730,32 +1730,24 @@ switch ($action) {
             );
 
             // Optionally terminate the linked membership_period RIGHT NOW
-            // regardless of partial/full refund. RefundService only auto-lapses
-            // on a full refund; the admin lightbox lets the admin force this
-            // for any refund size ("cancel & refund pro-rata" UX).
+            // regardless of partial/full refund. RefundService::processMembershipRefund
+            // already auto-lapses on a FULL refund; the lightbox checkbox lets
+            // the admin force termination for any refund size ("cancel &
+            // refund pro-rata" UX). Uses the shared helper so all three paths
+            // — full-refund auto-lapse, partial-refund + checkbox, and any
+            // future paths — produce the same result.
             if ($terminatePeriod) {
                 $pdo = Database::connection();
-                $stmt = $pdo->prepare('SELECT membership_period_id, member_id FROM orders WHERE id = :id LIMIT 1');
+                $stmt = $pdo->prepare('SELECT id, member_id, membership_period_id FROM orders WHERE id = :id LIMIT 1');
                 $stmt->execute(['id' => $orderId]);
-                $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                $periodId = (int) ($row['membership_period_id'] ?? 0);
-                $orderMemberId = (int) ($row['member_id'] ?? 0);
-                if ($periodId > 0) {
-                    $stmt = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED", end_date = CURDATE() WHERE id = :id');
-                    $stmt->execute(['id' => $periodId]);
-                }
-                // If the member has no other ACTIVE period, mark them LAPSED.
-                if ($orderMemberId > 0) {
-                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM membership_periods WHERE member_id = :mid AND status = 'ACTIVE' AND (end_date IS NULL OR end_date >= CURDATE())");
-                    $stmt->execute(['mid' => $orderMemberId]);
-                    if ((int) $stmt->fetchColumn() === 0) {
-                        $stmt = $pdo->prepare('UPDATE members SET status = "LAPSED", updated_at = NOW() WHERE id = :id');
-                        $stmt->execute(['id' => $orderMemberId]);
-                    }
-                }
+                $orderRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $orderMemberId = (int) ($orderRow['member_id'] ?? 0);
+
+                RefundService::terminateMembershipForOrder($pdo, $orderRow);
+
                 ActivityLogger::log('admin', $user['id'] ?? null, $orderMemberId ?: $memberId, 'membership.terminated_on_refund', [
                     'order_id' => $orderId,
-                    'period_id' => $periodId,
+                    'period_id' => (int) ($orderRow['membership_period_id'] ?? 0),
                     'refund_amount_cents' => $amountCents,
                 ]);
             }
