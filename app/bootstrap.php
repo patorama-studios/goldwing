@@ -35,12 +35,19 @@ if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
 }
 
 session_name($sessionConfig['name']);
+// SameSite=Lax (not Strict) so the session cookie is sent on top-level GET
+// navigations from external sites — specifically Stripe Checkout, which
+// redirects the user back to /member/index.php?page=billing&success=1 (and
+// /order/success?order=…) when the payment is done. Under Strict the cookie
+// is dropped on that first navigation and the user lands on /login.php
+// instead of the success / thank-you page. Lax still blocks the cross-site
+// POSTs that matter for CSRF.
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
     'secure' => $secure,
     'httponly' => $sessionConfig['httponly'],
-    'samesite' => 'Strict',
+    'samesite' => $sessionConfig['samesite'] ?? 'Lax',
 ]);
 session_set_save_handler(new DbSessionHandler(), true);
 if (session_status() !== PHP_SESSION_ACTIVE) {

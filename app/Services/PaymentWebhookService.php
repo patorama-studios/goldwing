@@ -775,15 +775,94 @@ class PaymentWebhookService
                     MembershipUpgradeService::convertAssociateToFull($memberId);
                 }
 
-                $stmt = Database::connection()->prepare('SELECT first_name, last_name, email FROM members WHERE id = :id LIMIT 1');
+                $pdo = Database::connection();
+                $stmt = $pdo->prepare('SELECT first_name, last_name, email, phone, member_type FROM members WHERE id = :id LIMIT 1');
                 $stmt->execute(['id' => $memberId]);
                 $member = $stmt->fetch();
+                $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+
+                // Member-facing thin receipt — unchanged behaviour.
                 NotificationService::dispatch('membership_payment_received', [
                     'primary_email' => $member['email'] ?? '',
                     'admin_emails' => NotificationService::getAdminEmails(),
-                    'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                    'member_name' => $memberName,
                     'order_number' => $order['order_number'] ?? '',
                 ]);
+
+                // Treasurer-facing detailed notification — full reconciliation
+                // data so the treasurer can match payments without opening the
+                // site. Recipient list comes from the admin_emails setting (or
+                // a custom list configured per-template in admin).
+                try {
+                    // Period for term + dates.
+                    $periodStart = '';
+                    $periodEnd   = '';
+                    $termLabel   = '';
+                    $stmt = $pdo->prepare('SELECT start_date, end_date FROM membership_periods WHERE id = :id LIMIT 1');
+                    $stmt->execute(['id' => $periodId]);
+                    $period = $stmt->fetch();
+                    if ($period) {
+                        $periodStart = $period['start_date'] ? date('j M Y', strtotime((string) $period['start_date'])) : '';
+                        $periodEnd   = $period['end_date']   ? date('j M Y', strtotime((string) $period['end_date']))   : '';
+                        if ($period['start_date'] && $period['end_date']) {
+                            $months = max(1, (int) round((strtotime((string) $period['end_date']) - strtotime((string) $period['start_date'])) / (60 * 60 * 24 * 30.44)));
+                            $termLabel = $months >= 34 ? '3-year' : ($months >= 22 ? '2-year' : '1-year');
+                        }
+                    }
+                    if ($termLabel === '' && !empty($metadata['term'])) {
+                        // Fall back to the term we put in Stripe metadata.
+                        $termLabel = strtoupper((string) $metadata['term']) === '3Y'
+                            ? '3-year' : (strtoupper((string) $metadata['term']) === '2Y' ? '2-year' : '1-year');
+                    }
+
+                    // Associate name (if this order purchased an associate add-on).
+                    $associateName = '—';
+                    $associateMemberId = isset($metadata['associate_member_id']) ? (int) $metadata['associate_member_id'] : 0;
+                    if ($associateMemberId > 0) {
+                        $stmt = $pdo->prepare('SELECT first_name, last_name FROM members WHERE id = :id LIMIT 1');
+                        $stmt->execute(['id' => $associateMemberId]);
+                        $assoc = $stmt->fetch();
+                        if ($assoc) {
+                            $associateName = trim(($assoc['first_name'] ?? '') . ' ' . ($assoc['last_name'] ?? ''));
+                        }
+                    }
+
+                    // Amount + payment method from the order row.
+                    $amount = '';
+                    if (isset($order['total'])) {
+                        $amount = 'A$' . number_format((float) $order['total'], 2);
+                    } elseif (isset($order['amount'])) {
+                        $amount = 'A$' . number_format((float) $order['amount'], 2);
+                    }
+                    $paymentMethod = 'Stripe (card)';
+                    if (!empty($order['payment_method'])) {
+                        $paymentMethod = ucfirst((string) $order['payment_method']);
+                    }
+
+                    $orderId = (int) ($order['id'] ?? 0);
+                    $adminLink = BaseUrlService::buildUrl('/admin/membership-orders/view.php?id=' . $orderId);
+
+                    NotificationService::dispatch('membership_treasurer_notification', [
+                        'primary_email'        => $member['email'] ?? '',
+                        'admin_emails'         => NotificationService::getAdminEmails(),
+                        'member_name'          => $memberName,
+                        'member_email'         => $member['email'] ?? '—',
+                        'member_phone'         => $member['phone'] ?? '—',
+                        'member_type'          => ucfirst(strtolower((string) ($member['member_type'] ?? 'member'))),
+                        'term_label'           => $termLabel,
+                        'amount'               => $amount,
+                        'period_start'         => $periodStart,
+                        'period_end'           => $periodEnd,
+                        'payment_method'       => $paymentMethod,
+                        'stripe_payment_intent'=> (string) ($order['stripe_payment_intent_id'] ?? ''),
+                        'associate_name'       => $associateName,
+                        'order_number'         => $order['order_number'] ?? ('#' . $orderId),
+                        'admin_link'           => $adminLink,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Don't block the webhook on a notification failure.
+                    error_log('[PaymentWebhookService] treasurer notification failed: ' . $e->getMessage());
+                }
             }
             return;
         }

@@ -138,6 +138,45 @@ class NotificationService
                     'reply_to' => 'webmaster@goldwing.org.au',
                 ],
             ],
+            'membership_treasurer_notification' => [
+                'label' => 'Membership payment — treasurer notification',
+                'description' => 'Sent to the treasurer / admin recipients when a membership payment is received, with the full reconciliation details.',
+                'trigger' => 'Stripe webhook for membership_payment_received (fires alongside the member-facing receipt).',
+                'category' => 'payments',
+                'is_mandatory' => false,
+                'placeholders' => [
+                    'order_number', 'member_name', 'member_email', 'member_phone',
+                    'member_type', 'term_label', 'amount', 'period_start', 'period_end',
+                    'payment_method', 'stripe_payment_intent', 'associate_name',
+                    'admin_link',
+                ],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'admin',
+                    'custom_recipients' => '',
+                    'subject' => '[Membership paid] {{member_name}} — {{term_label}} {{member_type}} — {{amount}}',
+                    'body' =>
+                        '<p>A membership payment has just been received and processed.</p>'
+                        . '<table style="border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;margin-top:12px;">'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Member</td><td style="padding:6px 0;"><strong>{{member_name}}</strong></td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;">{{member_email}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;">{{member_phone}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Membership type</td><td style="padding:6px 0;">{{member_type}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Term</td><td style="padding:6px 0;">{{term_label}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Period</td><td style="padding:6px 0;">{{period_start}} → <strong>{{period_end}}</strong></td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Associate</td><td style="padding:6px 0;">{{associate_name}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Amount paid</td><td style="padding:6px 0;"><strong>{{amount}}</strong></td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Payment method</td><td style="padding:6px 0;">{{payment_method}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Order #</td><td style="padding:6px 0;">{{order_number}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Stripe PI</td><td style="padding:6px 0;font-family:monospace;font-size:12px;">{{stripe_payment_intent}}</td></tr>'
+                        . '</table>'
+                        . '<p style="margin-top:18px;"><a href="{{admin_link}}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">View order in admin</a></p>'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:12px;">This is an automated notification. You can edit who receives it, and the content, in Admin → Settings → Notifications → Membership payment — treasurer notification.</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
             'membership_order_approved' => [
                 'label' => 'Membership order approved',
                 'description' => 'Sent when an admin approves a membership order.',

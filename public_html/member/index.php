@@ -729,7 +729,10 @@ if ($user && $user['member_id']) {
                 'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
               ];
             }
-            $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+            // Land on the dashboard with ?renewed=1 so the thank-you lightbox
+            // + confetti fires. Old /member/index.php?page=billing&success=1
+            // showed a flat banner only.
+            $successUrl = BaseUrlService::buildUrl('/member/?renewed=1');
             $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
             $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, [
               'order_id' => (string) $orderId,
@@ -896,7 +899,10 @@ if ($user && $user['member_id']) {
             if ($renewError) {
               $billingError = $renewError;
             } else {
-              $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+              // Land on the dashboard with ?renewed=1 for the confetti
+              // lightbox. Cancel still goes to billing so the member can
+              // try again immediately.
+              $successUrl = BaseUrlService::buildUrl('/member/?renewed=1');
               $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
               $metadata = [
                 'order_type' => 'membership',
@@ -5372,6 +5378,122 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     </div>
   </main>
 </div>
+
+<?php
+// Post-Stripe-checkout thank-you lightbox + confetti.
+// Fires when /member/?renewed=1 is hit (i.e. the Stripe success_url).
+// We pull the renewal end date and member type for the message.
+$showRenewedLightbox = isset($_GET['renewed']) && $member;
+if ($showRenewedLightbox):
+  $renewEndIso = (string) ($membershipPeriod['end_date'] ?? '');
+  $renewEndLabel = $renewEndIso !== '' ? date('j F Y', strtotime($renewEndIso)) : '';
+  $renewStatus = strtoupper((string) ($membershipPeriod['status'] ?? ''));
+  $renewIsPending = $renewStatus === 'PENDING_PAYMENT' || $renewStatus === '';
+  $renewTermLabel = '';
+  if ($renewEndIso !== '') {
+    $start = strtotime((string) ($membershipPeriod['start_date'] ?? 'today'));
+    $diffMonths = max(1, (int) round((strtotime($renewEndIso) - $start) / (60 * 60 * 24 * 30.44)));
+    if ($diffMonths >= 34) {
+      $renewTermLabel = '3-year';
+    } elseif ($diffMonths >= 22) {
+      $renewTermLabel = '2-year';
+    } else {
+      $renewTermLabel = '1-year';
+    }
+  }
+  $renewMemberTypeLabel = ucfirst(strtolower((string) ($member['member_type'] ?? 'member')));
+?>
+<div id="renewed-lightbox"
+     class="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+     role="dialog" aria-modal="true" aria-labelledby="renewed-title">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-renewed-dismiss></div>
+  <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 md:p-10 text-center transform transition-all">
+    <!-- Trophy icon -->
+    <div class="mx-auto w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-5">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-primary">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+        <path d="M4 22h16"/>
+        <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+        <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+        <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+      </svg>
+    </div>
+    <h2 id="renewed-title" class="font-display text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+      Thank you, <?= e($welcomeName ?? 'Member') ?>! 🎉
+    </h2>
+    <?php if ($renewIsPending): ?>
+      <p class="text-gray-600 mb-6 leading-relaxed">
+        Your <?= e($renewTermLabel) ?: '' ?> <?= e(strtolower($renewMemberTypeLabel)) ?> membership renewal is being confirmed by our payment provider. This usually takes under a minute — refresh this page in a moment to see your new end date.
+      </p>
+    <?php else: ?>
+      <p class="text-gray-600 mb-2 leading-relaxed">
+        Your <strong><?= e($renewTermLabel) ?: '' ?> <?= e(strtolower($renewMemberTypeLabel)) ?> membership</strong> is locked in.
+      </p>
+      <?php if ($renewEndLabel !== ''): ?>
+        <p class="text-gray-700 mb-6">
+          You're a current member until <strong><?= e($renewEndLabel) ?></strong>. Ride safe!
+        </p>
+      <?php endif; ?>
+    <?php endif; ?>
+    <p class="text-xs text-gray-400 mb-6">
+      A receipt has been emailed to <?= e($member['email'] ?? '') ?>. The treasurer has been notified too.
+    </p>
+    <button type="button" data-renewed-dismiss
+            class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm transition-colors shadow-sm">
+      Continue to my dashboard
+    </button>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+<script>
+  (function () {
+    const lightbox = document.getElementById('renewed-lightbox');
+    if (!lightbox) return;
+    const fireConfetti = () => {
+      if (typeof confetti !== 'function') return;
+      const end = Date.now() + 2500;
+      const colors = ['#F2C94C', '#16a34a', '#dc2626', '#1d4ed8', '#ffffff'];
+      (function frame() {
+        confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0 }, colors });
+        confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1 }, colors });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      }());
+      // Big initial burst from the centre.
+      confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 }, colors });
+    };
+    const trigger = () => {
+      fireConfetti();
+      // Re-fire after 600ms for layered effect.
+      setTimeout(fireConfetti, 600);
+    };
+    // Run confetti once the script has loaded (defer attribute -> after DOM).
+    if (document.readyState === 'complete') {
+      trigger();
+    } else {
+      window.addEventListener('load', trigger, { once: true });
+    }
+    const dismiss = () => {
+      lightbox.classList.add('opacity-0', 'pointer-events-none');
+      setTimeout(() => lightbox.remove(), 200);
+      // Strip ?renewed=1 from URL so a refresh doesn't re-show it.
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('renewed');
+        window.history.replaceState({}, '', u.pathname + (u.search || ''));
+      } catch (e) { /* ignore */ }
+    };
+    lightbox.querySelectorAll('[data-renewed-dismiss]').forEach((el) => {
+      el.addEventListener('click', dismiss);
+    });
+    // Esc to close.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') dismiss();
+    });
+  })();
+</script>
+<?php endif; ?>
+
 <?php
 $renewModalEligible = false;
 if ($member
