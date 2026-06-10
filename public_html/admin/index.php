@@ -735,7 +735,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
               ];
             }
-            $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&success=1');
+            // Land on the dashboard with ?renewed=1 (thank-you lightbox + confetti).
+            $successUrl = BaseUrlService::buildUrl('/member/?renewed=1');
             $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
             $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $row['email'], $successUrl, $cancelUrl, [
               'order_id' => (string) $order['id'],

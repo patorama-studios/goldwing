@@ -114,7 +114,8 @@ class MembershipUpgradeService
             }
 
             $orderId = (int) ($order['id'] ?? 0);
-            $successUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&upgrade=1&success=1');
+            // Land on the dashboard with ?renewed=1&upgrade=1 (thank-you lightbox + confetti).
+            $successUrl = BaseUrlService::buildUrl('/member/?renewed=1&upgrade=1');
             $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=profile&upgrade=cancelled');
 
             $lineItems = [[
