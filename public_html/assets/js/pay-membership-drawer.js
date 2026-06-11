@@ -218,10 +218,22 @@
     if (isFetchingIntent) return false;
     isFetchingIntent = true;
     showPayError('');
+    showSelectError('');
     try {
-      // Always re-fetch on Continue — guarantees the amount matches the
-      // member's current pick even if they bounced between views.
-      var data = await fetchIntent();
+      // 1) Fetch intent. This call decides amount + creates/reuses the
+      // pending order on the server. Returns client_secret + matrix.
+      var data;
+      try {
+        data = await fetchIntent();
+      } catch (e) {
+        // Surface a clear, actionable message — both views show it so
+        // the user sees something whichever view they're on.
+        var msg = e.message || 'Could not start the payment.';
+        showSelectError(msg);
+        showPayError(msg);
+        throw e;
+      }
+
       pricingMatrix = data.pricing || pricingMatrix;
       publishableKey = data.publishable_key || publishableKey;
       currentOrderId = data.order_id || currentOrderId;
@@ -229,37 +241,71 @@
       updatePriceLabels();
       updateSummary(data);
 
+      // 2) Make sure Stripe.js is loaded. If the <script> tag is still
+      // pending (defer / network), wait briefly and surface a useful
+      // error if it never lands.
       if (!window.Stripe) {
-        throw new Error('Stripe.js failed to load. Refresh the page.');
+        for (var i = 0; i < 20; i++) {
+          await new Promise(function (r) { return setTimeout(r, 100); });
+          if (window.Stripe) break;
+        }
+        if (!window.Stripe) {
+          var m = 'Stripe.js did not load (network or CSP block). Refresh the page.';
+          showPayError(m);
+          throw new Error(m);
+        }
+      }
+      if (!publishableKey) {
+        var m2 = 'Stripe publishable key missing — admin must configure Stripe.';
+        showPayError(m2);
+        throw new Error(m2);
       }
       if (!stripe) stripe = window.Stripe(publishableKey);
 
+      // 3) Mount (or remount on tier/term change) the Payment Element.
+      // The container is in View 2 which is off-screen on the slider —
+      // mounting into an off-screen container works fine for Stripe;
+      // the iframe sizes itself on first render.
       if (currentSecret !== data.client_secret || !paymentElement) {
         if (paymentElement) { try { paymentElement.unmount(); } catch (e) {} }
-        elements = stripe.elements({
-          clientSecret: data.client_secret,
-          appearance: {
-            theme: 'stripe',
-            variables: {
-              colorPrimary: '#111827',
-              colorBackground: '#ffffff',
-              colorText: '#111827',
-              borderRadius: '8px',
-              fontFamily: 'Inter, system-ui, sans-serif',
+        var container = get('[data-pay-drawer-element]');
+        if (!container) {
+          var m3 = 'Payment form container missing in DOM.';
+          showPayError(m3);
+          throw new Error(m3);
+        }
+        try {
+          elements = stripe.elements({
+            clientSecret: data.client_secret,
+            appearance: {
+              theme: 'stripe',
+              variables: {
+                colorPrimary: '#dc2626',
+                colorBackground: '#ffffff',
+                colorText: '#111827',
+                borderRadius: '8px',
+                fontFamily: 'Inter, system-ui, sans-serif',
+              },
             },
-          },
-        });
-        paymentElement = elements.create('payment', {
-          layout: { type: 'tabs', defaultCollapsed: false },
-          wallets: { applePay: 'auto', googlePay: 'auto' },
-        });
-        paymentElement.mount(get('[data-pay-drawer-element]'));
-        paymentElement.on('ready', clearPlaceholder);
-        currentSecret = data.client_secret;
+          });
+          paymentElement = elements.create('payment', {
+            layout: { type: 'tabs', defaultCollapsed: false },
+            wallets: { applePay: 'auto', googlePay: 'auto' },
+          });
+          paymentElement.mount(container);
+          paymentElement.on('ready', clearPlaceholder);
+          paymentElement.on('loaderror', function (ev) {
+            var m4 = (ev && ev.error && ev.error.message) || 'Stripe Element failed to load.';
+            showPayError(m4);
+          });
+          currentSecret = data.client_secret;
+        } catch (mountErr) {
+          showPayError('Could not mount payment form: ' + (mountErr.message || mountErr));
+          throw mountErr;
+        }
       }
       return true;
     } catch (e) {
-      showSelectError(e.message || 'Could not prepare payment.');
       return false;
     } finally {
       isFetchingIntent = false;
@@ -327,21 +373,16 @@
     if (overrides.term) currentTerm = overrides.term;
     syncInputs();
     setView('select');
+    // Centered lightbox — the root has `hidden` + `items-start justify-center`
+    // flex classes. Removing `hidden` and adding `flex` shows the modal.
     root.classList.remove('hidden');
-    requestAnimationFrame(function () {
-      var bd = get('[data-pay-drawer-backdrop]');
-      var pn = get('[data-pay-drawer-panel]');
-      if (bd) bd.classList.add('opacity-100');
-      if (pn) pn.classList.remove('translate-x-full');
-    });
+    root.classList.add('flex');
     document.body.style.overflow = 'hidden';
-    // Pre-fetch the pricing matrix so the term cards show real prices
-    // without the member having to click Continue first. If this fails
-    // silently, the matrix populates on the first Continue click instead.
+    // Kick off the intent fetch right away — that way the price labels
+    // populate, the order summary shows, and the Element is already
+    // primed when the user clicks Continue to payment.
     if (!pricingMatrix) {
       ensureElementMounted().catch(function () {}).then(function () {
-        // After fetch we've moved further than we wanted — revert to
-        // select view so the slide stays on view 1.
         setView('select');
       });
     } else {
@@ -352,15 +393,10 @@
 
   function close() {
     if (!root) return;
-    var bd = get('[data-pay-drawer-backdrop]');
-    var pn = get('[data-pay-drawer-panel]');
-    if (bd) bd.classList.remove('opacity-100');
-    if (pn) pn.classList.add('translate-x-full');
-    setTimeout(function () {
-      root.classList.add('hidden');
-      document.body.style.overflow = '';
-      setView('select');
-    }, 300);
+    root.classList.add('hidden');
+    root.classList.remove('flex');
+    document.body.style.overflow = '';
+    setView('select');
     if (window.location.search.indexOf('pay=') !== -1) {
       try {
         var url = new URL(window.location.href);

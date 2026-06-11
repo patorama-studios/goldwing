@@ -1655,7 +1655,7 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
-<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R3 — if you can grep for this on
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R4 — if you can grep for this on
      the rendered HTML it means cPanel actually copied files. Bump the
      suffix on every push so a stale opcache vs missing-file question can
      be answered with one curl. -->
@@ -5420,10 +5420,14 @@ try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
 }
 ?>
 <?php if ($member): ?>
-<aside id="pay-membership-drawer"
-       class="fixed inset-0 z-[9000] hidden"
-       role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
-       data-csrf="<?= e($_drawerCsrf) ?>"
+<!-- Pay-membership lightbox — same centered modal style as #renew-modal
+     so the visual language is consistent. Inside the white card there's
+     a slider that swaps between View 1 (membership selector) and View 2
+     (Stripe Payment Element). -->
+<div id="pay-membership-drawer"
+     class="hidden fixed inset-0 z-[9000] items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
+     data-csrf="<?= e($_drawerCsrf) ?>"
        data-default-tier="<?= e($_defaultTier) ?>"
        data-default-term="<?= e($_defaultTerm) ?>"
        data-allow-associate="<?= $_allowBoth ? '1' : '0' ?>"
@@ -5431,50 +5435,44 @@ try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
        data-show-36="<?= $_show36 ? '1' : '0' ?>"
        data-auto-open="<?= $_autoOpen ? '1' : '0' ?>"
        data-pending-number="<?= e($_pendingNum) ?>">
-  <!-- Backdrop -->
-  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"
-       data-pay-drawer-backdrop data-pay-drawer-close></div>
-  <!-- Panel -->
-  <div class="absolute right-0 top-0 h-full w-full max-w-[560px] bg-white shadow-2xl
-              transform translate-x-full transition-transform duration-300 ease-out
-              flex flex-col"
+  <!-- Outer click target closes drawer (matches renew-modal behaviour) -->
+  <div class="absolute inset-0" data-pay-drawer-close></div>
+
+  <!-- Lightbox card — same shell as #renew-modal -->
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600 overflow-hidden"
        data-pay-drawer-panel>
-    <!-- Header (shared across both views) -->
-    <header class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
-      <div class="flex items-center gap-3 min-w-0">
-        <!-- Back button — only shown in payment view -->
+    <!-- Shared header (icon + title + back arrow + close) — matches renew-modal -->
+    <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+      <div class="flex items-start gap-3 min-w-0">
         <button type="button" data-pay-drawer-back
-                class="hidden text-slate-400 hover:text-slate-700 flex-shrink-0"
-                aria-label="Back to membership">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
+                class="hidden mt-1 text-gray-400 hover:text-gray-700"
+                aria-label="Back to plan">
+          <span class="material-icons-outlined">arrow_back</span>
         </button>
         <div class="min-w-0">
-          <h2 id="pay-drawer-title" class="font-display text-xl font-bold text-gray-900 truncate"
-              data-pay-drawer-title>Renew your membership</h2>
-          <p class="text-xs text-slate-500 mt-0.5 truncate" data-pay-drawer-subtitle>
-            Pick a plan — payment comes next.
+          <h2 id="pay-drawer-title" class="font-display text-xl font-bold text-gray-900 flex items-center gap-2"
+              data-pay-drawer-title>
+            <span class="material-icons-outlined text-red-600">payments</span>
+            <span>Renew membership</span>
+          </h2>
+          <p class="mt-1 text-sm text-gray-500" data-pay-drawer-subtitle>
+            Choose your renewal term and confirm your details.
           </p>
         </div>
       </div>
       <button type="button" data-pay-drawer-close
-              class="text-slate-400 hover:text-slate-700 flex-shrink-0" aria-label="Close">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-          <path d="M18 6 6 18M6 6l12 12"/>
-        </svg>
+              class="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100" aria-label="Close">
+        <span class="material-icons-outlined">close</span>
       </button>
     </header>
 
     <!-- Sliding viewport: 2 panels side-by-side, width = 200% -->
-    <div class="flex-1 overflow-hidden">
-      <div class="h-full flex transition-transform duration-300 ease-out"
+    <div class="overflow-hidden">
+      <div class="flex transition-transform duration-300 ease-out"
            style="width:200%" data-pay-drawer-slider>
 
         <!-- ============= VIEW 1: Membership selector ============= -->
-        <section class="w-1/2 h-full overflow-y-auto" data-pay-drawer-view="select">
+        <section class="w-1/2 self-start" data-pay-drawer-view="select">
           <!-- Membership type -->
           <div class="px-6 py-5 border-b border-gray-100">
             <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Membership type</h3>
@@ -5556,7 +5554,7 @@ try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
         </section>
 
         <!-- ============= VIEW 2: Credit card / payment ============= -->
-        <section class="w-1/2 h-full overflow-y-auto" data-pay-drawer-view="pay">
+        <section class="w-1/2 self-start" data-pay-drawer-view="pay">
           <div class="px-6 py-5">
             <!-- Inline security messaging (inlined here too — no partial req) -->
             <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3 mb-4">
@@ -5612,25 +5610,23 @@ try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
       </div>
     </div>
 
-    <!-- Footer with Pay button (only enabled on payment view) -->
-    <footer class="px-6 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+    <!-- Footer Pay button — bottom of the lightbox card. Same red gradient
+         style as the renew-modal's "Continue to payment" button so it
+         visually matches the rest of the experience. -->
+    <div class="px-6 py-4 border-t border-gray-100 bg-white">
       <button type="button" data-pay-drawer-pay
-              disabled
-              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-sm">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-        <span data-pay-drawer-pay-label>Continue to payment →</span>
+              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-sm">
+        <span class="material-icons-outlined text-base" data-pay-drawer-pay-icon>lock</span>
+        <span data-pay-drawer-pay-label>Continue to payment</span>
       </button>
       <p class="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
         <span>256-bit SSL</span><span>•</span>
         <span>PCI DSS Level 1</span><span>•</span>
         <span>Powered by Stripe</span>
       </p>
-    </footer>
+    </div>
   </div>
-</aside>
+</div>
 <?php endif; ?>
 
 <?php
