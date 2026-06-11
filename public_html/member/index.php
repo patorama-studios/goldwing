@@ -1655,7 +1655,7 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
-<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R2 — if you can grep for this on
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R3 — if you can grep for this on
      the rendered HTML it means cPanel actually copied files. Bump the
      suffix on every push so a stale opcache vs missing-file question can
      be answered with one curl. -->
@@ -5389,29 +5389,37 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 // break it). Panel 1 = membership selector, Panel 2 = credit card form;
 // the "Continue to payment →" button slides panel 1 left to reveal panel
 // 2 in the same drawer width. No Stripe full-page redirect anywhere.
-$_drawerOk = false;
+// Always render the drawer markup if there's a logged-in member. The
+// per-setting lookups (StripeSettings, defaults, etc) are each defensively
+// resolved below — a missing config is a degraded experience, not a hidden
+// drawer. Previous round wrapped all this in try/catch and silently set
+// $_drawerOk=false if anything inside threw, which is exactly what was
+// happening on live and why the drawer was invisible.
+$_drawerError = '';
+$_stripeSettingsForDrawer = [];
 try {
-  if ($member) {
-    $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
-    if (!is_array($_stripeSettingsForDrawer)) $_stripeSettingsForDrawer = [];
-    $_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
-    if (!is_array($_drawerPrices)) $_drawerPrices = [];
-    $_defaultTier = strtoupper((string) ($member['member_type'] ?? 'FULL'));
-    $_defaultTerm = (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M');
-    $_allowBoth   = !empty($_stripeSettingsForDrawer['membership_allow_both_types']);
-    $_show24      = !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']);
-    $_show36      = !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']);
-    $_hasPending  = !empty($pendingMembershipOrder);
-    $_autoOpen    = $_hasPending && in_array($page, ['billing', 'dashboard'], true);
-    $_pendingNum  = (string) ($pendingMembershipOrder['order_number'] ?? '');
-    $_drawerCsrf  = Csrf::token();
-    $_drawerOk    = true;
-  }
-} catch (\Throwable $_drawerError) {
-  error_log('[/member/] pay drawer setup failed: ' . $_drawerError->getMessage());
+  $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
+  if (!is_array($_stripeSettingsForDrawer)) $_stripeSettingsForDrawer = [];
+} catch (\Throwable $e) {
+  $_drawerError = 'stripe settings: ' . $e->getMessage();
+  error_log('[/member/] drawer Stripe settings failed: ' . $e->getMessage());
+}
+$_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
+if (!is_array($_drawerPrices)) $_drawerPrices = [];
+$_defaultTier = $member ? strtoupper((string) ($member['member_type'] ?? 'FULL')) : 'FULL';
+$_defaultTerm = (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M');
+$_allowBoth   = !empty($_stripeSettingsForDrawer['membership_allow_both_types']);
+$_show24      = !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']);
+$_show36      = !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']);
+$_hasPending  = !empty($pendingMembershipOrder);
+$_autoOpen    = $_hasPending && in_array($page, ['billing', 'dashboard'], true);
+$_pendingNum  = (string) ($pendingMembershipOrder['order_number'] ?? '');
+$_drawerCsrf  = '';
+try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
+  $_drawerError = ($_drawerError ?: '') . ' csrf: ' . $e->getMessage();
 }
 ?>
-<?php if ($_drawerOk): ?>
+<?php if ($member): ?>
 <aside id="pay-membership-drawer"
        class="fixed inset-0 z-[9000] hidden"
        role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
