@@ -1,5 +1,5 @@
 <?php
-// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN_R2 — bump on every push so we can curl
+// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN_R3 — bump on every push so we can curl
 // the rendered page to confirm whether cPanel actually copied new files.
 require_once __DIR__ . '/../../app/bootstrap.php';
 
@@ -121,6 +121,25 @@ function status_badge_classes(string $status): string
     'suspended' => 'bg-indigo-50 text-indigo-800',
     default => 'bg-slate-100 text-slate-800',
   };
+}
+
+/**
+ * Small lock overlay dropped inside a dashboard widget that previews a locked
+ * feature (Wings, calendar, awards, notices) while the membership is lapsed.
+ * The parent card needs `relative overflow-hidden`; the overlay uses a high
+ * z-index so it sits above the card content regardless of DOM order, blurring
+ * it and intercepting clicks. CSS lives in app/Views/partials/member_lockdown.php.
+ */
+function gw_dashboard_lock_overlay(string $renewUrl): string
+{
+  $url = htmlspecialchars($renewUrl, ENT_QUOTES, 'UTF-8');
+  return <<<HTML
+<div class="gw-lock-card-overlay" aria-label="Locked — renew your membership to unlock">
+  <span class="gw-lock-card-pill"><span class="material-icons-outlined">lock</span></span>
+  <p class="gw-lock-card-text">Renew your membership to unlock</p>
+  <a href="$url" class="gw-lock-card-btn"><span class="material-icons-outlined text-sm">autorenew</span> Renew now</a>
+</div>
+HTML;
 }
 
 function membership_renewal_amount_cents(string $magazineType, string $memberTypeKey, string $termMonths): int
@@ -1718,6 +1737,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         // Committee/leadership role pills sourced from member_committee_assignments.
         $memberRolePills = $member ? CommitteeService::rolesForMember((int) $member['id']) : [];
         $isLifeMember = ($member['member_type'] ?? '') === 'LIFE';
+        // Lapsed members can stay on the dashboard, but its widgets that preview
+        // locked features (Wings / calendar / awards / notices / directory) get
+        // an individual lock overlay so they can't be clicked through.
+        $gwLapsedDash = \App\Services\MembershipAccessService::isLapsed($user);
+        $gwRenewUrl = '/member/index.php?page=billing&pay=1';
         $expiryLabel = $isLifeMember
           ? 'No expiry'
           : ($membershipPeriod ? (format_date_au($membershipPeriod['end_date'] ?? null) ?: 'N/A') : 'N/A');
@@ -1948,7 +1972,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 
         <!-- WINGS MAGAZINE (slim, directly under the welcome) -->
         <?php if ($wingsLatest): ?>
-          <section class="bg-gradient-to-r from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
+          <section class="relative overflow-hidden bg-gradient-to-r from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
+            <?php if ($gwLapsedDash): ?><?= gw_dashboard_lock_overlay($gwRenewUrl) ?><?php endif; ?>
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
               <div class="w-20 aspect-[3/4] rounded-lg border border-indigo-100 bg-white shadow-sm overflow-hidden flex-shrink-0">
                 <?php if (!empty($wingsLatest['cover_image_url'])): ?>
@@ -2028,7 +2053,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <!-- 3-COL: Calendar (left) | Quick Actions | AGM Awards -->
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Upcoming events / calendar -->
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+          <div class="relative overflow-hidden bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+            <?php if ($gwLapsedDash): ?><?= gw_dashboard_lock_overlay($gwRenewUrl) ?><?php endif; ?>
             <div class="flex items-center justify-between mb-5">
               <div class="flex items-center gap-3">
                 <div class="p-2 bg-teal-100 rounded-lg text-teal-600">
@@ -2105,6 +2131,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </span>
                 <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
               </a>
+              <?php if ($gwLapsedDash): ?>
+              <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 bg-gray-50 opacity-70 hover:border-red-300 hover:bg-red-50 transition"
+                href="<?= e($gwRenewUrl) ?>" title="Renew your membership to unlock">
+                <span class="flex items-center gap-2 font-medium text-gray-500">
+                  <span class="material-icons-outlined text-[18px] text-gray-400">groups</span>
+                  Members directory
+                </span>
+                <span class="material-icons-outlined text-gray-400 text-base">lock</span>
+              </a>
+              <?php else: ?>
               <a class="group flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition"
                 href="/member/index.php?page=directory">
                 <span class="flex items-center gap-2 font-medium text-gray-700 group-hover:text-green-700">
@@ -2113,11 +2149,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </span>
                 <span class="material-icons-outlined text-gray-400 group-hover:text-green-600 text-sm">arrow_forward_ios</span>
               </a>
+              <?php endif; ?>
             </div>
           </div>
 
           <!-- AGM Award trophy card -->
           <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full relative overflow-hidden">
+            <?php if ($gwLapsedDash): ?><?= gw_dashboard_lock_overlay($gwRenewUrl) ?><?php endif; ?>
             <?php if ($latestAward): ?>
               <div class="absolute -top-4 -right-4 opacity-10 pointer-events-none">
                 <span class="material-icons-outlined text-9xl text-yellow-500">emoji_events</span>
@@ -2277,7 +2315,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <!-- NOTICES + ORDERS -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Notice board (clickable list, no inline content) -->
-          <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="relative overflow-hidden bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <?php if ($gwLapsedDash): ?><?= gw_dashboard_lock_overlay($gwRenewUrl) ?><?php endif; ?>
             <div class="flex items-center justify-between mb-5">
               <div class="flex items-center gap-3">
                 <div class="p-2 bg-red-100 rounded-lg text-red-600">

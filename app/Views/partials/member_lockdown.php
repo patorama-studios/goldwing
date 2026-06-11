@@ -159,6 +159,30 @@ if (!empty($ldState['lapsed'])):
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
     overflow: hidden;
   }
+  /* Per-widget lock overlay used on dashboard preview cards (Wings, calendar,
+     awards, notices). Parent card must be position:relative overflow-hidden. */
+  .gw-lock-card-overlay {
+    position: absolute; inset: 0; z-index: 20;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.6rem; text-align: center; padding: 1rem;
+    background: rgba(248, 250, 252, 0.6);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    border-radius: inherit;
+  }
+  .gw-lock-card-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 2.5rem; width: 2.5rem; border-radius: 9999px;
+    background: #fee2e2; color: #dc2626;
+  }
+  .gw-lock-card-text { font-size: 0.8rem; font-weight: 600; color: #334155; }
+  .gw-lock-card-btn {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    border-radius: 0.5rem; background: #dc2626; color: #fff;
+    padding: 0.4rem 0.85rem; font-size: 0.75rem; font-weight: 600;
+    transition: background-color .15s ease;
+  }
+  .gw-lock-card-btn:hover { background: #b91c1c; }
 </style>
 <script>
   (function () {
