@@ -39,8 +39,8 @@ class MembershipAccessService
         'notifications',
     ];
 
-    /** Normalised status values that mean the membership has lapsed. */
-    private const LAPSED_STATUSES = ['expired', 'lapsed', 'inactive'];
+    /** Normalised status values that mean the membership is locked down. */
+    public const LAPSED_STATUSES = ['expired', 'lapsed', 'cancelled', 'suspended', 'inactive'];
 
     /** Per-request memo keyed by user/member id so each page hits the DB once. */
     private static array $stateCache = [];
@@ -58,6 +58,44 @@ class MembershipAccessService
     public static function isLapsed(?array $user): bool
     {
         return (bool) (self::state($user)['lapsed'] ?? false);
+    }
+
+    /** Does this normalised status value mean the member is locked out? */
+    public static function isLockedStatus(?string $status): bool
+    {
+        return in_array(strtolower(trim((string) $status)), self::LAPSED_STATUSES, true);
+    }
+
+    /**
+     * Resolve the single effective status from the two status fields.
+     *
+     * members.status is authoritative for the locked states (expired,
+     * cancelled, suspended, inactive): an admin setting any of these in the
+     * single-member view — or the expiry cron — wins immediately, even if the
+     * latest membership_period row still reads ACTIVE. For active/pending
+     * members we trust the live period status instead, which keeps a freshly
+     * renewed member (members.status already 'active') from being false-locked
+     * by a stale value. Pure function so the dashboard and the lockdown agree.
+     */
+    public static function effectiveStatusFrom(?array $member, ?array $period): string
+    {
+        $memberStatus = strtolower(trim((string) ($member['status'] ?? '')));
+        $periodStatus = strtolower(trim((string) ($period['status'] ?? '')));
+
+        // Admin / cron override on members.status wins.
+        if (self::isLockedStatus($memberStatus)) {
+            return $memberStatus;
+        }
+
+        // Otherwise defer to the live period status.
+        if ($periodStatus !== '') {
+            return $periodStatus;
+        }
+        if (!empty($period['end_date'])
+            && strtotime((string) $period['end_date']) >= strtotime('today')) {
+            return 'active';
+        }
+        return $memberStatus;
     }
 
     /**
@@ -109,12 +147,9 @@ class MembershipAccessService
             $period = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
             $result['end_date'] = $period['end_date'] ?? null;
 
-            // Prefer the live period status over the cached members.status.
-            $statusKey = strtolower((string) ($period['status'] ?? $member['status'] ?? ''));
-            if ($statusKey === '' && !empty($period['end_date'])
-                && strtotime((string) $period['end_date']) >= strtotime('today')) {
-                $statusKey = 'active';
-            }
+            // members.status wins for admin/cron-set locked states; otherwise
+            // the live period status is used. See effectiveStatusFrom().
+            $statusKey = self::effectiveStatusFrom($member, $period);
             $result['status'] = $statusKey;
 
             // A payment in flight (processing/succeeded per the dashboard's
@@ -125,7 +160,7 @@ class MembershipAccessService
                 return self::$stateCache[$cacheKey] = $result;
             }
 
-            $result['lapsed'] = in_array($statusKey, self::LAPSED_STATUSES, true);
+            $result['lapsed'] = self::isLockedStatus($statusKey);
             $result['reason'] = $result['lapsed'] ? 'lapsed' : 'active';
         } catch (Throwable $e) {
             // Fail open — never trap a member behind a DB hiccup.

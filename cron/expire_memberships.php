@@ -11,6 +11,9 @@ foreach ($periods as $period) {
     $update = $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id');
     $update->execute(['id' => $period['id']]);
 
+    // "LAPSED" matches the legacy members.status convention written by
+    // MemberRepository::normalizeStatus (EXPIRED -> LAPSED); the lockdown
+    // reader lowercases and treats "lapsed" as locked.
     $updateMember = $pdo->prepare('UPDATE members SET status = "LAPSED" WHERE id = :member_id');
     $updateMember->execute(['member_id' => $period['member_id']]);
 }

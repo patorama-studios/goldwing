@@ -1,5 +1,5 @@
 <?php
-// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN — bump on every push so we can curl
+// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN_R2 — bump on every push so we can curl
 // the rendered page to confirm whether cPanel actually copied new files.
 require_once __DIR__ . '/../../app/bootstrap.php';
 
@@ -1725,14 +1725,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         if (!$isLifeMember && !empty($membershipPeriod['end_date'])) {
           $renewalDays = (int) ceil((strtotime($membershipPeriod['end_date']) - time()) / 86400);
         }
-        // Prefer the live membership_period status (e.g. ACTIVE / PENDING_PAYMENT)
-        // over the cached members.status field, which can be stale after a
-        // renewal (showing "Lapsed" even when the period is currently active).
-        $statusKey = strtolower((string) ($membershipPeriod['status'] ?? $member['status'] ?? ''));
-        if ($statusKey === '' && !empty($membershipPeriod['end_date'])
-            && strtotime($membershipPeriod['end_date']) >= strtotime('today')) {
-            $statusKey = 'active';
-        }
+        // Effective status: members.status wins for admin/cron-set locked
+        // states (expired/cancelled/suspended), otherwise the live period
+        // status is used — so an admin status change in the single-member view
+        // reflects here immediately, while a freshly renewed member (already
+        // members.status 'active') isn't false-flagged. Shared with the
+        // lockdown so the dot, the banner and the overlay can't disagree.
+        $statusKey = \App\Services\MembershipAccessService::effectiveStatusFrom($member, $membershipPeriod);
         // Payment made, activation still settling (PI processing / webhook
         // in flight) → show Pending, never Lapsed or a pay prompt.
         if ($pendingPaymentInFlight) {
@@ -1740,7 +1739,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         }
         $statusDot = match ($statusKey) {
           'active', 'paid' => 'bg-green-500',
-          'expired', 'inactive', 'lapsed' => 'bg-red-500',
+          'expired', 'inactive', 'lapsed', 'cancelled', 'suspended' => 'bg-red-500',
           'pending', 'pending_payment' => 'bg-amber-500',
           default => 'bg-slate-400',
         };
@@ -1855,14 +1854,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full <?= $statusDot ?>"></span>
                     <?php
-                      // Same source as $statusKey above — prefer live period
-                      // status, fall back to cached members.status. Avoids the
-                      // "Lapsed" label appearing when the period is active.
-                      $statusDisplay = (string) ($membershipPeriod['status'] ?? $member['status'] ?? 'N/A');
-                      if ($pendingPaymentInFlight) {
-                        $statusDisplay = 'Pending';
-                      }
-                      $statusDisplay = str_replace('_', ' ', $statusDisplay);
+                      // Same effective status as $statusKey above (members.status
+                      // admin/cron override wins, else live period) so the label
+                      // matches the dot and the lockdown state.
+                      $statusDisplay = str_replace('_', ' ', $statusKey !== '' ? $statusKey : 'N/A');
                     ?>
                     <p class="text-lg font-semibold text-gray-900"><?= e(ucfirst(strtolower($statusDisplay))) ?></p>
                   </div>
