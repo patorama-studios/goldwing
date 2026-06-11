@@ -4430,14 +4430,24 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
                   </div>
                   <?php if ($pendingPaymentMethod === 'stripe'): ?>
-                    <form method="post" class="mt-2" data-tour="pay-fees-pay-now">
-                      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                      <input type="hidden" name="action" value="membership_order_pay">
-                      <input type="hidden" name="order_id" value="<?= e((string) $pendingMembershipOrder['id']) ?>">
-                      <button
-                        class="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900"
-                        type="submit">Pay now</button>
-                    </form>
+                    <!-- Inline Stripe Payment Element — no full-page redirect.
+                         Replaces the old "Pay now → Stripe Checkout → return"
+                         round-trip that was losing the session for some users. -->
+                    <?php
+                      $pendingTotalCents = (int) round(((float) ($pendingMembershipOrder['total'] ?? 0)) * 100);
+                      $stripeInlinePayment = [
+                        'context'      => 'membership_renewal',
+                        'order_id'     => (int) $pendingMembershipOrder['id'],
+                        'amount_label' => 'A$' . number_format($pendingTotalCents / 100, 2),
+                        'description'  => 'Membership renewal — ' . ($pendingMembershipOrder['order_number'] ?? ''),
+                        'return_url'   => '/member/?renewed=1',
+                        'pay_button'   => 'Pay A$' . number_format($pendingTotalCents / 100, 2),
+                        'intent_url'   => '/api/payments/intent',
+                        'csrf_token'   => Csrf::token(),
+                        'instance'     => 'renewal-' . (int) $pendingMembershipOrder['id'],
+                      ];
+                      require __DIR__ . '/../../app/Views/partials/stripe_inline_payment.php';
+                    ?>
                   <?php elseif ($pendingPaymentMethod === 'bank_transfer'): ?>
                     <?php if ($bankInstructions !== ''): ?>
                       <div class="rounded-lg bg-white/80 px-3 py-2 text-xs text-gray-700 whitespace-pre-line">
@@ -6078,4 +6088,10 @@ if ($renewModalEligible) {
     }
   })();
 </script>
+
+<!-- Inline Stripe Payment Element (replaces the old hosted-Checkout redirect
+     on the Billing page for the Pay-now flow). -->
+<script src="https://js.stripe.com/v3/" defer></script>
+<script src="/assets/js/stripe-inline-payment.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/stripe-inline-payment.js')) ?>" defer></script>
+
 <?php require __DIR__ . '/../../app/Views/partials/backend_footer.php'; ?>

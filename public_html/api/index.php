@@ -294,6 +294,159 @@ if (empty($segments)) {
 
 $resource = $segments[0];
 
+// /api/payments/intent — unified endpoint used by the inline Stripe Payment
+// Element widget (app/Views/partials/stripe_inline_payment.php). Returns a
+// PaymentIntent client_secret + the publishable key + a human label, given
+// a context tag and (usually) an order_id. Each context resolves the
+// amount + the Stripe metadata it needs from the right DB table so the
+// widget itself doesn't care whether it's renewing a membership, paying
+// for a store order, buying an AGM ticket, etc.
+if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'intent') {
+    if ($method !== 'POST') {
+        json_response(['error' => 'Method not allowed.'], 405);
+    }
+    require_csrf_json($body);
+    require_stripe_checkout_enabled();
+    $activeKeys = StripeSettingsService::getActiveKeys();
+    if (empty($activeKeys['secret_key']) || empty($activeKeys['publishable_key'])) {
+        json_response(['error' => 'Stripe is not configured.'], 422);
+    }
+
+    $context = (string) ($body['context'] ?? 'order');
+    $orderId = isset($body['order_id']) ? (int) $body['order_id'] : 0;
+    $user = current_user();
+    if (!$user) {
+        json_response(['error' => 'Sign in to continue.'], 401);
+    }
+
+    $pdo = db();
+    $intentArgs = null;     // ['amount', 'currency', 'metadata', 'description', 'amount_label', 'order']
+    $intentTable = null;    // 'orders' (membership) | 'store_orders' (store)
+
+    if (in_array($context, ['membership_renewal', 'membership_pay'], true) && $orderId > 0) {
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND user_id = :user_id AND order_type = "membership" LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'user_id' => (int) $user['id']]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            json_response(['error' => 'Order not found or not yours.'], 404);
+        }
+        if (in_array(strtolower((string) ($order['payment_status'] ?? '')), ['accepted', 'paid'], true)) {
+            json_response(['error' => 'This order is already paid.'], 409);
+        }
+        $amountCents = (int) round(((float) $order['total']) * 100);
+        if ($amountCents <= 0) {
+            json_response(['error' => 'Order has no balance to pay.'], 422);
+        }
+        $intentArgs = [
+            'amount' => $amountCents,
+            'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+            'metadata' => [
+                'order_id' => (string) $orderId,
+                'order_type' => 'membership',
+                'member_id' => (string) ($order['member_id'] ?? ''),
+                'period_id' => (string) ($order['membership_period_id'] ?? ''),
+                'channel_id' => (string) ($order['channel_id'] ?? ''),
+                'context' => $context,
+            ],
+            'description' => 'AGA membership — order ' . ($order['order_number'] ?? ('#' . $orderId)),
+            'amount_label' => 'A$' . number_format($amountCents / 100, 2),
+            'order' => $order,
+        ];
+        $intentTable = 'orders';
+
+    } elseif ($context === 'store_order' && $orderId > 0) {
+        $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $stmt->execute(['id' => $orderId, 'user_id' => (int) $user['id']]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            json_response(['error' => 'Store order not found.'], 404);
+        }
+        if (strtolower((string) ($order['payment_status'] ?? '')) === 'paid') {
+            json_response(['error' => 'This order is already paid.'], 409);
+        }
+        $amountCents = (int) round(((float) $order['total_amount']) * 100);
+        if ($amountCents <= 0) {
+            json_response(['error' => 'Order has no balance to pay.'], 422);
+        }
+        $intentArgs = [
+            'amount' => $amountCents,
+            'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
+            'metadata' => [
+                'store_order_id' => (string) $orderId,
+                'store_order_number' => (string) ($order['order_number'] ?? ''),
+                'order_type' => 'store',
+                'channel_id' => (string) ($order['channel_id'] ?? ''),
+                'context' => $context,
+            ],
+            'description' => 'AGA Store — order ' . ($order['order_number'] ?? ('#' . $orderId)),
+            'amount_label' => 'A$' . number_format($amountCents / 100, 2),
+            'order' => $order,
+        ];
+        $intentTable = 'store_orders';
+
+    } else {
+        json_response(['error' => 'Unknown payment context.'], 400);
+    }
+
+    // If the order already has a Stripe PaymentIntent that's still
+    // confirmable, reuse it (avoids minting duplicate PIs every time the
+    // widget mounts on a page refresh).
+    $existingPi = trim((string) ($intentArgs['order']['stripe_payment_intent_id'] ?? ''));
+    if ($existingPi !== '') {
+        $existing = StripeService::retrievePaymentIntent($existingPi);
+        if (is_array($existing)
+            && in_array((string) ($existing['status'] ?? ''), ['requires_payment_method', 'requires_confirmation', 'requires_action'], true)
+            && !empty($existing['client_secret'])
+        ) {
+            json_response([
+                'client_secret'   => (string) $existing['client_secret'],
+                'publishable_key' => (string) $activeKeys['publishable_key'],
+                'amount_label'    => $intentArgs['amount_label'],
+                'description'     => $intentArgs['description'],
+                'reused'          => true,
+            ]);
+        }
+    }
+
+    // Mint a fresh PaymentIntent.
+    try {
+        $pi = StripeService::createPaymentIntent([
+            'amount' => $intentArgs['amount'],
+            'currency' => $intentArgs['currency'],
+            'metadata' => $intentArgs['metadata'],
+            'description' => $intentArgs['description'],
+            'automatic_payment_methods' => ['enabled' => true],
+        ]);
+    } catch (Throwable $e) {
+        json_response(['error' => 'Could not start the payment with Stripe.'], 502);
+    }
+    if (!$pi || empty($pi['id']) || empty($pi['client_secret'])) {
+        json_response(['error' => 'Could not start the payment with Stripe.'], 502);
+    }
+
+    // Cache the PI back to the order so the existing webhook + refund paths
+    // (which match on stripe_payment_intent_id) can find it.
+    try {
+        if ($intentTable === 'orders') {
+            $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
+        } else {
+            $stmt = $pdo->prepare('UPDATE store_orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
+        }
+        $stmt->execute(['pi' => (string) $pi['id'], 'id' => $orderId]);
+    } catch (Throwable $e) {
+        // Non-fatal — the webhook will fall back to other references.
+        error_log('[/api/payments/intent] PI cache-back failed: ' . $e->getMessage());
+    }
+
+    json_response([
+        'client_secret'   => (string) $pi['client_secret'],
+        'publishable_key' => (string) $activeKeys['publishable_key'],
+        'amount_label'    => $intentArgs['amount_label'],
+        'description'     => $intentArgs['description'],
+        'reused'          => false,
+    ]);
+}
+
 if ($resource === 'stripe') {
     if (count($segments) === 2 && $segments[1] === 'config') {
         if ($method !== 'GET') {
