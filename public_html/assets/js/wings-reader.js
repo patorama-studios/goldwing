@@ -126,16 +126,45 @@
 
     // Two-finger pinch -> enter zoom (capture phase so the flip engine, bound
     // on a descendant, never sees it). One finger passes through to the flip.
+    // Also track single-finger taps for double-tap-to-zoom: mobile browsers
+    // don't reliably synthesise dblclick (and StPageFlip preventDefaults
+    // touchstart, which suppresses synthetic mouse events entirely), so
+    // browse-mode double-tap must be detected from raw touch events.
+    var tapT = 0, tapX = 0, tapY = 0, downX = 0, downY = 0, tapMoved = true;
     this.container.addEventListener('touchstart', function (e) {
       if (self.zoom.isActive()) return;
       if (e.touches.length === 2) {
         e.stopPropagation();
+        tapMoved = true;                       // a pinch is not a tap
         var m = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         self.zoom.enter(focalPage(m), null, 1, [e.touches[0], e.touches[1]]);
+      } else if (e.touches.length === 1) {
+        downX = e.touches[0].clientX;
+        downY = e.touches[0].clientY;
+        tapMoved = false;
+      }
+    }, { capture: true });
+    this.container.addEventListener('touchmove', function (e) {
+      if (tapMoved || e.touches.length !== 1) return;
+      if (Math.abs(e.touches[0].clientX - downX) > 12 ||
+          Math.abs(e.touches[0].clientY - downY) > 12) tapMoved = true;  // swipe, not tap
+    }, { capture: true, passive: true });
+    this.container.addEventListener('touchend', function (e) {
+      if (self.zoom.isActive() || e.touches.length > 0) return;
+      if (tapMoved || e.changedTouches.length !== 1) { tapT = 0; return; }
+      var t = e.changedTouches[0];
+      var now = Date.now();
+      if (now - tapT < 320 && Math.abs(t.clientX - tapX) < 40 && Math.abs(t.clientY - tapY) < 40) {
+        e.preventDefault();                    // no synthetic click / flip
+        e.stopPropagation();
+        tapT = 0;
+        self.zoom.enter(focalPage(t.clientX), { x: t.clientX, y: t.clientY }, 2.5);
+      } else {
+        tapT = now; tapX = t.clientX; tapY = t.clientY;
       }
     }, { capture: true });
 
-    // Double-tap/click and wheel-in also enter zoom.
+    // Double-click (desktop) and wheel-in also enter zoom.
     this.container.addEventListener('dblclick', function (e) {
       if (self.zoom.isActive()) return;
       self.zoom.enter(focalPage(e.clientX), { x: e.clientX, y: e.clientY }, 2.5);

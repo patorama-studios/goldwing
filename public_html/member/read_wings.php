@@ -120,6 +120,10 @@ $asset = function (string $path): string {
       position: relative; width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
       opacity: 0; transition: opacity 0.4s ease;
+      /* No native pinch-zoom/scroll over the book — our JS owns pinch (zoom
+         layer) and horizontal swipes (flip engine). The page doesn't scroll
+         (fixed 100dvh layout), so nothing is lost. */
+      touch-action: none;
     }
     #flip-book.is-ready { opacity: 1; }
     .wings-page { background: #fff; overflow: hidden; }

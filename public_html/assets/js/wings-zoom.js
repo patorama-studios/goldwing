@@ -103,13 +103,20 @@
     this.el.style.pointerEvents = 'auto';
     this.onEnter();
 
+    // Seed an in-progress pinch SYNCHRONOUSLY — the user's fingers are already
+    // moving, and touchmove events arrive before the async render resolves.
+    // (Touch events are implicitly captured by the element the gesture started
+    // on, which is why our move handlers live on the container, capture-phase.)
+    if (seedTouches && seedTouches.length === 2) {
+      this._pinchStartDist = dist(seedTouches[0], seedTouches[1]);
+      this._pinchStartScale = 1;
+      this._pinching = true;
+    }
+
     // First render at scale 1, then the zoom-to-focal kicks it sharper.
     this._render(1).then(function () {
-      if (seedTouches && seedTouches.length === 2) {
-        self._pinchStartDist = dist(seedTouches[0], seedTouches[1]);
-        self._pinchStartScale = 1;
-        self._pinching = true;
-      } else {
+      if (!self.active) return;
+      if (!(seedTouches && seedTouches.length === 2)) {
         var fx = focal ? focal.x - rect.left : self.OW / 2;
         var fy = focal ? focal.y - rect.top : self.OH / 2;
         self._zoomTo(startScale || 2.5, fx, fy, true);
@@ -154,7 +161,14 @@
     this.scale = newScale;
     this._clamp();
     this._apply(animate);
-    if (this.scale <= EXIT_SCALE) { this._exit(); return; }
+    // Never exit mid-pinch — a transient dip to 1 (finger wobble at the start
+    // of a spread) would kill the overlay during the gesture. Fingers-down
+    // rides at fit scale; touchend decides whether to leave. Wheel/dbl-tap
+    // (no fingers down) exit immediately as before.
+    if (this.scale <= EXIT_SCALE) {
+      if (!this._pinching) this._exit();
+      return;
+    }
     this._scheduleRerender();
   };
 
@@ -185,22 +199,31 @@
   };
 
   /* ---- gesture handlers --------------------------------------------------- */
+  // Touch handlers live on the CONTAINER in the CAPTURE phase, not on the
+  // overlay element. Touch events are implicitly captured by whatever element
+  // the fingers first landed on — for the pinch that *opens* the zoom, that's
+  // a flip-book page, so listeners on the overlay would never see the rest of
+  // that gesture (the "pinch starts then does nothing" bug). Capture-phase on
+  // the container sees every gesture in the book area regardless of target.
   WingsZoom.prototype._bind = function () {
     var self = this;
     var el = this.el;
+    var container = this.container;
 
-    // ---- touch ----
-    el.addEventListener('touchstart', function (e) {
+    // ---- touch (container, capture) ----
+    container.addEventListener('touchstart', function (e) {
+      if (!self.active) return;
       if (e.touches.length === 2) {
         self._pinching = true;
         self._pinchStartDist = dist(e.touches[0], e.touches[1]);
         self._pinchStartScale = self.scale;
         self._panning = false;
+        e.stopPropagation();              // keep the frozen flip engine deaf
       } else if (e.touches.length === 1) {
         var now = Date.now();
         if (now - (self._lastTap || 0) < DOUBLE_TAP_MS) {
           // double-tap: toggle between fit and 2.5× at the tap point
-          var r = self.container.getBoundingClientRect();
+          var r = container.getBoundingClientRect();
           var fx = e.touches[0].clientX - r.left, fy = e.touches[0].clientY - r.top;
           self._zoomTo(self.scale > 1.3 ? 1 : 2.5, fx, fy, true);
           self._lastTap = 0;
@@ -210,33 +233,49 @@
           self._panStart = { x: e.touches[0].clientX - self.tx, y: e.touches[0].clientY - self.ty };
         }
       }
-    }, { passive: true });
+    }, { capture: true, passive: true });
 
-    el.addEventListener('touchmove', function (e) {
-      if (self._pinching && e.touches.length === 2) {
-        e.preventDefault();
+    container.addEventListener('touchmove', function (e) {
+      if (!self.active) return;
+      if (e.touches.length === 2) {
+        // Continue (or adopt) a pinch — including the one that opened the zoom,
+        // whose touchstart happened on a flip page before we were active.
+        if (!self._pinching) {
+          self._pinching = true;
+          self._pinchStartDist = dist(e.touches[0], e.touches[1]);
+          self._pinchStartScale = self.scale;
+        }
+        e.preventDefault();               // block native browser pinch-zoom
+        e.stopPropagation();
         var d = dist(e.touches[0], e.touches[1]);
         var m = mid(e.touches[0], e.touches[1]);
-        var r = self.container.getBoundingClientRect();
+        var r = container.getBoundingClientRect();
         var ns = self._pinchStartScale * (d / self._pinchStartDist);
         self._zoomTo(ns, m.x - r.left, m.y - r.top, false);
       } else if (self._panning && e.touches.length === 1) {
         e.preventDefault();
+        e.stopPropagation();
         self.tx = e.touches[0].clientX - self._panStart.x;
         self.ty = e.touches[0].clientY - self._panStart.y;
         self._clamp();
         self._apply(false);
       }
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
-    el.addEventListener('touchend', function (e) {
+    container.addEventListener('touchend', function (e) {
+      if (!self.active) return;
       if (e.touches.length < 2) self._pinching = false;
       if (e.touches.length === 0) {
         self._panning = false;
         if (self.scale <= EXIT_SCALE) self._exit();
         else self._scheduleRerender();
       }
-    });
+    }, { capture: true });
+    container.addEventListener('touchcancel', function () {
+      if (!self.active) return;
+      self._pinching = false;
+      self._panning = false;
+    }, { capture: true });
 
     // ---- mouse (desktop) ----
     el.addEventListener('mousedown', function (e) {
