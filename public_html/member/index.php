@@ -1,5 +1,5 @@
 <?php
-// DEPLOY_MARKER_2026_06_11_PAY_DRAWER — bump on every push so we can curl
+// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN — bump on every push so we can curl
 // the rendered page to confirm whether cPanel actually copied new files.
 require_once __DIR__ . '/../../app/bootstrap.php';
 
@@ -1691,6 +1691,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
     <?php require __DIR__ . '/../../app/Views/partials/feedback_widget.php'; ?>
     <?php $topbarTitle = $pageTitle;
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
+    <?php $lockdownPageKey = $page;
+    require __DIR__ . '/../../app/Views/partials/member_lockdown.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <?php if ($page === 'dashboard'): ?>
         <?php if ($profileMessage): ?>

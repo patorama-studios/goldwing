@@ -64,6 +64,12 @@ $items = [
   ['key' => 'main-site', 'group' => 'Help', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
 ];
 $user = $user ?? current_user();
+// Membership-lapsed lockdown: locked categories stay visible but greyed with a
+// padlock. They remain clickable — the destination page draws a blur overlay.
+$gwLapsed = \App\Services\MembershipAccessService::isLapsed($user);
+$gwIsLocked = static function (?string $key) use ($gwLapsed): bool {
+  return $gwLapsed && \App\Services\MembershipAccessService::isPageLocked($key);
+};
 $impersonation = function_exists('impersonation_context') ? impersonation_context() : null;
 $impersonationName = '';
 if ($impersonation) {
@@ -176,21 +182,28 @@ if (!empty($member)) {
           <?php foreach ($groupItems as $item): ?>
             <?php if (!empty($item['children'])): ?>
               <?php $isActive = $activePage === $item['key']; ?>
+              <?php $itemLocked = $gwIsLocked($item['key'] ?? null); ?>
               <details class="group" <?= $isActive ? 'open' : '' ?>>
                 <summary
-                  class="flex items-center justify-between gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>">
+                  class="flex items-center justify-between gap-3 px-3 py-3 text-base font-medium rounded-lg cursor-pointer transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?> <?= $itemLocked ? 'opacity-60' : '' ?>"
+                  <?= $itemLocked ? 'title="Renew your membership to unlock"' : '' ?>>
                   <span class="flex items-center gap-3">
                     <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
                     <?= e($item['label']) ?>
                   </span>
-                  <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+                  <?php if ($itemLocked): ?>
+                    <span class="material-icons-outlined text-base text-gray-400">lock</span>
+                  <?php else: ?>
+                    <span class="material-icons-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+                  <?php endif; ?>
                 </summary>
                 <div class="ml-10 mt-1 space-y-0.5">
                   <?php foreach ($item['children'] as $child): ?>
                     <?php $isChildActive = $activeSubPage === $child['key']; ?>
-                    <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>"
-                      href="<?= e($child['href']) ?>">
-                      <span class="material-icons-outlined text-base">chevron_right</span>
+                    <?php $childLocked = $gwIsLocked($child['key'] ?? null); ?>
+                    <a class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors <?= $isChildActive ? 'bg-primary/10 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?> <?= $childLocked ? 'opacity-60' : '' ?>"
+                      href="<?= e($child['href']) ?>" <?= $childLocked ? 'title="Renew your membership to unlock"' : '' ?>>
+                      <span class="material-icons-outlined text-base"><?= $childLocked ? 'lock' : 'chevron_right' ?></span>
                       <?= e($child['label']) ?>
                     </a>
                   <?php endforeach; ?>
@@ -199,11 +212,14 @@ if (!empty($member)) {
             <?php else: ?>
               <?php $isActive = $activePage === $item['key']; ?>
               <?php $itemBadge = (int) ($item['badge'] ?? 0); ?>
-              <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?>"
-                href="<?= e($item['href']) ?>">
+              <?php $itemLocked = $gwIsLocked($item['key'] ?? null); ?>
+              <a class="flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg transition-colors <?= $isActive ? 'bg-primary/10 text-gray-900' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' ?> <?= $itemLocked ? 'opacity-60' : '' ?>"
+                href="<?= e($item['href']) ?>" <?= $itemLocked ? 'title="Renew your membership to unlock"' : '' ?>>
                 <span class="material-icons-outlined"><?= e($item['icon']) ?></span>
                 <span class="flex-1"><?= e($item['label']) ?></span>
-                <?php if ($itemBadge > 0): ?>
+                <?php if ($itemLocked): ?>
+                  <span class="material-icons-outlined text-base text-gray-400">lock</span>
+                <?php elseif ($itemBadge > 0): ?>
                   <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-primary text-gray-900 text-xs font-bold"><?= e((string) $itemBadge) ?></span>
                 <?php endif; ?>
               </a>

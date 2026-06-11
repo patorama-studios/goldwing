@@ -61,6 +61,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   <main class="flex-1 overflow-y-auto bg-background-light relative">
     <?php $topbarTitle = 'Thank you';
     require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
+    <?php $lockdownPageKey = 'dashboard'; require __DIR__ . '/../../../app/Views/partials/member_lockdown.php'; ?>
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
 
       <section class="bg-card-light rounded-2xl shadow-sm border border-gray-100 p-8 md:p-10 text-center">

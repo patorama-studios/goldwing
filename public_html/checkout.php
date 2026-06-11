@@ -214,6 +214,7 @@ if ($cartItems) {
     <?php require __DIR__ . '/../app/Views/partials/feedback_widget.php'; ?>
     <?php $topbarTitle = 'Checkout';
     require __DIR__ . '/../app/Views/partials/backend_mobile_topbar.php'; ?>
+    <?php $lockdownPageKey = 'store'; require __DIR__ . '/../app/Views/partials/member_lockdown.php'; ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
       <section class="bg-card-light rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">

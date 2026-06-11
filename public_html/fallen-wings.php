@@ -49,6 +49,7 @@ require __DIR__ . '/../app/Views/partials/backend_head.php';
   <?php require __DIR__ . '/../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
     <?php $topbarTitle = 'Fallen Wings'; require __DIR__ . '/../app/Views/partials/backend_mobile_topbar.php'; ?>
+    <?php $lockdownPageKey = 'fallen-wings'; require __DIR__ . '/../app/Views/partials/member_lockdown.php'; ?>
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
       <div>

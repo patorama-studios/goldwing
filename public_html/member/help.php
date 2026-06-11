@@ -27,6 +27,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 <div class="flex min-h-screen bg-background-light">
   <?php include __DIR__ . '/../../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 p-6 md:p-10">
+    <?php $lockdownPageKey = 'help'; require __DIR__ . '/../../app/Views/partials/member_lockdown.php'; ?>
     <div class="max-w-3xl mx-auto">
       <header class="mb-8">
         <h1 class="font-display text-3xl text-gray-900">Help &amp; Walkthroughs</h1>
