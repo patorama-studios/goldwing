@@ -96,8 +96,8 @@ In addition to the 60/30-day reminder emails, members can renew on demand from i
   1. Pick a **term** — 1, 2, or 3 years. Each option shows the price for their member type and magazine preference; greyed-out options mean that term has no AUD amount set in the pricing matrix.
   2. Optionally tick **"Also renew my partner"** — visible only when the member has a linked partner (Full ↔ Associate, either direction). When ticked, the modal shows the combined total live.
   3. Confirm the **"details are correct"** acknowledgement.
-  4. Click through to Stripe to pay.
-- If they bundle the partner, both renewals go through one combined Stripe Checkout session — so the member pays once for two periods.
+  4. Click **Continue to payment** — the lightbox slides to a second view with the order summary and an embedded Stripe card form (Payment Element). They enter their card and click **Pay** without ever leaving the site; no redirect to a Stripe-hosted checkout page.
+- If they bundle the partner, both renewals are covered by one combined Stripe payment — the member pays once, and the webhook activates both periods (the partner's order rides along in the PaymentIntent's `extra_order_ids` metadata).
 - A small **Cancel my membership instead** link sits at the bottom of the lightbox. It opens a confirmation step with a reason field; submitting flags the member as "do not renew" and emails the committee. They keep access until their period ends — nothing is terminated immediately.
 
 <!-- SCREENSHOT: Member dashboard at /member/index.php for a member within 60 days of expiry, showing the red "Renew now" button in Quick Actions. Save as 19-renew-now-cta.png. -->

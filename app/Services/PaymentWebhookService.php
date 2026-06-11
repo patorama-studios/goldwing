@@ -305,12 +305,20 @@ class PaymentWebhookService
                 ]);
                 return;
             }
+            $chargeId = $intent['latest_charge'] ?? '';
+            if ($chargeId === '' && !empty($intent['charges']['data'][0]['id'])) {
+                $chargeId = (string) $intent['charges']['data'][0]['id'];
+            }
             if (($order['status'] ?? '') !== 'paid') {
-                $chargeId = $intent['latest_charge'] ?? '';
-                if ($chargeId === '' && !empty($intent['charges']['data'][0]['id'])) {
-                    $chargeId = (string) $intent['charges']['data'][0]['id'];
-                }
                 OrderService::markPaid($orderId, $paymentIntentId, $chargeId !== '' ? $chargeId : null);
+                // Inline Payment Element flow: there is no
+                // checkout.session.completed event, so membership
+                // activation (period → ACTIVE, member receipt, treasurer
+                // notification) has to happen here.
+                if (($order['order_type'] ?? '') === 'membership') {
+                    $updated = OrderService::getOrderById($orderId);
+                    self::markMembershipPaid($updated ?: $order, $metadata);
+                }
             }
 
             if (($order['order_type'] ?? '') === 'store') {
@@ -327,6 +335,40 @@ class PaymentWebhookService
                     $order = $updatedOrder;
                 }
                 InvoiceService::createForOrder($order);
+            }
+
+            // A single PaymentIntent can cover additional orders (e.g. the
+            // partner's renewal bought in the same lightbox). They're
+            // listed in metadata.extra_order_ids as a comma-separated list.
+            if (!empty($metadata['extra_order_ids'])) {
+                foreach (explode(',', (string) $metadata['extra_order_ids']) as $extraIdRaw) {
+                    $extraId = (int) trim($extraIdRaw);
+                    if ($extraId <= 0 || $extraId === $orderId) {
+                        continue;
+                    }
+                    $extra = self::getOrderForUpdate($extraId);
+                    if (!$extra) {
+                        StripeErrorLogger::logWebhookSkip(__METHOD__, 'extra order not found by id ' . $extraId, [
+                            'event_id' => $event['id'] ?? null,
+                            'related_order_id' => $extraId,
+                            'related_stripe_pi_id' => $paymentIntentId,
+                        ]);
+                        continue;
+                    }
+                    if (($extra['status'] ?? '') !== 'paid') {
+                        OrderService::markPaid($extraId, $paymentIntentId, $chargeId !== '' ? $chargeId : null);
+                        if (($extra['order_type'] ?? '') === 'membership') {
+                            $extraUpdated = OrderService::getOrderById($extraId);
+                            self::markMembershipPaid($extraUpdated ?: $extra, []);
+                        }
+                    }
+                    if (!self::invoiceExists($extraId)) {
+                        $extraRow = OrderService::getOrderById($extraId);
+                        if ($extraRow) {
+                            InvoiceService::createForOrder($extraRow);
+                        }
+                    }
+                }
             }
 
             $pdo->commit();

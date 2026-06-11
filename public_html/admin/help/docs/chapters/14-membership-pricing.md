@@ -207,7 +207,7 @@ MembershipPricingService::getMembershipPricing();
 
 #### How prices flow into Stripe
 
-Membership applications still use a **PaymentIntent** flow (not a Stripe Checkout Session). The API route `/api/membership/create-application-intent` in `public_html/api/index.php` (~line 343) reads `full_magazine_type`, `full_period_key`, `associate_period_key` from the request body and calls `MembershipPricingService::resolveJoinPriceCents()` for each. Renewals from the member profile go through `public_html/member/index.php` `membership_renewal_amount_cents()` → `findRenewalPeriodByMonths()` → `getRenewalPriceCents()`. Both compute amounts server-side milliseconds before creating the PaymentIntent — Stripe never sees a fixed Price object for memberships.
+Membership applications still use a **PaymentIntent** flow (not a Stripe Checkout Session). The API route `/api/membership/create-application-intent` in `public_html/api/index.php` (~line 343) reads `full_magazine_type`, `full_period_key`, `associate_period_key` from the request body and calls `MembershipPricingService::resolveJoinPriceCents()` for each. Renewals go through `MembershipPricingService::renewalAmountCents($magazine, $type, $months)` — period match via `findRenewalPeriodByMonths()` → `getRenewalPriceCents()`, falling back to the legacy `getPriceCents()` terms. It's called by the pay-membership lightbox endpoint `/api/payments/membership-intent` and by `public_html/member/index.php` (whose `membership_renewal_amount_cents()` helper is now a thin delegate). Both compute amounts server-side milliseconds before creating the PaymentIntent — Stripe never sees a fixed Price object for memberships.
 
 #### The legacy `stripe.membership_prices` block
 
@@ -220,7 +220,7 @@ Membership applications still use a **PaymentIntent** flow (not a Stripe Checkou
 - **Read sites**:
   - `public_html/apply.php` — uses `getJoinOptions()` + `resolveJoinPriceCents()`.
   - `public_html/api/index.php` — same.
-  - `public_html/member/index.php` — `membership_renewal_amount_cents()` uses `findRenewalPeriodByMonths()`.
+  - `public_html/member/index.php` and `public_html/api/index.php` (`/api/payments/membership-intent`) — both resolve renewal amounts via `MembershipPricingService::renewalAmountCents()`.
   - `app/Services/MembershipUpgradeService.php` — `getUpgradePriceCents()` uses the 12-month period.
   - `public_html/migrate.php` — legacy callers (`ONE_YEAR`/`THREE_YEARS`), kept on `getPriceCents()` for compatibility.
   - `app/Views/partials/membership_content.php` — public showcase, uses `getPriceCents()` with legacy keys.

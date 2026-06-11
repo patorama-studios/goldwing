@@ -159,6 +159,31 @@ class MembershipPricingService
         return null;
     }
 
+    /**
+     * Renewal price in cents for a magazine type / member type / term length.
+     * Prefers an admin-defined renewal period matching the exact duration,
+     * then falls back to the legacy fixed-term lookup (24M = 2 × annual).
+     * Returns 0 when no price is configured.
+     */
+    public static function renewalAmountCents(string $magazineType, string $membershipType, int $months): int
+    {
+        $period = self::findRenewalPeriodByMonths($months);
+        if ($period) {
+            $cents = self::getRenewalPriceCents($magazineType, $membershipType, $period['id']);
+            if ($cents !== null) {
+                return (int) $cents;
+            }
+        }
+        if ($months === 36) {
+            return (int) (self::getPriceCents($magazineType, $membershipType, 'THREE_YEARS') ?? 0);
+        }
+        $oneYear = (int) (self::getPriceCents($magazineType, $membershipType, 'ONE_YEAR') ?? 0);
+        if ($months === 24) {
+            return $oneYear * 2;
+        }
+        return $oneYear;
+    }
+
     /* ------------------------------------------------------------------ */
     /* Pro-rata for new joins                                              */
     /* ------------------------------------------------------------------ */

@@ -294,12 +294,13 @@ if (empty($segments)) {
 
 $resource = $segments[0];
 
-// /api/payments/membership-intent — drives the pay-membership slide-out
-// drawer. POST {tier, term, magazine?} → server picks (or creates) a
-// pending membership order matching that selection, voids any other
-// pending membership orders the user has, mints a PaymentIntent, and
-// returns the client_secret plus the full pricing matrix so the drawer
-// can render its tier/term selector and the order summary.
+// /api/payments/membership-intent — drives the pay-membership lightbox.
+// POST {term, include_partner?} → server resolves the member's own tier +
+// magazine preference (and optionally their linked partner, same lookup as
+// the membership_renew POST handler), supersedes any prior pending renewal
+// orders/periods, creates a fresh period + order per renewer, and mints a
+// single PaymentIntent covering the combined total. Returns the
+// client_secret plus per-renewer summary lines for the lightbox's View 2.
 if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'membership-intent') {
     if ($method !== 'POST') {
         json_response(['error' => 'Method not allowed.'], 405);
@@ -320,196 +321,184 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     if (!$member) {
         json_response(['error' => 'Member record not found.'], 404);
     }
+    if (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
+        json_response(['error' => 'Life members do not need to renew.'], 422);
+    }
 
-    // Inputs.
-    $tier = strtoupper(trim((string) ($body['tier'] ?? '')));
-    if (!in_array($tier, ['FULL', 'ASSOCIATE'], true)) {
-        // Default: keep what the member currently has, fall through to FULL.
-        $tier = strtoupper((string) ($member['member_type'] ?? 'FULL'));
-        if (!in_array($tier, ['FULL', 'ASSOCIATE'], true)) {
-            $tier = 'FULL';
+    // Inputs. Term comes as "12M"/"24M"/"36M" (bare months tolerated).
+    $termMonths = (int) rtrim(strtoupper(trim((string) ($body['term'] ?? '12M'))), 'M');
+    if (!in_array($termMonths, [12, 24, 36], true)) {
+        $termMonths = 12;
+    }
+    $term = $termMonths . 'M';
+    $termYearsLabel = $termMonths === 36 ? '3 years' : ($termMonths === 24 ? '2 years' : '1 year');
+    $includePartner = !empty($body['include_partner']);
+
+    // Resolve renewers — self plus (optionally) the linked partner, using
+    // the same lookup as the membership_renew POST handler in /member/.
+    $renewers = [['member' => $member, 'role' => 'self']];
+    if ($includePartner) {
+        $partner = null;
+        $memberTypeUpper = strtoupper((string) ($member['member_type'] ?? ''));
+        if ($memberTypeUpper === 'FULL') {
+            $stmt = $pdo->prepare('SELECT * FROM members WHERE full_member_id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $member['id']]);
+            $partner = $stmt->fetch() ?: null;
+        } elseif ($memberTypeUpper === 'ASSOCIATE' && !empty($member['full_member_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $member['full_member_id']]);
+            $partner = $stmt->fetch() ?: null;
         }
-    }
-    $term = strtoupper(trim((string) ($body['term'] ?? '12M')));
-    if (!in_array($term, ['12M', '24M', '36M'], true)) {
-        $term = '12M';
-    }
-    $termMonths = $term === '36M' ? 36 : ($term === '24M' ? 24 : 12);
-    $magazine = strtoupper(trim((string) ($body['magazine'] ?? 'DIGITAL')));
-    if (!in_array($magazine, ['DIGITAL', 'PRINT'], true)) {
-        $magazine = 'DIGITAL';
-    }
-
-    // Pricing matrix for the drawer's selector. Returns cents per
-    // tier × term so the JS can update the order-summary live without a
-    // server round-trip on every click.
-    $pricing = [];
-    foreach (['FULL', 'ASSOCIATE'] as $t) {
-        foreach (['12' => '12M', '24' => '24M', '36' => '36M'] as $months => $key) {
-            $cents = membership_renewal_amount_cents($magazine, $t, (string) $months);
-            if ($cents > 0) {
-                $pricing[$t][$key] = $cents;
-            }
+        if ($partner && strtoupper((string) ($partner['member_type'] ?? '')) === 'LIFE') {
+            $partner = null;
         }
+        if (!$partner) {
+            json_response(['error' => 'No linked member found to include in this renewal.'], 422);
+        }
+        $renewers[] = ['member' => $partner, 'role' => 'partner'];
     }
 
-    $amountCents = membership_renewal_amount_cents($magazine, $tier, (string) $termMonths);
-    if ($amountCents <= 0) {
-        json_response(['error' => 'No price configured for ' . $tier . ' / ' . $term . '. Ask an admin to set membership prices.'], 422);
+    // Price each renewer from their own member type + magazine preference.
+    // Magazine keys in the pricing config are PDF / PRINTED.
+    $totalCents = 0;
+    foreach ($renewers as &$r) {
+        $rMember = $r['member'];
+        $rType = strtoupper((string) ($rMember['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+        $rMagazine = strtolower((string) ($rMember['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+        $cents = MembershipPricingService::renewalAmountCents($rMagazine, $rType, $termMonths);
+        if ($cents <= 0) {
+            json_response(['error' => 'No price configured for ' . ucfirst(strtolower($rType)) . ' / ' . $termYearsLabel . '. Ask an admin to set membership prices.'], 422);
+        }
+        $r['type'] = $rType;
+        $r['cents'] = $cents;
+        $r['label'] = ucfirst(strtolower($rType)) . ' membership renewal (' . $termYearsLabel . ')';
+        $totalCents += $cents;
     }
+    unset($r);
 
-    // Void any existing pending membership orders for this user that
-    // don't match the selected tier+term — so the change is reflected
-    // in the admin orders list immediately and we don't end up minting
-    // duplicate PaymentIntents on stale rows.
+    // Supersede any prior pending renewal attempt for these members —
+    // cancel pending/failed membership orders, delete never-paid periods.
+    $renewerIds = array_map(static fn($r) => (int) $r['member']['id'], $renewers);
+    $idPlaceholders = implode(',', array_fill(0, count($renewerIds), '?'));
     try {
-        $userId = (int) $user['id'];
         $stmt = $pdo->prepare(
-            "SELECT id, order_number, total, order_type
-               FROM orders
-              WHERE user_id = :user_id
-                AND order_type = 'membership'
-                AND status IN ('pending', 'PENDING_PAYMENT')
-                AND payment_status IN ('pending', 'PENDING_PAYMENT', 'unpaid', 'failed')
-              ORDER BY id DESC"
+            'UPDATE orders SET status = "cancelled", payment_status = "cancelled", updated_at = NOW(), '
+            . 'internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" '
+            . 'THEN "Superseded by new renewal attempt" '
+            . 'ELSE CONCAT(internal_notes, "\nSuperseded by new renewal attempt") END '
+            . 'WHERE member_id IN (' . $idPlaceholders . ') '
+            . 'AND order_type = "membership" '
+            . 'AND payment_status IN ("pending", "failed", "unpaid")'
         );
-        $stmt->execute(['user_id' => $userId]);
-        $candidates = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt->execute($renewerIds);
     } catch (Throwable $e) {
-        $candidates = [];
+        error_log('[/api/payments/membership-intent] order supersede failed: ' . $e->getMessage());
+    }
+    try {
+        $stmt = $pdo->prepare('DELETE FROM membership_periods WHERE member_id IN (' . $idPlaceholders . ') AND status = "PENDING_PAYMENT"');
+        $stmt->execute($renewerIds);
+    } catch (Throwable $e) {
+        error_log('[/api/payments/membership-intent] period cleanup failed: ' . $e->getMessage());
     }
 
-    // Find an existing pending row whose total matches the new amount —
-    // we'll reuse it. Anything else with a different total gets voided.
-    $matchOrder = null;
-    foreach ($candidates as $c) {
-        $rowCents = (int) round(((float) ($c['total'] ?? 0)) * 100);
-        if ($rowCents === $amountCents && $matchOrder === null) {
-            $matchOrder = $c;
-            continue;
+    // Fresh period + order per renewer — same services the legacy
+    // membership_renew handler uses, so the webhook activation path is
+    // identical.
+    $currency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+    $startDate = date('Y-m-d');
+    $primary = null;
+    $partnerRenewer = null;
+    foreach ($renewers as &$r) {
+        $rMember = $r['member'];
+        $periodId = MembershipService::createMembershipPeriod((int) $rMember['id'], $term, $startDate);
+        if (!$periodId) {
+            json_response(['error' => 'Could not create the renewal period.'], 500);
         }
-        try {
-            $stmt = $pdo->prepare(
-                'UPDATE orders SET status = "cancelled", payment_status = "cancelled",
-                                   voided_at = NOW(), updated_at = NOW(),
-                                   internal_notes = CONCAT(COALESCE(internal_notes, ""), CASE WHEN COALESCE(internal_notes, "") = "" THEN "" ELSE "\n" END, :note)
-                              WHERE id = :id'
-            );
-            $stmt->execute([
-                'note' => 'Auto-cancelled when member changed selection in pay drawer to ' . $tier . ' ' . $term . '.',
-                'id'   => (int) $c['id'],
-            ]);
-        } catch (Throwable $e) {
-            // Non-fatal; older schemas may not have voided_at — try a simpler update.
-            try {
-                $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "cancelled", updated_at = NOW() WHERE id = :id');
-                $stmt->execute(['id' => (int) $c['id']]);
-            } catch (Throwable $e2) {
-                error_log('[/api/payments/membership-intent] void failed for order ' . $c['id'] . ': ' . $e2->getMessage());
-            }
+        $order = MembershipOrderService::createMembershipOrder((int) $rMember['id'], $periodId, round($r['cents'] / 100, 2), [
+            'payment_method' => 'stripe',
+            'payment_status' => 'pending',
+            'fulfillment_status' => 'pending',
+            'currency' => $currency,
+            'item_name' => $r['label'],
+            'term' => $term,
+        ]);
+        if (!$order || empty($order['id'])) {
+            json_response(['error' => 'Could not create the renewal order.'], 500);
         }
-    }
-
-    // Either reuse the matching pending order, or create a fresh one.
-    $orderId = $matchOrder ? (int) $matchOrder['id'] : 0;
-    $orderNumber = $matchOrder ? (string) $matchOrder['order_number'] : '';
-    if ($orderId === 0) {
-        try {
-            $year = (int) date('Y');
-            $periodId = (int) ($member['membership_period_id'] ?? 0);
-
-            $created = OrderService::createOrder([
-                'user_id' => (int) $user['id'],
-                'member_id' => (int) $user['member_id'],
-                'membership_period_id' => $periodId > 0 ? $periodId : null,
-                'order_type' => 'membership',
-                'currency' => 'AUD',
-                'subtotal' => $amountCents / 100,
-                'tax_total' => 0,
-                'shipping_total' => 0,
-                'total' => $amountCents / 100,
-                'shipping_required' => 0,
-            ], [[
-                'product_id' => null,
-                'name' => ucfirst(strtolower($tier)) . ' membership renewal (' . ($termMonths === 36 ? '3 years' : ($termMonths === 24 ? '2 years' : '1 year')) . ')',
-                'quantity' => 1,
-                'unit_price' => $amountCents / 100,
-                'is_physical' => 0,
-            ]]);
-            $orderId = (int) ($created['id'] ?? 0);
-            $orderNumber = (string) ($created['order_number'] ?? ('M-' . $orderId));
-        } catch (Throwable $e) {
-            json_response(['error' => 'Could not create the order. ' . $e->getMessage()], 500);
-        }
-        if ($orderId === 0) {
-            json_response(['error' => 'Could not create the order.'], 500);
+        $r['period_id'] = $periodId;
+        $r['order_id'] = (int) $order['id'];
+        $r['order_number'] = (string) ($order['order_number'] ?? '');
+        if ($r['role'] === 'self') {
+            $primary = $r;
+        } else {
+            $partnerRenewer = $r;
         }
     }
+    unset($r);
 
-    // Mint a fresh PaymentIntent for this order. If a previous one still
-    // exists and is confirmable, reuse it (the /api/payments/intent
-    // endpoint has the same cache-hit logic — keeping behaviour
-    // consistent).
-    $stmt = $pdo->prepare('SELECT stripe_payment_intent_id FROM orders WHERE id = :id LIMIT 1');
-    $stmt->execute(['id' => $orderId]);
-    $existingPi = trim((string) ($stmt->fetchColumn() ?: ''));
-    $reusedPi = false;
-    $pi = null;
-    if ($existingPi !== '') {
-        $existing = StripeService::retrievePaymentIntent($existingPi);
-        if (is_array($existing)
-            && in_array((string) ($existing['status'] ?? ''), ['requires_payment_method', 'requires_confirmation', 'requires_action'], true)
-            && !empty($existing['client_secret'])
-            && (int) ($existing['amount'] ?? 0) === $amountCents
-        ) {
-            $pi = $existing;
-            $reusedPi = true;
-        }
+    // One PaymentIntent for the combined total. order_id drives the
+    // primary activation in the webhook; extra_order_ids covers the
+    // partner's order.
+    $metadata = [
+        'order_id'     => (string) $primary['order_id'],
+        'order_type'   => 'membership',
+        'order_number' => $primary['order_number'],
+        'member_id'    => (string) $member['id'],
+        'period_id'    => (string) $primary['period_id'],
+        'tier'         => $primary['type'],
+        'term'         => $term,
+        'context'      => 'membership_renewal',
+    ];
+    if ($partnerRenewer) {
+        $metadata['extra_order_ids'] = (string) $partnerRenewer['order_id'];
+        $metadata['associate_member_id'] = (string) $partnerRenewer['member']['id'];
     }
-    if (!$pi) {
-        try {
-            $pi = StripeService::createPaymentIntent([
-                'amount' => $amountCents,
-                'currency' => 'aud',
-                'description' => 'AGA membership — ' . $orderNumber . ' (' . $tier . ' / ' . $term . ')',
-                'metadata' => [
-                    'order_id' => (string) $orderId,
-                    'order_type' => 'membership',
-                    'order_number' => $orderNumber,
-                    'member_id' => (string) $user['member_id'],
-                    'period_id' => (string) ($member['membership_period_id'] ?? ''),
-                    'tier' => $tier,
-                    'term' => $term,
-                    'context' => 'membership_renewal',
-                ],
-                'automatic_payment_methods' => ['enabled' => true],
-            ]);
-        } catch (Throwable $e) {
-            json_response(['error' => 'Stripe could not start the payment.'], 502);
-        }
-        if (!$pi || empty($pi['id']) || empty($pi['client_secret'])) {
-            json_response(['error' => 'Stripe could not start the payment.'], 502);
-        }
+    $orderNumbers = array_map(static fn($r) => $r['order_number'], $renewers);
+    try {
+        $pi = StripeService::createPaymentIntent([
+            'amount' => $totalCents,
+            'currency' => strtolower($currency),
+            'description' => 'AGA membership — ' . implode(' + ', $orderNumbers) . ' (' . $term . ')',
+            'metadata' => $metadata,
+            'automatic_payment_methods' => ['enabled' => true],
+        ]);
+    } catch (Throwable $e) {
+        error_log('[/api/payments/membership-intent] PI create failed: ' . $e->getMessage());
+        json_response(['error' => 'Stripe could not start the payment.'], 502);
+    }
+    if (!$pi || empty($pi['id']) || empty($pi['client_secret'])) {
+        json_response(['error' => 'Stripe could not start the payment.'], 502);
+    }
+    foreach ($renewers as $r) {
         try {
             $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['pi' => (string) $pi['id'], 'id' => $orderId]);
+            $stmt->execute(['pi' => (string) $pi['id'], 'id' => $r['order_id']]);
         } catch (Throwable $e) {
             error_log('[/api/payments/membership-intent] PI cache-back failed: ' . $e->getMessage());
         }
     }
 
+    $lines = [];
+    foreach ($renewers as $r) {
+        $name = trim(((string) ($r['member']['first_name'] ?? '')) . ' ' . ((string) ($r['member']['last_name'] ?? '')));
+        $lines[] = [
+            'label'        => $r['label'],
+            'sublabel'     => trim($name . ' · Order ' . $r['order_number'], ' ·'),
+            'amount_cents' => $r['cents'],
+            'amount_label' => 'A$' . number_format($r['cents'] / 100, 2),
+        ];
+    }
+
     json_response([
-        'order_id'        => $orderId,
-        'order_number'    => $orderNumber,
-        'tier'            => $tier,
+        'order_id'        => $primary['order_id'],
+        'order_number'    => $primary['order_number'],
         'term'            => $term,
-        'magazine'        => $magazine,
-        'amount_cents'    => $amountCents,
-        'amount_label'    => 'A$' . number_format($amountCents / 100, 2),
+        'include_partner' => (bool) $partnerRenewer,
+        'amount_cents'    => $totalCents,
+        'amount_label'    => 'A$' . number_format($totalCents / 100, 2),
+        'lines'           => $lines,
         'client_secret'   => (string) $pi['client_secret'],
         'publishable_key' => (string) $activeKeys['publishable_key'],
-        'pricing'         => $pricing,
-        'reused_pi'       => $reusedPi,
     ]);
 }
 

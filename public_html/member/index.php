@@ -124,25 +124,7 @@ function status_badge_classes(string $status): string
 
 function membership_renewal_amount_cents(string $magazineType, string $memberTypeKey, string $termMonths): int
 {
-  $months = (int) $termMonths;
-  // Prefer an admin-defined renewal period whose duration matches exactly.
-  $period = MembershipPricingService::findRenewalPeriodByMonths($months);
-  if ($period) {
-    $cents = MembershipPricingService::getRenewalPriceCents($magazineType, $memberTypeKey, $period['id']);
-    if ($cents !== null) {
-      return (int) $cents;
-    }
-  }
-  // Fallback: derive from the legacy lookup (which itself falls through to
-  // pro-rata calculations if no exact period match exists).
-  if ($months === 36) {
-    return (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'THREE_YEARS') ?? 0);
-  }
-  $oneYear = (int) (MembershipPricingService::getPriceCents($magazineType, $memberTypeKey, 'ONE_YEAR') ?? 0);
-  if ($months === 24) {
-    return $oneYear * 2;
-  }
-  return $oneYear;
+  return MembershipPricingService::renewalAmountCents($magazineType, $memberTypeKey, (int) $termMonths);
 }
 
 function normalize_membership_price_term(string $term): string
@@ -1655,7 +1637,7 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
-<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R4 — if you can grep for this on
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R5 — if you can grep for this on
      the rendered HTML it means cPanel actually copied files. Bump the
      suffix on every push so a stale opcache vs missing-file question can
      be answered with one curl. -->
@@ -4438,7 +4420,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <!-- The Pay button just opens the slide-out drawer. The
                          drawer also auto-opens on this page (see
                          data-auto-open below). -->
-                    <button type="button" data-pay-drawer-open
+                    <button type="button" data-pay-drawer-open data-tour="pay-fees-pay-now"
                             class="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 hover:bg-primary/90 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
                         <rect x="3" y="11" width="18" height="11" rx="2"/>
@@ -5383,251 +5365,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
   </main>
 </div>
 
-<?php
-// Pay-membership slide-out drawer — TWO-PANEL inline version (markup is
-// rendered right here so a missing partial / deploy ordering issue can't
-// break it). Panel 1 = membership selector, Panel 2 = credit card form;
-// the "Continue to payment →" button slides panel 1 left to reveal panel
-// 2 in the same drawer width. No Stripe full-page redirect anywhere.
-// Always render the drawer markup if there's a logged-in member. The
-// per-setting lookups (StripeSettings, defaults, etc) are each defensively
-// resolved below — a missing config is a degraded experience, not a hidden
-// drawer. Previous round wrapped all this in try/catch and silently set
-// $_drawerOk=false if anything inside threw, which is exactly what was
-// happening on live and why the drawer was invisible.
-$_drawerError = '';
-$_stripeSettingsForDrawer = [];
-try {
-  $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
-  if (!is_array($_stripeSettingsForDrawer)) $_stripeSettingsForDrawer = [];
-} catch (\Throwable $e) {
-  $_drawerError = 'stripe settings: ' . $e->getMessage();
-  error_log('[/member/] drawer Stripe settings failed: ' . $e->getMessage());
-}
-$_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
-if (!is_array($_drawerPrices)) $_drawerPrices = [];
-$_defaultTier = $member ? strtoupper((string) ($member['member_type'] ?? 'FULL')) : 'FULL';
-$_defaultTerm = (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M');
-$_allowBoth   = !empty($_stripeSettingsForDrawer['membership_allow_both_types']);
-$_show24      = !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']);
-$_show36      = !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']);
-$_hasPending  = !empty($pendingMembershipOrder);
-$_autoOpen    = $_hasPending && in_array($page, ['billing', 'dashboard'], true);
-$_pendingNum  = (string) ($pendingMembershipOrder['order_number'] ?? '');
-$_drawerCsrf  = '';
-try { $_drawerCsrf = Csrf::token(); } catch (\Throwable $e) {
-  $_drawerError = ($_drawerError ?: '') . ' csrf: ' . $e->getMessage();
-}
-?>
-<?php if ($member): ?>
-<!-- Pay-membership lightbox — same centered modal style as #renew-modal
-     so the visual language is consistent. Inside the white card there's
-     a slider that swaps between View 1 (membership selector) and View 2
-     (Stripe Payment Element). -->
-<div id="pay-membership-drawer"
-     class="hidden fixed inset-0 z-[9000] items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4"
-     role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
-     data-csrf="<?= e($_drawerCsrf) ?>"
-       data-default-tier="<?= e($_defaultTier) ?>"
-       data-default-term="<?= e($_defaultTerm) ?>"
-       data-allow-associate="<?= $_allowBoth ? '1' : '0' ?>"
-       data-show-24="<?= $_show24 ? '1' : '0' ?>"
-       data-show-36="<?= $_show36 ? '1' : '0' ?>"
-       data-auto-open="<?= $_autoOpen ? '1' : '0' ?>"
-       data-pending-number="<?= e($_pendingNum) ?>">
-  <!-- Outer click target closes drawer (matches renew-modal behaviour) -->
-  <div class="absolute inset-0" data-pay-drawer-close></div>
-
-  <!-- Lightbox card — same shell as #renew-modal -->
-  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600 overflow-hidden"
-       data-pay-drawer-panel>
-    <!-- Shared header (icon + title + back arrow + close) — matches renew-modal -->
-    <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-      <div class="flex items-start gap-3 min-w-0">
-        <button type="button" data-pay-drawer-back
-                class="hidden mt-1 text-gray-400 hover:text-gray-700"
-                aria-label="Back to plan">
-          <span class="material-icons-outlined">arrow_back</span>
-        </button>
-        <div class="min-w-0">
-          <h2 id="pay-drawer-title" class="font-display text-xl font-bold text-gray-900 flex items-center gap-2"
-              data-pay-drawer-title>
-            <span class="material-icons-outlined text-red-600">payments</span>
-            <span>Renew membership</span>
-          </h2>
-          <p class="mt-1 text-sm text-gray-500" data-pay-drawer-subtitle>
-            Choose your renewal term and confirm your details.
-          </p>
-        </div>
-      </div>
-      <button type="button" data-pay-drawer-close
-              class="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100" aria-label="Close">
-        <span class="material-icons-outlined">close</span>
-      </button>
-    </header>
-
-    <!-- Sliding viewport: 2 panels side-by-side, width = 200% -->
-    <div class="overflow-hidden">
-      <div class="flex transition-transform duration-300 ease-out"
-           style="width:200%" data-pay-drawer-slider>
-
-        <!-- ============= VIEW 1: Membership selector ============= -->
-        <section class="w-1/2 self-start" data-pay-drawer-view="select">
-          <!-- Membership type -->
-          <div class="px-6 py-5 border-b border-gray-100">
-            <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Membership type</h3>
-            <div class="grid grid-cols-<?= $_allowBoth ? '2' : '1' ?> gap-2">
-              <label class="flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
-                <input type="radio" name="pay-drawer-tier" value="FULL" class="mt-0.5" data-pay-drawer-tier>
-                <span class="flex-1">
-                  <span class="block font-semibold text-gray-900 text-sm">Full Member</span>
-                  <span class="block text-xs text-slate-500 leading-snug mt-0.5">Voting member, all benefits.</span>
-                </span>
-              </label>
-              <?php if ($_allowBoth): ?>
-                <label class="flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
-                  <input type="radio" name="pay-drawer-tier" value="ASSOCIATE" class="mt-0.5" data-pay-drawer-tier>
-                  <span class="flex-1">
-                    <span class="block font-semibold text-gray-900 text-sm">Associate</span>
-                    <span class="block text-xs text-slate-500 leading-snug mt-0.5">Household partner of a Full member.</span>
-                  </span>
-                </label>
-              <?php endif; ?>
-            </div>
-          </div>
-
-          <!-- Term -->
-          <div class="px-6 py-5 border-b border-gray-100">
-            <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Term</h3>
-            <div class="grid grid-cols-<?= ($_show24 || $_show36) ? '3' : '1' ?> gap-2">
-              <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
-                <input type="radio" name="pay-drawer-term" value="12M" class="sr-only" data-pay-drawer-term>
-                <span class="block font-semibold text-gray-900 text-sm">1 year</span>
-                <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="12M">—</span>
-              </label>
-              <?php if ($_show24): ?>
-                <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
-                  <input type="radio" name="pay-drawer-term" value="24M" class="sr-only" data-pay-drawer-term>
-                  <span class="block font-semibold text-gray-900 text-sm">2 years</span>
-                  <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="24M">—</span>
-                </label>
-              <?php endif; ?>
-              <?php if ($_show36): ?>
-                <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
-                  <input type="radio" name="pay-drawer-term" value="36M" class="sr-only" data-pay-drawer-term>
-                  <span class="block font-semibold text-gray-900 text-sm">3 years</span>
-                  <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="36M">—</span>
-                </label>
-              <?php endif; ?>
-            </div>
-          </div>
-
-          <!-- Live summary + continue button -->
-          <div class="px-6 py-5 space-y-4">
-            <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm">
-              <div class="flex justify-between items-start">
-                <div class="min-w-0">
-                  <div class="font-semibold text-gray-900" data-pay-drawer-summary-title>—</div>
-                  <div class="text-xs text-slate-500 truncate" data-pay-drawer-summary-order>—</div>
-                </div>
-                <div class="text-xl font-bold text-gray-900" data-pay-drawer-summary-total>—</div>
-              </div>
-            </div>
-
-            <p class="text-xs text-slate-500">
-              You can come back and change your plan up until you click Pay.
-            </p>
-
-            <!-- Inline error for selector view -->
-            <div data-pay-drawer-error-select
-                 class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                 role="alert"></div>
-
-            <button type="button" data-pay-drawer-continue
-                    class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
-              Continue to payment
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-                <path d="m9 18 6-6-6-6"/>
-              </svg>
-            </button>
-          </div>
-        </section>
-
-        <!-- ============= VIEW 2: Credit card / payment ============= -->
-        <section class="w-1/2 self-start" data-pay-drawer-view="pay">
-          <div class="px-6 py-5">
-            <!-- Inline security messaging (inlined here too — no partial req) -->
-            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3 mb-4">
-              <div class="flex items-start gap-3">
-                <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </span>
-                <div class="text-xs leading-relaxed text-slate-700">
-                  <p class="font-semibold text-slate-900 text-sm">Your card details never touch our servers.</p>
-                  <p class="mt-1">
-                    Payment is processed by <strong>Stripe</strong>, a <strong>Level&nbsp;1 PCI Service Provider</strong> trusted by Amazon, Google, Lyft and millions of other businesses. The connection uses <strong>TLS&nbsp;1.2+</strong> with 256-bit encryption, and the AGA only ever sees the last 4 digits for receipt purposes.
-                    <a href="https://stripe.com/docs/security" target="_blank" rel="noopener" class="text-emerald-700 hover:underline">Learn more&nbsp;↗</a>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Order recap -->
-            <div class="rounded-xl bg-slate-50 px-4 py-3 mb-4 text-sm">
-              <div class="flex justify-between items-start">
-                <div class="min-w-0">
-                  <div class="font-semibold text-gray-900" data-pay-drawer-recap-title>—</div>
-                  <div class="text-xs text-slate-500 truncate" data-pay-drawer-recap-order>—</div>
-                </div>
-                <div class="text-xl font-bold text-gray-900" data-pay-drawer-recap-total>—</div>
-              </div>
-            </div>
-
-            <!-- Inline error for payment view -->
-            <div data-pay-drawer-error-pay
-                 class="hidden mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                 role="alert"></div>
-
-            <!-- Stripe Payment Element mounts here -->
-            <div class="rounded-lg border border-gray-200 bg-white px-3 py-3 min-h-[220px]"
-                 data-pay-drawer-element>
-              <div data-pay-drawer-placeholder
-                   class="flex items-center justify-center min-h-[180px] text-sm text-slate-400">
-                <span class="inline-flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 animate-spin">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                  </svg>
-                  Loading secure payment form…
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </div>
-    </div>
-
-    <!-- Footer Pay button — bottom of the lightbox card. Same red gradient
-         style as the renew-modal's "Continue to payment" button so it
-         visually matches the rest of the experience. -->
-    <div class="px-6 py-4 border-t border-gray-100 bg-white">
-      <button type="button" data-pay-drawer-pay
-              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-sm">
-        <span class="material-icons-outlined text-base" data-pay-drawer-pay-icon>lock</span>
-        <span data-pay-drawer-pay-label>Continue to payment</span>
-      </button>
-      <p class="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-        <span>256-bit SSL</span><span>•</span>
-        <span>PCI DSS Level 1</span><span>•</span>
-        <span>Powered by Stripe</span>
-      </p>
-    </div>
-  </div>
-</div>
-<?php endif; ?>
 
 <?php
 // Post-Stripe-checkout thank-you lightbox + confetti.
@@ -5815,97 +5552,175 @@ if ($renewModalEligible) {
     ? (strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'Associate' : 'Full')
     : '';
 ?>
-<div id="renew-modal" data-tour="renew-modal" class="hidden fixed inset-0 z-50 items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600">
+<!-- Pay-membership lightbox — single centred modal, two views on a
+     horizontal slider. View 1 = pick term + associate add-on (the old
+     #renew-modal layout). View 2 = order summary + Stripe Payment Element
+     (same pattern as /checkout/). Controller: assets/js/pay-membership-drawer.js.
+     No Stripe full-page redirect anywhere. -->
+<div id="pay-membership-drawer" data-tour="renew-modal"
+     class="hidden fixed inset-0 z-[9000] items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
+     data-csrf="<?= e(Csrf::token()) ?>"
+     data-currency="<?= e($renewCurrency) ?>"
+     data-auto-open="<?= !empty($pendingMembershipOrder) ? '1' : '0' ?>">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600 overflow-hidden">
     <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
-      <div>
-        <h2 class="font-display text-xl font-bold text-gray-900 flex items-center gap-2">
-          <span class="material-icons-outlined text-red-600">payments</span>
-          Renew membership
-        </h2>
-        <p class="mt-1 text-sm text-gray-500">Choose your renewal term and confirm your details.</p>
+      <div class="flex items-start gap-3 min-w-0">
+        <button type="button" data-pay-drawer-back class="hidden mt-1 text-gray-400 hover:text-gray-700" aria-label="Back to plan">
+          <span class="material-icons-outlined">arrow_back</span>
+        </button>
+        <div class="min-w-0">
+          <h2 id="pay-drawer-title" class="font-display text-xl font-bold text-gray-900 flex items-center gap-2">
+            <span class="material-icons-outlined text-red-600">payments</span>
+            <span data-pay-drawer-title>Renew membership</span>
+          </h2>
+          <p class="mt-1 text-sm text-gray-500" data-pay-drawer-subtitle>Choose your renewal term and confirm your details.</p>
+        </div>
       </div>
-      <button type="button" data-renew-close
+      <button type="button" data-pay-drawer-close
         class="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100" aria-label="Close">
         <span class="material-icons-outlined">close</span>
       </button>
     </div>
-    <form method="post" action="/member/index.php?page=billing" class="p-6 space-y-5" id="renew-form">
-      <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-      <input type="hidden" name="action" value="membership_renew">
-      <div class="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-800">
-        <p class="font-semibold"><?= e($renewMemberName) ?> &middot; <?= e($renewMemberType === 'ASSOCIATE' ? 'Associate Member' : 'Full Member') ?></p>
-        <?php if (!empty($membershipPeriod['end_date'])): ?>
-          <p class="text-xs">Current period ends <?= e(format_date($membershipPeriod['end_date'])) ?>.</p>
-        <?php endif; ?>
-      </div>
-      <div data-tour="renew-term">
-        <p class="text-sm font-semibold text-gray-900 mb-2">Renewal term</p>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-renew-term-group>
-          <?php $firstTerm = true; foreach ($renewOptions as $opt): ?>
-            <label class="relative cursor-pointer">
-              <input type="radio" name="term" value="<?= e($opt['months']) ?>" class="peer sr-only" data-renew-term-radio
-                data-self-amount="<?= e(number_format($opt['self_amount'], 2, '.', '')) ?>"
-                data-partner-amount="<?= e(number_format($opt['partner_amount'], 2, '.', '')) ?>"
-                <?= !$opt['self_available'] ? 'disabled' : '' ?>
-                <?= $firstTerm && $opt['self_available'] ? 'checked' : '' ?>>
-              <div class="rounded-xl border-2 border-gray-200 px-4 py-3 text-center peer-checked:border-red-600 peer-checked:bg-red-50 peer-disabled:opacity-40 transition-all">
-                <p class="text-sm font-bold text-gray-900"><?= e($opt['label']) ?></p>
-                <p class="mt-1 text-lg font-display font-bold text-red-700">$<?= e(number_format($opt['self_amount'], 2)) ?></p>
-                <p class="text-xs text-gray-500"><?= e($renewCurrency) ?></p>
-                <?php if (!$opt['self_available']): ?>
-                  <p class="text-[10px] text-amber-700 mt-1">Not configured</p>
-                <?php endif; ?>
-              </div>
-            </label>
-          <?php $firstTerm = false; endforeach; ?>
-        </div>
-      </div>
-      <?php if ($renewPartnerMember): ?>
-        <div data-tour="renew-partner">
-          <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
-            <input type="checkbox" name="include_partner" value="1" data-renew-partner-toggle
-              class="mt-0.5 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-600">
-            <div class="flex-1">
-              <p class="text-sm font-semibold text-gray-900">Also renew my <?= e(strtolower($renewPartnerTypeLabel)) ?> member</p>
-              <p class="text-xs text-gray-600 mt-0.5"><?= e($renewPartnerName) ?> &middot; <?= e($renewPartnerTypeLabel) ?> Member</p>
-              <p class="text-xs text-red-700 mt-1 font-medium" data-renew-partner-price>+$<?= e(number_format($renewOptions['12']['partner_amount'], 2)) ?> for the same term</p>
+
+    <div class="overflow-hidden">
+      <div class="flex w-[200%] transition-transform duration-300 ease-out" data-pay-drawer-slider>
+
+        <!-- ============= VIEW 1: term + associate + confirm ============= -->
+        <section class="w-1/2 self-start p-6 space-y-5" data-pay-drawer-view="select">
+          <div class="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-800">
+            <p class="font-semibold"><?= e($renewMemberName) ?> &middot; <?= e($renewMemberType === 'ASSOCIATE' ? 'Associate Member' : 'Full Member') ?></p>
+            <?php if (!empty($membershipPeriod['end_date'])): ?>
+              <p class="text-xs">Current period ends <?= e(format_date($membershipPeriod['end_date'])) ?>.</p>
+            <?php endif; ?>
+          </div>
+          <div data-tour="renew-term">
+            <p class="text-sm font-semibold text-gray-900 mb-2">Renewal term</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <?php $firstTerm = true; foreach ($renewOptions as $opt): ?>
+                <label class="relative cursor-pointer">
+                  <input type="radio" name="pay_drawer_term" value="<?= e($opt['months']) ?>" class="peer sr-only" data-pay-drawer-term
+                    data-self-amount="<?= e(number_format($opt['self_amount'], 2, '.', '')) ?>"
+                    data-partner-amount="<?= e(number_format($opt['partner_amount'], 2, '.', '')) ?>"
+                    <?= !$opt['self_available'] ? 'disabled' : '' ?>
+                    <?= $firstTerm && $opt['self_available'] ? 'checked' : '' ?>>
+                  <div class="rounded-xl border-2 border-gray-200 px-4 py-3 text-center peer-checked:border-red-600 peer-checked:bg-red-50 peer-disabled:opacity-40 transition-all">
+                    <p class="text-sm font-bold text-gray-900"><?= e($opt['label']) ?></p>
+                    <p class="mt-1 text-lg font-display font-bold text-red-700">$<?= e(number_format($opt['self_amount'], 2)) ?></p>
+                    <p class="text-xs text-gray-500"><?= e($renewCurrency) ?></p>
+                    <?php if (!$opt['self_available']): ?>
+                      <p class="text-[10px] text-amber-700 mt-1">Not configured</p>
+                    <?php endif; ?>
+                  </div>
+                </label>
+              <?php $firstTerm = false; endforeach; ?>
             </div>
+          </div>
+          <?php if ($renewPartnerMember): ?>
+            <div data-tour="renew-partner">
+              <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
+                <input type="checkbox" value="1" data-pay-drawer-partner
+                  class="mt-0.5 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-600">
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-gray-900">Also pay for my <?= e(strtolower($renewPartnerTypeLabel)) ?> member</p>
+                  <p class="text-xs text-gray-600 mt-0.5"><?= e($renewPartnerName) ?> &middot; <?= e($renewPartnerTypeLabel) ?> Member</p>
+                  <p class="text-xs text-red-700 mt-1 font-medium" data-pay-drawer-partner-price>+$<?= e(number_format($renewOptions[array_key_first($renewOptions)]['partner_amount'], 2)) ?> for the same term</p>
+                </div>
+              </label>
+            </div>
+          <?php endif; ?>
+          <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-600">You pay today</span>
+              <span class="text-xl font-display font-bold text-gray-900" data-pay-drawer-total>—</span>
+            </div>
+            <p class="text-xs text-gray-500 flex items-center gap-1">
+              <span class="material-icons-outlined text-sm">lock</span>
+              Secure payment by card via Stripe.
+            </p>
+          </div>
+          <label class="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer">
+            <input type="checkbox" value="1" data-pay-drawer-ack
+              class="mt-0.5 h-5 w-5 rounded border-amber-300 text-red-600 focus:ring-red-600">
+            <span class="text-sm text-amber-900">
+              I confirm my membership details (name, address, contact, bike) are correct and up to date.
+              <a href="/member/index.php?page=profile" class="underline font-semibold ml-1">Review my details</a>
+            </span>
           </label>
-        </div>
-      <?php endif; ?>
-      <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-gray-600">You pay today</span>
-          <span class="text-xl font-display font-bold text-gray-900" data-renew-total>$<?= e(number_format($renewOptions['12']['self_amount'], 2)) ?> <?= e($renewCurrency) ?></span>
-        </div>
-        <p class="text-xs text-gray-500 flex items-center gap-1">
-          <span class="material-icons-outlined text-sm">lock</span>
-          Secure payment by card via Stripe.
-        </p>
-      </div>
-      <label class="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer">
-        <input type="checkbox" name="acknowledged" value="1" required
-          class="mt-0.5 h-5 w-5 rounded border-amber-300 text-red-600 focus:ring-red-600">
-        <span class="text-sm text-amber-900">
-          I confirm my membership details (name, address, contact, bike) are correct and up to date.
-          <a href="/member/index.php?page=profile" class="underline font-semibold ml-1">Review my details</a>
-        </span>
-      </label>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-100">
-        <button type="button" data-renew-cancel-trigger data-tour="renew-cancel-link"
-          class="text-xs text-gray-500 hover:text-red-700 underline self-start">Cancel my membership instead</button>
-        <div class="flex items-center gap-2">
-          <button type="button" data-renew-close
-            class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Close</button>
-          <button type="submit" data-tour="renew-submit"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-md">
+          <div data-pay-drawer-error-select
+               class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+               role="alert"></div>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-100">
+            <button type="button" data-renew-cancel-trigger data-tour="renew-cancel-link"
+              class="text-xs text-gray-500 hover:text-red-700 underline self-start">Cancel my membership instead</button>
+            <div class="flex items-center gap-2">
+              <button type="button" data-pay-drawer-close
+                class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Close</button>
+              <button type="button" data-pay-drawer-continue data-tour="renew-submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold text-white shadow-md">
+                <span class="material-icons-outlined text-base">lock</span>
+                <span data-pay-drawer-continue-label>Continue to payment</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============= VIEW 2: order summary + card ============= -->
+        <section class="w-1/2 self-start p-6 space-y-4" data-pay-drawer-view="pay">
+          <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Order summary</p>
+            <div class="space-y-2" data-pay-drawer-lines></div>
+            <div class="flex items-center justify-between border-t border-gray-200 mt-2 pt-2">
+              <span class="font-semibold text-gray-900">Total</span>
+              <span class="text-lg font-display font-bold text-gray-900" data-pay-drawer-pay-total>—</span>
+            </div>
+          </div>
+          <div class="rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3">
+            <div class="flex items-start gap-3">
+              <span class="material-icons-outlined text-emerald-700 mt-0.5">verified_user</span>
+              <div class="text-xs leading-relaxed text-slate-700">
+                <p class="font-semibold text-slate-900 text-sm">Your card details never touch our servers.</p>
+                <p class="mt-0.5">Processed by <strong>Stripe</strong> (Level&nbsp;1 PCI &middot; TLS&nbsp;1.2+). The AGA only ever sees the last 4 digits.</p>
+              </div>
+            </div>
+          </div>
+          <label class="flex items-center gap-3 p-4 rounded-xl border border-primary bg-primary/5 cursor-default">
+            <input type="radio" checked disabled class="text-primary focus:ring-primary">
+            <span class="material-icons-outlined text-gray-700">credit_card</span>
+            <span class="flex-1">
+              <span class="block text-sm font-semibold text-gray-900">Credit or debit card</span>
+              <span class="block text-xs text-gray-500">Visa, Mastercard, Amex &middot; Apple Pay &middot; Google Pay</span>
+            </span>
+          </label>
+          <div data-pay-drawer-error-pay
+               class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+               role="alert"></div>
+          <div class="rounded-lg border border-gray-200 bg-white px-3 py-3 min-h-[220px]" data-pay-drawer-element-wrap>
+            <div data-pay-drawer-element></div>
+            <div data-pay-drawer-placeholder
+                 class="flex items-center justify-center min-h-[180px] text-sm text-slate-400">
+              <span class="inline-flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 animate-spin">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                Loading secure payment form…
+              </span>
+            </div>
+          </div>
+          <button type="button" data-pay-drawer-pay
+            class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-sm">
             <span class="material-icons-outlined text-base">lock</span>
-            Continue to payment
+            <span data-pay-drawer-pay-label>Pay</span>
           </button>
-        </div>
+          <p class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+            <span>256-bit SSL</span><span>&bull;</span>
+            <span>PCI DSS Level 1</span><span>&bull;</span>
+            <span>Powered by Stripe</span>
+          </p>
+        </section>
+
       </div>
-    </form>
+    </div>
   </div>
 </div>
 <div id="renew-cancel-modal" class="hidden fixed inset-0 z-[60] items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -5934,65 +5749,6 @@ if ($renewModalEligible) {
     </div>
   </div>
 </div>
-<script>
-  (() => {
-    const modal = document.getElementById('renew-modal');
-    if (!modal) return;
-    const cancelModal = document.getElementById('renew-cancel-modal');
-    const triggers = document.querySelectorAll('[data-renew-trigger]');
-    const closers = modal.querySelectorAll('[data-renew-close]');
-    const termRadios = modal.querySelectorAll('[data-renew-term-radio]');
-    const partnerToggle = modal.querySelector('[data-renew-partner-toggle]');
-    const partnerPriceLabel = modal.querySelector('[data-renew-partner-price]');
-    const totalEl = modal.querySelector('[data-renew-total]');
-    const cancelTrigger = modal.querySelector('[data-renew-cancel-trigger]');
-    const cancelClosers = cancelModal ? cancelModal.querySelectorAll('[data-renew-cancel-close]') : [];
-    const currency = <?= json_encode($renewCurrency) ?>;
-
-    const open = (el) => {
-      el.classList.remove('hidden');
-      el.classList.add('flex');
-      document.body.style.overflow = 'hidden';
-    };
-    const close = (el) => {
-      el.classList.add('hidden');
-      el.classList.remove('flex');
-      document.body.style.overflow = '';
-    };
-    const fmt = (n) => '$' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    const recalc = () => {
-      const selected = modal.querySelector('[data-renew-term-radio]:checked');
-      if (!selected) {
-        if (totalEl) totalEl.textContent = '—';
-        return;
-      }
-      const self = parseFloat(selected.dataset.selfAmount || '0');
-      const partner = parseFloat(selected.dataset.partnerAmount || '0');
-      const withPartner = partnerToggle && partnerToggle.checked;
-      const total = self + (withPartner ? partner : 0);
-      if (totalEl) totalEl.textContent = fmt(total) + ' ' + currency;
-      if (partnerPriceLabel) partnerPriceLabel.textContent = '+' + fmt(partner) + ' for the same term';
-    };
-
-    triggers.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); open(modal); recalc(); }));
-    closers.forEach((c) => c.addEventListener('click', () => close(modal)));
-    modal.addEventListener('click', (e) => { if (e.target === modal) close(modal); });
-    termRadios.forEach((r) => r.addEventListener('change', recalc));
-    if (partnerToggle) partnerToggle.addEventListener('change', recalc);
-    if (cancelTrigger && cancelModal) {
-      cancelTrigger.addEventListener('click', () => { close(modal); open(cancelModal); });
-      cancelClosers.forEach((c) => c.addEventListener('click', () => close(cancelModal)));
-      cancelModal.addEventListener('click', (e) => { if (e.target === cancelModal) close(cancelModal); });
-    }
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        close(modal);
-        if (cancelModal) close(cancelModal);
-      }
-    });
-  })();
-</script>
 <?php } ?>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
