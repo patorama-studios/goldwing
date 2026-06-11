@@ -294,6 +294,225 @@ if (empty($segments)) {
 
 $resource = $segments[0];
 
+// /api/payments/membership-intent — drives the pay-membership slide-out
+// drawer. POST {tier, term, magazine?} → server picks (or creates) a
+// pending membership order matching that selection, voids any other
+// pending membership orders the user has, mints a PaymentIntent, and
+// returns the client_secret plus the full pricing matrix so the drawer
+// can render its tier/term selector and the order summary.
+if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'membership-intent') {
+    if ($method !== 'POST') {
+        json_response(['error' => 'Method not allowed.'], 405);
+    }
+    require_csrf_json($body);
+    require_stripe_checkout_enabled();
+    $activeKeys = StripeSettingsService::getActiveKeys();
+    if (empty($activeKeys['secret_key']) || empty($activeKeys['publishable_key'])) {
+        json_response(['error' => 'Stripe is not configured.'], 422);
+    }
+    $user = current_user();
+    if (!$user || empty($user['member_id'])) {
+        json_response(['error' => 'Sign in as a member to continue.'], 401);
+    }
+
+    $pdo = db();
+    $member = MemberRepository::findById((int) $user['member_id']);
+    if (!$member) {
+        json_response(['error' => 'Member record not found.'], 404);
+    }
+
+    // Inputs.
+    $tier = strtoupper(trim((string) ($body['tier'] ?? '')));
+    if (!in_array($tier, ['FULL', 'ASSOCIATE'], true)) {
+        // Default: keep what the member currently has, fall through to FULL.
+        $tier = strtoupper((string) ($member['member_type'] ?? 'FULL'));
+        if (!in_array($tier, ['FULL', 'ASSOCIATE'], true)) {
+            $tier = 'FULL';
+        }
+    }
+    $term = strtoupper(trim((string) ($body['term'] ?? '12M')));
+    if (!in_array($term, ['12M', '24M', '36M'], true)) {
+        $term = '12M';
+    }
+    $termMonths = $term === '36M' ? 36 : ($term === '24M' ? 24 : 12);
+    $magazine = strtoupper(trim((string) ($body['magazine'] ?? 'DIGITAL')));
+    if (!in_array($magazine, ['DIGITAL', 'PRINT'], true)) {
+        $magazine = 'DIGITAL';
+    }
+
+    // Pricing matrix for the drawer's selector. Returns cents per
+    // tier × term so the JS can update the order-summary live without a
+    // server round-trip on every click.
+    $pricing = [];
+    foreach (['FULL', 'ASSOCIATE'] as $t) {
+        foreach (['12' => '12M', '24' => '24M', '36' => '36M'] as $months => $key) {
+            $cents = membership_renewal_amount_cents($magazine, $t, (string) $months);
+            if ($cents > 0) {
+                $pricing[$t][$key] = $cents;
+            }
+        }
+    }
+
+    $amountCents = membership_renewal_amount_cents($magazine, $tier, (string) $termMonths);
+    if ($amountCents <= 0) {
+        json_response(['error' => 'No price configured for ' . $tier . ' / ' . $term . '. Ask an admin to set membership prices.'], 422);
+    }
+
+    // Void any existing pending membership orders for this user that
+    // don't match the selected tier+term — so the change is reflected
+    // in the admin orders list immediately and we don't end up minting
+    // duplicate PaymentIntents on stale rows.
+    try {
+        $userId = (int) $user['id'];
+        $stmt = $pdo->prepare(
+            "SELECT id, order_number, total, order_type
+               FROM orders
+              WHERE user_id = :user_id
+                AND order_type = 'membership'
+                AND status IN ('pending', 'PENDING_PAYMENT')
+                AND payment_status IN ('pending', 'PENDING_PAYMENT', 'unpaid', 'failed')
+              ORDER BY id DESC"
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $candidates = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $candidates = [];
+    }
+
+    // Find an existing pending row whose total matches the new amount —
+    // we'll reuse it. Anything else with a different total gets voided.
+    $matchOrder = null;
+    foreach ($candidates as $c) {
+        $rowCents = (int) round(((float) ($c['total'] ?? 0)) * 100);
+        if ($rowCents === $amountCents && $matchOrder === null) {
+            $matchOrder = $c;
+            continue;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                'UPDATE orders SET status = "cancelled", payment_status = "cancelled",
+                                   voided_at = NOW(), updated_at = NOW(),
+                                   internal_notes = CONCAT(COALESCE(internal_notes, ""), CASE WHEN COALESCE(internal_notes, "") = "" THEN "" ELSE "\n" END, :note)
+                              WHERE id = :id'
+            );
+            $stmt->execute([
+                'note' => 'Auto-cancelled when member changed selection in pay drawer to ' . $tier . ' ' . $term . '.',
+                'id'   => (int) $c['id'],
+            ]);
+        } catch (Throwable $e) {
+            // Non-fatal; older schemas may not have voided_at — try a simpler update.
+            try {
+                $stmt = $pdo->prepare('UPDATE orders SET status = "cancelled", payment_status = "cancelled", updated_at = NOW() WHERE id = :id');
+                $stmt->execute(['id' => (int) $c['id']]);
+            } catch (Throwable $e2) {
+                error_log('[/api/payments/membership-intent] void failed for order ' . $c['id'] . ': ' . $e2->getMessage());
+            }
+        }
+    }
+
+    // Either reuse the matching pending order, or create a fresh one.
+    $orderId = $matchOrder ? (int) $matchOrder['id'] : 0;
+    $orderNumber = $matchOrder ? (string) $matchOrder['order_number'] : '';
+    if ($orderId === 0) {
+        try {
+            $year = (int) date('Y');
+            $periodId = (int) ($member['membership_period_id'] ?? 0);
+
+            $created = OrderService::createOrder([
+                'user_id' => (int) $user['id'],
+                'member_id' => (int) $user['member_id'],
+                'membership_period_id' => $periodId > 0 ? $periodId : null,
+                'order_type' => 'membership',
+                'currency' => 'AUD',
+                'subtotal' => $amountCents / 100,
+                'tax_total' => 0,
+                'shipping_total' => 0,
+                'total' => $amountCents / 100,
+                'shipping_required' => 0,
+            ], [[
+                'product_id' => null,
+                'name' => ucfirst(strtolower($tier)) . ' membership renewal (' . ($termMonths === 36 ? '3 years' : ($termMonths === 24 ? '2 years' : '1 year')) . ')',
+                'quantity' => 1,
+                'unit_price' => $amountCents / 100,
+                'is_physical' => 0,
+            ]]);
+            $orderId = (int) ($created['id'] ?? 0);
+            $orderNumber = (string) ($created['order_number'] ?? ('M-' . $orderId));
+        } catch (Throwable $e) {
+            json_response(['error' => 'Could not create the order. ' . $e->getMessage()], 500);
+        }
+        if ($orderId === 0) {
+            json_response(['error' => 'Could not create the order.'], 500);
+        }
+    }
+
+    // Mint a fresh PaymentIntent for this order. If a previous one still
+    // exists and is confirmable, reuse it (the /api/payments/intent
+    // endpoint has the same cache-hit logic — keeping behaviour
+    // consistent).
+    $stmt = $pdo->prepare('SELECT stripe_payment_intent_id FROM orders WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $orderId]);
+    $existingPi = trim((string) ($stmt->fetchColumn() ?: ''));
+    $reusedPi = false;
+    $pi = null;
+    if ($existingPi !== '') {
+        $existing = StripeService::retrievePaymentIntent($existingPi);
+        if (is_array($existing)
+            && in_array((string) ($existing['status'] ?? ''), ['requires_payment_method', 'requires_confirmation', 'requires_action'], true)
+            && !empty($existing['client_secret'])
+            && (int) ($existing['amount'] ?? 0) === $amountCents
+        ) {
+            $pi = $existing;
+            $reusedPi = true;
+        }
+    }
+    if (!$pi) {
+        try {
+            $pi = StripeService::createPaymentIntent([
+                'amount' => $amountCents,
+                'currency' => 'aud',
+                'description' => 'AGA membership — ' . $orderNumber . ' (' . $tier . ' / ' . $term . ')',
+                'metadata' => [
+                    'order_id' => (string) $orderId,
+                    'order_type' => 'membership',
+                    'order_number' => $orderNumber,
+                    'member_id' => (string) $user['member_id'],
+                    'period_id' => (string) ($member['membership_period_id'] ?? ''),
+                    'tier' => $tier,
+                    'term' => $term,
+                    'context' => 'membership_renewal',
+                ],
+                'automatic_payment_methods' => ['enabled' => true],
+            ]);
+        } catch (Throwable $e) {
+            json_response(['error' => 'Stripe could not start the payment.'], 502);
+        }
+        if (!$pi || empty($pi['id']) || empty($pi['client_secret'])) {
+            json_response(['error' => 'Stripe could not start the payment.'], 502);
+        }
+        try {
+            $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
+            $stmt->execute(['pi' => (string) $pi['id'], 'id' => $orderId]);
+        } catch (Throwable $e) {
+            error_log('[/api/payments/membership-intent] PI cache-back failed: ' . $e->getMessage());
+        }
+    }
+
+    json_response([
+        'order_id'        => $orderId,
+        'order_number'    => $orderNumber,
+        'tier'            => $tier,
+        'term'            => $term,
+        'magazine'        => $magazine,
+        'amount_cents'    => $amountCents,
+        'amount_label'    => 'A$' . number_format($amountCents / 100, 2),
+        'client_secret'   => (string) $pi['client_secret'],
+        'publishable_key' => (string) $activeKeys['publishable_key'],
+        'pricing'         => $pricing,
+        'reused_pi'       => $reusedPi,
+    ]);
+}
+
 // /api/payments/intent — unified endpoint used by the inline Stripe Payment
 // Element widget (app/Views/partials/stripe_inline_payment.php). Returns a
 // PaymentIntent client_secret + the publishable key + a human label, given

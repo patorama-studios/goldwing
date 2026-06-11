@@ -1839,11 +1839,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </div>
               </div>
               <?php if ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
-                <a href="/member/index.php?page=billing"
+                <button type="button" data-pay-drawer-open
                   class="mt-6 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-gray-900 font-semibold text-sm hover:bg-primary/90 transition">
                   <span class="material-icons-outlined text-base">payments</span>
                   Complete payment
-                </a>
+                </button>
               <?php elseif ($renewalDays !== null && $renewalDays <= 60): ?>
                 <button type="button" data-renew-trigger
                   class="mt-6 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md transition">
@@ -4430,24 +4430,17 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
                   </div>
                   <?php if ($pendingPaymentMethod === 'stripe'): ?>
-                    <!-- Inline Stripe Payment Element — no full-page redirect.
-                         Replaces the old "Pay now → Stripe Checkout → return"
-                         round-trip that was losing the session for some users. -->
-                    <?php
-                      $pendingTotalCents = (int) round(((float) ($pendingMembershipOrder['total'] ?? 0)) * 100);
-                      $stripeInlinePayment = [
-                        'context'      => 'membership_renewal',
-                        'order_id'     => (int) $pendingMembershipOrder['id'],
-                        'amount_label' => 'A$' . number_format($pendingTotalCents / 100, 2),
-                        'description'  => 'Membership renewal — ' . ($pendingMembershipOrder['order_number'] ?? ''),
-                        'return_url'   => '/member/?renewed=1',
-                        'pay_button'   => 'Pay A$' . number_format($pendingTotalCents / 100, 2),
-                        'intent_url'   => '/api/payments/intent',
-                        'csrf_token'   => Csrf::token(),
-                        'instance'     => 'renewal-' . (int) $pendingMembershipOrder['id'],
-                      ];
-                      require __DIR__ . '/../../app/Views/partials/stripe_inline_payment.php';
-                    ?>
+                    <!-- The Pay button just opens the slide-out drawer. The
+                         drawer also auto-opens on this page (see
+                         data-auto-open below). -->
+                    <button type="button" data-pay-drawer-open
+                            class="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 hover:bg-primary/90 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                      Pay membership
+                    </button>
                   <?php elseif ($pendingPaymentMethod === 'bank_transfer'): ?>
                     <?php if ($bankInstructions !== ''): ?>
                       <div class="rounded-lg bg-white/80 px-3 py-2 text-xs text-gray-700 whitespace-pre-line">
@@ -4601,14 +4594,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         </td>
                         <td class="py-3 text-gray-600">
                           <?php if ($order['type'] === 'membership' && in_array(strtolower((string) ($order['payment_status'] ?? $order['status'] ?? '')), ['pending', 'failed'], true) && in_array(strtolower((string) ($order['payment_method'] ?? 'stripe')), ['stripe', 'card', ''], true)): ?>
-                            <form method="post">
-                              <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
-                              <input type="hidden" name="action" value="membership_order_pay">
-                              <input type="hidden" name="order_id" value="<?= e((string) ($order['order_id'] ?? '')) ?>">
-                              <button
-                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary text-xs font-semibold text-primary hover:bg-primary/10"
-                                type="submit">Pay now</button>
-                            </form>
+                            <button type="button" data-pay-drawer-open
+                              class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary text-xs font-semibold text-primary hover:bg-primary/10">
+                              Pay now
+                            </button>
                           <?php elseif ($order['type'] === 'store' && !empty($order['order_id'])): ?>
                             <form method="post" action="/store/cart">
                               <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
@@ -5390,6 +5379,32 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 </div>
 
 <?php
+// Pay-membership slide-out drawer — single source of truth for any "pay now"
+// button on this page. Auto-opens whenever a pending membership order exists
+// AND the member is on the billing tab, or whenever the URL has ?pay=1.
+if ($member) {
+  $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
+  $_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
+  if (!is_array($_drawerPrices)) {
+    $_drawerPrices = [];
+  }
+  $_drawerHasPending = !empty($pendingMembershipOrder);
+  $_drawerAutoOpen = $_drawerHasPending && in_array($page, ['billing', 'dashboard'], true);
+  $payDrawerData = [
+    'csrf_token'           => Csrf::token(),
+    'current_tier'         => strtoupper((string) ($member['member_type'] ?? 'FULL')),
+    'current_term'         => (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M'),
+    'allow_both_types'     => !empty($_stripeSettingsForDrawer['membership_allow_both_types']),
+    'show_24'              => !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']),
+    'show_36'              => !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']),
+    'auto_open'            => $_drawerAutoOpen,
+    'pending_order_number' => (string) ($pendingMembershipOrder['order_number'] ?? ''),
+  ];
+  require __DIR__ . '/../../app/Views/partials/pay_membership_drawer.php';
+}
+?>
+
+<?php
 // Post-Stripe-checkout thank-you lightbox + confetti.
 // Fires when /member/?renewed=1 is hit (i.e. the Stripe success_url).
 // We pull the renewal end date and member type for the message.
@@ -6093,5 +6108,7 @@ if ($renewModalEligible) {
      on the Billing page for the Pay-now flow). -->
 <script src="https://js.stripe.com/v3/" defer></script>
 <script src="/assets/js/stripe-inline-payment.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/stripe-inline-payment.js')) ?>" defer></script>
+<!-- Pay-membership slide-out drawer controller. -->
+<script src="/assets/js/pay-membership-drawer.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/pay-membership-drawer.js')) ?>" defer></script>
 
 <?php require __DIR__ . '/../../app/Views/partials/backend_footer.php'; ?>
