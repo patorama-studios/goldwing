@@ -68,7 +68,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
-    <?php require __DIR__ . '/../../app/Views/partials/feedback_widget.php'; ?>
     <?php $topbarTitle = $pageTitle;
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <?php $lockdownPageKey = 'store'; require __DIR__ . '/../../app/Views/partials/member_lockdown.php'; ?>

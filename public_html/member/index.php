@@ -1,5 +1,5 @@
 <?php
-// DEPLOY_MARKER_2026_06_11_LAPSED_LOCKDOWN_R3 — bump on every push so we can curl
+// DEPLOY_MARKER_2026_06_11_FEEDBACK_MOVE_R4 — bump on every push so we can curl
 // the rendered page to confirm whether cPanel actually copied new files.
 require_once __DIR__ . '/../../app/bootstrap.php';
 
@@ -1384,15 +1384,9 @@ if ($user && $user['member_id']) {
     $calendarEvents = [];
     try {
       if (calendar_table_exists($pdo, 'calendar_events')) {
-        $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published" AND (e.scope = "NATIONAL"';
-        $eventsParams = [];
-        if (!empty($memberChapterId)) {
-          $eventsSql .= ' OR e.chapter_id = :chapter_id';
-          $eventsParams['chapter_id'] = (int) $memberChapterId;
-        }
-        $eventsSql .= ')';
+        $eventsSql = 'SELECT e.*, m.path AS thumbnail_url, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id LEFT JOIN chapters c ON c.id = e.chapter_id WHERE e.status = "published"';
         $stmt = $pdo->prepare($eventsSql);
-        $stmt->execute($eventsParams);
+        $stmt->execute();
         $calendarEvents = $stmt->fetchAll();
       }
     } catch (PDOException $e) {
@@ -1707,7 +1701,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
-    <?php require __DIR__ . '/../../app/Views/partials/feedback_widget.php'; ?>
     <?php $topbarTitle = $pageTitle;
     require __DIR__ . '/../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <?php $lockdownPageKey = $page;
@@ -2089,7 +2082,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <div class="flex-1 flex flex-col items-center justify-center text-center py-6">
                 <span class="material-icons-outlined text-5xl text-teal-200 mb-2">explore</span>
                 <p class="text-sm font-semibold text-gray-700 mb-1">No rides scheduled yet</p>
-                <p class="text-xs text-gray-500 mb-4">Nothing in the next 60 days for your chapter — there may be more on the full calendar.</p>
+                <p class="text-xs text-gray-500 mb-4">Nothing in the next 60 days — check the full calendar for upcoming rides.</p>
                 <a href="/calendar/" class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 transition">
                   <span class="material-icons-outlined text-sm">map</span>
                   Browse the calendar

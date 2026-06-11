@@ -1,10 +1,9 @@
-<div class="fixed bottom-6 right-6 z-50 md:top-6 md:bottom-auto md:right-8">
-  <div class="relative" id="feedback-widget-container">
-    <button type="button" id="feedback-toggle-btn" class="bg-primary text-gray-900 px-5 py-2.5 rounded-full shadow-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 font-semibold">
-      <span class="material-icons-outlined text-sm">campaign</span> Beta Feedback
+<div class="relative" id="feedback-widget-container">
+    <button type="button" id="feedback-toggle-btn" class="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+      <span class="material-icons-outlined text-base">campaign</span> Beta Feedback
     </button>
-    
-    <div id="feedback-dropdown" class="absolute hidden bottom-full right-0 mb-3 md:bottom-auto md:top-full md:mt-3 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 p-5 transition-all duration-200 opacity-0 transform scale-95 origin-bottom-right md:origin-top-right">
+
+    <div id="feedback-dropdown" class="absolute hidden top-full left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-gray-100 p-5 z-50 transition-all duration-200 opacity-0 transform scale-95 origin-top-left">
       <div class="flex justify-between items-center mb-2">
         <h3 class="font-bold text-gray-900 text-base">Send Feedback</h3>
         <button type="button" id="feedback-close-btn" class="text-gray-400 hover:text-gray-600 rounded-full p-1 hover:bg-gray-100 transition-colors"><span class="material-icons-outlined text-sm">close</span></button>
@@ -29,7 +28,6 @@
       </form>
     </div>
   </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

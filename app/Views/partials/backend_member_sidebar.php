@@ -156,6 +156,7 @@ if (!empty($member)) {
         View as Admin
       </a>
     <?php endif; ?>
+    <?php require __DIR__ . '/feedback_widget.php'; ?>
   </div>
   <?php
     $groups = [];
