@@ -286,7 +286,10 @@ if ($cartItems) {
 
             <?php
             $sectionNumber = 0;
-            $renderSection = function (string $key, string $title, callable $summaryFn, callable $bodyFn, bool $open = false) use (&$sectionNumber) {
+            // $footerFn, when provided, replaces the default "Continue" button —
+            // used for the final (Payment) section so the step flow ends with the
+            // real Pay button instead of a dead-end Continue.
+            $renderSection = function (string $key, string $title, callable $summaryFn, callable $bodyFn, bool $open = false, ?callable $footerFn = null) use (&$sectionNumber) {
                 $sectionNumber++;
                 $num = $sectionNumber;
                 ?>
@@ -305,11 +308,17 @@ if ($cartItems) {
                   </button>
                   <div class="px-5 pb-5 pt-1 border-t border-gray-100 <?= $open ? '' : 'hidden' ?>" data-section-body>
                     <?php $bodyFn(); ?>
-                    <div class="mt-5 flex justify-end">
-                      <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm transition-colors" data-section-continue>
-                        Continue
-                        <span class="material-icons-outlined text-base">arrow_forward</span>
-                      </button>
+                    <div class="mt-5">
+                      <?php if ($footerFn !== null): ?>
+                        <?php $footerFn(); ?>
+                      <?php else: ?>
+                        <div class="flex justify-end">
+                          <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm transition-colors" data-section-continue>
+                            Continue
+                            <span class="material-icons-outlined text-base">arrow_forward</span>
+                          </button>
+                        </div>
+                      <?php endif; ?>
                     </div>
                   </div>
                 </section>
@@ -461,6 +470,27 @@ if ($cartItems) {
                 <div class="mt-4 hidden" data-payment-panel="bank_transfer">
                   <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-line"><?= e($bankTransferInstructions) ?></div>
                 </div>
+              <?php },
+              false,
+              function () use ($totals) { ?>
+                <button type="button" data-pay-button class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
+                  <!-- Inline SVG instead of icon font: the Material Icons
+                       Outlined font occasionally renders the word "lock" as
+                       text on this button (FOUC during late font load).
+                       SVG is bulletproof. -->
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  Pay $<?= e(store_money($totals['total'])) ?>
+                </button>
+                <p class="flex items-center justify-center gap-1.5 text-xs text-gray-500 mt-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  Secure checkout · 256-bit SSL · Powered by Stripe
+                </p>
               <?php }
             ); ?>
 
@@ -574,24 +604,13 @@ if ($cartItems) {
                 </div>
               </div>
 
-              <div class="px-5 py-5 border-t border-gray-100 space-y-3">
-                <button type="button" data-pay-button class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
-                  <!-- Inline SVG instead of icon font: the Material Icons
-                       Outlined font occasionally renders the word "lock" as
-                       text on this button (FOUC during late font load).
-                       SVG is bulletproof. -->
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+              <div class="px-5 py-4 border-t border-gray-100">
+                <p class="flex items-center justify-center gap-1.5 text-xs text-gray-500 text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 shrink-0">
                     <rect x="3" y="11" width="18" height="11" rx="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  Pay $<?= e(store_money($totals['total'])) ?>
-                </button>
-                <p class="flex items-center justify-center gap-1.5 text-xs text-gray-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  Secure checkout · 256-bit SSL · Powered by Stripe
+                  Complete the steps on the left, then press Pay.
                 </p>
               </div>
             </section>
