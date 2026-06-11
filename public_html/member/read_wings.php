@@ -45,8 +45,15 @@ $asset = function (string $path): string {
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 
-  <!-- Reader engine (vendored, on-the-fly PDF rendering — no stored images) -->
-  <script src="<?= $asset('/assets/js/vendor/pdfjs/pdf.min.js') ?>"></script>
+  <!-- Reader engine (on-the-fly PDF rendering — no stored images).
+       PDF.js (lib + worker) loads from cdnjs: the site CSP is
+       `worker-src blob: https://cdnjs.cloudflare.com` (no 'self', no
+       'unsafe-eval'), so PDF.js must fetch a cdnjs worker and run it as a real
+       blob worker — a self-hosted worker triggers the fake-worker fallback,
+       which then can't init without 'unsafe-eval' and hangs every render.
+       This matches the original (proven) reader's setup. page-flip + the reader
+       modules are self-hosted (script-src 'self'). -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="<?= $asset('/assets/js/vendor/pageflip/page-flip.browser.js') ?>"></script>
   <script src="<?= $asset('/assets/js/wings-reader-core.js') ?>"></script>
   <script src="<?= $asset('/assets/js/wings-zoom.js') ?>"></script>
@@ -285,7 +292,7 @@ $asset = function (string $path): string {
 <script>
 (function () {
   var PDF_URL  = <?= json_encode($pdfUrl) ?>;
-  var WORKER   = <?= json_encode($asset('/assets/js/vendor/pdfjs/pdf.worker.min.js')) ?>;
+  var WORKER   = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   var overlay   = document.getElementById('loading-overlay');
   var errorMsg  = document.getElementById('error-msg');

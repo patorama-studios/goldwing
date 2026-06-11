@@ -63,7 +63,10 @@
     this.map.clear();
   };
 
-  /* ---- LRU of blob-URL strings (revokes URLs on eviction) ----------------- */
+  /* ---- LRU of image-URL strings (revokes any blob: URLs on eviction) ------ */
+  function revokeIfBlob(url) {
+    if (typeof url === 'string' && url.lastIndexOf('blob:', 0) === 0) URL.revokeObjectURL(url);
+  }
   function ImgLRU(capacity) {
     this.capacity = capacity;
     this.map = new Map();
@@ -75,16 +78,16 @@
     return v;
   };
   ImgLRU.prototype.set = function (key, url) {
-    if (this.map.has(key)) { URL.revokeObjectURL(this.map.get(key)); this.map.delete(key); }
+    if (this.map.has(key)) { revokeIfBlob(this.map.get(key)); this.map.delete(key); }
     this.map.set(key, url);
     while (this.map.size > this.capacity) {
       var oldestKey = this.map.keys().next().value;
-      URL.revokeObjectURL(this.map.get(oldestKey));
+      revokeIfBlob(this.map.get(oldestKey));
       this.map.delete(oldestKey);
     }
   };
   ImgLRU.prototype.clear = function () {
-    this.map.forEach(function (url) { URL.revokeObjectURL(url); });
+    this.map.forEach(function (url) { revokeIfBlob(url); });
     this.map.clear();
   };
 
@@ -112,12 +115,16 @@
     var task = this._lib.getDocument({
       url: this.url,
       withCredentials: true,     // the PDF endpoint is auth-gated (member benefit)
-      // Lazy chunked loading. On a range-capable server PDF.js streams; on our
-      // download_wings.php (full file, no ranges) it loads the whole PDF — same
-      // as the previous reader. disableAutoFetch avoids prefetching the lot.
-      rangeChunkSize: 262144,
-      disableAutoFetch: true,
-      disableStream: false
+      // Force ONE plain full fetch — no HTTP range probing, no progressive
+      // streaming. download_wings.php (and most PHP file serves) don't support
+      // Range requests, and PDF.js's range/stream path ABORTS against them,
+      // stalling every render. A single GET is robust on any server; Wings
+      // issues are ~6 MB so the upfront cost is negligible.
+      // NOTE: do NOT set disableAutoFetch here — with ranges disabled there is
+      // no on-demand fetch path, so disableAutoFetch would starve renders of
+      // page data and hang them. We want the whole file pulled in one go.
+      disableRange: true,
+      disableStream: true
     });
     return task.promise.then(function (pdf) {
       self.pdf = pdf;
@@ -219,16 +226,18 @@
   };
 
   /**
-   * Like getPage(), but resolves to a blob-URL string for an <img>.
+   * Like getPage(), but resolves to an image-URL string for an <img>.
    *
    * The flip engine clones page nodes for its turn animation, and a cloned
    * <canvas> comes out blank — so flip content must be an <img>, not a canvas.
-   * A blob URL is far lighter than a base64 data URL (holds compressed bytes,
-   * not raw RGBA in a string) and clones keep working. URLs are revoked when
-   * evicted from this cache. Use this for browse/flip mode; use getPage() (raw
-   * canvas) for the zoom overlay where there's no clone and we want max sharp.
    *
-   * @returns {Promise<string|null>} object URL, or null if the render cancelled
+   * We use a `data:` URL (JPEG), NOT a `blob:` URL: the site's Content-Security
+   * -Policy is `img-src 'self' data: https:` — it does NOT allow blob:, so blob
+   * URLs render as broken images. JPEG also avoids WebP-encoding gaps on older
+   * browsers. The zoom overlay uses getPage() (raw canvas) for full sharpness;
+   * these browse-mode images only need to look good at 1x.
+   *
+   * @returns {Promise<string|null>} data URL, or null if the render cancelled
    */
   WingsReaderCore.prototype.getPageImage = function (pageNum, o) {
     o = o || {};
@@ -245,15 +254,11 @@
 
     var p = this.getPage(pageNum, o).then(function (canvas) {
       if (!canvas) return null;
-      return new Promise(function (resolve) {
-        // WebP keeps text crisp and files tiny; high quality since it's display.
-        canvas.toBlob(function (blob) {
-          if (!blob) { resolve(null); return; }
-          var url = URL.createObjectURL(blob);
-          self._imgCache.set(key, url);
-          resolve(url);
-        }, 'image/webp', 0.92);
-      });
+      var url;
+      try { url = canvas.toDataURL('image/jpeg', 0.9); }
+      catch (e) { return null; }
+      self._imgCache.set(key, url);
+      return url;
     }).then(function (url) {
       delete self._imgInFlight[key];
       return url;
