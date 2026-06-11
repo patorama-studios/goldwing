@@ -376,6 +376,21 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     }
     unset($r);
 
+    // Card processing fee — same store settings + gross-up formula the
+    // store checkout and the application form use. This flow is card-only,
+    // so the surcharge applies whenever it's enabled in admin settings.
+    $feeCents = 0;
+    $feeSettings = store_get_settings();
+    if ((int) ($feeSettings['stripe_fee_enabled'] ?? 0) === 1) {
+        $fee = store_calculate_processing_fee(
+            $totalCents / 100,
+            (float) ($feeSettings['stripe_fee_percent'] ?? 0),
+            (float) ($feeSettings['stripe_fee_fixed'] ?? 0)
+        );
+        $feeCents = (int) round($fee * 100);
+    }
+    $grandTotalCents = $totalCents + $feeCents;
+
     // Guard: if a previous renewal payment is already in flight, do NOT
     // supersede it — that's how double payments happen. A PI that actually
     // succeeded (webhook not landed yet) gets reconciled on the spot.
@@ -482,10 +497,13 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
         $metadata['extra_order_ids'] = (string) $partnerRenewer['order_id'];
         $metadata['associate_member_id'] = (string) $partnerRenewer['member']['id'];
     }
+    if ($feeCents > 0) {
+        $metadata['processing_fee_cents'] = (string) $feeCents;
+    }
     $orderNumbers = array_map(static fn($r) => $r['order_number'], $renewers);
     try {
         $pi = StripeService::createPaymentIntent([
-            'amount' => $totalCents,
+            'amount' => $grandTotalCents,
             'currency' => strtolower($currency),
             'description' => 'AGA membership — ' . implode(' + ', $orderNumbers) . ' (' . $term . ')',
             'metadata' => $metadata,
@@ -517,14 +535,23 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
             'amount_label' => 'A$' . number_format($r['cents'] / 100, 2),
         ];
     }
+    if ($feeCents > 0) {
+        $lines[] = [
+            'label'        => 'Card processing fee',
+            'sublabel'     => 'Passed through at cost from our payment provider',
+            'amount_cents' => $feeCents,
+            'amount_label' => 'A$' . number_format($feeCents / 100, 2),
+        ];
+    }
 
     json_response([
         'order_id'        => $primary['order_id'],
         'order_number'    => $primary['order_number'],
         'term'            => $term,
         'include_partner' => (bool) $partnerRenewer,
-        'amount_cents'    => $totalCents,
-        'amount_label'    => 'A$' . number_format($totalCents / 100, 2),
+        'amount_cents'    => $grandTotalCents,
+        'amount_label'    => 'A$' . number_format($grandTotalCents / 100, 2),
+        'fee_cents'       => $feeCents,
         'lines'           => $lines,
         'client_secret'   => (string) $pi['client_secret'],
         'publishable_key' => (string) $activeKeys['publishable_key'],

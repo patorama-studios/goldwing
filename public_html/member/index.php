@@ -1681,7 +1681,7 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
-<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R6 — if you can grep for this on
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R7 — if you can grep for this on
      the rendered HTML it means cPanel actually copied files. Bump the
      suffix on every push so a stale opcache vs missing-file question can
      be answered with one curl. -->
@@ -5616,6 +5616,22 @@ if ($renewModalEligible) {
   $renewPartnerTypeLabel = $renewPartnerMember
     ? (strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'ASSOCIATE' ? 'Associate' : 'Full')
     : '';
+  // Only offer the partner add-on when at least one term actually has a
+  // partner price configured — otherwise ticking it would 422 at the API.
+  $renewPartnerOfferable = false;
+  foreach ($renewOptions as $opt) {
+    if (!empty($opt['partner_available'])) {
+      $renewPartnerOfferable = true;
+      break;
+    }
+  }
+  // Card processing fee settings — same store.* keys the store checkout and
+  // application form use. The lightbox JS mirrors the gross-up formula so
+  // the View 1 "You pay today" total matches what Stripe actually charges.
+  $renewFeeSettings = store_get_settings();
+  $renewFeeEnabled = (int) ($renewFeeSettings['stripe_fee_enabled'] ?? 0) === 1;
+  $renewFeePercent = $renewFeeEnabled ? (float) ($renewFeeSettings['stripe_fee_percent'] ?? 0) : 0.0;
+  $renewFeeFixed = $renewFeeEnabled ? (float) ($renewFeeSettings['stripe_fee_fixed'] ?? 0) : 0.0;
 ?>
 <!-- Pay-membership lightbox — single centred modal, two views on a
      horizontal slider. View 1 = pick term + associate add-on (the old
@@ -5628,7 +5644,10 @@ if ($renewModalEligible) {
      data-csrf="<?= e(Csrf::token()) ?>"
      data-currency="<?= e($renewCurrency) ?>"
      data-auto-open="<?= (!empty($pendingMembershipOrder) && empty($pendingPaymentInFlight)) ? '1' : '0' ?>"
-     data-payment-inflight="<?= !empty($pendingPaymentInFlight) ? '1' : '0' ?>">
+     data-payment-inflight="<?= !empty($pendingPaymentInFlight) ? '1' : '0' ?>"
+     data-fee-enabled="<?= $renewFeeEnabled ? '1' : '0' ?>"
+     data-fee-percent="<?= e(number_format($renewFeePercent, 4, '.', '')) ?>"
+     data-fee-fixed="<?= e(number_format($renewFeeFixed, 2, '.', '')) ?>">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600 overflow-hidden">
     <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
       <div class="flex items-start gap-3 min-w-0">
@@ -5682,7 +5701,7 @@ if ($renewModalEligible) {
               <?php $firstTerm = false; endforeach; ?>
             </div>
           </div>
-          <?php if ($renewPartnerMember): ?>
+          <?php if ($renewPartnerMember && $renewPartnerOfferable): ?>
             <div data-tour="renew-partner">
               <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
                 <input type="checkbox" value="1" data-pay-drawer-partner
@@ -5696,6 +5715,10 @@ if ($renewModalEligible) {
             </div>
           <?php endif; ?>
           <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
+            <div class="hidden items-center justify-between text-xs text-gray-500" data-pay-drawer-fee-row>
+              <span>Card processing fee</span>
+              <span data-pay-drawer-fee>—</span>
+            </div>
             <div class="flex items-center justify-between">
               <span class="text-gray-600">You pay today</span>
               <span class="text-xl font-display font-bold text-gray-900" data-pay-drawer-total>—</span>

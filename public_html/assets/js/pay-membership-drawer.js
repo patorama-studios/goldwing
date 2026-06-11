@@ -67,20 +67,46 @@
     return (t ? t.value : '') + '|' + (partnerChecked() ? '1' : '0');
   }
 
+  // Card processing fee — mirrors store_calculate_processing_fee() in PHP
+  // (gross-up so the fee covers itself): fee = (rate·base + fixed)/(1−rate).
+  // Settings come from the same store.* keys the store checkout uses,
+  // server-rendered as data attributes on the root.
+  function feeFor(base) {
+    if (!root || root.dataset.feeEnabled !== '1') return 0;
+    var rate = (parseFloat(root.dataset.feePercent || '0') || 0) / 100;
+    var fixed = parseFloat(root.dataset.feeFixed || '0') || 0;
+    if (base <= 0 || (rate <= 0 && fixed <= 0) || rate >= 1) return 0;
+    return Math.round(((rate * base + fixed) / (1 - rate)) * 100) / 100;
+  }
+
   // Live "You pay today" total + partner price label on View 1, computed
   // from the server-rendered data-self-amount / data-partner-amount attrs.
   function recalc() {
     var t = selectedTerm();
     var totalEl = get('[data-pay-drawer-total]');
     var partnerLabel = get('[data-pay-drawer-partner-price]');
+    var feeRow = get('[data-pay-drawer-fee-row]');
+    var feeEl = get('[data-pay-drawer-fee]');
     if (!t) {
       if (totalEl) totalEl.textContent = '—';
+      if (feeRow) { feeRow.classList.add('hidden'); feeRow.classList.remove('flex'); }
       return;
     }
     var self = parseFloat(t.dataset.selfAmount || '0');
     var partner = parseFloat(t.dataset.partnerAmount || '0');
-    var total = self + (partnerChecked() ? partner : 0);
-    if (totalEl) totalEl.textContent = fmt(total) + ' ' + currency;
+    var base = self + (partnerChecked() ? partner : 0);
+    var fee = feeFor(base);
+    if (feeRow) {
+      if (fee > 0) {
+        feeRow.classList.remove('hidden');
+        feeRow.classList.add('flex');
+        if (feeEl) feeEl.textContent = '+' + fmt(fee);
+      } else {
+        feeRow.classList.add('hidden');
+        feeRow.classList.remove('flex');
+      }
+    }
+    if (totalEl) totalEl.textContent = fmt(base + fee) + ' ' + currency;
     if (partnerLabel) partnerLabel.textContent = '+' + fmt(partner) + ' for the same term';
   }
 
