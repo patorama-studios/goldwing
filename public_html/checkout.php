@@ -822,7 +822,13 @@ if ($cartItems) {
 
     const setPaymentPanel = (method) => {
       paymentPanels.forEach((panel) => {
-        panel.hidden = panel.dataset.paymentPanel !== method;
+        const hide = panel.dataset.paymentPanel !== method;
+        // Toggle the Tailwind `hidden` CLASS (display:none) — not just the
+        // `hidden` property. The panels ship with the `hidden` class, and
+        // setting only the property leaves the class in place, so the card
+        // fields would stay display:none and never appear.
+        panel.classList.toggle('hidden', hide);
+        panel.hidden = hide;
       });
       if (payButton) {
         payButton.textContent = method === 'bank_transfer' ? 'Place order' : payButtonLabel;
@@ -894,6 +900,21 @@ if ($cartItems) {
       }
     };
 
+    // Only mount the Stripe Payment Element once its container is actually
+    // on-screen. Mounting into a display:none container (the collapsed Payment
+    // accordion step) leaves the Stripe iframe permanently stuck at 0px height
+    // even after it's later revealed — so the card fields would never appear.
+    const cardPanelOnScreen = () => {
+      const panel = form.querySelector('[data-payment-panel="card"]');
+      return !!panel && panel.offsetParent !== null;
+    };
+    const mountCardIfReady = () => {
+      const picked = form.querySelector('input[name="payment_method"]:checked');
+      if (picked && picked.value === 'card' && cardPanelOnScreen()) {
+        ensureStripeReady();
+      }
+    };
+
     if (paymentMethodInputs.length) {
       let defaultMethod = paymentMethodInputs.find((input) => !input.disabled && input.value === 'card');
       if (!defaultMethod) {
@@ -902,20 +923,27 @@ if ($cartItems) {
       if (defaultMethod) {
         defaultMethod.checked = true;
         setPaymentPanel(defaultMethod.value);
-        if (defaultMethod.value === 'card') {
-          ensureStripeReady();
-        }
       }
       paymentMethodInputs.forEach((input) => {
         input.addEventListener('change', () => {
           showPaymentMethodError('');
           setPaymentPanel(input.value);
-          if (input.value === 'card') {
-            ensureStripeReady();
-          }
+          mountCardIfReady();
         });
       });
     }
+
+    // The Payment step starts collapsed. When the accordion opens it (whether by
+    // the user tapping the header or by the "Continue" flow), its body loses the
+    // `hidden` class — that's our cue to mount the Stripe element now that it has
+    // real dimensions.
+    const paymentSectionBody = document.querySelector('[data-checkout-section="payment"] [data-section-body]');
+    if (paymentSectionBody) {
+      const observer = new MutationObserver(() => mountCardIfReady());
+      observer.observe(paymentSectionBody, { attributes: true, attributeFilter: ['class'] });
+    }
+    // Handle the case where the Payment step is already open on load.
+    mountCardIfReady();
 
     if (payButton) {
       payButton.addEventListener('click', async () => {
