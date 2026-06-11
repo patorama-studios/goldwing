@@ -82,23 +82,11 @@ $_swDataAttrs = [
       </span>
     </div>
 
-    <!-- Trust copy -->
-    <div class="mt-4 grid gap-2 text-xs text-slate-600 leading-relaxed">
-      <p>
-        <strong class="text-slate-900">Your card details never touch our servers.</strong>
-        They're sent directly to <strong>Stripe</strong> — a Level&nbsp;1 PCI Service Provider
-        (the highest payment-security certification) used by Amazon, Google, Lyft and millions
-        of other businesses worldwide.
-      </p>
-      <p>
-        The connection uses <strong>TLS&nbsp;1.2+</strong> with 256-bit encryption. Card numbers,
-        expiry, and CVC are tokenised inside Stripe's vault and we only ever see the last 4
-        digits for receipt purposes.
-        <a href="https://stripe.com/docs/security" target="_blank" rel="noopener" class="text-blue-600 hover:underline">
-          Read Stripe's security overview&nbsp;↗
-        </a>
-      </p>
-    </div>
+  </div>
+
+  <!-- Trust copy — same partial used by every pay area site-wide -->
+  <div class="px-6 pt-4">
+    <?php require __DIR__ . '/stripe_security_block.php'; ?>
   </div>
 
   <!-- Payment Element + button -->

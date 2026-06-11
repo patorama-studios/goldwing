@@ -237,9 +237,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
 
       <section class="form-section">
         <h3>Payment</h3>
+        <?php require __DIR__ . '/../app/Views/partials/stripe_security_block.php'; ?>
         <div id="membership-payment-element" class="mt-4"></div>
         <div class="form-alert error" id="membership-error" hidden></div>
-        <p class="form-helper">Membership activates after Stripe confirms payment.</p>
+        <p class="form-helper">Membership activates immediately after payment is confirmed.</p>
       </section>
 
       <div class="form-actions">
@@ -570,7 +571,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           const { error } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-              return_url: `${window.location.origin}/memberships/success`,
+              // Land on the dashboard so the thank-you lightbox + confetti
+              // fires for new members too (same UX as the renewal flow).
+              return_url: `${window.location.origin}/member/?renewed=1`,
             },
           });
           if (error) {

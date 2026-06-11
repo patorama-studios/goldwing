@@ -426,9 +426,12 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
                             <input type="radio" name="payment_method" value="stripe" <?= ($formData['payment_method'] ?? 'stripe') === 'stripe' ? 'checked' : '' ?>>
                             <span>
                                 <strong>Pay now by card (Stripe)</strong>
-                                <span style="display:block;font-size:0.875rem;color:#64748b;">You'll be redirected to Stripe Checkout to complete payment securely.</span>
+                                <span style="display:block;font-size:0.875rem;color:#64748b;">You'll be redirected to Stripe Checkout to complete payment securely. Your card details never touch our servers — they go straight to Stripe.</span>
                             </span>
                         </label>
+                        <div style="margin-left:1.5rem;">
+                          <?php require __DIR__ . '/../../app/Views/partials/stripe_security_block.php'; ?>
+                        </div>
                     <?php endif; ?>
                     <?php if (!empty($event['allow_bank_transfer'])): ?>
                         <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer;">
