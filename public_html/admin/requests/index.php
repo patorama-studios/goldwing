@@ -73,6 +73,7 @@ function reqStatusPill(array $item): array {
         'store_order'    => ['label' => 'Action Required',        'dot' => 'bg-rose-500',  'text' => 'text-rose-700',  'bg' => 'bg-rose-50'],
         'chapter_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
         'profile_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
+        'profile_update' => ['label' => 'No Action Needed',       'dot' => 'bg-sky-500',   'text' => 'text-sky-700',   'bg' => 'bg-sky-50'],
         default          => ['label' => 'Pending Review',         'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
     };
 }
@@ -96,6 +97,7 @@ function reqActionButtons(array $item): string {
         'store_order'    => $sec('Track Order') . $orange('Resolve Conflict'),
         'chapter_change' => $sec('View History') . $green('Approve Change'),
         'profile_change' => $sec('View Details') . $green('Approve Change'),
+        'profile_update' => $sec('View Changes') . $dark('Mark as Read'),
         default          => $sec('View Details') . $green('Approve'),
     };
 }

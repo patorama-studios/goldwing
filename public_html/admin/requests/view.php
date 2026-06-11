@@ -190,6 +190,7 @@ function reqStatusBadge2(?string $status): string {
 
         <?php
           $isFeedback   = $type === \App\Services\PendingRequestsService::TYPE_FEEDBACK;
+          $isInfoOnly   = $type === \App\Services\PendingRequestsService::TYPE_PROFILE_UPDATE;
           $approveLabel  = $isFeedback ? 'Mark resolved' : 'Approve';
           $rejectLabel   = $isFeedback ? "Won't fix"     : 'Deny';
           $feedbackLabel = $isFeedback ? 'Reply to user' : 'Send feedback';
@@ -233,7 +234,26 @@ function reqStatusBadge2(?string $status): string {
           </section>
         <?php endif; ?>
 
-        <?php if ($canAction && $isPending): ?>
+        <?php if ($canAction && $isPending && $isInfoOnly): ?>
+          <section class="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <p class="text-sm text-gray-600">
+                This is an informational notification — the member's changes have already been saved
+                and no approval is needed. Mark it as read once you've noted the new details.
+              </p>
+              <form method="post" action="/admin/requests/actions.php" class="shrink-0">
+                <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                <input type="hidden" name="type" value="<?= e($type) ?>">
+                <input type="hidden" name="id" value="<?= (int) $id ?>">
+                <button type="submit" name="action" value="archive"
+                        class="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800">
+                  <span class="material-icons-outlined text-base">mark_email_read</span> Mark as Read
+                </button>
+              </form>
+            </div>
+          </section>
+
+        <?php elseif ($canAction && $isPending): ?>
           <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-6 py-3">
               <h2 class="font-semibold text-gray-900">Take action</h2>

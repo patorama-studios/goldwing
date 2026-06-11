@@ -18,6 +18,7 @@ class PendingRequestsService
     public const TYPE_FALLEN_WINGS        = 'fallen_wings';
     public const TYPE_CHAPTER_CHANGE      = 'chapter_change';
     public const TYPE_PROFILE_CHANGE      = 'profile_change';
+    public const TYPE_PROFILE_UPDATE      = 'profile_update';
     public const TYPE_STORE_ORDER         = 'store_order';
     public const TYPE_MEMBERSHIP          = 'membership_application';
     public const TYPE_FEEDBACK            = 'feedback';
@@ -34,6 +35,16 @@ class PendingRequestsService
         ],
     ];
 
+    /**
+     * Fields whose change marks a profile update as contact-relevant —
+     * the ones that matter before a CSV export or external mail-out.
+     */
+    public const PROFILE_UPDATE_CONTACT_FIELDS = [
+        'email', 'phone',
+        'address_line1', 'address_line2', 'suburb', 'city',
+        'state', 'postcode', 'postal_code', 'country',
+    ];
+
     public static function types(): array
     {
         return [
@@ -44,6 +55,7 @@ class PendingRequestsService
             self::TYPE_FALLEN_WINGS        => ['label' => 'Fallen Wings',           'icon' => 'military_tech'],
             self::TYPE_CHAPTER_CHANGE      => ['label' => 'Chapter Change',         'icon' => 'swap_horiz'],
             self::TYPE_PROFILE_CHANGE      => ['label' => 'Profile Change',         'icon' => 'edit_note'],
+            self::TYPE_PROFILE_UPDATE      => ['label' => 'Details Updated',        'icon' => 'manage_accounts'],
             self::TYPE_STORE_ORDER         => ['label' => 'Store Order',            'icon' => 'storefront'],
             self::TYPE_MEMBERSHIP          => ['label' => 'Membership Application', 'icon' => 'how_to_reg'],
         ];
@@ -70,6 +82,7 @@ class PendingRequestsService
             self::TYPE_FALLEN_WINGS   => 'fetchFallenWings',
             self::TYPE_CHAPTER_CHANGE => 'fetchChapterChange',
             self::TYPE_PROFILE_CHANGE => 'fetchProfileChange',
+            self::TYPE_PROFILE_UPDATE => 'fetchProfileUpdates',
             self::TYPE_STORE_ORDER    => 'fetchStoreOrders',
             self::TYPE_MEMBERSHIP     => 'fetchMembershipApplications',
         ];
@@ -275,6 +288,20 @@ class PendingRequestsService
                         . ' → ' . self::formatProfileValue($r['requested_value']);
                     return self::row(self::TYPE_PROFILE_CHANGE, $r['id'], $title, strtolower((string) $r['status']),
                         $r['requested_at'], $submitter, $r['email'] ?? null, $summary, $r);
+
+                case self::TYPE_PROFILE_UPDATE:
+                    $stmt = $pdo->prepare(
+                        "SELECT mpu.id, mpu.member_id, mpu.source, mpu.changes, mpu.has_contact_change,
+                                mpu.status, mpu.created_at, mpu.reviewed_by, mpu.reviewed_at,
+                                m.first_name, m.last_name, m.email
+                         FROM member_profile_updates mpu
+                         LEFT JOIN members m ON m.id = mpu.member_id
+                         WHERE mpu.id = :id LIMIT 1"
+                    );
+                    $stmt->execute(['id' => $id]);
+                    $r = $stmt->fetch();
+                    if (!$r) return null;
+                    return self::profileUpdateRow($r);
 
                 case self::TYPE_STORE_ORDER:
                     $stmt = $pdo->prepare(
@@ -659,6 +686,58 @@ class PendingRequestsService
         }, $rows);
     }
 
+    private static function fetchProfileUpdates(string $statusFilter): array
+    {
+        $pdo = Database::connection();
+        // Informational entries only ever sit in PENDING (unread) or
+        // ARCHIVED (read); the approved/rejected filters match nothing.
+        $where = self::statusWhereUpper($statusFilter, 'mpu.status');
+        $sql = "SELECT mpu.id, mpu.member_id, mpu.source, mpu.changes, mpu.has_contact_change,
+                       mpu.status, mpu.created_at, mpu.reviewed_by, mpu.reviewed_at,
+                       m.first_name, m.last_name, m.email
+                FROM member_profile_updates mpu
+                LEFT JOIN members m ON m.id = mpu.member_id
+                WHERE 1=1 $where
+                ORDER BY mpu.created_at DESC
+                LIMIT 200";
+        $stmt = $pdo->query($sql);
+        $rows = $stmt->fetchAll() ?: [];
+        return array_map(fn ($r) => self::profileUpdateRow($r), $rows);
+    }
+
+    /** Build a hub row for a member_profile_updates record. */
+    private static function profileUpdateRow(array $r): array
+    {
+        $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+        $changes = json_decode((string) ($r['changes'] ?? ''), true);
+        $changes = is_array($changes) ? $changes : [];
+        $hasContact = !empty($r['has_contact_change']);
+
+        $parts = [];
+        foreach ($changes as $change) {
+            if (!is_array($change)) {
+                continue;
+            }
+            $label = (string) ($change['label'] ?? $change['field'] ?? 'Field');
+            $old = self::formatProfileValue(isset($change['old']) ? (string) $change['old'] : '');
+            $new = self::formatProfileValue(isset($change['new']) ? (string) $change['new'] : '');
+            $parts[] = $label . ': ' . $old . ' → ' . $new;
+            // Expose each change as its own raw field so the detail page's
+            // metadata grid renders one entry per changed field.
+            $r['changed ' . $label] = $old . ' → ' . $new;
+        }
+        unset($r['changes'], $r['has_contact_change']);
+
+        $title = ($submitter !== '' ? $submitter : 'Member #' . (int) ($r['member_id'] ?? 0)) . ' updated their details';
+        $summary = ($hasContact ? 'Contact details changed · ' : '') . implode(' · ', $parts);
+        if ($summary === '') {
+            $summary = 'Profile details updated.';
+        }
+
+        return self::row(self::TYPE_PROFILE_UPDATE, $r['id'], $title, strtolower((string) $r['status']),
+            $r['created_at'], $submitter !== '' ? $submitter : null, $r['email'] ?? null, $summary, $r);
+    }
+
     private static function fetchStoreOrders(string $statusFilter): array
     {
         $pdo = Database::connection();
@@ -812,6 +891,7 @@ class PendingRequestsService
             self::TYPE_FALLEN_WINGS   => ['table' => 'fallen_wings',                'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_CHAPTER_CHANGE => ['table' => 'chapter_change_requests',     'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_PROFILE_CHANGE => ['table' => 'member_profile_change_requests', 'pk' => 'id', 'enum' => 'upper'],
+            self::TYPE_PROFILE_UPDATE => ['table' => 'member_profile_updates',      'pk' => 'id', 'enum' => 'info'],
             self::TYPE_MEMBERSHIP     => ['table' => 'membership_applications',     'pk' => 'id', 'enum' => 'upper'],
             self::TYPE_MEMBER_OF_YEAR => ['table' => 'member_of_year_nominations',  'pk' => 'id', 'enum' => 'moy'],
             self::TYPE_STORE_ORDER    => ['table' => 'store_orders',                'pk' => 'id', 'enum' => 'store'],
@@ -826,6 +906,10 @@ class PendingRequestsService
         $row = self::find($type, $id);
         if (!$row) {
             return ['ok' => false, 'message' => 'Request not found'];
+        }
+
+        if ($cfg['enum'] === 'info' && $action === 'feedback') {
+            return ['ok' => false, 'message' => 'This notification is informational only — there is nothing to send feedback on.'];
         }
 
         try {
@@ -866,6 +950,14 @@ class PendingRequestsService
     {
         $table = $cfg['table'];
         $enum = $cfg['enum'];
+
+        if ($enum === 'info') {
+            // Informational entries have no approval flow — any status action
+            // simply marks them as read (archived).
+            $sql = "UPDATE $table SET status = 'ARCHIVED', reviewed_by = :r, reviewed_at = NOW() WHERE id = :id";
+            $pdo->prepare($sql)->execute(['r' => $reviewerUserId, 'id' => $id]);
+            return;
+        }
 
         if ($enum === 'lower') {
             // calendar_events: existing render code filters status='published', so use that
@@ -994,6 +1086,63 @@ class PendingRequestsService
             return;
         }
         $pdo->prepare($sql)->execute(['msg' => $message, 'id' => $id]);
+    }
+
+    // ─── profile update (informational) helpers ────────────────────────────
+
+    /**
+     * Record an informational "member updated their details" entry for the
+     * admin hub. $changes is a list of ['field' => column, 'label' => display
+     * name, 'old' => previous value, 'new' => saved value]; entries whose old
+     * and new values match are dropped. Returns the new row id, or null when
+     * nothing actually changed or the table is missing (pre-migration).
+     */
+    public static function recordProfileUpdate(int $memberId, array $changes, string $source = 'member'): ?int
+    {
+        if ($memberId <= 0) {
+            return null;
+        }
+        $clean = [];
+        $hasContact = false;
+        foreach ($changes as $change) {
+            if (!is_array($change)) {
+                continue;
+            }
+            $field = trim((string) ($change['field'] ?? ''));
+            $old = isset($change['old']) ? trim((string) $change['old']) : '';
+            $new = isset($change['new']) ? trim((string) $change['new']) : '';
+            if ($field === '' || $old === $new) {
+                continue;
+            }
+            $clean[] = [
+                'field' => $field,
+                'label' => (string) ($change['label'] ?? ucwords(str_replace('_', ' ', $field))),
+                'old'   => $old,
+                'new'   => $new,
+            ];
+            if (in_array($field, self::PROFILE_UPDATE_CONTACT_FIELDS, true)) {
+                $hasContact = true;
+            }
+        }
+        if ($clean === []) {
+            return null;
+        }
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare(
+                'INSERT INTO member_profile_updates (member_id, source, changes, has_contact_change, status, created_at)
+                 VALUES (:member_id, :source, :changes, :has_contact, "PENDING", NOW())'
+            );
+            $stmt->execute([
+                'member_id'   => $memberId,
+                'source'      => $source,
+                'changes'     => json_encode($clean, JSON_UNESCAPED_UNICODE),
+                'has_contact' => $hasContact ? 1 : 0,
+            ]);
+            return (int) $pdo->lastInsertId();
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     // ─── profile change request helpers ────────────────────────────────────

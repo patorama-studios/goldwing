@@ -198,6 +198,8 @@ Security alerts (FIM changes, repeated failed logins, new admin device, refund c
 
 `/admin/requests/` (`PendingRequestsService`) is the in-app inbox for items needing a webmaster decision: noticeboard submissions, event proposals, Fallen Wings tributes, nominations. It is **not** an email queue — emails are dispatched separately via the `webmaster_new_request` / `request_approved` / `request_denied` / `request_feedback` templates from `/admin/requests/actions.php` when the admin clicks the action.
 
+One hub type is **informational only**: "Details Updated" (`profile_update`, table `member_profile_updates`) logs member self-service profile edits — email, phone, postal address, privacy/directory flags — with old → new values. No approval is involved and no email is sent; the only action is "Mark as Read" (archive). It exists so the committee can review what changed before a CSV export or mail-out. Entries are written best-effort from the member portal's `update_profile` and `update_shipping` handlers via `PendingRequestsService::recordProfileUpdate()`.
+
 ### Where to change it
 
 - **Email copy, subject, sender, recipients, on/off:** Admin → Settings → **Notifications** tab → Catalogue. Each row has a preview + a "Send test" button.
