@@ -3200,6 +3200,59 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 035 — member_profile_updates table (Notification Hub "Details Updated")
+// Informational log of member self-service profile edits (email, phone,
+// postal address, privacy/directory flags) surfaced in the admin
+// Notification Hub under the 'profile_update' type. No approval flow —
+// PENDING means unread, ARCHIVED means read.
+// Mirrors database/migrations/2026_06_11_member_profile_updates.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_035_member_profile_updates';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 035 — member_profile_updates table', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $hasTable = (bool) $pdo->query("SHOW TABLES LIKE 'member_profile_updates'")->fetchColumn();
+        if ($hasTable) {
+            $note = 'member_profile_updates already present';
+        } else {
+            $columns = "
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                member_id INT NOT NULL,
+                source VARCHAR(20) NOT NULL DEFAULT 'member',
+                changes TEXT NOT NULL,
+                has_contact_change TINYINT(1) NOT NULL DEFAULT 0,
+                status ENUM('PENDING','ARCHIVED') NOT NULL DEFAULT 'PENDING',
+                reviewed_by INT NULL,
+                reviewed_at DATETIME NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_mpu_status_created (status, created_at),
+                INDEX idx_mpu_member_created (member_id, created_at)";
+            try {
+                $pdo->exec("CREATE TABLE member_profile_updates ($columns,
+                    CONSTRAINT fk_mpu_member FOREIGN KEY (member_id) REFERENCES members(id),
+                    CONSTRAINT fk_mpu_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                $note = 'member_profile_updates table created (with FKs)';
+            } catch (Throwable $inner) {
+                // Older/strict hosts can reject the FKs — the table matters
+                // more than the constraints, so retry without them.
+                $pdo->exec("CREATE TABLE IF NOT EXISTS member_profile_updates ($columns
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                $note = 'member_profile_updates table created (FKs skipped: ' . $inner->getMessage() . ')';
+            }
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 035 — member_profile_updates table', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 035 — member_profile_updates table', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
