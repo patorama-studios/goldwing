@@ -174,11 +174,16 @@ Token substitution is intentionally naive — `{{member_name}}`, `{{order_number
 | `member_set_password` | Admin approves application | yes |
 | `member_password_reset_self` / `_admin` | Member or admin requests reset | yes |
 | `security_email_otp` | Login requires email OTP (Ch 06) | yes |
+| `application_member_submitted` | Public apply.php form submitted (applicant) | no |
+| `application_admin_new_submission` | Public apply.php form submitted (admin alert) | no |
+| `application_member_approved` | Admin approves a membership application | no |
 | `membership_approved`, `membership_order_created`, `membership_payment_received` | Approval / order / Stripe webhook | yes |
+| `membership_treasurer_notification` | Paired with `membership_payment_received` for admins | no |
 | `membership_order_approved/rejected`, `membership_payment_failed` | Admin action / Stripe failure | no |
 | `membership_admin_pending_approval` | Bank-transfer order needs review | no |
 | `store_order_confirmation`, `store_ticket_codes`, `store_shipping_update` | Store checkout / tracking saved | mixed |
 | `store_refund_processed` | `RefundService` issues a refund (Ch 17) | no |
+| `store_admin_order_placed` | Store checkout reaches payment step (admin, pre-pay) | no |
 | `store_admin_new_order` | New paid store order (admin only) | no |
 | `request_approved/denied/feedback`, `webmaster_new_request` | Notification Hub actions | no |
 

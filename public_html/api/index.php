@@ -1009,6 +1009,22 @@ if ($resource === 'stripe') {
             ]);
         }
 
+        try {
+            NotificationService::dispatch('store_admin_order_placed', [
+                'primary_email' => '',
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'order_number' => $orderNumber,
+                'customer_name' => NotificationService::escape($customerName !== '' ? $customerName : '—'),
+                'customer_email' => NotificationService::escape($customerEmail !== '' ? $customerEmail : '—'),
+                'fulfillment_method' => NotificationService::escape(ucfirst((string) $fulfillment)),
+                'items_html' => store_order_items_html($itemsWithDiscount),
+                'totals_html' => store_order_totals_html($orderPayload),
+                'admin_link' => NotificationService::escape(BaseUrlService::buildUrl('/admin/store/order_view.php?id=' . $storeOrderId)),
+            ]);
+        } catch (Throwable $e) {
+            error_log('[api.create-payment-intent] store_admin_order_placed dispatch failed: ' . $e->getMessage());
+        }
+
         $orderSubtotal = max(0.0, $totals['subtotal'] - $totals['discount_total'] + $totals['processing_fee_total']);
         $orderItems = array_map(function ($item) {
             return [
@@ -1918,6 +1934,22 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
                 'value' => $discount['value'],
                 'amount' => $totals['discount_total'],
             ]);
+        }
+
+        try {
+            NotificationService::dispatch('store_admin_order_placed', [
+                'primary_email' => '',
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'order_number' => $orderNumber,
+                'customer_name' => NotificationService::escape((string) ($orderPayload['customer_name'] ?? '') !== '' ? (string) $orderPayload['customer_name'] : '—'),
+                'customer_email' => NotificationService::escape((string) ($orderPayload['customer_email'] ?? '') !== '' ? (string) $orderPayload['customer_email'] : '—'),
+                'fulfillment_method' => NotificationService::escape(ucfirst((string) $fulfillment)),
+                'items_html' => store_order_items_html($itemsWithDiscount),
+                'totals_html' => store_order_totals_html($orderPayload),
+                'admin_link' => NotificationService::escape(BaseUrlService::buildUrl('/admin/store/order_view.php?id=' . $storeOrderId)),
+            ]);
+        } catch (Throwable $e) {
+            error_log('[api.checkout.create-session] store_admin_order_placed dispatch failed: ' . $e->getMessage());
         }
 
         $orderSubtotal = max(0.0, $totals['subtotal'] - $totals['discount_total'] + $totals['processing_fee_total']);

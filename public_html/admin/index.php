@@ -623,6 +623,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
           if (!empty($memberRow['email'])) {
+            $approvedFirstName = trim((string) ($memberRow['first_name'] ?? ''));
+            NotificationService::dispatch('application_member_approved', [
+              'primary_email' => $memberRow['email'],
+              'admin_emails' => NotificationService::getAdminEmails(),
+              'member_name' => NotificationService::escape($approvedFirstName !== '' ? $approvedFirstName : 'rider'),
+              'payment_link' => NotificationService::escape($paymentLink),
+              'site_name' => NotificationService::escape((string) SettingsService::getGlobal('site.name', 'Australian Goldwing Association')),
+            ]);
             NotificationService::dispatch('membership_order_created', [
               'primary_email' => $memberRow['email'],
               'admin_emails' => NotificationService::getAdminEmails(),

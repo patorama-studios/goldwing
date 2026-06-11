@@ -78,6 +78,76 @@ class NotificationService
                     'reply_to' => 'webmaster@goldwing.org.au',
                 ],
             ],
+            'application_member_submitted' => [
+                'label' => 'Membership application received (applicant)',
+                'description' => 'Sent to the applicant after they submit a membership application via the public apply form.',
+                'trigger' => 'Public membership application form is submitted.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['member_name', 'member_type', 'site_name'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'primary',
+                    'custom_recipients' => '',
+                    'subject' => 'We received your AGA membership application',
+                    'body' => '<p>Hi {{member_name}},</p>'
+                        . '<p>Thanks for applying to join the Australian Goldwing Association as a <strong>{{member_type}}</strong> member.</p>'
+                        . '<p>Your application is now with the committee for review. Once it is approved you will get a follow-up email with payment instructions and a link to set up your account.</p>'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:13px;">If anything in your application needs to change, just reply to this email and we will sort it out.</p>'
+                        . '<p>Thanks,<br>{{site_name}}</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
+            'application_admin_new_submission' => [
+                'label' => 'Admin: new membership application',
+                'description' => 'Sent to admins when a new membership application is submitted via the public apply form.',
+                'trigger' => 'Public membership application form is submitted.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['applicant_name', 'applicant_email', 'applicant_phone', 'member_type', 'review_link'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'admin',
+                    'custom_recipients' => '',
+                    'subject' => 'New {{member_type}} application — {{applicant_name}}',
+                    'body' => '<p>A new membership application is waiting for review.</p>'
+                        . '<table style="border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;margin-top:12px;">'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Applicant</td><td style="padding:6px 0;"><strong>{{applicant_name}}</strong></td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;">{{applicant_email}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Phone</td><td style="padding:6px 0;">{{applicant_phone}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Membership type</td><td style="padding:6px 0;">{{member_type}}</td></tr>'
+                        . '</table>'
+                        . '<p style="margin-top:18px;"><a href="{{review_link}}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Review application</a></p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
+            'application_member_approved' => [
+                'label' => 'Membership application approved (applicant)',
+                'description' => 'Sent to the applicant when an admin approves their membership application. Fires alongside the payment instructions email.',
+                'trigger' => 'Admin approves a membership application.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['member_name', 'payment_link', 'site_name'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'primary',
+                    'custom_recipients' => '',
+                    'subject' => 'You\'re in — your AGA membership is approved',
+                    'body' => '<p>Hi {{member_name}},</p>'
+                        . '<p>Great news — your Australian Goldwing Association membership application has been approved by the committee. Welcome aboard!</p>'
+                        . '<p>You will receive a separate email shortly with payment instructions and a link to set up your member portal password.</p>'
+                        . '<p>If your payment email has not arrived, you can also pay directly here:</p>'
+                        . '<p style="text-align:center;margin:24px 0;"><a href="{{payment_link}}" style="display:inline-block;padding:12px 28px;background:#0055ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p>'
+                        . '<p>Thanks,<br>{{site_name}}</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
             'membership_approved' => [
                 'label' => 'Membership approved',
                 'description' => 'Sent when a membership application is approved.',
@@ -414,6 +484,34 @@ class NotificationService
                     'custom_recipients' => '',
                     'subject' => 'Shipping update for order #{{order_number}}',
                     'body' => '<p>Your order <strong>#{{order_number}}</strong> has shipped.</p><p>Carrier: {{carrier}}<br>Tracking: {{tracking_number}}</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
+            'store_admin_order_placed' => [
+                'label' => 'Admin: store order placed (pre-payment)',
+                'description' => 'Sent to admins as soon as a customer starts a store checkout — before payment has been confirmed. Useful for spotting abandoned carts and following up.',
+                'trigger' => 'Store checkout creates a payment intent / checkout session.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['order_number', 'customer_name', 'customer_email', 'fulfillment_method', 'items_html', 'totals_html', 'admin_link'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'admin',
+                    'custom_recipients' => '',
+                    'subject' => 'Store checkout started — #{{order_number}} ({{customer_name}})',
+                    'body' => '<p>A customer has just reached the payment step for a store order. Payment is <strong>not yet confirmed</strong>; you will get the usual "new store order" email once Stripe confirms it.</p>'
+                        . '<table style="border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;margin-top:12px;">'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Order #</td><td style="padding:6px 0;"><strong>{{order_number}}</strong></td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Customer</td><td style="padding:6px 0;">{{customer_name}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;">{{customer_email}}</td></tr>'
+                        . '<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Fulfillment</td><td style="padding:6px 0;">{{fulfillment_method}}</td></tr>'
+                        . '</table>'
+                        . '<h3 style="margin-top:20px;margin-bottom:6px;font-size:15px;color:#111827;">Items</h3>{{items_html}}'
+                        . '<h3 style="margin-top:20px;margin-bottom:6px;font-size:15px;color:#111827;">Totals</h3>{{totals_html}}'
+                        . '<p style="margin-top:18px;"><a href="{{admin_link}}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">View order in admin</a></p>'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:12px;">This email fires the moment a customer reaches checkout. If they abandon, the order will stay pending in admin.</p>',
                     'from_name' => 'Australian Goldwing Association',
                     'from_email' => 'no-reply@goldwing.org.au',
                     'reply_to' => 'webmaster@goldwing.org.au',

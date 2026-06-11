@@ -9,7 +9,8 @@ use App\Services\SettingsService;
 use App\Services\MembershipService;
 use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
-use App\Services\EmailService;
+use App\Services\NotificationService;
+use App\Services\BaseUrlService;
 
 if (!function_exists('json_response')) {
   function json_response(array $data, int $status = 200): void
@@ -385,14 +386,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         AuditService::log(null, 'application_submitted', 'New membership application submitted.');
         $message = 'Application submitted. We will confirm your membership and payment details shortly.';
 
+        $siteName = (string) SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
+        $memberTypeLabel = $memberType === 'ASSOCIATE' ? 'Associate' : 'Full';
+        $applicantName = trim($firstName . ' ' . $lastName);
+        if ($applicantName === '') {
+          $applicantName = $firstName;
+        }
+        $adminEmails = NotificationService::getAdminEmails();
+        $reviewLink = BaseUrlService::buildUrl('/admin/index.php?page=applications');
+
         try {
-          EmailService::send(
-            $email,
-            'Membership Application Received',
-            "Hi $firstName,\n\nWe have received your membership application. Our committee will review your details and contact you with the next steps shortly.\n\nThank you,\nAustralian Goldwing Association"
-          );
+          NotificationService::dispatch('application_member_submitted', [
+            'primary_email' => $email,
+            'admin_emails' => $adminEmails,
+            'member_name' => NotificationService::escape($firstName !== '' ? $firstName : $applicantName),
+            'member_type' => NotificationService::escape($memberTypeLabel),
+            'site_name' => NotificationService::escape($siteName),
+          ]);
         } catch (Throwable $e) {
-          // Suppress email dispatch errors to prevent breaking the application flow
+          error_log('[apply.php] application_member_submitted dispatch failed: ' . $e->getMessage());
+        }
+
+        try {
+          NotificationService::dispatch('application_admin_new_submission', [
+            'primary_email' => '',
+            'admin_emails' => $adminEmails,
+            'applicant_name' => NotificationService::escape($applicantName !== '' ? $applicantName : '—'),
+            'applicant_email' => NotificationService::escape($email !== '' ? $email : '—'),
+            'applicant_phone' => NotificationService::escape($phone !== '' ? $phone : '—'),
+            'member_type' => NotificationService::escape($memberTypeLabel),
+            'review_link' => NotificationService::escape($reviewLink),
+          ]);
+        } catch (Throwable $e) {
+          error_log('[apply.php] application_admin_new_submission dispatch failed: ' . $e->getMessage());
         }
       }
     }
