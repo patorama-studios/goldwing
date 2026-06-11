@@ -1,80 +1,145 @@
 /**
- * Pay-membership slide-out drawer controller.
+ * Pay-membership slide-out drawer controller — two-panel slide UX.
  *
- * Pairs with app/Views/partials/pay_membership_drawer.php.
+ * Drawer DOM lives inline in /member/index.php (no partial dependency).
  *
- *  Open from anywhere on the page:   <button data-pay-drawer-open>Pay now</button>
- *  Open programmatically:            window.PayMembershipDrawer.open()
- *  Open with overrides:              window.PayMembershipDrawer.open({tier:'FULL', term:'24M'})
- *  Auto-open conditions (on load):
- *    • The drawer has data-auto-open="1" (set server-side when pending order exists), OR
- *    • The URL contains ?pay=1
+ * View 1 (default) — Select membership type + term + see live price.
+ *   Pay button at the bottom says "Continue to payment →" and only fires
+ *   the slide transition. NO Stripe call yet.
  *
- * IMPORTANT vs. the inline widget mistake we made last round: the Element
- * is mounted when the drawer OPENS, not on Pay click. So when the user
- * clicks Pay, their card details are already in the Element and
- * stripe.confirmPayment can finish in-page (3DS popup stays in-page;
- * non-3DS finishes silently and redirects to /member/?renewed=1).
+ * View 2 (slid in) — Stripe Payment Element, fully mounted, with a real
+ *   "Pay A$XX" button. Back arrow returns to view 1. The Element is
+ *   mounted JUST before the slide-in completes, so by the time the
+ *   member sees the form it's ready to type into.
  *
- * Tier / term changes void the previous pending order and mint a fresh
- * PaymentIntent (see /api/payments/membership-intent), and the Element
- * remounts with the new client_secret.
+ *   When the member changes tier/term in view 1 (which can happen any
+ *   time before clicking Pay), the next "Continue to payment" call
+ *   re-fetches a fresh PaymentIntent and remounts the Element.
+ *
+ * Triggers:
+ *   • Any element with data-pay-drawer-open opens to view 1
+ *   • window.PayMembershipDrawer.open({tier?, term?})
+ *   • Auto-open when data-auto-open="1" on the drawer root, OR ?pay=1 in URL
+ *
+ * NO Stripe full-page redirect anywhere. stripe.confirmPayment uses
+ * return_url=/member/?renewed=1 which only fires for 3DS / wallet
+ * flows; the page never leaves goldwing.org.au except for those
+ * authentication overlays.
  */
 (function () {
   'use strict';
 
   var root = null;
+  var slider = null;
   var stripe = null;
   var elements = null;
   var paymentElement = null;
   var currentSecret = '';
   var currentOrderId = 0;
+  var currentOrderNumber = '';
   var currentTier = 'FULL';
   var currentTerm = '12M';
+  var currentAmountLabel = '';
   var pricingMatrix = null;
   var publishableKey = '';
-  var isMounting = false;
+  var view = 'select';            // 'select' | 'pay'
+  var isFetchingIntent = false;
 
-  function getEl(sel, ctx) { return (ctx || root).querySelector(sel); }
-  function getAll(sel, ctx) { return Array.from((ctx || root).querySelectorAll(sel)); }
+  function get(sel) { return root ? root.querySelector(sel) : null; }
+  function getAll(sel) { return root ? Array.from(root.querySelectorAll(sel)) : []; }
 
-  function showError(msg) {
-    var box = getEl('[data-pay-drawer-error]');
-    if (!box) return;
-    box.textContent = msg || 'Payment could not be processed.';
-    box.classList.remove('hidden');
+  function fmtA$(cents) { return 'A$' + (cents / 100).toFixed(2); }
+
+  // ---- Error helpers (per view) ----------------------------------------
+  function showSelectError(msg) {
+    var box = get('[data-pay-drawer-error-select]');
+    if (box) { box.textContent = msg || ''; box.classList.remove('hidden'); }
   }
-  function clearError() {
-    var box = getEl('[data-pay-drawer-error]');
-    if (box) { box.classList.add('hidden'); box.textContent = ''; }
+  function clearSelectError() {
+    var box = get('[data-pay-drawer-error-select]');
+    if (box) { box.textContent = ''; box.classList.add('hidden'); }
+  }
+  function showPayError(msg) {
+    var box = get('[data-pay-drawer-error-pay]');
+    if (box) { box.textContent = msg || ''; box.classList.remove('hidden'); }
+  }
+  function clearPayError() {
+    var box = get('[data-pay-drawer-error-pay]');
+    if (box) { box.textContent = ''; box.classList.add('hidden'); }
   }
 
-  function setPayBusy(busy, label) {
-    var btn = getEl('[data-pay-drawer-pay]');
-    if (!btn) return;
-    var lbl = btn.querySelector('[data-pay-drawer-pay-label]');
-    if (busy) {
-      btn.disabled = true;
-      if (lbl && !btn.dataset.originalLabel) {
-        btn.dataset.originalLabel = lbl.textContent;
-      }
-      if (lbl) lbl.textContent = label || 'Processing…';
+  // ---- Pay button state -----------------------------------------------
+  function setPayLabel(text) {
+    var lbl = get('[data-pay-drawer-pay-label]');
+    if (lbl) lbl.textContent = text;
+  }
+  function setPayDisabled(disabled) {
+    var btn = get('[data-pay-drawer-pay]');
+    if (btn) btn.disabled = !!disabled;
+  }
+
+  // ---- View switching --------------------------------------------------
+  function setView(next) {
+    view = next;
+    var backBtn = get('[data-pay-drawer-back]');
+    var titleEl = get('[data-pay-drawer-title]');
+    var subEl   = get('[data-pay-drawer-subtitle]');
+    if (next === 'pay') {
+      slider.style.transform = 'translateX(-50%)';
+      if (backBtn) backBtn.classList.remove('hidden');
+      if (titleEl) titleEl.textContent = 'Enter your card';
+      if (subEl)   subEl.textContent   = 'You can come back and change your plan.';
+      setPayLabel(currentAmountLabel ? 'Pay ' + currentAmountLabel : 'Pay');
+      setPayDisabled(false);
     } else {
-      btn.disabled = false;
-      if (lbl && btn.dataset.originalLabel) {
-        lbl.textContent = btn.dataset.originalLabel;
-      }
+      slider.style.transform = 'translateX(0)';
+      if (backBtn) backBtn.classList.add('hidden');
+      if (titleEl) titleEl.textContent = 'Renew your membership';
+      if (subEl)   subEl.textContent   = 'Pick a plan — payment comes next.';
+      setPayLabel('Continue to payment →');
+      // Pay button is disabled on the select view — the Continue button
+      // inside the panel does the work. We hide the footer button by
+      // making it match (visually it's the same affordance).
+      setPayDisabled(false);
     }
   }
 
-  function fmtA$(cents) {
-    return 'A$' + (cents / 100).toFixed(2);
+  // ---- Selection inputs <-> state -------------------------------------
+  function syncInputs() {
+    getAll('[data-pay-drawer-tier]').forEach(function (i) {
+      i.checked = i.value === currentTier;
+    });
+    getAll('[data-pay-drawer-term]').forEach(function (i) {
+      i.checked = i.value === currentTerm;
+    });
+  }
+
+  function onSelectionChange() {
+    var t = get('[data-pay-drawer-tier]:checked');
+    var p = get('[data-pay-drawer-term]:checked');
+    var newTier = t ? t.value : currentTier;
+    var newTerm = p ? p.value : currentTerm;
+    if (newTier === currentTier && newTerm === currentTerm) return;
+    currentTier = newTier;
+    currentTerm = newTerm;
+    // Just update the live summary from the cached pricing matrix.
+    // We don't hit the server again until "Continue to payment" — saves
+    // a request per radio click.
+    updateSummaryFromMatrix();
+    // Any cached PI / Element no longer matches the new selection, so
+    // wipe the mount; we'll rebuild on Continue.
+    if (paymentElement) {
+      try { paymentElement.unmount(); } catch (e) {}
+      paymentElement = null;
+      elements = null;
+      currentSecret = '';
+      restorePlaceholder();
+    }
   }
 
   function updatePriceLabels() {
     if (!pricingMatrix) return;
-    var tier = currentTier;
-    var tierPrices = pricingMatrix[tier] || {};
+    var tierPrices = pricingMatrix[currentTier] || {};
     getAll('[data-pay-drawer-price]').forEach(function (el) {
       var term = el.getAttribute('data-pay-drawer-price');
       var cents = tierPrices[term];
@@ -82,46 +147,63 @@
     });
   }
 
-  function updateSummary(data) {
-    data = data || {};
-    var title = getEl('[data-pay-drawer-summary-title]');
-    var order = getEl('[data-pay-drawer-summary-order]');
-    var total = getEl('[data-pay-drawer-summary-total]');
-    if (title) {
-      var tierLabel = data.tier === 'ASSOCIATE' ? 'Associate' : 'Full Member';
-      var termLabel = data.term === '36M' ? '3 years' : (data.term === '24M' ? '2 years' : '1 year');
-      title.textContent = tierLabel + ' — ' + termLabel;
-    }
-    if (order) {
-      order.textContent = data.order_number ? 'Order ' + data.order_number : '';
-    }
-    if (total) {
-      total.textContent = data.amount_label || (data.amount_cents ? fmtA$(data.amount_cents) : '—');
-    }
-    var payLabel = getEl('[data-pay-drawer-pay-label]');
-    if (payLabel) {
-      payLabel.textContent = data.amount_label ? 'Pay ' + data.amount_label : 'Pay securely';
-      var btn = getEl('[data-pay-drawer-pay]');
-      if (btn) delete btn.dataset.originalLabel;
-    }
+  function updateSummaryFromMatrix() {
+    if (!pricingMatrix) return;
+    var tierPrices = pricingMatrix[currentTier] || {};
+    var cents = tierPrices[currentTerm];
+    var tierLabel = currentTier === 'ASSOCIATE' ? 'Associate' : 'Full Member';
+    var termLabel = currentTerm === '36M' ? '3 years' : (currentTerm === '24M' ? '2 years' : '1 year');
+    var summary = {
+      tier: currentTier,
+      term: currentTerm,
+      amount_cents: cents,
+      amount_label: cents ? fmtA$(cents) : '—',
+      order_number: currentOrderNumber,
+    };
+    summary.tierLabel = tierLabel;
+    summary.termLabel = termLabel;
+    updateSummary(summary);
   }
 
+  function updateSummary(d) {
+    var title = (d.tierLabel || (d.tier === 'ASSOCIATE' ? 'Associate' : 'Full Member')) +
+                ' — ' + (d.termLabel || (d.term === '36M' ? '3 years' : (d.term === '24M' ? '2 years' : '1 year')));
+    var amt = d.amount_label || (d.amount_cents ? fmtA$(d.amount_cents) : '—');
+    var ord = d.order_number ? 'Order ' + d.order_number : '';
+    [
+      ['[data-pay-drawer-summary-title]', title],
+      ['[data-pay-drawer-summary-order]', ord],
+      ['[data-pay-drawer-summary-total]', amt],
+      ['[data-pay-drawer-recap-title]',   title],
+      ['[data-pay-drawer-recap-order]',   ord],
+      ['[data-pay-drawer-recap-total]',   amt],
+    ].forEach(function (pair) {
+      var el = get(pair[0]);
+      if (el) el.textContent = pair[1];
+    });
+    currentAmountLabel = amt && amt !== '—' ? amt : '';
+  }
+
+  function restorePlaceholder() {
+    var container = get('[data-pay-drawer-element]');
+    if (!container) return;
+    if (!container.querySelector('[data-pay-drawer-placeholder]')) {
+      container.innerHTML = '<div data-pay-drawer-placeholder class="flex items-center justify-center min-h-[180px] text-sm text-slate-400"><span class="inline-flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Loading secure payment form…</span></div>';
+    }
+  }
   function clearPlaceholder() {
-    var ph = getEl('[data-pay-drawer-placeholder]');
+    var ph = get('[data-pay-drawer-placeholder]');
     if (ph) ph.remove();
   }
 
-  async function fetchMembershipIntent() {
+  // ---- Server: fetch PI for current selection -------------------------
+  async function fetchIntent() {
     var csrf = root.dataset.csrf || '';
-    var body = { tier: currentTier, term: currentTerm };
     var resp = await fetch('/api/payments/membership-intent', {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrf,
-      },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ tier: currentTier, term: currentTerm }),
     });
     var data = {};
     try { data = await resp.json(); } catch (e) {}
@@ -131,31 +213,29 @@
     return data;
   }
 
-  async function mountElement(force) {
-    if (isMounting) return;
-    isMounting = true;
-    setPayBusy(true, 'Preparing secure form…');
-
+  // ---- Mount the Stripe Element on the payment view -------------------
+  async function ensureElementMounted() {
+    if (isFetchingIntent) return false;
+    isFetchingIntent = true;
+    showPayError('');
     try {
-      var data = await fetchMembershipIntent();
+      // Always re-fetch on Continue — guarantees the amount matches the
+      // member's current pick even if they bounced between views.
+      var data = await fetchIntent();
       pricingMatrix = data.pricing || pricingMatrix;
       publishableKey = data.publishable_key || publishableKey;
       currentOrderId = data.order_id || currentOrderId;
+      currentOrderNumber = data.order_number || currentOrderNumber;
       updatePriceLabels();
       updateSummary(data);
 
       if (!window.Stripe) {
-        throw new Error('Stripe.js failed to load. Refresh the page and try again.');
+        throw new Error('Stripe.js failed to load. Refresh the page.');
       }
       if (!stripe) stripe = window.Stripe(publishableKey);
 
-      // If the secret changed (tier/term swap) or we never mounted, build
-      // a fresh Elements instance. Stripe doesn't allow swapping the
-      // clientSecret on an existing Elements — must recreate.
-      if (force || currentSecret !== data.client_secret || !paymentElement) {
-        if (paymentElement) {
-          try { paymentElement.unmount(); } catch (e) {}
-        }
+      if (currentSecret !== data.client_secret || !paymentElement) {
+        if (paymentElement) { try { paymentElement.unmount(); } catch (e) {} }
         elements = stripe.elements({
           clientSecret: data.client_secret,
           appearance: {
@@ -173,26 +253,33 @@
           layout: { type: 'tabs', defaultCollapsed: false },
           wallets: { applePay: 'auto', googlePay: 'auto' },
         });
-        paymentElement.mount(getEl('[data-pay-drawer-element]'));
+        paymentElement.mount(get('[data-pay-drawer-element]'));
         paymentElement.on('ready', clearPlaceholder);
         currentSecret = data.client_secret;
       }
-      setPayBusy(false);
+      return true;
     } catch (e) {
-      showError(e.message || 'Could not prepare payment.');
-      setPayBusy(false);
+      showSelectError(e.message || 'Could not prepare payment.');
+      return false;
     } finally {
-      isMounting = false;
+      isFetchingIntent = false;
     }
   }
 
-  async function pay() {
-    clearError();
-    if (!stripe || !elements) {
-      await mountElement(true);
-      if (!stripe || !elements) return;
+  // ---- The footer Pay button ------------------------------------------
+  async function payClicked() {
+    if (view === 'select') {
+      await continueToPayment();
+      return;
     }
-    setPayBusy(true, 'Confirming with Stripe…');
+    // view === 'pay'
+    clearPayError();
+    if (!stripe || !elements) {
+      showPayError('Payment form not ready yet. Wait a moment and try again.');
+      return;
+    }
+    setPayLabel('Confirming with Stripe…');
+    setPayDisabled(true);
     try {
       var result = await stripe.confirmPayment({
         elements: elements,
@@ -201,46 +288,79 @@
         },
       });
       if (result && result.error) {
-        showError(result.error.message || 'Payment was declined.');
-        setPayBusy(false);
+        showPayError(result.error.message || 'Payment was declined.');
+        setPayLabel('Pay ' + (currentAmountLabel || ''));
+        setPayDisabled(false);
       }
-      // Otherwise Stripe redirects (3DS / wallets / final success). We
-      // don't reset the button state — the page is unmounting.
+      // Otherwise Stripe handles 3DS / Link in-page and redirects on
+      // success; nothing to do here.
     } catch (e) {
-      showError(e.message || 'Payment was declined.');
-      setPayBusy(false);
+      showPayError(e.message || 'Payment failed.');
+      setPayLabel('Pay ' + (currentAmountLabel || ''));
+      setPayDisabled(false);
     }
   }
 
+  async function continueToPayment() {
+    clearSelectError();
+    if (!pricingMatrix || !pricingMatrix[currentTier] || !pricingMatrix[currentTier][currentTerm]) {
+      // First click — pricing matrix not yet loaded. Fetch it now so the
+      // select view shows real prices, then the user can click Continue
+      // again. (We try-mount immediately if the matrix already arrived.)
+    }
+    setPayLabel('Preparing secure form…');
+    setPayDisabled(true);
+    var ok = await ensureElementMounted();
+    setPayDisabled(false);
+    if (!ok) {
+      setPayLabel('Continue to payment →');
+      return;
+    }
+    setView('pay');
+  }
+
+  // ---- Open / close ----------------------------------------------------
   function open(overrides) {
     if (!root) return;
     overrides = overrides || {};
     if (overrides.tier) currentTier = overrides.tier;
     if (overrides.term) currentTerm = overrides.term;
-    syncSelectionInputs();
+    syncInputs();
+    setView('select');
     root.classList.remove('hidden');
     requestAnimationFrame(function () {
-      var bd = getEl('[data-pay-drawer-backdrop]');
-      var pn = getEl('[data-pay-drawer-panel]');
+      var bd = get('[data-pay-drawer-backdrop]');
+      var pn = get('[data-pay-drawer-panel]');
       if (bd) bd.classList.add('opacity-100');
       if (pn) pn.classList.remove('translate-x-full');
     });
     document.body.style.overflow = 'hidden';
-    mountElement(false);
+    // Pre-fetch the pricing matrix so the term cards show real prices
+    // without the member having to click Continue first. If this fails
+    // silently, the matrix populates on the first Continue click instead.
+    if (!pricingMatrix) {
+      ensureElementMounted().catch(function () {}).then(function () {
+        // After fetch we've moved further than we wanted — revert to
+        // select view so the slide stays on view 1.
+        setView('select');
+      });
+    } else {
+      updateSummaryFromMatrix();
+      updatePriceLabels();
+    }
   }
 
   function close() {
     if (!root) return;
-    var bd = getEl('[data-pay-drawer-backdrop]');
-    var pn = getEl('[data-pay-drawer-panel]');
+    var bd = get('[data-pay-drawer-backdrop]');
+    var pn = get('[data-pay-drawer-panel]');
     if (bd) bd.classList.remove('opacity-100');
     if (pn) pn.classList.add('translate-x-full');
     setTimeout(function () {
       root.classList.add('hidden');
       document.body.style.overflow = '';
+      setView('select');
     }, 300);
-
-    // Strip ?pay=1 so a refresh doesn't auto-reopen.
     if (window.location.search.indexOf('pay=') !== -1) {
       try {
         var url = new URL(window.location.href);
@@ -250,67 +370,51 @@
     }
   }
 
-  function syncSelectionInputs() {
-    getAll('[data-pay-drawer-tier]').forEach(function (input) {
-      input.checked = input.value === currentTier;
-    });
-    getAll('[data-pay-drawer-term]').forEach(function (input) {
-      input.checked = input.value === currentTerm;
-    });
-  }
-
-  function onSelectionChange() {
-    var t = getEl('[data-pay-drawer-tier]:checked');
-    var p = getEl('[data-pay-drawer-term]:checked');
-    var newTier = t ? t.value : currentTier;
-    var newTerm = p ? p.value : currentTerm;
-    if (newTier === currentTier && newTerm === currentTerm) return;
-    currentTier = newTier;
-    currentTerm = newTerm;
-    clearError();
-    // Re-fetch the intent for the new combo. The backend will void the
-    // old pending order and mint a new one.
-    mountElement(true);
-  }
-
+  // ---- Wiring ----------------------------------------------------------
   function attachListeners() {
-    document.querySelectorAll('[data-pay-drawer-open]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        open();
-      });
+    document.querySelectorAll('[data-pay-drawer-open]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.preventDefault(); open(); });
     });
     getAll('[data-pay-drawer-close]').forEach(function (el) {
       el.addEventListener('click', close);
     });
-    getAll('[data-pay-drawer-tier]').forEach(function (input) {
-      input.addEventListener('change', onSelectionChange);
+    var back = get('[data-pay-drawer-back]');
+    if (back) back.addEventListener('click', function () { setView('select'); });
+
+    getAll('[data-pay-drawer-tier]').forEach(function (i) {
+      i.addEventListener('change', onSelectionChange);
     });
-    getAll('[data-pay-drawer-term]').forEach(function (input) {
-      input.addEventListener('change', onSelectionChange);
+    getAll('[data-pay-drawer-term]').forEach(function (i) {
+      i.addEventListener('change', onSelectionChange);
     });
-    var payBtn = getEl('[data-pay-drawer-pay]');
-    if (payBtn) payBtn.addEventListener('click', pay);
+
+    var cont = get('[data-pay-drawer-continue]');
+    if (cont) cont.addEventListener('click', continueToPayment);
+
+    var pay = get('[data-pay-drawer-pay]');
+    if (pay) pay.addEventListener('click', payClicked);
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !root.classList.contains('hidden')) close();
+      if (e.key === 'Escape' && root && !root.classList.contains('hidden')) close();
     });
   }
 
   function init() {
     root = document.getElementById('pay-membership-drawer');
     if (!root) return;
+    slider = root.querySelector('[data-pay-drawer-slider]');
+    if (!slider) return;
 
     currentTier = root.dataset.defaultTier || 'FULL';
     currentTerm = root.dataset.defaultTerm || '12M';
-    syncSelectionInputs();
+    syncInputs();
+    setView('select');
     attachListeners();
 
     var autoOpenFromData = root.dataset.autoOpen === '1';
     var autoOpenFromQuery = /(?:^|[?&])pay=1(?:&|$)/.test(window.location.search);
     if (autoOpenFromData || autoOpenFromQuery) {
-      // Defer slightly so the page chrome paints first.
-      setTimeout(function () { open(); }, 300);
+      setTimeout(function () { open(); }, 250);
     }
   }
 

@@ -764,65 +764,12 @@ if ($user && $user['member_id']) {
           $billingMessage = 'Shipping address updated.';
         }
       } elseif ($_POST['action'] === 'membership_order_pay') {
-        $orderId = (int) ($_POST['order_id'] ?? 0);
-        if (!$member || $orderId <= 0) {
-          $billingError = 'Unable to start payment for this order.';
-        } else {
-          $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id AND member_id = :member_id AND order_type = "membership" LIMIT 1');
-          $stmt->execute(['id' => $orderId, 'member_id' => $member['id']]);
-          $order = $stmt->fetch();
-          if (!$order) {
-            $billingError = 'Unable to locate the selected order.';
-          } elseif (!empty($order['payment_method']) && $order['payment_method'] !== 'stripe') {
-            $billingError = 'This order requires manual payment approval.';
-          } else {
-            $itemsStmt = $pdo->prepare('SELECT * FROM order_items WHERE order_id = :order_id ORDER BY id ASC');
-            $itemsStmt->execute(['order_id' => $orderId]);
-            $items = $itemsStmt->fetchAll();
-            $lineItems = [];
-            foreach ($items as $item) {
-              $lineItems[] = [
-                'name' => $item['name'],
-                'unit_amount' => (int) round(((float) $item['unit_price']) * 100),
-                'quantity' => (int) ($item['quantity'] ?? 1),
-                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
-              ];
-            }
-            if (!$lineItems) {
-              $lineItems[] = [
-                'name' => 'Membership',
-                'unit_amount' => (int) round(((float) ($order['total'] ?? 0)) * 100),
-                'quantity' => 1,
-                'currency' => strtolower((string) ($order['currency'] ?? 'aud')),
-              ];
-            }
-            // Land on the dashboard with ?renewed=1 so the thank-you lightbox
-            // + confetti fires. Old /member/index.php?page=billing&success=1
-            // showed a flat banner only.
-            $successUrl = BaseUrlService::buildUrl('/member/?renewed=1');
-            $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
-            $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, [
-              'order_id' => (string) $orderId,
-              'order_type' => 'membership',
-              'member_id' => (string) $member['id'],
-              'period_id' => (string) ($order['membership_period_id'] ?? ''),
-              'channel_id' => (string) ($order['channel_id'] ?? ''),
-            ]);
-            if (!$session || empty($session['id'])) {
-              $billingError = 'Unable to start checkout for this order.';
-            } else {
-              OrderService::updateStripeSession($orderId, $session['id']);
-              $updateFields = ['payment_method = "stripe"', 'status = "pending"', 'updated_at = NOW()'];
-              if (!empty($ordersPaymentStatusColumn) && $ordersPaymentStatusColumn !== 'status') {
-                $updateFields[] = 'payment_status = "pending"';
-              }
-              $stmt = $pdo->prepare('UPDATE orders SET ' . implode(', ', $updateFields) . ' WHERE id = :id');
-              $stmt->execute(['id' => $orderId]);
-              header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
-              exit;
-            }
-          }
-        }
+        // Legacy redirect-to-Stripe path. Now just bounce to the billing
+        // page with ?pay=1, which auto-opens the inline pay-membership
+        // drawer. We no longer create a hosted Stripe Checkout Session
+        // here — the drawer handles everything inline.
+        header('Location: /member/index.php?page=billing&pay=1');
+        exit;
       } elseif ($_POST['action'] === 'membership_renew') {
         if (!$member) {
           $billingError = 'Unable to start renewal.';
@@ -969,44 +916,29 @@ if ($user && $user['member_id']) {
               // Land on the dashboard with ?renewed=1 for the confetti
               // lightbox. Cancel still goes to billing so the member can
               // try again immediately.
-              $successUrl = BaseUrlService::buildUrl('/member/?renewed=1');
-              $cancelUrl = BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
-              $metadata = [
-                'order_type' => 'membership',
-                'member_id' => (string) $member['id'],
-                'order_ids' => implode(',', $createdOrderIds),
-                'period_ids' => implode(',', $createdPeriodIds),
-                'term' => $termCode,
-                'includes_partner' => $partner ? '1' : '0',
-              ];
-              $session = StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
-              if (!$session || empty($session['id'])) {
-                $billingError = 'Unable to start renewal payment.';
-              } else {
-                foreach ($createdOrderIds as $oid) {
-                  if ($oid > 0) {
-                    OrderService::updateStripeSession($oid, $session['id']);
-                  }
+              // No more hosted-Checkout redirect — the renew handler just
+              // creates the pending order(s) and bounces to the billing
+              // page with ?pay=1, which auto-opens the inline drawer where
+              // the member enters their card. Notifications fire with a
+              // resume link pointing at the same drawer URL.
+              $resumeLink = BaseUrlService::buildUrl('/member/index.php?page=billing&pay=1');
+              $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+              foreach ($createdOrderRows as $created) {
+                if ($created['member_email'] === '') {
+                  continue;
                 }
-                $resumeLink = (string) ($session['url'] ?? BaseUrlService::buildUrl('/member/index.php?page=billing'));
-                $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
-                foreach ($createdOrderRows as $created) {
-                  if ($created['member_email'] === '') {
-                    continue;
-                  }
-                  NotificationService::dispatch('membership_order_created', [
-                    'primary_email' => $created['member_email'],
-                    'admin_emails' => NotificationService::getAdminEmails(),
-                    'member_name' => $created['member_name'],
-                    'order_number' => $created['order_number'],
-                    'payment_link' => NotificationService::escape($resumeLink),
-                    'payment_method' => 'stripe',
-                    'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
-                  ]);
-                }
-                header('Location: ' . ($session['url'] ?? '/member/index.php?page=billing'));
-                exit;
+                NotificationService::dispatch('membership_order_created', [
+                  'primary_email' => $created['member_email'],
+                  'admin_emails' => NotificationService::getAdminEmails(),
+                  'member_name' => $created['member_name'],
+                  'order_number' => $created['order_number'],
+                  'payment_link' => NotificationService::escape($resumeLink),
+                  'payment_method' => 'stripe',
+                  'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+                ]);
               }
+              header('Location: /member/index.php?page=billing&pay=1');
+              exit;
             }
           }
         }
@@ -5446,48 +5378,246 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 </div>
 
 <?php
-// Pay-membership slide-out drawer — single source of truth for any "pay now"
-// button on this page. Auto-opens whenever a pending membership order exists
-// AND the member is on the billing tab, or whenever the URL has ?pay=1.
-//
-// WRAPPED IN try/catch so that a failure in Stripe settings (or anything
-// else this block needs) can't take down the rest of the page render —
-// previously it silently killed the renew-modal, the lightbox, the footer,
-// and every <script> tag below it, which broke the "Renew membership now"
-// button on the dashboard.
-if ($member) {
-  try {
+// Pay-membership slide-out drawer — TWO-PANEL inline version (markup is
+// rendered right here so a missing partial / deploy ordering issue can't
+// break it). Panel 1 = membership selector, Panel 2 = credit card form;
+// the "Continue to payment →" button slides panel 1 left to reveal panel
+// 2 in the same drawer width. No Stripe full-page redirect anywhere.
+$_drawerOk = false;
+try {
+  if ($member) {
     $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
-    if (!is_array($_stripeSettingsForDrawer)) {
-      $_stripeSettingsForDrawer = [];
-    }
+    if (!is_array($_stripeSettingsForDrawer)) $_stripeSettingsForDrawer = [];
     $_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
-    if (!is_array($_drawerPrices)) {
-      $_drawerPrices = [];
-    }
-    $_drawerHasPending = !empty($pendingMembershipOrder);
-    $_drawerAutoOpen = $_drawerHasPending && in_array($page, ['billing', 'dashboard'], true);
-    $payDrawerData = [
-      'csrf_token'           => Csrf::token(),
-      'current_tier'         => strtoupper((string) ($member['member_type'] ?? 'FULL')),
-      'current_term'         => (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M'),
-      'allow_both_types'     => !empty($_stripeSettingsForDrawer['membership_allow_both_types']),
-      'show_24'              => !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']),
-      'show_36'              => !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']),
-      'auto_open'            => $_drawerAutoOpen,
-      'pending_order_number' => (string) ($pendingMembershipOrder['order_number'] ?? ''),
-    ];
-    $_drawerPartial = __DIR__ . '/../../app/Views/partials/pay_membership_drawer.php';
-    if (file_exists($_drawerPartial)) {
-      require $_drawerPartial;
-    }
-  } catch (\Throwable $_drawerError) {
-    error_log('[/member/] pay-membership drawer render failed: ' . $_drawerError->getMessage());
-    // Drawer markup is non-critical — swallow the failure so the rest of
-    // the page (renew-modal, scripts, footer) still renders.
+    if (!is_array($_drawerPrices)) $_drawerPrices = [];
+    $_defaultTier = strtoupper((string) ($member['member_type'] ?? 'FULL'));
+    $_defaultTerm = (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M');
+    $_allowBoth   = !empty($_stripeSettingsForDrawer['membership_allow_both_types']);
+    $_show24      = !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']);
+    $_show36      = !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']);
+    $_hasPending  = !empty($pendingMembershipOrder);
+    $_autoOpen    = $_hasPending && in_array($page, ['billing', 'dashboard'], true);
+    $_pendingNum  = (string) ($pendingMembershipOrder['order_number'] ?? '');
+    $_drawerCsrf  = Csrf::token();
+    $_drawerOk    = true;
   }
+} catch (\Throwable $_drawerError) {
+  error_log('[/member/] pay drawer setup failed: ' . $_drawerError->getMessage());
 }
 ?>
+<?php if ($_drawerOk): ?>
+<aside id="pay-membership-drawer"
+       class="fixed inset-0 z-[9000] hidden"
+       role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
+       data-csrf="<?= e($_drawerCsrf) ?>"
+       data-default-tier="<?= e($_defaultTier) ?>"
+       data-default-term="<?= e($_defaultTerm) ?>"
+       data-allow-associate="<?= $_allowBoth ? '1' : '0' ?>"
+       data-show-24="<?= $_show24 ? '1' : '0' ?>"
+       data-show-36="<?= $_show36 ? '1' : '0' ?>"
+       data-auto-open="<?= $_autoOpen ? '1' : '0' ?>"
+       data-pending-number="<?= e($_pendingNum) ?>">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+       data-pay-drawer-backdrop data-pay-drawer-close></div>
+  <!-- Panel -->
+  <div class="absolute right-0 top-0 h-full w-full max-w-[560px] bg-white shadow-2xl
+              transform translate-x-full transition-transform duration-300 ease-out
+              flex flex-col"
+       data-pay-drawer-panel>
+    <!-- Header (shared across both views) -->
+    <header class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Back button — only shown in payment view -->
+        <button type="button" data-pay-drawer-back
+                class="hidden text-slate-400 hover:text-slate-700 flex-shrink-0"
+                aria-label="Back to membership">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div class="min-w-0">
+          <h2 id="pay-drawer-title" class="font-display text-xl font-bold text-gray-900 truncate"
+              data-pay-drawer-title>Renew your membership</h2>
+          <p class="text-xs text-slate-500 mt-0.5 truncate" data-pay-drawer-subtitle>
+            Pick a plan — payment comes next.
+          </p>
+        </div>
+      </div>
+      <button type="button" data-pay-drawer-close
+              class="text-slate-400 hover:text-slate-700 flex-shrink-0" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Sliding viewport: 2 panels side-by-side, width = 200% -->
+    <div class="flex-1 overflow-hidden">
+      <div class="h-full flex transition-transform duration-300 ease-out"
+           style="width:200%" data-pay-drawer-slider>
+
+        <!-- ============= VIEW 1: Membership selector ============= -->
+        <section class="w-1/2 h-full overflow-y-auto" data-pay-drawer-view="select">
+          <!-- Membership type -->
+          <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Membership type</h3>
+            <div class="grid grid-cols-<?= $_allowBoth ? '2' : '1' ?> gap-2">
+              <label class="flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
+                <input type="radio" name="pay-drawer-tier" value="FULL" class="mt-0.5" data-pay-drawer-tier>
+                <span class="flex-1">
+                  <span class="block font-semibold text-gray-900 text-sm">Full Member</span>
+                  <span class="block text-xs text-slate-500 leading-snug mt-0.5">Voting member, all benefits.</span>
+                </span>
+              </label>
+              <?php if ($_allowBoth): ?>
+                <label class="flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
+                  <input type="radio" name="pay-drawer-tier" value="ASSOCIATE" class="mt-0.5" data-pay-drawer-tier>
+                  <span class="flex-1">
+                    <span class="block font-semibold text-gray-900 text-sm">Associate</span>
+                    <span class="block text-xs text-slate-500 leading-snug mt-0.5">Household partner of a Full member.</span>
+                  </span>
+                </label>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Term -->
+          <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">Term</h3>
+            <div class="grid grid-cols-<?= ($_show24 || $_show36) ? '3' : '1' ?> gap-2">
+              <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
+                <input type="radio" name="pay-drawer-term" value="12M" class="sr-only" data-pay-drawer-term>
+                <span class="block font-semibold text-gray-900 text-sm">1 year</span>
+                <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="12M">—</span>
+              </label>
+              <?php if ($_show24): ?>
+                <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
+                  <input type="radio" name="pay-drawer-term" value="24M" class="sr-only" data-pay-drawer-term>
+                  <span class="block font-semibold text-gray-900 text-sm">2 years</span>
+                  <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="24M">—</span>
+                </label>
+              <?php endif; ?>
+              <?php if ($_show36): ?>
+                <label class="rounded-xl border border-gray-200 px-3 py-3 cursor-pointer text-center has-[:checked]:border-primary has-[:checked]:bg-primary/10 transition-colors">
+                  <input type="radio" name="pay-drawer-term" value="36M" class="sr-only" data-pay-drawer-term>
+                  <span class="block font-semibold text-gray-900 text-sm">3 years</span>
+                  <span class="block text-xs text-slate-500 mt-1" data-pay-drawer-price="36M">—</span>
+                </label>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Live summary + continue button -->
+          <div class="px-6 py-5 space-y-4">
+            <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm">
+              <div class="flex justify-between items-start">
+                <div class="min-w-0">
+                  <div class="font-semibold text-gray-900" data-pay-drawer-summary-title>—</div>
+                  <div class="text-xs text-slate-500 truncate" data-pay-drawer-summary-order>—</div>
+                </div>
+                <div class="text-xl font-bold text-gray-900" data-pay-drawer-summary-total>—</div>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-500">
+              You can come back and change your plan up until you click Pay.
+            </p>
+
+            <!-- Inline error for selector view -->
+            <div data-pay-drawer-error-select
+                 class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                 role="alert"></div>
+
+            <button type="button" data-pay-drawer-continue
+                    class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-base transition-colors shadow-sm">
+              Continue to payment
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- ============= VIEW 2: Credit card / payment ============= -->
+        <section class="w-1/2 h-full overflow-y-auto" data-pay-drawer-view="pay">
+          <div class="px-6 py-5">
+            <!-- Inline security messaging (inlined here too — no partial req) -->
+            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3 mb-4">
+              <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </span>
+                <div class="text-xs leading-relaxed text-slate-700">
+                  <p class="font-semibold text-slate-900 text-sm">Your card details never touch our servers.</p>
+                  <p class="mt-1">
+                    Payment is processed by <strong>Stripe</strong>, a <strong>Level&nbsp;1 PCI Service Provider</strong> trusted by Amazon, Google, Lyft and millions of other businesses. The connection uses <strong>TLS&nbsp;1.2+</strong> with 256-bit encryption, and the AGA only ever sees the last 4 digits for receipt purposes.
+                    <a href="https://stripe.com/docs/security" target="_blank" rel="noopener" class="text-emerald-700 hover:underline">Learn more&nbsp;↗</a>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Order recap -->
+            <div class="rounded-xl bg-slate-50 px-4 py-3 mb-4 text-sm">
+              <div class="flex justify-between items-start">
+                <div class="min-w-0">
+                  <div class="font-semibold text-gray-900" data-pay-drawer-recap-title>—</div>
+                  <div class="text-xs text-slate-500 truncate" data-pay-drawer-recap-order>—</div>
+                </div>
+                <div class="text-xl font-bold text-gray-900" data-pay-drawer-recap-total>—</div>
+              </div>
+            </div>
+
+            <!-- Inline error for payment view -->
+            <div data-pay-drawer-error-pay
+                 class="hidden mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                 role="alert"></div>
+
+            <!-- Stripe Payment Element mounts here -->
+            <div class="rounded-lg border border-gray-200 bg-white px-3 py-3 min-h-[220px]"
+                 data-pay-drawer-element>
+              <div data-pay-drawer-placeholder
+                   class="flex items-center justify-center min-h-[180px] text-sm text-slate-400">
+                <span class="inline-flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 animate-spin">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  Loading secure payment form…
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- Footer with Pay button (only enabled on payment view) -->
+    <footer class="px-6 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+      <button type="button" data-pay-drawer-pay
+              disabled
+              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span data-pay-drawer-pay-label>Continue to payment →</span>
+      </button>
+      <p class="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+        <span>256-bit SSL</span><span>•</span>
+        <span>PCI DSS Level 1</span><span>•</span>
+        <span>Powered by Stripe</span>
+      </p>
+    </footer>
+  </div>
+</aside>
+<?php endif; ?>
 
 <?php
 // Post-Stripe-checkout thank-you lightbox + confetti.
