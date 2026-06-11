@@ -168,7 +168,12 @@ $_pdPending = (string) ($_pd['pending_order_number'] ?? '');
         </div>
 
         <!-- Trust block — same partial as every other pay area site-wide -->
-        <?php require __DIR__ . '/stripe_security_block.php'; ?>
+        <?php
+          $_secBlock = __DIR__ . '/stripe_security_block.php';
+          if (file_exists($_secBlock)) {
+            require $_secBlock;
+          }
+        ?>
 
         <!-- Inline error -->
         <div data-pay-drawer-error

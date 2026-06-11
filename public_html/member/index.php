@@ -305,6 +305,48 @@ if ($user && $user['member_id']) {
               $stmt->execute(['email' => $newEmail, 'id' => $user['id']]);
             }
             if ($updated) {
+              // Record an informational "details updated" entry for the admin
+              // notification hub so the committee can see what changed before
+              // CSV exports / mail-outs. Never block the save on this.
+              try {
+                $textFields = [
+                  'email'         => ['column' => 'email',         'label' => 'Email'],
+                  'phone'         => ['column' => 'phone',         'label' => 'Phone'],
+                  'address_line1' => ['column' => 'address_line1', 'label' => 'Address line 1'],
+                  'address_line2' => ['column' => 'address_line2', 'label' => 'Address line 2'],
+                  'suburb'        => ['column' => 'city',          'label' => 'Suburb'],
+                  'state'         => ['column' => 'state',         'label' => 'State'],
+                  'postcode'      => ['column' => 'postal_code',   'label' => 'Postcode'],
+                  'country'       => ['column' => 'country',       'label' => 'Country'],
+                  'privacy_level' => ['column' => 'privacy_level', 'label' => 'Privacy level'],
+                ];
+                $profileChanges = [];
+                foreach ($textFields as $key => $def) {
+                  $profileChanges[] = [
+                    'field' => $def['column'],
+                    'label' => $def['label'],
+                    'old'   => trim((string) ($targetMember[$def['column']] ?? '')),
+                    'new'   => trim((string) ($payload[$key] ?? '')),
+                  ];
+                }
+                $profileChanges[] = [
+                  'field' => 'is_historic',
+                  'label' => 'Historic register',
+                  'old'   => !empty($targetMember['is_historic']) ? 'Yes' : 'No',
+                  'new'   => !empty($payload['is_historic']) ? 'Yes' : 'No',
+                ];
+                foreach (MemberRepository::directoryPreferences() as $letter => $info) {
+                  $profileChanges[] = [
+                    'field' => $info['column'],
+                    'label' => 'Directory: ' . $info['label'],
+                    'old'   => !empty($targetMember[$info['column']]) ? 'Yes' : 'No',
+                    'new'   => !empty($payload['directory_pref_' . $letter]) ? 'Yes' : 'No',
+                  ];
+                }
+                \App\Services\PendingRequestsService::recordProfileUpdate($targetMemberId, $profileChanges, 'member');
+              } catch (Throwable $e) {
+                // Hub logging is best-effort only.
+              }
               $profileMessage = $targetMemberId === (int) $member['id'] ? 'Profile updated.' : 'Linked profile updated.';
             } else {
               $profileError = 'Unable to save profile changes.';
@@ -658,6 +700,31 @@ if ($user && $user['member_id']) {
             'country' => $shipping['country'],
             'id' => $member['id'],
           ]);
+
+          // Surface the address change in the admin notification hub
+          // (informational only — best-effort, never blocks the save).
+          try {
+            $addressLabels = [
+              'address_line1' => 'Address line 1',
+              'address_line2' => 'Address line 2',
+              'city'          => 'Suburb',
+              'state'         => 'State',
+              'postal_code'   => 'Postcode',
+              'country'       => 'Country',
+            ];
+            $shippingChanges = [];
+            foreach ($addressLabels as $col => $label) {
+              $shippingChanges[] = [
+                'field' => $col,
+                'label' => $label,
+                'old'   => trim((string) ($member[$col] ?? '')),
+                'new'   => trim((string) ($shipping[$col] ?? '')),
+              ];
+            }
+            \App\Services\PendingRequestsService::recordProfileUpdate((int) $member['id'], $shippingChanges, 'member');
+          } catch (Throwable $e) {
+            // Hub logging is best-effort only.
+          }
 
           $channel = PaymentSettingsService::getChannelByCode('primary');
           $settings = $channel ? PaymentSettingsService::getSettingsByChannelId((int) $channel['id']) : [];
@@ -5382,25 +5449,43 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 // Pay-membership slide-out drawer — single source of truth for any "pay now"
 // button on this page. Auto-opens whenever a pending membership order exists
 // AND the member is on the billing tab, or whenever the URL has ?pay=1.
+//
+// WRAPPED IN try/catch so that a failure in Stripe settings (or anything
+// else this block needs) can't take down the rest of the page render —
+// previously it silently killed the renew-modal, the lightbox, the footer,
+// and every <script> tag below it, which broke the "Renew membership now"
+// button on the dashboard.
 if ($member) {
-  $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
-  $_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
-  if (!is_array($_drawerPrices)) {
-    $_drawerPrices = [];
+  try {
+    $_stripeSettingsForDrawer = StripeSettingsService::getSettings();
+    if (!is_array($_stripeSettingsForDrawer)) {
+      $_stripeSettingsForDrawer = [];
+    }
+    $_drawerPrices = $_stripeSettingsForDrawer['membership_prices'] ?? [];
+    if (!is_array($_drawerPrices)) {
+      $_drawerPrices = [];
+    }
+    $_drawerHasPending = !empty($pendingMembershipOrder);
+    $_drawerAutoOpen = $_drawerHasPending && in_array($page, ['billing', 'dashboard'], true);
+    $payDrawerData = [
+      'csrf_token'           => Csrf::token(),
+      'current_tier'         => strtoupper((string) ($member['member_type'] ?? 'FULL')),
+      'current_term'         => (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M'),
+      'allow_both_types'     => !empty($_stripeSettingsForDrawer['membership_allow_both_types']),
+      'show_24'              => !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']),
+      'show_36'              => !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']),
+      'auto_open'            => $_drawerAutoOpen,
+      'pending_order_number' => (string) ($pendingMembershipOrder['order_number'] ?? ''),
+    ];
+    $_drawerPartial = __DIR__ . '/../../app/Views/partials/pay_membership_drawer.php';
+    if (file_exists($_drawerPartial)) {
+      require $_drawerPartial;
+    }
+  } catch (\Throwable $_drawerError) {
+    error_log('[/member/] pay-membership drawer render failed: ' . $_drawerError->getMessage());
+    // Drawer markup is non-critical — swallow the failure so the rest of
+    // the page (renew-modal, scripts, footer) still renders.
   }
-  $_drawerHasPending = !empty($pendingMembershipOrder);
-  $_drawerAutoOpen = $_drawerHasPending && in_array($page, ['billing', 'dashboard'], true);
-  $payDrawerData = [
-    'csrf_token'           => Csrf::token(),
-    'current_tier'         => strtoupper((string) ($member['member_type'] ?? 'FULL')),
-    'current_term'         => (string) ($_stripeSettingsForDrawer['membership_default_term'] ?? '12M'),
-    'allow_both_types'     => !empty($_stripeSettingsForDrawer['membership_allow_both_types']),
-    'show_24'              => !empty($_drawerPrices['FULL_24']) || !empty($_drawerPrices['ASSOCIATE_24']),
-    'show_36'              => !empty($_drawerPrices['FULL_36']) || !empty($_drawerPrices['ASSOCIATE_36']),
-    'auto_open'            => $_drawerAutoOpen,
-    'pending_order_number' => (string) ($pendingMembershipOrder['order_number'] ?? ''),
-  ];
-  require __DIR__ . '/../../app/Views/partials/pay_membership_drawer.php';
 }
 ?>
 

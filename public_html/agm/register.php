@@ -430,7 +430,10 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
                             </span>
                         </label>
                         <div style="margin-left:1.5rem;">
-                          <?php require __DIR__ . '/../../app/Views/partials/stripe_security_block.php'; ?>
+                          <?php
+                            $_secBlock = __DIR__ . '/../../app/Views/partials/stripe_security_block.php';
+                            if (file_exists($_secBlock)) { require $_secBlock; }
+                          ?>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($event['allow_bank_transfer'])): ?>

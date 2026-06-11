@@ -86,7 +86,10 @@ $_swDataAttrs = [
 
   <!-- Trust copy — same partial used by every pay area site-wide -->
   <div class="px-6 pt-4">
-    <?php require __DIR__ . '/stripe_security_block.php'; ?>
+    <?php
+      $_secBlock = __DIR__ . '/stripe_security_block.php';
+      if (file_exists($_secBlock)) { require $_secBlock; }
+    ?>
   </div>
 
   <!-- Payment Element + button -->

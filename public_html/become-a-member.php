@@ -237,7 +237,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
 
       <section class="form-section">
         <h3>Payment</h3>
-        <?php require __DIR__ . '/../app/Views/partials/stripe_security_block.php'; ?>
+        <?php
+          $_secBlock = __DIR__ . '/../app/Views/partials/stripe_security_block.php';
+          if (file_exists($_secBlock)) { require $_secBlock; }
+        ?>
         <div id="membership-payment-element" class="mt-4"></div>
         <div class="form-alert error" id="membership-error" hidden></div>
         <p class="form-helper">Membership activates immediately after payment is confirmed.</p>

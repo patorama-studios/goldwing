@@ -449,7 +449,10 @@ if ($cartItems) {
                 </div>
 
                 <div class="mt-4 hidden" data-payment-panel="card">
-                  <?php require __DIR__ . '/../app/Views/partials/stripe_security_block.php'; ?>
+                  <?php
+                    $_secBlock = __DIR__ . '/../app/Views/partials/stripe_security_block.php';
+                    if (file_exists($_secBlock)) { require $_secBlock; }
+                  ?>
                   <p id="stripe-payment-note" class="text-xs text-gray-500 mb-2">Enter your card details below — they go straight to Stripe, never to us.</p>
                   <div id="stripe-payment-element"></div>
                   <div id="stripe-payment-error" class="hidden mt-2 bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2 text-sm"></div>
