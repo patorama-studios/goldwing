@@ -63,6 +63,7 @@ $twofaRequirement = SecurityPolicyService::computeTwoFaRequirement($user ?? []);
 $pdo = db();
 $member = null;
 $membershipPeriod = null;
+$pendingPaymentInFlight = false;
 $associates = [];
 $fullMember = null;
 $upcomingEvents = [];
@@ -1248,6 +1249,49 @@ if ($user && $user['member_id']) {
       $member = $stmt->fetch();
     }
 
+    // --- Payment reconcile -------------------------------------------------
+    // If the member's latest pending membership order has a PaymentIntent
+    // that already SUCCEEDED (webhook delayed or missed), activate the
+    // membership right now — before we fetch the period below — so the page
+    // never shows a stale "complete payment" state after a real payment.
+    // A PI still PROCESSING (e.g. wallet/bank rails) flags the UI to show
+    // "Pending" and hide the pay buttons instead. The Stripe lookup is
+    // throttled to once a minute per session, except on the ?renewed=1
+    // return from Stripe where we always check.
+    $pendingPaymentInFlight = false;
+    try {
+      $stmt = $pdo->prepare(
+        "SELECT id, stripe_payment_intent_id FROM orders
+          WHERE member_id = :mid AND order_type = 'membership'
+            AND payment_status = 'pending'
+            AND COALESCE(stripe_payment_intent_id, '') != ''
+          ORDER BY id DESC LIMIT 1"
+      );
+      $stmt->execute(['mid' => (int) $member['id']]);
+      $inflightOrder = $stmt->fetch();
+      if ($inflightOrder) {
+        $inflightPiId = (string) $inflightOrder['stripe_payment_intent_id'];
+        $cache = $_SESSION['pay_reconcile'] ?? [];
+        $cacheFresh = ($cache['pi'] ?? '') === $inflightPiId
+          && (int) ($cache['at'] ?? 0) > time() - 60
+          && !isset($_GET['renewed']);
+        if ($cacheFresh) {
+          $pendingPaymentInFlight = ($cache['status'] ?? '') === 'processing';
+        } else {
+          $pi = StripeService::retrievePaymentIntent($inflightPiId);
+          $piStatus = is_array($pi) ? (string) ($pi['status'] ?? '') : '';
+          $_SESSION['pay_reconcile'] = ['pi' => $inflightPiId, 'status' => $piStatus, 'at' => time()];
+          if ($piStatus === 'succeeded') {
+            \App\Services\PaymentWebhookService::reconcilePaymentIntent($pi);
+          } elseif ($piStatus === 'processing') {
+            $pendingPaymentInFlight = true;
+          }
+        }
+      }
+    } catch (\Throwable $e) {
+      error_log('[/member/] payment reconcile failed: ' . $e->getMessage());
+    }
+
     $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY end_date DESC LIMIT 1');
     $stmt->execute(['member_id' => $member['id']]);
     $membershipPeriod = $stmt->fetch();
@@ -1637,7 +1681,7 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
-<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R5 — if you can grep for this on
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R6 — if you can grep for this on
      the rendered HTML it means cPanel actually copied files. Bump the
      suffix on every push so a stale opcache vs missing-file question can
      be answered with one curl. -->
@@ -1686,6 +1730,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         if ($statusKey === '' && !empty($membershipPeriod['end_date'])
             && strtotime($membershipPeriod['end_date']) >= strtotime('today')) {
             $statusKey = 'active';
+        }
+        // Payment made, activation still settling (PI processing / webhook
+        // in flight) → show Pending, never Lapsed or a pay prompt.
+        if ($pendingPaymentInFlight) {
+            $statusKey = 'pending';
         }
         $statusDot = match ($statusKey) {
           'active', 'paid' => 'bg-green-500',
@@ -1808,6 +1857,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       // status, fall back to cached members.status. Avoids the
                       // "Lapsed" label appearing when the period is active.
                       $statusDisplay = (string) ($membershipPeriod['status'] ?? $member['status'] ?? 'N/A');
+                      if ($pendingPaymentInFlight) {
+                        $statusDisplay = 'Pending';
+                      }
                       $statusDisplay = str_replace('_', ' ', $statusDisplay);
                     ?>
                     <p class="text-lg font-semibold text-gray-900"><?= e(ucfirst(strtolower($statusDisplay))) ?></p>
@@ -1825,7 +1877,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <?php endif; ?>
                 </div>
               </div>
-              <?php if ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
+              <?php if ($pendingPaymentInFlight): ?>
+                <div class="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+                  <span class="material-icons-outlined text-base">hourglass_top</span>
+                  Payment received — your membership will be activated shortly.
+                </div>
+              <?php elseif ($membershipPeriod && $membershipPeriod['status'] === 'PENDING_PAYMENT'): ?>
                 <button type="button" data-pay-drawer-open
                   class="mt-6 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-gray-900 font-semibold text-sm hover:bg-primary/90 transition">
                   <span class="material-icons-outlined text-base">payments</span>
@@ -4416,7 +4473,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <span
                       class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= status_badge_classes($pendingStatus) ?>"><?= ucfirst($pendingStatus) ?></span>
                   </div>
-                  <?php if ($pendingPaymentMethod === 'stripe'): ?>
+                  <?php if ($pendingPaymentInFlight): ?>
+                    <p class="text-xs text-emerald-900 flex items-center gap-1.5">
+                      <span class="material-icons-outlined text-sm">hourglass_top</span>
+                      Payment received — your membership will be activated shortly. No further action needed.
+                    </p>
+                  <?php elseif ($pendingPaymentMethod === 'stripe'): ?>
                     <!-- The Pay button just opens the slide-out drawer. The
                          drawer also auto-opens on this page (see
                          data-auto-open below). -->
@@ -5441,13 +5503,16 @@ if ($showRenewedLightbox):
       if (typeof confetti !== 'function') return;
       const end = Date.now() + 2500;
       const colors = ['#F2C94C', '#16a34a', '#dc2626', '#1d4ed8', '#ffffff'];
+      // zIndex must beat the lightbox (z-[9999]) so the confetti rains on
+      // top of the modal + blur overlay, not underneath them.
+      const zIndex = 10010;
       (function frame() {
-        confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0 }, colors });
-        confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1 }, colors });
+        confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0 }, colors, zIndex });
+        confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1 }, colors, zIndex });
         if (Date.now() < end) requestAnimationFrame(frame);
       }());
       // Big initial burst from the centre.
-      confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 }, colors });
+      confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 }, colors, zIndex });
     };
     const trigger = () => {
       fireConfetti();
@@ -5562,7 +5627,8 @@ if ($renewModalEligible) {
      role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
      data-csrf="<?= e(Csrf::token()) ?>"
      data-currency="<?= e($renewCurrency) ?>"
-     data-auto-open="<?= !empty($pendingMembershipOrder) ? '1' : '0' ?>">
+     data-auto-open="<?= (!empty($pendingMembershipOrder) && empty($pendingPaymentInFlight)) ? '1' : '0' ?>"
+     data-payment-inflight="<?= !empty($pendingPaymentInFlight) ? '1' : '0' ?>">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 border-t-4 border-red-600 overflow-hidden">
     <div class="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
       <div class="flex items-start gap-3 min-w-0">

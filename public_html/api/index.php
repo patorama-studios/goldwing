@@ -376,6 +376,35 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     }
     unset($r);
 
+    // Guard: if a previous renewal payment is already in flight, do NOT
+    // supersede it — that's how double payments happen. A PI that actually
+    // succeeded (webhook not landed yet) gets reconciled on the spot.
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT stripe_payment_intent_id FROM orders
+              WHERE member_id = :mid AND order_type = 'membership'
+                AND payment_status = 'pending'
+                AND COALESCE(stripe_payment_intent_id, '') != ''
+              ORDER BY id DESC LIMIT 1"
+        );
+        $stmt->execute(['mid' => (int) $member['id']]);
+        $existingPiId = trim((string) ($stmt->fetchColumn() ?: ''));
+        if ($existingPiId !== '') {
+            $existingPi = StripeService::retrievePaymentIntent($existingPiId);
+            $existingStatus = is_array($existingPi) ? (string) ($existingPi['status'] ?? '') : '';
+            if ($existingStatus === 'succeeded') {
+                PaymentWebhookService::reconcilePaymentIntent($existingPi);
+                json_response(['error' => 'Your payment has already gone through — your membership is being activated. Refresh the page to see your new status.'], 409);
+            }
+            if ($existingStatus === 'processing') {
+                json_response(['error' => 'Your previous payment is still processing. No need to pay again — refresh the page in a minute to check the status.'], 409);
+            }
+        }
+    } catch (Throwable $e) {
+        // Stripe lookup failure shouldn't block a renewal — fall through.
+        error_log('[/api/payments/membership-intent] in-flight check failed: ' . $e->getMessage());
+    }
+
     // Supersede any prior pending renewal attempt for these members —
     // cancel pending/failed membership orders, delete never-paid periods.
     $renewerIds = array_map(static fn($r) => (int) $r['member']['id'], $renewers);

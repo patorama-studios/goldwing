@@ -271,7 +271,17 @@ class PaymentWebhookService
 
     public static function handlePaymentIntentSucceeded(array $event): void
     {
-        $intent = $event['data']['object'] ?? [];
+        self::reconcilePaymentIntent($event['data']['object'] ?? [], $event['id'] ?? null);
+    }
+
+    /**
+     * Apply a succeeded PaymentIntent to its order(s): mark paid, activate
+     * memberships, create invoices. Called by the webhook, and synchronously
+     * from /member/ page loads when the webhook is delayed or missed.
+     * Idempotent — already-paid orders are skipped.
+     */
+    public static function reconcilePaymentIntent(array $intent, ?string $eventId = null): void
+    {
         if (!empty($intent['invoice'])) {
             return;
         }
@@ -284,7 +294,7 @@ class PaymentWebhookService
         $orderId = isset($metadata['order_id']) ? (int) $metadata['order_id'] : 0;
         if ($orderId <= 0) {
             StripeErrorLogger::logWebhookSkip(__METHOD__, 'metadata.order_id missing', [
-                'event_id' => $event['id'] ?? null,
+                'event_id' => $eventId,
                 'metadata' => $metadata,
                 'related_stripe_pi_id' => $paymentIntentId,
             ]);
@@ -298,7 +308,7 @@ class PaymentWebhookService
             if (!$order) {
                 $pdo->rollBack();
                 StripeErrorLogger::logWebhookSkip(__METHOD__, 'order not found by id ' . $orderId, [
-                    'event_id' => $event['id'] ?? null,
+                    'event_id' => $eventId,
                     'related_order_id' => $orderId,
                     'related_stripe_pi_id' => $paymentIntentId,
                     'metadata' => $metadata,
@@ -349,7 +359,7 @@ class PaymentWebhookService
                     $extra = self::getOrderForUpdate($extraId);
                     if (!$extra) {
                         StripeErrorLogger::logWebhookSkip(__METHOD__, 'extra order not found by id ' . $extraId, [
-                            'event_id' => $event['id'] ?? null,
+                            'event_id' => $eventId,
                             'related_order_id' => $extraId,
                             'related_stripe_pi_id' => $paymentIntentId,
                         ]);

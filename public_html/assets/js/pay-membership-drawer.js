@@ -392,9 +392,13 @@
     recalc();
     attachListeners();
 
+    // Never auto-open when a payment is already in flight (paid, awaiting
+    // activation) — emailed ?pay=1 links would otherwise reopen the drawer
+    // and invite a double payment.
+    var paymentInFlight = root.dataset.paymentInflight === '1';
     var autoOpenFromData = root.dataset.autoOpen === '1';
     var autoOpenFromQuery = /(?:^|[?&])pay=1(?:&|$)/.test(window.location.search);
-    if (autoOpenFromData || autoOpenFromQuery) {
+    if (!paymentInFlight && (autoOpenFromData || autoOpenFromQuery)) {
       setTimeout(open, 250);
     }
   }
