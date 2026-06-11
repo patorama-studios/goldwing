@@ -1,4 +1,6 @@
 <?php
+// DEPLOY_MARKER_2026_06_11_PAY_DRAWER — bump on every push so we can curl
+// the rendered page to confirm whether cPanel actually copied new files.
 require_once __DIR__ . '/../../app/bootstrap.php';
 
 use App\Services\CommitteeService;
@@ -1653,6 +1655,10 @@ $activeSubPage = $page;
 
 require __DIR__ . '/../../app/Views/partials/backend_head.php';
 ?>
+<!-- DEPLOY_MARKER_2026_06_11_PAYDRAWER_R2 — if you can grep for this on
+     the rendered HTML it means cPanel actually copied files. Bump the
+     suffix on every push so a stale opcache vs missing-file question can
+     be answered with one curl. -->
 <div class="flex h-screen overflow-hidden">
   <?php require __DIR__ . '/../../app/Views/partials/backend_member_sidebar.php'; ?>
   <main class="flex-1 overflow-y-auto bg-background-light relative">
