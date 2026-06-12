@@ -2130,7 +2130,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                            reaches them. The switch position is the on/off indicator. -->
                       <label class="relative inline-flex h-6 w-11 cursor-pointer" title="Toggle historic rego flag">
                         <input type="checkbox" name="is_historic" value="1" class="sr-only peer" <?= !empty($member['is_historic']) ? 'checked' : '' ?>>
-                        <span class="absolute inset-0 rounded-full bg-gray-300 peer-checked:bg-amber-500 transition-colors"></span>
+                        <span class="absolute inset-0 rounded-full bg-gray-300 peer-checked:bg-green-500 transition-colors"></span>
                         <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
                       </label>
                       <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-gray-900 text-sm font-semibold">Save</button>

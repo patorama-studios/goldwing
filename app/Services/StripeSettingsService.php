@@ -288,6 +288,15 @@ class StripeSettingsService
             $errors[] = 'Webhook secret must start with whsec_.';
         }
 
+        if (!$useTestMode) {
+            $current = self::getSettings();
+            $effectiveLivePublishable = $livePublishable !== '' ? $livePublishable : (string) ($current['live_publishable_key'] ?? '');
+            $effectiveLiveSecret = $liveSecret !== '' ? $liveSecret : (string) ($current['live_secret_key'] ?? '');
+            if ($effectiveLivePublishable === '' || $effectiveLiveSecret === '') {
+                $errors[] = 'Add the live publishable and secret keys before switching to Live mode.';
+            }
+        }
+
         if ($errors) {
             return;
         }
