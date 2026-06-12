@@ -16,7 +16,7 @@ $sponsors = [
         'name' => 'Hawkesbury Motorcycles',
         'url' => 'https://www.hawkesbury.motorcycles/',
         'image' => '/assets/img/sponsors/hawkesbury-bw.png',
-        'hover_image' => '/assets/img/sponsors/hawkesbury.webp',
+        'hover_image' => '/assets/img/sponsors/hawkesbury.png',
         'alt' => 'Hawkesbury Motorcycles'
     ],
     [
