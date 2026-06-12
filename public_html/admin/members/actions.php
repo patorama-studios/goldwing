@@ -349,6 +349,263 @@ function deleteMemberPermanently(\PDO $pdo, array $user, array $member): bool
     }
 }
 
+/**
+ * Insert a bike row for a member, mirroring the column-detection used by the
+ * `bike_add` action so optional columns (rego/image_url/colour/is_primary) are
+ * only written when they exist. Returns false when make/model are missing.
+ */
+function insertMemberBike(\PDO $pdo, int $memberId, array $data): bool
+{
+    $make = trim((string) ($data['make'] ?? ''));
+    $model = trim((string) ($data['model'] ?? ''));
+    if ($make === '' || $model === '') {
+        return false;
+    }
+    $year = (int) ($data['year'] ?? 0);
+    $rego = trim((string) ($data['rego'] ?? ''));
+    $imageUrl = trim((string) ($data['image_url'] ?? ''));
+    $color = trim((string) ($data['color'] ?? ''));
+
+    $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
+    $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
+    $params = [
+        'member_id' => $memberId,
+        'make' => $make,
+        'model' => $model,
+        'year' => $year ?: null,
+    ];
+    if (memberBikeHasColumn($pdo, 'rego')) {
+        $columns[] = 'rego';
+        $placeholders[] = ':rego';
+        $params['rego'] = $rego !== '' ? $rego : null;
+    }
+    if (memberBikeHasColumn($pdo, 'image_url')) {
+        $columns[] = 'image_url';
+        $placeholders[] = ':image_url';
+        $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
+    }
+    if ($color !== '') {
+        if (memberBikeHasColumn($pdo, 'color')) {
+            $columns[] = 'color';
+            $placeholders[] = ':color';
+            $params['color'] = $color;
+        } elseif (memberBikeHasColumn($pdo, 'colour')) {
+            $columns[] = 'colour';
+            $placeholders[] = ':colour';
+            $params['colour'] = $color;
+        }
+    }
+    if (memberBikeHasColumn($pdo, 'is_primary')) {
+        $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
+        $primaryStmt->execute(['member_id' => $memberId]);
+        if (!$primaryStmt->fetchColumn()) {
+            $columns[] = 'is_primary';
+            $placeholders[] = ':is_primary';
+            $params['is_primary'] = 1;
+        }
+    }
+    $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+    $stmt->execute($params);
+    return true;
+}
+
+/**
+ * Ensure the member has a login account and email them a "set your password"
+ * welcome link (48h). Shared by the `send_welcome_email` action and the new
+ * member wizard. Returns ['success' => bool, 'error' => ?string, 'user_id' => ?int]
+ * instead of redirecting so callers control the flow.
+ */
+function sendWelcomeEmailForMember(\PDO $pdo, array $member, ?array $actor): array
+{
+    $memberId = (int) ($member['id'] ?? 0);
+    if (empty($member['email'])) {
+        return ['success' => false, 'error' => 'Member has no email address on record.'];
+    }
+    $actorUserId = $actor['id'] ?? null;
+    $userId = $member['user_id'] ?? null;
+    if (!$userId) {
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute(['email' => $member['email']]);
+        $existingUser = $stmt->fetch();
+        if ($existingUser) {
+            $userId = (int) $existingUser['id'];
+            $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+            $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
+        } else {
+            $tempPassword = bin2hex(random_bytes(4));
+            $stmt = $pdo->prepare('INSERT INTO users (member_id, name, email, password_hash, is_active, created_at) VALUES (:member_id, :name, :email, :hash, 1, NOW())');
+            $stmt->execute([
+                'member_id' => $memberId,
+                'name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+                'email' => $member['email'],
+                'hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+            ]);
+            $userId = (int) $pdo->lastInsertId();
+            $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
+            $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
+            $stmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT :user_id, id FROM roles WHERE name = "member"');
+            $stmt->execute(['user_id' => $userId]);
+            ActivityLogger::log('admin', $actorUserId, $memberId, 'member.user_account_created', ['user_id' => $userId]);
+        }
+    }
+    if (!$userId) {
+        return ['success' => false, 'error' => 'Could not create a user account for this member.'];
+    }
+    $token = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+    $stmt = $pdo->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at, ip_address) VALUES (:user_id, :token_hash, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW(), :ip)');
+    $stmt->execute([
+        'user_id' => $userId,
+        'token_hash' => $tokenHash,
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+    ]);
+    $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
+    $sent = NotificationService::dispatch('member_set_password', [
+        'primary_email' => $member['email'],
+        'admin_emails' => NotificationService::getAdminEmails(),
+        'reset_link' => NotificationService::escape($link),
+        'first_name' => NotificationService::escape(trim((string) ($member['first_name'] ?? ''))),
+    ]);
+    if (!$sent) {
+        return ['success' => false, 'error' => 'Welcome email could not be sent. Check email settings.', 'user_id' => (int) $userId];
+    }
+    ActivityLogger::log('admin', $actorUserId, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
+    return ['success' => true, 'user_id' => (int) $userId];
+}
+
+/**
+ * Create a membership period + matching manual order for a member, mirroring
+ * the `manual_membership_order` action. Shared by that action and the new
+ * member wizard. Does NOT send any emails (callers do that). Returns a result
+ * array; on failure ['success' => false, 'error' => string].
+ *
+ * $params keys: membership_type_id, cost, payment_method, membership_status
+ * (active|pending|complimentary|lapsed), reference, start_date, renewal_date.
+ * $forceMemberTypeCode overrides the FULL/ASSOCIATE/LIFE code derived from the
+ * membership type name (used by the wizard where the admin picks it directly).
+ */
+function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?array $actor, ?string $forceMemberTypeCode = null): array
+{
+    $membershipTypeId = (int) ($params['membership_type_id'] ?? 0);
+    $costValue = (float) ($params['cost'] ?? 0);
+    $paymentMethod = trim((string) ($params['payment_method'] ?? 'Manual'));
+    if ($paymentMethod === '') {
+        $paymentMethod = 'Manual';
+    }
+    $membershipStatus = trim((string) ($params['membership_status'] ?? 'active'));
+    $orderNotes = trim((string) ($params['reference'] ?? ''));
+    $startDate = trim((string) ($params['start_date'] ?? ''));
+    $renewalDate = trim((string) ($params['renewal_date'] ?? ''));
+    $actorUserId = $actor['id'] ?? null;
+
+    $allowedStatus = ['active', 'pending', 'complimentary', 'lapsed'];
+    if (!in_array($membershipStatus, $allowedStatus, true)) {
+        return ['success' => false, 'error' => 'Invalid membership status.'];
+    }
+
+    $stmt = $pdo->prepare('SELECT id, name FROM membership_types WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $membershipTypeId]);
+    $membershipType = $stmt->fetch();
+    if (!$membershipType) {
+        return ['success' => false, 'error' => 'Invalid membership type selected.'];
+    }
+
+    $memberTypeCode = $forceMemberTypeCode ?: mapMembershipTypeName((string) $membershipType['name']);
+    $memberStatus = match ($membershipStatus) {
+        'pending' => 'PENDING',
+        'lapsed' => 'LAPSED',
+        default => 'ACTIVE',
+    };
+    $periodStatus = match ($membershipStatus) {
+        'pending' => 'PENDING_PAYMENT',
+        'lapsed' => 'LAPSED',
+        default => 'ACTIVE',
+    };
+
+    $startValue = DateTime::createFromFormat('Y-m-d', $startDate);
+    $startDate = $startValue ? $startValue->format('Y-m-d') : date('Y-m-d');
+    $endDate = null;
+    if ($memberTypeCode !== 'LIFE') {
+        $endValue = $renewalDate !== '' ? DateTime::createFromFormat('Y-m-d', $renewalDate) : null;
+        $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, 1);
+    }
+
+    $updateFields = 'member_type = :member_type, status = :status, updated_at = NOW()';
+    $updateParams = [
+        'member_type' => $memberTypeCode,
+        'status' => $memberStatus,
+        'id' => $memberId,
+    ];
+    if (MemberRepository::hasMemberColumn($pdo, 'membership_type_id')) {
+        $updateFields = 'membership_type_id = :membership_type_id, ' . $updateFields;
+        $updateParams['membership_type_id'] = $membershipTypeId;
+    }
+    $stmt = $pdo->prepare('UPDATE members SET ' . $updateFields . ' WHERE id = :id');
+    $stmt->execute($updateParams);
+
+    $term = $memberTypeCode === 'LIFE' ? 'LIFE' : '1Y';
+    $paidAt = ($periodStatus === 'ACTIVE') ? date('Y-m-d H:i:s') : null;
+    $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, paid_at, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, :paid_at, NOW())');
+    $stmt->execute([
+        'member_id' => $memberId,
+        'term' => $term,
+        'start_date' => $startDate,
+        'end_date' => $endDate,
+        'status' => $periodStatus,
+        'paid_at' => $paidAt,
+    ]);
+    $periodId = (int) $pdo->lastInsertId();
+
+    $paymentStatus = match ($membershipStatus) {
+        'pending' => 'pending',
+        'lapsed' => 'failed',
+        default => 'accepted',
+    };
+    $fulfillmentStatus = match ($membershipStatus) {
+        'pending' => 'pending',
+        'lapsed' => 'expired',
+        default => 'active',
+    };
+    $order = MembershipOrderService::createMembershipOrder($memberId, $periodId, max(0, $costValue), [
+        'payment_method' => $paymentMethod,
+        'payment_status' => $paymentStatus,
+        'fulfillment_status' => $fulfillmentStatus,
+        'actor_user_id' => $actorUserId,
+        'term' => $term,
+        'item_name' => ($membershipType['name'] ?? 'Membership') . ' membership',
+        'admin_notes' => $orderNotes !== '' ? $orderNotes : null,
+        'internal_notes' => $orderNotes !== '' ? $orderNotes : null,
+    ]);
+    if (!$order) {
+        return ['success' => false, 'error' => 'Unable to create membership order.'];
+    }
+
+    $orderNumber = (string) ($order['order_number'] ?? '');
+    if ($orderNumber !== '') {
+        $stmt = $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id');
+        $stmt->execute(['payment_id' => $orderNumber, 'id' => $periodId]);
+    }
+
+    ActivityLogger::log('admin', $actorUserId, $memberId, 'membership.manual_order_created', [
+        'membership_type' => $memberTypeCode,
+        'status' => $membershipStatus,
+        'amount' => max(0, $costValue),
+        'order_number' => $orderNumber !== '' ? $orderNumber : null,
+        'actor_roles' => $actor['roles'] ?? [],
+    ]);
+
+    return [
+        'success' => true,
+        'order_number' => $orderNumber,
+        'end_date' => $endDate,
+        'period_id' => $periodId,
+        'membership_type_name' => (string) ($membershipType['name'] ?? 'Member'),
+        'member_type_code' => $memberTypeCode,
+        'membership_status' => $membershipStatus,
+        'payment_method' => $paymentMethod,
+    ];
+}
+
 $action = $_POST['action'] ?? '';
 $jsonActions = ['member_inline_update', 'bulk_member_action', 'associate_search', 'link_associate_member', 'unlink_associate_member'];
 if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
@@ -362,7 +619,7 @@ if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     header('Location: /admin/members');
     exit;
 }
-$requiresMemberContext = !in_array($action, ['member_inline_update', 'bulk_member_action'], true);
+$requiresMemberContext = !in_array($action, ['member_inline_update', 'bulk_member_action', 'create_member'], true);
 $member = null;
 $chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
 
@@ -380,12 +637,235 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'membership_order_refund', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'membership_order_refund', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member', 'create_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
 
 switch ($action) {
+    case 'create_member':
+        // Creating a member requires full member-edit access (the wizard sets
+        // the full profile) AND manual-payment access (it always creates a
+        // membership period + order). Welcome emails additionally need
+        // user-edit access, checked separately below.
+        if (!AdminMemberAccess::isFullAccess($user) || !AdminMemberAccess::canManualOrderFix($user)) {
+            $_SESSION['members_flash'] = ['type' => 'error', 'message' => 'You are not authorized to add members.'];
+            header('Location: /admin/members');
+            exit;
+        }
+        // Area-reps (chapter-restricted) cannot create members from the wizard.
+        if ($chapterRestriction !== null) {
+            $_SESSION['members_flash'] = ['type' => 'error', 'message' => 'Adding members is not available for chapter-restricted accounts.'];
+            header('Location: /admin/members');
+            exit;
+        }
+
+        $pdo = Database::connection();
+        $redirectAddError = static function (string $message): void {
+            $_SESSION['members_flash'] = ['type' => 'error', 'message' => $message];
+            header('Location: /admin/members/add.php');
+            exit;
+        };
+
+        // --- Step 2: contact (required) ---
+        $firstName = trim((string) ($_POST['first_name'] ?? ''));
+        $lastName = trim((string) ($_POST['last_name'] ?? ''));
+        $email = trim((string) ($_POST['email'] ?? ''));
+        if ($firstName === '' || $lastName === '') {
+            $redirectAddError('First name and last name are required.');
+        }
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $redirectAddError('A valid email address is required.');
+        }
+        if (!MemberRepository::isEmailAvailable($email, null)) {
+            $redirectAddError('That email address is already linked to another member.');
+        }
+
+        // --- Step 1: member type + number ---
+        $memberTypeStep = strtoupper(trim((string) ($_POST['member_type'] ?? 'FULL')));
+        if (!in_array($memberTypeStep, ['FULL', 'ASSOCIATE', 'LIFE'], true)) {
+            $memberTypeStep = 'FULL';
+        }
+        $fullMemberId = (int) ($_POST['full_member_id'] ?? 0);
+        $base = 0;
+        $suffix = 0;
+        if ($memberTypeStep === 'ASSOCIATE' && $fullMemberId > 0) {
+            // Associate linked to a full member: reuse the full member's base,
+            // allocate the next free suffix under that base.
+            $stmt = $pdo->prepare('SELECT member_number_base FROM members WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $fullMemberId]);
+            $linkedBase = $stmt->fetchColumn();
+            if ($linkedBase === false) {
+                $redirectAddError('The selected full member could not be found.');
+            }
+            $base = (int) $linkedBase;
+            $stmt = $pdo->prepare('SELECT COALESCE(MAX(member_number_suffix), 0) + 1 FROM members WHERE member_number_base = :base');
+            $stmt->execute(['base' => $base]);
+            $suffix = (int) $stmt->fetchColumn();
+        } else {
+            // Full / Life / unlinked associate: own base number, suffix 0.
+            $fullMemberId = 0;
+            $inputBase = trim((string) ($_POST['member_number_base'] ?? ''));
+            if ($inputBase !== '' && ctype_digit($inputBase)) {
+                $base = (int) $inputBase;
+            } else {
+                $memberNumberStart = (int) SettingsService::getGlobal('membership.member_number_start', 1000);
+                $maxBase = (int) $pdo->query('SELECT MAX(member_number_base) FROM members')->fetchColumn();
+                $base = max($maxBase, max($memberNumberStart, 1) - 1) + 1;
+            }
+            $suffix = 0;
+        }
+        if ($base <= 0) {
+            $redirectAddError('A valid member number is required.');
+        }
+        $stmt = $pdo->prepare('SELECT id FROM members WHERE member_number_base = :base AND member_number_suffix = :suffix LIMIT 1');
+        $stmt->execute(['base' => $base, 'suffix' => $suffix]);
+        if ($stmt->fetchColumn()) {
+            $redirectAddError('Member number ' . MembershipService::displayMembershipNumber($base, $suffix) . ' is already in use.');
+        }
+
+        $chapterId = isset($_POST['chapter_id']) && $_POST['chapter_id'] !== '' ? (int) $_POST['chapter_id'] : null;
+
+        // --- Minimal INSERT (required columns); optional fields filled via
+        // MemberRepository::update() which handles all the column mapping. ---
+        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, created_at) VALUES (:member_type, :status, :base, :suffix, :full_member_id, :chapter_id, :first_name, :last_name, :email, NOW())');
+        $stmt->execute([
+            'member_type' => $memberTypeStep,
+            'status' => 'PENDING',
+            'base' => $base,
+            'suffix' => $suffix,
+            'full_member_id' => $fullMemberId > 0 ? $fullMemberId : null,
+            'chapter_id' => $chapterId,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+        ]);
+        $newMemberId = (int) $pdo->lastInsertId();
+        if ($newMemberId <= 0) {
+            $redirectAddError('Failed to create the member record.');
+        }
+
+        // --- Steps 3 & 4: address + preferences (reuses existing field mapping) ---
+        $profilePayload = [
+            'phone' => trim((string) ($_POST['phone'] ?? '')),
+            'address_line1' => trim((string) ($_POST['address_line1'] ?? '')),
+            'address_line2' => trim((string) ($_POST['address_line2'] ?? '')),
+            'suburb' => trim((string) ($_POST['suburb'] ?? '')),
+            'state' => trim((string) ($_POST['state'] ?? '')),
+            'postcode' => trim((string) ($_POST['postcode'] ?? '')),
+            'country' => trim((string) ($_POST['country'] ?? '')),
+            'notes' => trim((string) ($_POST['notes'] ?? '')),
+        ];
+        $wp = strtolower(trim((string) ($_POST['wings_preference'] ?? 'digital')));
+        if (in_array($wp, ['digital', 'print', 'both'], true)) {
+            $profilePayload['wings_preference'] = $wp;
+        }
+        $pl = strtoupper(trim((string) ($_POST['privacy_level'] ?? 'A')));
+        if (in_array($pl, ['A', 'B', 'C', 'D', 'E', 'F'], true)) {
+            $profilePayload['privacy_level'] = $pl;
+        }
+        foreach (MemberRepository::directoryPreferences() as $letter => $info) {
+            $profilePayload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
+        }
+        MemberRepository::update($newMemberId, $profilePayload);
+
+        // --- Step 5: bike(s) (optional) ---
+        $bikesInput = $_POST['bikes'] ?? [];
+        $bikesAdded = 0;
+        if (is_array($bikesInput)) {
+            foreach ($bikesInput as $bikeRow) {
+                if (!is_array($bikeRow)) {
+                    continue;
+                }
+                if (insertMemberBike($pdo, $newMemberId, [
+                    'make' => $bikeRow['make'] ?? '',
+                    'model' => $bikeRow['model'] ?? '',
+                    'year' => $bikeRow['year'] ?? 0,
+                    'rego' => $bikeRow['rego'] ?? '',
+                    'color' => $bikeRow['color'] ?? '',
+                ])) {
+                    $bikesAdded++;
+                }
+            }
+        }
+
+        // --- Step 6: membership + expiry + order (always created) ---
+        $membershipResult = createMembershipForMember($pdo, $newMemberId, [
+            'membership_type_id' => $_POST['membership_type_id'] ?? 0,
+            'cost' => $_POST['membership_cost'] ?? 0,
+            'payment_method' => $_POST['payment_method'] ?? 'Manual',
+            'membership_status' => $_POST['membership_status'] ?? 'active',
+            'reference' => $_POST['order_reference'] ?? '',
+            'start_date' => $_POST['start_date'] ?? '',
+            'renewal_date' => $_POST['renewal_date'] ?? '',
+        ], $user, $memberTypeStep);
+        if (!$membershipResult['success']) {
+            // Member row exists but membership failed — surface on the profile so
+            // the admin can finish setting up the membership manually.
+            redirectWithFlash($newMemberId, 'overview', 'Member created, but the membership could not be set up: ' . ($membershipResult['error'] ?? 'unknown error') . ' Please add it from the Orders tab.', 'error');
+        }
+
+        // Reload the full member record for email dispatch (name/email/user_id).
+        $newMember = MemberRepository::findById($newMemberId) ?? [
+            'id' => $newMemberId,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'user_id' => null,
+        ];
+
+        // --- Step 7: finish actions (emails) ---
+        $finishActions = $_POST['finish_actions'] ?? [];
+        if (!is_array($finishActions)) {
+            $finishActions = [$finishActions];
+        }
+        $sendWelcome = in_array('welcome', $finishActions, true);
+        $sendPayment = in_array('payment', $finishActions, true);
+
+        $emailNotes = [];
+        if ($sendWelcome) {
+            if (!AdminMemberAccess::canResetPassword($user)) {
+                $emailNotes[] = 'welcome email skipped (not permitted)';
+            } else {
+                $welcomeResult = sendWelcomeEmailForMember($pdo, $newMember, $user);
+                $emailNotes[] = $welcomeResult['success'] ? 'welcome email sent' : 'welcome email failed (' . ($welcomeResult['error'] ?? 'unknown') . ')';
+            }
+        }
+        if ($sendPayment && $membershipResult['membership_status'] === 'pending' && !empty($newMember['email'])) {
+            $paymentLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+            $bankInstructions = (string) SettingsService::getGlobal('payments.bank_transfer_instructions', '');
+            $paymentSent = NotificationService::dispatch('membership_order_created', [
+                'primary_email' => $newMember['email'],
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'member_name' => trim(($newMember['first_name'] ?? '') . ' ' . ($newMember['last_name'] ?? '')),
+                'order_number' => $membershipResult['order_number'] !== '' ? $membershipResult['order_number'] : '',
+                'payment_link' => NotificationService::escape($paymentLink),
+                'payment_method' => $membershipResult['payment_method'],
+                'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+            ]);
+            $emailNotes[] = $paymentSent ? 'payment email sent' : 'payment email failed';
+        } elseif ($sendPayment && $membershipResult['membership_status'] !== 'pending') {
+            $emailNotes[] = 'payment email skipped (membership not pending)';
+        }
+
+        ActivityLogger::log('admin', $user['id'] ?? null, $newMemberId, 'member.created', [
+            'member_type' => $memberTypeStep,
+            'member_number' => MembershipService::displayMembershipNumber($base, $suffix),
+            'membership_status' => $membershipResult['membership_status'],
+            'finish_actions' => $finishActions,
+            'actor_roles' => $user['roles'] ?? [],
+        ]);
+
+        $summary = 'Member ' . trim($firstName . ' ' . $lastName) . ' (#' . MembershipService::displayMembershipNumber($base, $suffix) . ') created.';
+        if ($bikesAdded > 0) {
+            $summary .= ' ' . $bikesAdded . ' bike' . ($bikesAdded === 1 ? '' : 's') . ' added.';
+        }
+        if ($emailNotes !== []) {
+            $summary .= ' ' . ucfirst(implode('; ', $emailNotes)) . '.';
+        }
+        redirectWithFlash($newMemberId, 'overview', $summary);
+        break;
+
     case 'impersonate_member':
         if (!AdminMemberAccess::canImpersonate($user)) {
             redirectWithFlash($memberId, $tab, 'You are not authorized to impersonate members.', 'error');
@@ -1061,58 +1541,18 @@ switch ($action) {
         if (!AdminMemberAccess::canManageVehicles($user)) {
             redirectWithFlash($memberId, $tab, 'Bike management not permitted.', 'error');
         }
-        $make = trim($_POST['bike_make'] ?? '');
-        $model = trim($_POST['bike_model'] ?? '');
-        $year = (int) ($_POST['bike_year'] ?? 0);
-        $rego = trim($_POST['bike_rego'] ?? '');
-        $imageUrl = trim($_POST['bike_image_url'] ?? '');
-        $color = trim($_POST['bike_color'] ?? '');
-        if ($make === '' || $model === '') {
+        $pdo = Database::connection();
+        $bikeAdded = insertMemberBike($pdo, $memberId, [
+            'make' => $_POST['bike_make'] ?? '',
+            'model' => $_POST['bike_model'] ?? '',
+            'year' => $_POST['bike_year'] ?? 0,
+            'rego' => $_POST['bike_rego'] ?? '',
+            'image_url' => $_POST['bike_image_url'] ?? '',
+            'color' => $_POST['bike_color'] ?? '',
+        ]);
+        if (!$bikeAdded) {
             redirectWithFlash($memberId, $tab, 'Make and model are required.', 'error');
         }
-        $pdo = Database::connection();
-        $columns = ['member_id', 'make', 'model', 'year', 'created_at'];
-        $placeholders = [':member_id', ':make', ':model', ':year', 'NOW()'];
-        $params = [
-            'member_id' => $memberId,
-            'make' => $make,
-            'model' => $model,
-            'year' => $year ?: null,
-        ];
-        $hasPrimary = memberBikeHasColumn($pdo, 'is_primary');
-        if (memberBikeHasColumn($pdo, 'rego')) {
-            $columns[] = 'rego';
-            $placeholders[] = ':rego';
-            $params['rego'] = $rego !== '' ? $rego : null;
-        }
-        if (memberBikeHasColumn($pdo, 'image_url')) {
-            $columns[] = 'image_url';
-            $placeholders[] = ':image_url';
-            $params['image_url'] = $imageUrl !== '' ? $imageUrl : null;
-        }
-        if ($color !== '') {
-            if (memberBikeHasColumn($pdo, 'color')) {
-                $columns[] = 'color';
-                $placeholders[] = ':color';
-                $params['color'] = $color;
-            } elseif (memberBikeHasColumn($pdo, 'colour')) {
-                $columns[] = 'colour';
-                $placeholders[] = ':colour';
-                $params['colour'] = $color;
-            }
-        }
-        if ($hasPrimary) {
-            $primaryStmt = $pdo->prepare('SELECT 1 FROM member_bikes WHERE member_id = :member_id AND is_primary = 1 LIMIT 1');
-            $primaryStmt->execute(['member_id' => $memberId]);
-            $primaryExists = (bool) $primaryStmt->fetchColumn();
-            if (!$primaryExists) {
-                $columns[] = 'is_primary';
-                $placeholders[] = ':is_primary';
-                $params['is_primary'] = 1;
-            }
-        }
-        $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
-        $stmt->execute($params);
         redirectWithFlash($memberId, $tab, 'Bike added.');
         break;
 
@@ -1298,121 +1738,28 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Manual membership orders are restricted.', 'error');
         }
         $pdo = Database::connection();
-        $membershipTypeId = (int) ($_POST['manual_membership_type_id'] ?? 0);
-        $costValue = (float) ($_POST['manual_membership_cost'] ?? 0);
-        $paymentMethod = trim($_POST['manual_payment_method'] ?? 'Manual');
-        $membershipStatus = trim($_POST['manual_membership_status'] ?? 'active');
-        $orderNotes = trim($_POST['manual_order_reference'] ?? '');
-        $startDate = trim($_POST['manual_start_date'] ?? '');
-        $renewalDate = trim($_POST['manual_renewal_date'] ?? '');
-
-        $allowedStatus = ['active', 'pending', 'complimentary', 'lapsed'];
-        if (!in_array($membershipStatus, $allowedStatus, true)) {
-            redirectWithFlash($memberId, $tab, 'Invalid membership status.', 'error');
+        $membershipResult = createMembershipForMember($pdo, $memberId, [
+            'membership_type_id' => $_POST['manual_membership_type_id'] ?? 0,
+            'cost' => $_POST['manual_membership_cost'] ?? 0,
+            'payment_method' => $_POST['manual_payment_method'] ?? 'Manual',
+            'membership_status' => $_POST['manual_membership_status'] ?? 'active',
+            'reference' => $_POST['manual_order_reference'] ?? '',
+            'start_date' => $_POST['manual_start_date'] ?? '',
+            'renewal_date' => $_POST['manual_renewal_date'] ?? '',
+        ], $user);
+        if (!$membershipResult['success']) {
+            redirectWithFlash($memberId, $tab, $membershipResult['error'] ?? 'Unable to create membership order.', 'error');
         }
 
-        $stmt = $pdo->prepare('SELECT id, name FROM membership_types WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $membershipTypeId]);
-        $membershipType = $stmt->fetch();
-        if (!$membershipType) {
-            redirectWithFlash($memberId, $tab, 'Invalid membership type selected.', 'error');
-        }
-
-        $memberTypeCode = mapMembershipTypeName((string) $membershipType['name']);
-        $memberStatus = match ($membershipStatus) {
-            'pending' => 'PENDING',
-            'lapsed' => 'LAPSED',
-            default => 'ACTIVE',
-        };
-        $periodStatus = match ($membershipStatus) {
-            'pending' => 'PENDING_PAYMENT',
-            'lapsed' => 'LAPSED',
-            default => 'ACTIVE',
-        };
-
-        $startValue = DateTime::createFromFormat('Y-m-d', $startDate);
-        $startDate = $startValue ? $startValue->format('Y-m-d') : date('Y-m-d');
-        $endDate = null;
-        if ($memberTypeCode !== 'LIFE') {
-            $endValue = $renewalDate !== '' ? DateTime::createFromFormat('Y-m-d', $renewalDate) : null;
-            $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, 1);
-        }
-
-        $updateFields = 'member_type = :member_type, status = :status, updated_at = NOW()';
-        $updateParams = [
-            'member_type' => $memberTypeCode,
-            'status' => $memberStatus,
-            'id' => $memberId,
-        ];
-
-        if (MemberRepository::hasMemberColumn($pdo, 'membership_type_id')) {
-            $updateFields = 'membership_type_id = :membership_type_id, ' . $updateFields;
-            $updateParams['membership_type_id'] = $membershipTypeId;
-        }
-
-        $stmt = $pdo->prepare('UPDATE members SET ' . $updateFields . ' WHERE id = :id');
-        $stmt->execute($updateParams);
-
-        $term = $memberTypeCode === 'LIFE' ? 'LIFE' : '1Y';
-        $paidAt = ($periodStatus === 'ACTIVE') ? date('Y-m-d H:i:s') : null;
-        $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, paid_at, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, :paid_at, NOW())');
-        $stmt->execute([
-            'member_id' => $memberId,
-            'term' => $term,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'status' => $periodStatus,
-            'paid_at' => $paidAt,
-        ]);
-        $periodId = (int) $pdo->lastInsertId();
-
-        $paymentStatus = match ($membershipStatus) {
-            'pending' => 'pending',
-            'lapsed' => 'failed',
-            default => 'accepted',
-        };
-        $fulfillmentStatus = match ($membershipStatus) {
-            'pending' => 'pending',
-            'lapsed' => 'expired',
-            default => 'active',
-        };
-        $order = MembershipOrderService::createMembershipOrder($memberId, $periodId, max(0, $costValue), [
-            'payment_method' => $paymentMethod,
-            'payment_status' => $paymentStatus,
-            'fulfillment_status' => $fulfillmentStatus,
-            'actor_user_id' => $user['id'] ?? null,
-            'term' => $term,
-            'item_name' => ($membershipType['name'] ?? 'Membership') . ' membership',
-            'admin_notes' => $orderNotes !== '' ? $orderNotes : null,
-            'internal_notes' => $orderNotes !== '' ? $orderNotes : null,
-        ]);
-        if (!$order) {
-            redirectWithFlash($memberId, $tab, 'Unable to create membership order.', 'error');
-        }
-
-        $orderNumber = (string) ($order['order_number'] ?? '');
-        if ($orderNumber !== '') {
-            $stmt = $pdo->prepare('UPDATE membership_periods SET payment_id = :payment_id WHERE id = :id');
-            $stmt->execute([
-                'payment_id' => $orderNumber,
-                'id' => $periodId,
-            ]);
-        }
-
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.manual_order_created', [
-            'membership_type' => $memberTypeCode,
-            'status' => $membershipStatus,
-            'amount' => max(0, $costValue),
-            'order_number' => $orderNumber !== '' ? $orderNumber : null,
-            'actor_roles' => $user['roles'] ?? [],
-        ]);
-
+        $endDate = $membershipResult['end_date'];
+        $orderNumber = $membershipResult['order_number'];
+        $membershipStatus = $membershipResult['membership_status'];
         if ($membershipStatus === 'active' || $membershipStatus === 'complimentary') {
             NotificationService::dispatch('membership_activated_confirmation', [
                 'primary_email' => $member['email'] ?? '',
                 'admin_emails' => NotificationService::getAdminEmails(),
                 'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
-                'membership_type' => $membershipType['name'] ?? 'Member',
+                'membership_type' => $membershipResult['membership_type_name'],
                 'renewal_date' => $endDate ?: 'N/A',
             ]);
         } elseif ($membershipStatus === 'pending' && !empty($member['email'])) {
@@ -1424,7 +1771,7 @@ switch ($action) {
                 'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
                 'order_number' => $orderNumber !== '' ? $orderNumber : '',
                 'payment_link' => NotificationService::escape($paymentLink),
-                'payment_method' => $paymentMethod,
+                'payment_method' => $membershipResult['payment_method'],
                 'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
             ]);
         }
@@ -2135,60 +2482,14 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Password reset links are restricted.', 'error', $flashContext);
         }
         $pdo = Database::connection();
-        if (empty($member['email'])) {
-            redirectWithFlash($memberId, $tab, 'Member has no email address on record.', 'error', $flashContext);
-        }
-        $userId = $member['user_id'] ?? null;
-        // If no user account exists yet (e.g. pre-loaded/imported member), create one now
-        if (!$userId) {
-            $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
-            $stmt->execute(['email' => $member['email']]);
-            $existingUser = $stmt->fetch();
-            if ($existingUser) {
-                $userId = (int) $existingUser['id'];
-                $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
-                $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
-            } else {
-                $tempPassword = bin2hex(random_bytes(4));
-                $stmt = $pdo->prepare('INSERT INTO users (member_id, name, email, password_hash, is_active, created_at) VALUES (:member_id, :name, :email, :hash, 1, NOW())');
-                $stmt->execute([
-                    'member_id' => $memberId,
-                    'name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
-                    'email' => $member['email'],
-                    'hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
-                ]);
-                $userId = (int) $pdo->lastInsertId();
-                $stmt = $pdo->prepare('UPDATE members SET user_id = :user_id WHERE id = :member_id');
-                $stmt->execute(['user_id' => $userId, 'member_id' => $memberId]);
-                $stmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT :user_id, id FROM roles WHERE name = "member"');
-                $stmt->execute(['user_id' => $userId]);
-                ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.user_account_created', ['user_id' => $userId]);
+        $welcomeResult = sendWelcomeEmailForMember($pdo, $member, $user);
+        if (!$welcomeResult['success']) {
+            if (($welcomeResult['error'] ?? '') === 'Welcome email could not be sent. Check email settings.') {
+                LogViewerService::write('[Admin] Welcome email not sent for member #' . $memberId . '.');
+                error_log('[Admin] Welcome email not sent for member #' . $memberId . '.');
             }
+            redirectWithFlash($memberId, $tab, $welcomeResult['error'] ?? 'Welcome email could not be sent.', 'error', $flashContext);
         }
-        if (!$userId) {
-            redirectWithFlash($memberId, $tab, 'Could not create a user account for this member.', 'error', $flashContext);
-        }
-        $token = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $token);
-        $stmt = $pdo->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at, ip_address) VALUES (:user_id, :token_hash, DATE_ADD(NOW(), INTERVAL 48 HOUR), NOW(), :ip)');
-        $stmt->execute([
-            'user_id' => $userId,
-            'token_hash' => $tokenHash,
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
-        ]);
-        $link = BaseUrlService::emailLink('/member/reset_password_confirm.php?token=' . urlencode($token));
-        $sent = NotificationService::dispatch('member_set_password', [
-            'primary_email' => $member['email'],
-            'admin_emails' => NotificationService::getAdminEmails(),
-            'reset_link' => NotificationService::escape($link),
-            'first_name' => NotificationService::escape(trim((string) ($member['first_name'] ?? ''))),
-        ]);
-        if (!$sent) {
-            LogViewerService::write('[Admin] Welcome email not sent for member #' . $memberId . '.');
-            error_log('[Admin] Welcome email not sent for member #' . $memberId . '.');
-            redirectWithFlash($memberId, $tab, 'Welcome email could not be sent. Check email settings.', 'error', $flashContext);
-        }
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.welcome_email_sent', ['user_id' => $userId]);
         LogViewerService::write('[Admin] Welcome email sent for member #' . $memberId . '.');
         redirectWithFlash($memberId, $tab, 'Welcome email sent.', 'success', $flashContext);
         break;

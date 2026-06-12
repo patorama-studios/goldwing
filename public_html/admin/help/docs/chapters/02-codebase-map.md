@@ -186,7 +186,7 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | `index.php` | Dashboard — section-switcher by `?section=`. |
 | `navigation.php` | Menu builder UI. |
 | `ai_editor.php` | AI page-builder entry. |
-| `members/` | List/view/actions, import, export, `merge_suburbs.php`, `backfill_member_baseline.php`. |
+| `members/` | List/view/actions, `add.php` (add-member wizard), import, export, `merge_suburbs.php`, `backfill_member_baseline.php`. |
 | `store/` | Products, `product_form.php`, categories, tags, discounts, orders, low-stock, import, merge, settings. |
 | `settings/` | Settings Hub (`index.php` by `?section=`), `roles.php`, `access-control.php`, `ai.php`, `*-save.php` handlers. |
 | `security/` | `activity_log.php` (302 redirect into the Audit Hub). |

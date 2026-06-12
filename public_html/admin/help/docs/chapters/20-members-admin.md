@@ -61,6 +61,25 @@ When you click into a member from a filtered list, the **Member Profile** back-a
 
 **Bulk actions** — tick multiple rows and you can: assign chapter, change status, enable 2FA, send a password reset link, send the welcome email, archive, or delete. Delete asks you to type `CONFIRM` because it can't be undone.
 
+### Adding a member (the wizard)
+
+The **Add Member** button (top-right of the list, full admins only) opens a step-by-step wizard that sets up one member from scratch — details, membership, expiry, and the first email, all in one go. It's the single-member counterpart to CSV import.
+
+The steps are:
+
+1. **Type & number** — Full / Associate / Life, chapter, and the membership number (the next free number is suggested; override if you need to). For an **Associate**, you can link them to an existing **Full** member — they then share that member's base number and get the next free suffix automatically (e.g. `1234.2`). Leave the link blank to give the associate their own number.
+2. **Contact** — first name, last name, email (all required), phone.
+3. **Address** — all optional.
+4. **Preferences** — Wings delivery, privacy level, and the A–F directory / assistance flags.
+5. **Bikes** — optionally add one or more Goldwings (make / model / year / rego / colour). Empty rows are ignored.
+6. **Membership & expiry** — pick the membership plan and status (**Active (paid)**, **Pending payment**, **Complimentary**, or **Lapsed**), the start date, and the renewal/expiry date. The expiry auto-fills using the **31 July** anchor (roll to next year if joining in August or later) and stays editable. Amount paid prefills from the plan price. This creates the membership period **and** a matching manual order — exactly like the "Manual membership order" tool on the Orders tab.
+7. **Finish** — the member and membership are always created; the checkboxes choose what to send:
+   - **Send welcome email** — creates a login and emails a "set your password" link. (Needs the same permission as a password reset.)
+   - **Send payment email** — emails a payment link. Only actually sends when the membership status is **Pending payment**.
+   - **Set up renewal reminders** — uses the renewal date so the nightly cron auto-sends reminders 60 & 30 days before expiry. (No extra step is needed beyond having an expiry date.)
+
+On submit you land on the new member's Overview with a confirmation of what was created and which emails went out.
+
 ### A member's detail page
 
 Click a member's name to open their detail page. It's a tabbed view. Here's what's on each tab.
@@ -111,6 +130,7 @@ This is the audit trail for that one person. If you ever need to answer "who cha
 {{tour:admin-find-edit-member}}
 {{tour:admin-make-life-member}}
 
+- **Add a new member from scratch** — Members list → **Add Member** (top right) → walk the wizard. See "Adding a member (the wizard)" above.
 - **Reset a password** — open the member → Settings tab (or Overview) → **Send reset link**. They get an email. If you need to bypass that — e.g. they've lost access to their email — use **Set password** to give them a temporary one and tell them in person.
 - **Make someone a Life Member** — open the member → Orders tab → scroll to **Manual membership order** → set type to **Life**, cost as appropriate, save. The walkthrough above will take you through it.
 - **Update contact details** — Profile tab → edit the fields → Save. The activity log records what changed.
@@ -223,9 +243,29 @@ Edit controls render conditionally on the relevant `AdminMemberAccess::can*` che
 
 #### Actions dispatcher — `/admin/members/actions.php`
 
-One ~2,300-line file with a giant `switch ($action)` handling every state-changing operation. Monolithic on purpose: every action shares the same prologue — parse `$_POST`, verify CSRF, load the member, check `AdminMemberAccess`, optionally `require_stepup()`, log to `activity_log`, redirect with flash. Splitting into 40 endpoints would multiply boilerplate and audit surface. Cases include `save_profile`, `change_status`, `member_archive`, `member_delete`, `send_reset_link`, `set_password`, `refund_submit`, `manual_order_fix`, `order_resync`, `twofa_force` / `_exempt` / `_reset`, `bike_*`, `manual_membership_order`, `impersonate_member`, and ~30 more.
+One large file with a giant `switch ($action)` handling every state-changing operation. Monolithic on purpose: every action shares the same prologue — parse `$_POST`, verify CSRF, load the member, check `AdminMemberAccess`, optionally `require_stepup()`, log to `activity_log`, redirect with flash. Splitting into 40 endpoints would multiply boilerplate and audit surface. Cases include `save_profile`, `change_status`, `member_archive`, `member_delete`, `send_reset_link`, `set_password`, `refund_submit`, `manual_order_fix`, `order_resync`, `twofa_force` / `_exempt` / `_reset`, `bike_*`, `manual_membership_order`, `create_member`, `impersonate_member`, and ~30 more.
 
-A `$sensitiveActions` array at the top lists every verb that triggers `require_stepup()` — basically anything that mutates state.
+A `$sensitiveActions` array at the top lists every verb that triggers `require_stepup()` — basically anything that mutates state. Most actions also assume a loaded member (`$requiresMemberContext`); the exceptions that run before a member exists are `member_inline_update`, `bulk_member_action`, and `create_member`.
+
+Three reusable helpers near the top of the file back both the per-member actions and the add-member wizard, so the two paths can't drift:
+
+- `insertMemberBike($pdo, $memberId, $data)` — column-detected bike INSERT (used by `bike_add` and the wizard's bike step).
+- `sendWelcomeEmailForMember($pdo, $member, $actor)` — ensures a login exists and emails the set-password link; returns `['success', 'error', 'user_id']` instead of redirecting (used by `send_welcome_email` and the wizard).
+- `createMembershipForMember($pdo, $memberId, $params, $actor, $forceMemberTypeCode = null)` — creates the membership period + manual order and returns the result; does **not** send emails (callers do). Used by `manual_membership_order` and the wizard. `$forceMemberTypeCode` lets the wizard keep the admin-chosen FULL/ASSOCIATE/LIFE instead of deriving it from the plan name.
+
+#### Add-member wizard — `/admin/members/add.php` + `create_member`
+
+`add.php` is a single page with seven client-side steps (vanilla JS, one final POST) — gated on `isFullAccess` **and** `canManualOrderFix`, and blocked for chapter-restricted accounts. It posts `action=create_member`, which:
+
+1. Validates name/email (`MemberRepository::isEmailAvailable`).
+2. Resolves the member number — Full/Life/unlinked-associate get their own base (suggested = `MAX(member_number_base)+1` honouring `membership.member_number_start`, overridable); a linked associate reuses the parent's base + `MAX(suffix)+1`. Duplicates are rejected.
+3. Minimal `INSERT` of the required columns, then `MemberRepository::update()` for all the optional profile fields (address, suburb→city, directory prefs, etc.) so the field mapping isn't duplicated.
+4. Optional bikes via `insertMemberBike`.
+5. Membership + order via `createMembershipForMember` (always created).
+6. Emails per the `finish_actions[]` checkboxes — `welcome` (→ `sendWelcomeEmailForMember`, needs `canResetPassword`) and `payment` (→ `membership_order_created`, only when status is pending). `renewal` is a no-op beyond having an expiry date the renewal-reminder cron picks up.
+7. Logs `member.created` and redirects to the new member's Overview.
+
+The JS mirrors `MembershipService::calculateExpiry` (31 July anchor) to auto-fill the renewal date, prefills cost from the plan's `price_cents`, and filters the full-member link list client-side.
 
 #### Impersonation — "Become this member"
 

@@ -360,6 +360,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <?php endif; ?>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <?php if ($chapterRestriction === null && AdminMemberAccess::isFullAccess($user) && AdminMemberAccess::canManualOrderFix($user)): ?>
+            <a class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-strong" href="/admin/members/add.php">
+              <span class="material-icons-outlined text-sm">person_add</span>
+              Add Member
+            </a>
+            <?php endif; ?>
             <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/export.php?<?= e(buildQuery()) ?>">
               <span class="material-icons-outlined text-sm">download</span>
               Export CSV
