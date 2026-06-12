@@ -14,8 +14,9 @@ $sponsors = [
     ],
     [
         'name' => 'Hawkesbury Motorcycles',
-        'url' => 'http://www.hawkesburymotorcycles.com.au/',
-        'image' => '/assets/img/sponsors/hawkesbury.png',
+        'url' => 'https://www.hawkesbury.motorcycles/',
+        'image' => '/assets/img/sponsors/hawkesbury-bw.png',
+        'hover_image' => '/assets/img/sponsors/hawkesbury.webp',
         'alt' => 'Hawkesbury Motorcycles'
     ],
     [
@@ -33,8 +34,12 @@ $sponsors = [
         
         <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4rem;">
             <?php foreach ($sponsors as $sponsor): ?>
-                <a href="<?= e($sponsor['url']) ?>" target="_blank" rel="noopener noreferrer" style="display: block; transition: transform 0.3s ease, filter 0.3s ease; filter: grayscale(100%) opacity(0.8);">
-                    <img src="<?= e($sponsor['image']) ?>" alt="<?= e($sponsor['alt']) ?>" style="max-height: 80px; max-width: 250px; width: auto; object-fit: contain;">
+                <?php $hasSwap = !empty($sponsor['hover_image']); ?>
+                <a href="<?= e($sponsor['url']) ?>" target="_blank" rel="noopener noreferrer" class="sponsor-link<?= $hasSwap ? ' sponsor-link--swap' : '' ?>">
+                    <img class="sponsor-img sponsor-img--default" src="<?= e($sponsor['image']) ?>" alt="<?= e($sponsor['alt']) ?>">
+                    <?php if ($hasSwap): ?>
+                        <img class="sponsor-img sponsor-img--hover" src="<?= e($sponsor['hover_image']) ?>" alt="" aria-hidden="true">
+                    <?php endif; ?>
                 </a>
             <?php endforeach; ?>
         </div>
@@ -47,8 +52,39 @@ main > .page-section {
     position: relative;
     z-index: 10;
 }
-.sponsors-section a:hover {
+.sponsors-section .sponsor-link {
+    display: block;
+    transition: transform 0.3s ease, filter 0.3s ease;
+    filter: grayscale(100%) opacity(0.8);
+}
+.sponsors-section .sponsor-link:hover {
     transform: scale(1.05);
-    filter: grayscale(0%) opacity(1) drop-shadow(0 0 15px rgba(212, 175, 55, 0.2)) !important;
+    filter: grayscale(0%) opacity(1) drop-shadow(0 0 15px rgba(212, 175, 55, 0.2));
+}
+.sponsors-section .sponsor-img {
+    max-height: 80px;
+    max-width: 250px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+}
+/* Sponsors that supply a separate full-colour hover image (e.g. logos with a
+   coloured background) — stack the two images and cross-fade on hover. */
+.sponsors-section .sponsor-link--swap {
+    position: relative;
+    filter: none;
+}
+.sponsors-section .sponsor-link--swap:hover {
+    filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.2));
+}
+.sponsors-section .sponsor-link--swap .sponsor-img--hover {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.sponsors-section .sponsor-link--swap:hover .sponsor-img--hover {
+    opacity: 1;
 }
 </style>
