@@ -48,7 +48,7 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
     'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
-    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both'], true) ? $_GET['wings_preference'] : '',
+    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both', 'printed'], true) ? $_GET['wings_preference'] : '',
 ];
 
 $sortOptions = [
@@ -370,6 +370,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined text-sm">download</span>
               Export CSV
             </a>
+            <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/export.php?wings_preference=printed" title="Members who need a physical copy posted (includes postal address columns)">
+              <span class="material-icons-outlined text-sm">local_post_office</span>
+              Printed mailing list
+            </a>
             <details class="relative">
               <summary class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300 cursor-pointer">
                 <span class="material-icons-outlined text-sm">upload</span>
@@ -536,12 +540,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
-                Wings preference
+                Wings magazine
                 <select name="wings_preference" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
-                  <option value="" <?= $filters['wings_preference'] === '' ? 'selected' : '' ?>>All</option>
-                  <option value="digital" <?= $filters['wings_preference'] === 'digital' ? 'selected' : '' ?>>Digital only</option>
-                  <option value="print" <?= $filters['wings_preference'] === 'print' ? 'selected' : '' ?>>Print only</option>
-                  <option value="both" <?= $filters['wings_preference'] === 'both' ? 'selected' : '' ?>>Both</option>
+                  <option value="" <?= $filters['wings_preference'] === '' ? 'selected' : '' ?>>All (everyone gets the email PDF)</option>
+                  <option value="printed" <?= $filters['wings_preference'] === 'printed' ? 'selected' : '' ?>>Needs a printed copy</option>
+                  <option value="digital" <?= $filters['wings_preference'] === 'digital' ? 'selected' : '' ?>>Email PDF only</option>
                 </select>
               </label>
             </div>

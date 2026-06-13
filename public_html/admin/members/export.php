@@ -33,7 +33,7 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
     'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
-    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both'], true) ? $_GET['wings_preference'] : '',
+    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both', 'printed'], true) ? $_GET['wings_preference'] : '',
 ];
 if (isset($_GET['sort_by'])) {
     $filters['sort_by'] = $_GET['sort_by'];
@@ -69,7 +69,7 @@ SecurityAlertService::send('member_export', 'Security alert: member export', '<p
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="members.csv"');
 $out = fopen('php://output', 'w');
-fputcsv($out, ['Member #', 'Name', 'Email', 'Phone', 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences']);
+fputcsv($out, ['Member #', 'Name', 'Email', 'Phone', 'Address 1', 'Address 2', 'Suburb', 'State', 'Postcode', 'Country', 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences']);
 
 foreach ($members as $member) {
     $prefs = [];
@@ -83,6 +83,12 @@ foreach ($members as $member) {
         ($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''),
         $member['email'] ?? '',
         $member['phone'] ?? '',
+        $member['address_line1'] ?? '',
+        $member['address_line2'] ?? '',
+        $member['city'] ?? '',
+        $member['state'] ?? '',
+        $member['postal_code'] ?? '',
+        $member['country'] ?? '',
         $member['chapter_name'] ?? '',
         $member['membership_type_name'] ?? '',
         ucfirst($member['status'] ?? ''),

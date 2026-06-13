@@ -747,9 +747,13 @@ class MemberRepository
         }
 
         // Wings magazine preference (members.wings_preference). Whitelisted values only.
+        // 'printed' is a convenience value meaning "needs a physical copy" — i.e.
+        // print OR both — since everyone now receives the email PDF regardless.
         if (!empty($filters['wings_preference'])) {
             $wp = strtolower((string) $filters['wings_preference']);
-            if (in_array($wp, ['digital', 'print', 'both'], true)) {
+            if ($wp === 'printed') {
+                $parts[] = "LOWER(m.wings_preference) IN ('print', 'both')";
+            } elseif (in_array($wp, ['digital', 'print', 'both'], true)) {
                 $parts[] = 'LOWER(m.wings_preference) = :wings_preference';
                 $params['wings_preference'] = $wp;
             }

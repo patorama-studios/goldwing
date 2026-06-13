@@ -315,8 +315,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <span class="mt-1 block text-xs text-gray-500">Auto-filled (31 July anchor). Editable. Renewal reminders auto-send 60 &amp; 30 days before.</span>
               </label>
               <label class="block">
+                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Joining fee (AUD)</span>
+                <input type="number" step="0.01" min="0" id="joining_fee" value="25.00" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 block text-xs text-gray-500">One-off, added to the plan price for first-year joins. Set to 0 to skip (e.g. associates / renewals).</span>
+              </label>
+              <label class="block">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Amount paid (AUD)</span>
                 <input type="number" step="0.01" min="0" name="membership_cost" id="membership_cost" value="0" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 block text-xs text-gray-500">Auto-filled from the plan price + joining fee. Editable — type any amount.</span>
               </label>
               <label class="block">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Payment method</span>
@@ -521,18 +527,23 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   if (startInput) { startInput.addEventListener('change', function () { renewalEdited = false; recalcExpiry(); }); }
   if (termInput) { termInput.addEventListener('change', function () { renewalEdited = false; recalcExpiry(); }); }
 
-  // --- Cost prefill from plan ---
+  // --- Cost prefill from plan (+ joining fee) ---
   var planSelect = document.getElementById('membership_type_id');
   var costInput = document.getElementById('membership_cost');
-  if (planSelect && costInput) {
-    planSelect.addEventListener('change', function () {
-      var opt = planSelect.options[planSelect.selectedIndex];
-      var price = opt ? opt.getAttribute('data-price') : '';
-      if (price !== '' && price !== null && !isNaN(parseFloat(price))) {
-        costInput.value = parseFloat(price).toFixed(2);
-      }
-    });
+  var joiningInput = document.getElementById('joining_fee');
+  var costEdited = false;
+  if (costInput) { costInput.addEventListener('input', function () { costEdited = true; }); }
+  function recalcCost() {
+    if (!planSelect || !costInput || costEdited) { return; }
+    var opt = planSelect.options[planSelect.selectedIndex];
+    var price = opt ? parseFloat(opt.getAttribute('data-price')) : NaN;
+    if (isNaN(price)) { return; }
+    var joining = joiningInput ? parseFloat(joiningInput.value) : 0;
+    if (isNaN(joining)) { joining = 0; }
+    costInput.value = (price + joining).toFixed(2);
   }
+  if (planSelect) { planSelect.addEventListener('change', recalcCost); }
+  if (joiningInput) { joiningInput.addEventListener('input', recalcCost); }
 
   // --- Bikes repeater ---
   var bikesContainer = document.getElementById('bikes-container');

@@ -72,7 +72,7 @@ The steps are:
 3. **Address** — all optional.
 4. **Preferences** — Wings delivery, privacy level, and the A–F directory / assistance flags.
 5. **Bikes** — optionally add one or more Goldwings (make / model / year / rego / colour). Empty rows are ignored.
-6. **Membership & expiry** — pick the membership plan and status (**Active (paid)**, **Pending payment**, **Complimentary**, or **Lapsed**), the start date, and the renewal/expiry date. The expiry auto-fills using the **31 July** anchor (roll to next year if joining in August or later) and stays editable. Amount paid prefills from the plan price. This creates the membership period **and** a matching manual order — exactly like the "Manual membership order" tool on the Orders tab.
+6. **Membership & expiry** — pick the membership plan and status (**Active (paid)**, **Pending payment**, **Complimentary**, or **Lapsed**), the start date, and the renewal/expiry date. The expiry auto-fills using the **31 July** anchor (roll to next year if joining in August or later) and stays editable. Amount paid prefills from the plan price **plus the one-off Joining fee** (defaults to $25 for first-year joins — set it to 0 for associates or renewals). The amount is fully editable: once you type your own figure the auto-fill stops overriding it. This creates the membership period **and** a matching manual order — exactly like the "Manual membership order" tool on the Orders tab.
 7. **Finish** — the member and membership are always created; the checkboxes choose what to send:
    - **Send welcome email** — creates a login and emails a "set your password" link. (Needs the same permission as a password reset.)
    - **Send payment email** — emails a payment link. Only actually sends when the membership status is **Pending payment**.
@@ -273,7 +273,7 @@ The JS mirrors `MembershipService::calculateExpiry` (31 July anchor) to auto-fil
 
 #### Export — `/admin/members/export.php`
 
-CSV download. Requires `admin.members.import_export` **and** `require_stepup()` — exporting PII is sensitive. Columns: `Member #, Name, Email, Phone, Chapter, Membership Type, Status, Last Login, Created, Directory Preferences`. Logs `member.export` with the row count and fires `SecurityAlertService::send('member_export', ...)` so admins get an email every time. Honours the same filters as the list view, including area-rep chapter scoping.
+CSV download. Requires `admin.members.import_export` **and** `require_stepup()` — exporting PII is sensitive. Columns: `Member #, Name, Email, Phone, Address 1, Address 2, Suburb, State, Postcode, Country, Chapter, Membership Type, Status, Last Login, Created, Directory Preferences`. Logs `member.export` with the row count and fires `SecurityAlertService::send('member_export', ...)` so admins get an email every time. Honours the same filters as the list view, including area-rep chapter scoping. The **Wings magazine** filter and the **Printed mailing list** button pass `wings_preference=printed`, a convenience value resolved in `MemberRepository` to `wings_preference IN ('print','both')` — i.e. everyone who needs a physical copy posted. Everyone receives the email PDF regardless, so there is no "print only" category any more.
 
 #### Import — `/admin/members/import.php` and `import_from_datafile.php`
 
