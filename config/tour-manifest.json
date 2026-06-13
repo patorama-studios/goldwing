@@ -419,6 +419,29 @@
         "public_html/admin/members/index.php",
         "public_html/assets/js/tours/tours/admin-find-edit-member.js"
       ]
+    },
+    "admin-membership-joining-prices": {
+      "slug": "admin-membership-joining-prices",
+      "name": "How to set new-member joining prices",
+      "blurb": "Walk me through the new-member joining price matrix and how it differs from renewals.",
+      "audience": "admin",
+      "roles": ["admin", "treasurer"],
+      "page_url": "/admin/settings/index.php?section=membership_pricing",
+      "page_match": "section=membership_pricing",
+      "starthint": "Tour ready: <strong>Set new-member joining prices</strong>.<br>You're on the Membership Settings page — scroll to the <strong>New-member joining prices</strong> card and the tour will walk you through it.",
+      "steps_file": "/assets/js/tours/tours/admin-membership-joining-prices.js",
+      "selectors": [
+        "[data-tour=\"joining-card\"]",
+        "[data-tour=\"joining-enabled\"]",
+        "[data-tour=\"joining-matrix\"]",
+        "[data-tour=\"joining-fee\"]",
+        "[data-tour=\"pricing-save\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/settings/index.php",
+        "app/Services/MembershipPricingService.php",
+        "public_html/assets/js/tours/tours/admin-membership-joining-prices.js"
+      ]
     }
   }
 }

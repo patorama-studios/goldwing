@@ -81,8 +81,49 @@ class MembershipPricingService
                 'PRINTED' => ['FULL' => 7500, 'ASSOCIATE' => 1500],
                 'PDF' => ['FULL' => 5500, 'ASSOCIATE' => 1500],
             ],
+            // New-member joining matrix. Prices are entered explicitly per
+            // (magazine × type × renewal period × join window) so they match the
+            // committee's printed fee matrix cell-for-cell — the cells already
+            // include the one-off joining fee. The window is derived from the
+            // join date relative to the membership year (thirds, not months):
+            //   FULL = joined in the first third (anchor → before 1 Dec)
+            //   DEC  = joined after 1 Dec (second third)
+            //   APR  = joined after 1 Apr (final third)
+            // joining_fee_cents is the one-off fee surfaced as the Add Member
+            // wizard default; the public matrix already bakes it into each cell.
+            'joining_enabled' => true,
+            'joining_fee_cents' => 1500,
+            'joining_prices' => [
+                'PRINTED' => [
+                    'FULL' => [
+                        'P_1Y' => ['FULL' => 9000, 'DEC' => 6500, 'APR' => 4000],
+                        'P_3Y' => ['FULL' => 22500, 'DEC' => 20400, 'APR' => 18300],
+                    ],
+                    'ASSOCIATE' => [
+                        'P_1Y' => ['FULL' => 3000, 'DEC' => 2500, 'APR' => 2000],
+                        'P_3Y' => ['FULL' => 6000, 'DEC' => 5500, 'APR' => 5000],
+                    ],
+                ],
+                'PDF' => [
+                    'FULL' => [
+                        'P_1Y' => ['FULL' => 7000, 'DEC' => 5200, 'APR' => 3300],
+                        'P_3Y' => ['FULL' => 16500, 'DEC' => 15000, 'APR' => 13500],
+                    ],
+                    'ASSOCIATE' => [
+                        'P_1Y' => ['FULL' => 3000, 'DEC' => 2500, 'APR' => 2000],
+                        'P_3Y' => ['FULL' => 6000, 'DEC' => 5500, 'APR' => 5000],
+                    ],
+                ],
+            ],
         ];
     }
+
+    /** The three join windows used by the joining matrix, in calendar order. */
+    public const JOINING_WINDOWS = [
+        'FULL' => 'Start of year',
+        'DEC' => 'After 1 Dec',
+        'APR' => 'After 1 Apr',
+    ];
 
     public static function pricingNote(): string
     {
@@ -280,6 +321,55 @@ class MembershipPricingService
     }
 
     /* ------------------------------------------------------------------ */
+    /* Joining matrix (explicit new-member prices per join window)         */
+    /* ------------------------------------------------------------------ */
+
+    public static function joiningEnabled(): bool
+    {
+        return !empty(self::getConfig()['joining_enabled']);
+    }
+
+    public static function getJoiningFeeCents(): int
+    {
+        return (int) (self::getConfig()['joining_fee_cents'] ?? 0);
+    }
+
+    /**
+     * Which join window a date falls in, by thirds of the membership year:
+     *   FULL = first third (anchor month .. before 1 Dec)
+     *   DEC  = second third (1 Dec .. before 1 Apr)
+     *   APR  = final third (1 Apr .. expiry)
+     * Window boundaries follow the calendar month, matching the committee
+     * matrix wording ("join after 1 December" / "join after 1 April").
+     */
+    public static function joiningWindowForDate(?DateTimeImmutable $joinDate = null): string
+    {
+        $config = self::getConfig();
+        $tz = new DateTimeZone('Australia/Sydney');
+        $joinDate = $joinDate ?: new DateTimeImmutable('today', $tz);
+        $anchorMonth = (int) $config['anchor_month'];
+        $joinMonth = (int) $joinDate->format('n');
+        $offset = ($joinMonth - $anchorMonth + 12) % 12; // 0..11 months into the year
+        $third = intdiv($offset, 4);                      // 0,1,2
+        return $third <= 0 ? 'FULL' : ($third === 1 ? 'DEC' : 'APR');
+    }
+
+    public static function getJoiningPriceCents(
+        string $magazineType,
+        string $membershipType,
+        string $periodId,
+        ?string $window = null,
+        ?DateTimeImmutable $joinDate = null
+    ): ?int {
+        $magazineType = strtoupper($magazineType);
+        $membershipType = strtoupper($membershipType);
+        $window = $window ?: self::joiningWindowForDate($joinDate);
+        $prices = self::getConfig()['joining_prices'];
+        $cents = $prices[$magazineType][$membershipType][$periodId][$window] ?? null;
+        return is_int($cents) ? $cents : null;
+    }
+
+    /* ------------------------------------------------------------------ */
     /* New-joiner option resolution                                        */
     /* ------------------------------------------------------------------ */
 
@@ -304,6 +394,32 @@ class MembershipPricingService
             'July', 'August', 'September', 'October', 'November', 'December'];
 
         $options = [];
+
+        // Joining matrix takes precedence: one option per active renewal period
+        // (the term the member is buying), priced from the explicit cell for the
+        // current join window. The cell already includes the joining fee.
+        if (!empty($config['joining_enabled'])) {
+            $window = self::joiningWindowForDate($joinDate);
+            $windowLabel = self::JOINING_WINDOWS[$window] ?? '';
+            foreach (self::getRenewalPeriods(true) as $period) {
+                $cents = self::getJoiningPriceCents($magazineType, $membershipType, $period['id'], $window, $joinDate);
+                if ($cents === null) {
+                    continue;
+                }
+                $options[] = [
+                    'key' => 'JOIN_' . $period['id'],
+                    'label' => $period['label'],
+                    'kind' => 'joining',
+                    'duration_months' => (int) $period['duration_months'],
+                    'cents' => (int) $cents,
+                    'breakdown' => ['joining_cents' => (int) $cents],
+                    'period_id' => $period['id'],
+                    'window' => $window,
+                    'window_label' => $windowLabel,
+                ];
+            }
+            return $options;
+        }
 
         // Pro-rata option: only when enabled. When disabled, new joiners just
         // pick a full renewal period like renewers do.
@@ -371,6 +487,17 @@ class MembershipPricingService
         $membershipType = strtoupper($membershipType);
         $config = self::getConfig();
         $proRataEnabled = !empty($config['prorata_enabled']);
+        // Joining matrix keys: JOIN_<period_id> (but not JOIN_ONLY / JOIN_PLUS_*).
+        if (str_starts_with($key, 'JOIN_') && $key !== 'JOIN_ONLY' && !str_starts_with($key, 'JOIN_PLUS_')) {
+            $periodId = substr($key, strlen('JOIN_'));
+            $cents = self::getJoiningPriceCents($magazineType, $membershipType, $periodId, null, $joinDate);
+            if ($cents !== null) {
+                return $cents;
+            }
+            // Period exists but no joining cell configured — fall through to the
+            // renewal price so we never silently fail a valid period.
+            return self::getRenewalPriceCents($magazineType, $membershipType, $periodId);
+        }
         if ($key === 'JOIN_ONLY') {
             if (!$proRataEnabled) {
                 return null; // option shouldn't exist; refuse to charge.
@@ -616,6 +743,41 @@ class MembershipPricingService
             }
         }
         $out['prorata_annual_prices'] = $proRataPrices;
+
+        // ---- Joining matrix ----
+        $out['joining_enabled'] = array_key_exists('joining_enabled', $cfg)
+            ? !empty($cfg['joining_enabled'])
+            : $defaults['joining_enabled'];
+        $out['joining_fee_cents'] = isset($cfg['joining_fee_cents']) && is_numeric($cfg['joining_fee_cents'])
+            ? max(0, (int) $cfg['joining_fee_cents'])
+            : $defaults['joining_fee_cents'];
+
+        $hasJoiningPrices = is_array($cfg['joining_prices'] ?? null);
+        $rawJoining = $hasJoiningPrices ? $cfg['joining_prices'] : [];
+        $defaultJoining = $defaults['joining_prices'];
+        $joiningPrices = [];
+        foreach (self::MAGAZINE_TYPES as $magazine) {
+            foreach (self::MEMBERSHIP_TYPES as $type) {
+                foreach ($periods as $period) {
+                    foreach (array_keys(self::JOINING_WINDOWS) as $window) {
+                        $cents = $rawJoining[$magazine][$type][$period['id']][$window] ?? null;
+                        if (is_numeric($cents)) {
+                            $joiningPrices[$magazine][$type][$period['id']][$window] = max(0, (int) $cents);
+                            continue;
+                        }
+                        // Missing cell: when the stored config has no joining
+                        // matrix at all, seed from the committee defaults so an
+                        // un-migrated config is correct out of the box. Once the
+                        // admin saves the form (which posts every cell) this
+                        // fallback no longer applies.
+                        $fallback = $defaultJoining[$magazine][$type][$period['id']][$window] ?? null;
+                        $joiningPrices[$magazine][$type][$period['id']][$window] =
+                            (!$hasJoiningPrices && is_int($fallback)) ? $fallback : 0;
+                    }
+                }
+            }
+        }
+        $out['joining_prices'] = $joiningPrices;
 
         return $out;
     }

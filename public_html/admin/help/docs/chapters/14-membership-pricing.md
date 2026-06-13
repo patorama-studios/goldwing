@@ -4,14 +4,17 @@
 
 ### What this is
 
-The Membership pricing settings page is where the association decides **what every membership costs and how long it lasts**. It has four parts, and you don't need to be technical to use any of them — each one is built around plain English questions, icons, and a live preview.
+The Membership pricing settings page is where the association decides **what every membership costs and how long it lasts**. It has several parts, and you don't need to be technical to use any of them — each one is built around plain English questions, icons, and a live preview.
 
-The four parts are:
+The parts are:
 
 1. **Membership year** — when a year of membership starts and when it ends. Every membership the website sells lines up with this date.
 2. **Renewal pricing** — the choices an *existing* member sees when they renew. You can name them anything (1 Year, 3 Years, 5 Years), set how long each one runs, and price them per magazine format and member type.
-3. **Pro-rata for new joiners** — what a *brand-new* member pays when they join part-way through the year. You set one full-year base price; the system charges a fair fraction based on how many months are left until the next expiry.
-4. **Live preview** — a dark card at the bottom that shows the exact prices the public website would quote *right now*, based on everything you've typed above. Save the page to make those prices live.
+3. **New-member joining prices** — the exact prices a *brand-new* member pays, entered cell-by-cell to match the committee's printed fee matrix. For each term (1 Year, 3 Years) you set three prices depending on when in the year they join: **Start of year** (before 1 Dec), **After 1 Dec**, and **After 1 Apr**. The website picks the right one automatically from the join date. These prices already include the one-off joining fee.
+4. **Pro-rata for new joiners (fallback)** — an automatic calculator used only if the joining matrix above is switched off. You set one full-year base price; the system charges a fair fraction based on how many months are left until the next expiry.
+5. **Live preview** — a dark card at the bottom that shows the exact prices the public website would quote *right now*, based on everything you've typed above. Save the page to make those prices live.
+
+> **Why both a joining matrix and a renewal table?** A renewing member pays the plain membership price (no joining fee). A brand-new member pays the same membership *plus* a one-off joining fee, and a reduced amount if they join late in the year. The two are deliberately separate so a renewal is never accidentally charged the new-member price.
 
 Change a number in any of these sections and click Save — the new price is live on the next checkout, no developer or deploy required.
 
@@ -64,6 +67,20 @@ The same page also has member-ID sequencing, manual migration controls, the Asso
 2. Click and drag the row up or down to its new position. A coloured line shows where it will land when you drop it.
 3. Click **Save Settings**. The new order is what members see at renewal time.
 
+### Walk-through: setting new-member joining prices
+
+{{tour:admin-membership-joining-prices}}
+
+{{link:/admin/settings/?section=membership_pricing|Take me to Membership & Pricing}}
+
+1. Go to **Admin → Settings → Membership Settings** and scroll to the **New-member joining prices** card (the one with the "person add" icon, below Renewal pricing).
+2. Make sure **Use this joining matrix for new members** is ticked.
+3. For each term (1 Year, 3 Years) you'll see three price columns: **Start of year** (joined before 1 Dec), **After 1 Dec**, and **After 1 Apr**. Type the figure from the committee's fee matrix into each cell, in dollars (e.g. `90.00`). The website picks the right column automatically from the member's join date — you don't work out the pro-rata yourself.
+4. Remember these prices **already include the joining fee**. The separate **One-off joining fee** field at the bottom only sets the default that pre-fills on the Add Member wizard — keep it in step with the fee built into the matrix.
+5. Use the dark **If a member checked out today…** preview card to sanity-check, then click **Save Settings**. New-member prices are live on the next checkout.
+
+> **Tip:** click the **Take the tour** button above (or the tour launcher on the page) for a guided walk-through of this card.
+
 ### Walk-through: turning pro-rata off (charge full price all year)
 
 1. Scroll to the **Pro-rata for new joiners** card.
@@ -76,7 +93,7 @@ With pro-rata off, every new joiner pays the full annual base price regardless o
 
 There are three distinct flows on the public site, and they each use a different part of the pricing page:
 
-- **A brand-new member joining on `/apply.php`** — sees the pro-rata price for "this year only", plus the option to extend with any active renewal period on top. Both are calculated server-side from the **Pro-rata** card and the **Renewal pricing** card.
+- **A brand-new member joining on `/apply.php`** — sees one price per term (1 Year, 3 Years), read straight from the **New-member joining prices** matrix for the window matching today's date. (If the joining matrix is switched off, it falls back to the **Pro-rata** card: a "this year only" price plus the option to extend with a renewal period.)
 - **An existing member renewing from their profile** — sees one button per active renewal period from the **Renewal pricing** card. No pro-rata applies; renewals always run whole years from the anchor date.
 - **An Associate upgrading to Full** — pays the 12-month Full member renewal price by default (set in the **Renewal pricing** card), or a custom flat fee if you've set one in the **Associate → Full Upgrade** section higher up the page.
 
@@ -169,9 +186,23 @@ The config blob (one JSON value at `settings_global['membership.pricing.config']
   "prorata_annual_prices": {
     "PRINTED": {"FULL": 7500, "ASSOCIATE": 1500},
     "PDF":     {"FULL": 5500, "ASSOCIATE": 1500}
+  },
+  "joining_enabled": true,
+  "joining_fee_cents": 1500,
+  "joining_prices": {
+    "PRINTED": {
+      "FULL":      {"P_1Y": {"FULL": 9000, "DEC": 6500, "APR": 4000}, "P_3Y": {"FULL": 22500, "DEC": 20400, "APR": 18300}},
+      "ASSOCIATE": {"P_1Y": {"FULL": 3000, "DEC": 2500, "APR": 2000}, "P_3Y": {"FULL": 6000,  "DEC": 5500,  "APR": 5000}}
+    },
+    "PDF": {
+      "FULL":      {"P_1Y": {"FULL": 7000, "DEC": 5200, "APR": 3300}, "P_3Y": {"FULL": 16500, "DEC": 15000, "APR": 13500}},
+      "ASSOCIATE": {"P_1Y": {"FULL": 3000, "DEC": 2500, "APR": 2000}, "P_3Y": {"FULL": 6000,  "DEC": 5500,  "APR": 5000}}
+    }
   }
 }
 ```
+
+The **joining matrix** (`joining_prices`) is the current source of truth for new-member prices when `joining_enabled` is true. It's keyed `[magazine][type][period_id][window]`, where `period_id` reuses the renewal periods (`P_1Y`, `P_3Y`) and `window` is one of `FULL` / `DEC` / `APR`. `joiningWindowForDate()` maps a join date to a window by **thirds of the membership year** (anchor → before 1 Dec = `FULL`; 1 Dec → before 1 Apr = `DEC`; 1 Apr → expiry = `APR`) — explicitly *not* month-by-month, to match the committee's printed matrix cell-for-cell. The cells already bake in the one-off joining fee; `joining_fee_cents` is surfaced only as the Add Member wizard default. `JOINING_WINDOWS` is the public constant listing the three windows.
 
 #### Backwards compatibility
 
@@ -203,7 +234,7 @@ MembershipPricingService::getPriceCents($mag, $type, $legacyKey);
 MembershipPricingService::getMembershipPricing();
 ```
 
-`getJoinOptions()` produces the dropdown apply.php and the API both consume. Each option has a stable `key` (`JOIN_ONLY` or `JOIN_PLUS_<period_id>`), a human label, and a server-side-resolved `cents` value. `resolveJoinPriceCents()` is the canonical accessor when an option key comes back over the wire — it understands `JOIN_ONLY`, `JOIN_PLUS_*`, and (for safety) the legacy keys.
+`getJoinOptions()` produces the dropdown apply.php and the API both consume. When `joining_enabled` is true it emits one option per active renewal period with key `JOIN_<period_id>` (e.g. `JOIN_P_1Y`), priced from the joining matrix cell for today's window, plus `window`/`window_label` fields. When joining is off it falls back to the legacy `JOIN_ONLY` / `JOIN_PLUS_<period_id>` shape (pro-rata stub + optional renewal extension). `resolveJoinPriceCents()` is the canonical accessor when an option key comes back over the wire — it understands `JOIN_<period_id>` (joining matrix, falling back to the renewal price if a cell is blank), `JOIN_ONLY`, `JOIN_PLUS_*`, and the legacy matrix keys. New-member expiry is unaffected by the window: term still drives it via `MembershipService::calculateExpiry()` (next 31 July, plus extra whole years for multi-year terms).
 
 #### How prices flow into Stripe
 
@@ -227,7 +258,7 @@ Membership applications still use a **PaymentIntent** flow (not a Stripe Checkou
 
 ### Settings
 
-- `membership.pricing.config` — JSON, the new full config. Source of truth.
+- `membership.pricing.config` — JSON, the new full config. Source of truth. Now also carries `joining_enabled` (bool), `joining_fee_cents` (int), and `joining_prices` (`[magazine][type][period_id][window]` cents).
 - `membership.pricing_matrix` — JSON, legacy 24-row matrix. Read once on first migration, otherwise inert.
 - `membership.member_number_start` — int, first base number for new Full members (default `1000`).
 - `membership.associate_suffix_start` — int, first suffix for Associate IDs (default `1`).
@@ -244,6 +275,8 @@ Membership applications still use a **PaymentIntent** flow (not a Stripe Checkou
 - **Missing prices clamp to zero, not null.** `normalizeConfig()` walks every (magazine × type × period) cell and inserts `0` where the form didn't post a value. This means deleting a period and re-adding it with the same ID does not resurrect old prices.
 - **Pro-rata uses `DateTimeImmutable` in `Australia/Sydney` timezone.** `monthsRemainingUntilExpiry()` is anchor-aware: if today is at or before the expiry date this year, it counts to *this* year's expiry; otherwise to next year's. Day-precision: an extra day past a month boundary rounds *up*, so a join on the 30th of a month still gets credit for that whole month.
 - **No discounts or coupons in the config.** It's a flat lookup — no member-of-member discount, no chapter override. The store discount-codes system does **not** apply to memberships.
+- **Joining matrix vs pro-rata.** When `joining_enabled` is true, `getJoinOptions()`/`resolveJoinPriceCents()` read explicit `joining_prices` cells and the continuous pro-rata engine is bypassed for new joins. The pro-rata card still saves and is the fallback if joining is switched off. An un-migrated config (no `joining_prices` key) is seeded from `defaultConfig()`'s committee values by `normalizeConfig()`; once the admin saves the form (which posts every cell) that fallback no longer applies, so a blank cell saves as `0`, not the default.
+- **Window detection is month-based, not day-based.** `joiningWindowForDate()` buckets by calendar month relative to the anchor (thirds of the year). It assumes a month-aligned anchor (1 Aug) and a 12-month year; exotic anchor days aren't special-cased.
 - **Two pricing systems coexist.** The new config (PaymentIntent path) is current; the Stripe Price IDs (Checkout Session + renewal cron) are legacy. If you change prices here, also update the Stripe Price IDs at `?section=payments` so renewal-reminder emails quote the same number. They don't auto-sync.
 - **Type constants are case-sensitive and currency is AUD-only.** Always `'PRINTED'` / `'PDF'` / `'FULL'` / `'ASSOCIATE'` uppercase. The JSON has a `currency` field but every write-path hardcodes `'AUD'`.
 - **The page is shared with ID sequencing and chapters.** Saving pricing re-saves the ID format strings. If those fail validation (e.g. someone removed the `{base}` token), the whole form refuses to save — pricing included.

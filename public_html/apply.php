@@ -1263,8 +1263,11 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           select.value = previousValue;
         }
         if (hintEl) {
+          const joiningOption = options.find((opt) => opt.kind === 'joining');
           const proRataOption = options.find((opt) => opt.kind === 'prorata_only');
-          if (proRataOption) {
+          if (joiningOption && joiningOption.window_label) {
+            hintEl.textContent = `Joining now (${joiningOption.window_label}) — prices are pro-rated to the 31 July expiry.`;
+          } else if (proRataOption) {
             hintEl.textContent = `Pro-rata: ${proRataOption.duration_months} month${proRataOption.duration_months === 1 ? '' : 's'} until expiry. Or extend with a full renewal period.`;
           } else {
             hintEl.textContent = '';

@@ -463,11 +463,11 @@ The actual API key is stored separately in `ai_provider_keys` (encrypted) via `A
 
 #### Membership Settings
 
-What it controls: the membership year anchor + expiry, admin-defined renewal periods + their prices, pro-rata engine config + per-cell annual base prices, member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateConfig()`. Deep dive: [Ch 14 — Membership pricing](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+What it controls: the membership year anchor + expiry, admin-defined renewal periods + their prices, the **new-member joining matrix** (explicit per-cell prices by term × join window) + the one-off joining fee, the pro-rata fallback engine + per-cell annual base prices, member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateConfig()`. Deep dive: [Ch 14 — Membership pricing](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `membership.pricing.config` | object | (seeded config) | Single JSON blob with `anchor_month`/`anchor_day`/`expiry_month`/`expiry_day`, `prorata_enabled`, `prorata_rounding`, `renewal_periods` list (`{id,label,duration_months,sort_order,active}`), `renewal_prices` matrix (`{magazine→type→period_id→cents}`), and `prorata_annual_prices` (`{magazine→type→cents}`). |
+| `membership.pricing.config` | object | (seeded config) | Single JSON blob with `anchor_month`/`anchor_day`/`expiry_month`/`expiry_day`, `prorata_enabled`, `prorata_rounding`, `renewal_periods` list (`{id,label,duration_months,sort_order,active}`), `renewal_prices` matrix (`{magazine→type→period_id→cents}`), `prorata_annual_prices` (`{magazine→type→cents}`), plus `joining_enabled` (bool), `joining_fee_cents` (int), and the `joining_prices` matrix (`{magazine→type→period_id→window→cents}`, window ∈ `FULL`/`DEC`/`APR`). |
 | `membership.pricing_matrix` | object | (legacy seed) | Legacy 24-row matrix `{magazine_type → membership_type → period → cents}`. Read once on first migration and then inert — `getConfig()` migrates it into `membership.pricing.config`. Kept for safety so older installs don't lose data on the first load. |
 | `membership.member_number_start` | int | 1000 | First member number issued. |
 | `membership.associate_suffix_start` | int | 1 | First associate suffix. |

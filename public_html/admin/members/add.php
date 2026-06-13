@@ -7,6 +7,7 @@ use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\MemberRepository;
 use App\Services\MembershipService;
+use App\Services\MembershipPricingService;
 use App\Services\SettingsService;
 
 require_permission('admin.members.view');
@@ -63,6 +64,9 @@ $flash = $_SESSION['members_flash'] ?? null;
 unset($_SESSION['members_flash']);
 
 $today = date('Y-m-d');
+
+// One-off joining fee default (configurable in Settings → Membership pricing).
+$joiningFeeDefault = number_format(MembershipPricingService::getJoiningFeeCents() / 100, 2, '.', '');
 
 $pageTitle = 'Add Member';
 $activePage = 'members';
@@ -316,7 +320,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </label>
               <label class="block">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Joining fee (AUD)</span>
-                <input type="number" step="0.01" min="0" id="joining_fee" value="25.00" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <input type="number" step="0.01" min="0" id="joining_fee" value="<?= e($joiningFeeDefault) ?>" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                 <span class="mt-1 block text-xs text-gray-500">One-off, added to the plan price for first-year joins. Set to 0 to skip (e.g. associates / renewals).</span>
               </label>
               <label class="block">

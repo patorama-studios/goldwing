@@ -424,6 +424,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'renewal_periods' => [],
                     'renewal_prices' => [],
                     'prorata_annual_prices' => [],
+                    'joining_enabled' => isset($_POST['joining_enabled']),
+                    'joining_fee_cents' => 0,
+                    'joining_prices' => [],
                 ];
 
                 // ---- Renewal periods ----
@@ -507,6 +510,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $newConfig['prorata_annual_prices'][$magazineType][$membershipType] = max(0, $amount);
                     }
+                }
+
+                // ---- Joining matrix (per magazine × type × period × window) ----
+                $rawJoining = $_POST['joining_prices'] ?? [];
+                $joiningWindowIds = array_keys(MembershipPricingService::JOINING_WINDOWS);
+                foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType) {
+                    foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType) {
+                        foreach ($newConfig['renewal_periods'] as $period) {
+                            foreach ($joiningWindowIds as $winId) {
+                                $fieldKey = 'joining.' . $magazineType . '.' . $membershipType . '.' . $period['id'] . '.' . $winId;
+                                $rawValue = normalize_text($rawJoining[$magazineType][$membershipType][$period['id']][$winId] ?? '0');
+                                if ($rawValue === '') {
+                                    $rawValue = '0';
+                                }
+                                $errorText = null;
+                                $amount = parse_money_to_cents($rawValue, $errorText);
+                                if ($amount === null) {
+                                    $fieldErrors[$fieldKey] = $errorText ?: 'Invalid amount.';
+                                    continue;
+                                }
+                                $newConfig['joining_prices'][$magazineType][$membershipType][$period['id']][$winId] = max(0, $amount);
+                            }
+                        }
+                    }
+                }
+
+                // ---- One-off joining fee (wizard default) ----
+                $joiningFeeError = null;
+                $joiningFeeCents = parse_money_to_cents(normalize_text($_POST['joining_fee'] ?? '0') ?: '0', $joiningFeeError);
+                if ($joiningFeeCents === null) {
+                    $fieldErrors['joining_fee'] = $joiningFeeError ?: 'Invalid amount.';
+                } else {
+                    $newConfig['joining_fee_cents'] = max(0, $joiningFeeCents);
                 }
 
                 if ($newConfig['anchor_month'] < 1 || $newConfig['anchor_month'] > 12) {
@@ -2915,6 +2951,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $renewalPrices = $pricingConfig['renewal_prices'];
               $proRataAnnual = $pricingConfig['prorata_annual_prices'];
               $proRataEnabled = !empty($pricingConfig['prorata_enabled']);
+              $joiningEnabled = !empty($pricingConfig['joining_enabled']);
+              $joiningPrices = $pricingConfig['joining_prices'] ?? [];
+              $joiningWindows = MembershipPricingService::JOINING_WINDOWS;
+              $joiningFeeDisplay = number_format(((int) ($pricingConfig['joining_fee_cents'] ?? 0)) / 100, 2, '.', '');
               $anchorMonth = (int) $pricingConfig['anchor_month'];
               $anchorDay = (int) $pricingConfig['anchor_day'];
               $expiryMonth = (int) $pricingConfig['expiry_month'];
@@ -3175,6 +3215,104 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <span class="material-icons-outlined text-sm text-slate-400">info</span>
                   Add a new period above and a blank price column will appear here. Save the form to lock it in.
                 </p>
+              </div>
+
+              <!-- New-member joining prices card -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4" data-pricing-card="joining" data-tour="joining-card">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">person_add</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">New-member joining prices</h2>
+                    <p class="text-sm text-slate-500">Exact prices a <em>brand-new</em> member pays, per term and when in the year they join. These follow the committee's fee matrix cell-for-cell and already include the one-off joining fee. The join window is set automatically from the join date (thirds of the year): <strong>Start of year</strong> = before 1&nbsp;Dec, <strong>After 1&nbsp;Dec</strong>, <strong>After 1&nbsp;Apr</strong>.</p>
+                  </div>
+                </div>
+
+                <label class="flex items-center gap-3 text-sm text-slate-700" data-tour="joining-enabled">
+                  <input type="checkbox" name="joining_enabled" value="1" <?= $joiningEnabled ? 'checked' : '' ?> class="rounded border-gray-300 text-emerald-600">
+                  Use this joining matrix for new members (recommended). When off, new joiners fall back to the pro-rata engine below.
+                </label>
+
+                <?php $joiningTableIdx = 0; foreach ($renewalPeriods as $period): if (empty($period['active'])) continue; ?>
+                  <div class="rounded-xl border border-slate-200 bg-white overflow-hidden"<?= $joiningTableIdx === 0 ? ' data-tour="joining-matrix"' : '' ?>>
+                    <?php $joiningTableIdx++; ?>
+                    <div class="px-3 py-2 bg-slate-50 border-b text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      <?= e($period['label']) ?> term <span class="text-slate-400 normal-case font-normal">(<?= (int) $period['duration_months'] ?> months)</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                        <thead class="bg-white text-left text-xs uppercase text-slate-500">
+                          <tr>
+                            <th class="px-3 py-2">Magazine</th>
+                            <th class="px-3 py-2">Member type</th>
+                            <?php foreach ($joiningWindows as $winId => $winLabel): ?>
+                              <th class="px-3 py-2 text-center"><?= e($winLabel) ?></th>
+                            <?php endforeach; ?>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                          <?php foreach (MembershipPricingService::MAGAZINE_TYPES as $magazineType): ?>
+                            <?php foreach (MembershipPricingService::MEMBERSHIP_TYPES as $membershipType):
+                              $magMeta = $magazineIcons[$magazineType];
+                              $memMeta = $membershipIcons[$membershipType];
+                              $magBadge = $magazineType === 'PRINTED' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800';
+                              $memBadge = $membershipType === 'FULL' ? 'bg-violet-100 text-violet-800' : 'bg-teal-100 text-teal-800';
+                            ?>
+                              <tr>
+                                <td class="px-3 py-3">
+                                  <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold <?= e($magBadge) ?>">
+                                    <span class="material-icons-outlined text-sm"><?= e($magMeta['icon']) ?></span>
+                                    <?= e($magMeta['label']) ?>
+                                  </span>
+                                </td>
+                                <td class="px-3 py-3">
+                                  <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold <?= e($memBadge) ?>">
+                                    <span class="material-icons-outlined text-sm"><?= e($memMeta['icon']) ?></span>
+                                    <?= e($memMeta['label']) ?>
+                                  </span>
+                                </td>
+                                <?php foreach ($joiningWindows as $winId => $winLabel):
+                                  $valueCents = $joiningPrices[$magazineType][$membershipType][$period['id']][$winId] ?? 0;
+                                  $fieldKey = 'joining.' . $magazineType . '.' . $membershipType . '.' . $period['id'] . '.' . $winId;
+                                ?>
+                                  <td class="px-3 py-3 align-top">
+                                    <label class="flex items-center gap-1 justify-center">
+                                      <span class="text-slate-400 text-xs">$</span>
+                                      <input
+                                        name="joining_prices[<?= e($magazineType) ?>][<?= e($membershipType) ?>][<?= e($period['id']) ?>][<?= e($winId) ?>]"
+                                        type="text"
+                                        inputmode="decimal"
+                                        class="w-20 rounded-lg border <?= isset($fieldErrors[$fieldKey]) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm text-right"
+                                        value="<?= e(format_cents_to_dollars($valueCents)) ?>"
+                                      >
+                                    </label>
+                                    <?php if (isset($fieldErrors[$fieldKey])): ?>
+                                      <div class="text-xs text-red-600 mt-1"><?= e($fieldErrors[$fieldKey]) ?></div>
+                                    <?php endif; ?>
+                                  </td>
+                                <?php endforeach; ?>
+                              </tr>
+                            <?php endforeach; ?>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+
+                <label class="flex items-center gap-3 py-1 text-sm" data-tour="joining-fee">
+                  <span class="text-slate-700 flex-1">One-off joining fee <span class="text-slate-400">(default used by the Add Member wizard; the matrix above already bakes it into each cell)</span></span>
+                  <span class="text-slate-400 text-xs">$</span>
+                  <input
+                    name="joining_fee"
+                    type="text"
+                    inputmode="decimal"
+                    class="w-24 rounded-lg border <?= isset($fieldErrors['joining_fee']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-2 py-1 text-sm text-right"
+                    value="<?= e($joiningFeeDisplay) ?>"
+                  >
+                </label>
+                <?php if (isset($fieldErrors['joining_fee'])): ?>
+                  <div class="text-xs text-red-600"><?= e($fieldErrors['joining_fee']) ?></div>
+                <?php endif; ?>
               </div>
 
               <!-- Pro-rata for new joins card -->
@@ -3641,7 +3779,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
                 <div class="flex items-center gap-3">
                   <a href="<?= e($cancelHref) ?>" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>
-                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                  <button type="submit" data-tour="pricing-save" class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm">
                     <span class="material-icons-outlined text-base">save</span>
                     Save Settings
                   </button>
