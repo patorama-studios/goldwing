@@ -944,127 +944,191 @@ if ($resource === 'stripe') {
             }
         }
 
-        $orderNumber = store_generate_order_number();
+        $pdo = db();
+        $cartIdForOrder = isset($cart['id']) ? (int) $cart['id'] : null;
+        $freshTotalCents = (int) round((float) $totals['total'] * 100);
         $customerName = $user ? ($user['name'] ?? '') : trim($guestFirst . ' ' . $guestLast);
         $customerEmail = $user ? ($user['email'] ?? '') : $guestEmail;
-
-        $orderPayload = [
-            'order_number' => $orderNumber,
-            'user_id' => $user['id'] ?? null,
-            'member_id' => $user['member_id'] ?? null,
-            'status' => 'pending',
-            'subtotal' => $totals['subtotal'],
-            'discount_total' => $totals['discount_total'],
-            'shipping_total' => $totals['shipping_total'],
-            'processing_fee_total' => $totals['processing_fee_total'],
-            'total' => $totals['total'],
-            'discount_code' => $cart['discount_code'] ?? null,
-            'discount_id' => $discount['id'] ?? null,
-            'fulfillment_method' => $fulfillment,
-            'shipping_name' => $fulfillment === 'shipping' ? $shipping['name'] : null,
-            'shipping_address_line1' => $fulfillment === 'shipping' ? $shipping['line1'] : null,
-            'shipping_address_line2' => $fulfillment === 'shipping' ? $shipping['line2'] : null,
-            'shipping_city' => $fulfillment === 'shipping' ? $shipping['city'] : null,
-            'shipping_state' => $fulfillment === 'shipping' ? $shipping['state'] : null,
-            'shipping_postal_code' => $fulfillment === 'shipping' ? $shipping['postal'] : null,
-            'shipping_country' => $fulfillment === 'shipping' ? 'Australia' : null,
-            'pickup_instructions_snapshot' => $fulfillment === 'pickup' ? ($settingsStore['pickup_instructions'] ?? '') : null,
-            'customer_name' => $customerName,
-            'customer_email' => $customerEmail,
-        ];
-
-        $pdo = db();
-        $stmt = $pdo->prepare('INSERT INTO store_orders (order_number, user_id, member_id, status, subtotal, discount_total, shipping_total, processing_fee_total, total, discount_code, discount_id, fulfillment_method, shipping_name, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, pickup_instructions_snapshot, customer_name, customer_email, created_at) VALUES (:order_number, :user_id, :member_id, :status, :subtotal, :discount_total, :shipping_total, :processing_fee_total, :total, :discount_code, :discount_id, :fulfillment_method, :shipping_name, :shipping_address_line1, :shipping_address_line2, :shipping_city, :shipping_state, :shipping_postal_code, :shipping_country, :pickup_instructions_snapshot, :customer_name, :customer_email, NOW())');
-        $stmt->execute($orderPayload);
-        $storeOrderId = (int) $pdo->lastInsertId();
-
         $itemsWithDiscount = store_apply_discount_to_items($items, $totals['discount_total']);
-        foreach ($itemsWithDiscount as $item) {
-            $stmt = $pdo->prepare('INSERT INTO store_order_items (order_id, product_id, variant_id, title_snapshot, variant_snapshot, sku_snapshot, type, event_name_snapshot, quantity, unit_price, unit_price_final, line_total, created_at) VALUES (:order_id, :product_id, :variant_id, :title_snapshot, :variant_snapshot, :sku_snapshot, :type, :event_name_snapshot, :quantity, :unit_price, :unit_price_final, :line_total, NOW())');
-            $stmt->execute([
-                'order_id' => $storeOrderId,
-                'product_id' => $item['product_id'],
-                'variant_id' => $item['variant_id'],
-                'title_snapshot' => $item['title_snapshot'],
-                'variant_snapshot' => $item['variant_snapshot'],
-                'sku_snapshot' => $item['sku_snapshot'],
-                'type' => $item['type'],
-                'event_name_snapshot' => $item['event_name'],
-                'quantity' => $item['quantity'],
-                'unit_price' => $item['unit_price'],
-                'unit_price_final' => $item['unit_price_final'],
-                'line_total' => $item['line_total'],
-            ]);
+
+        // ── Idempotent checkout: reuse this cart's existing pending order ───────
+        // Opening / reloading / revisiting the checkout Payment step calls this
+        // endpoint. It used to INSERT a brand-new store_order (+ mirror orders row
+        // + admin "order placed" email) on EVERY call — the duplicate-orders bug:
+        // one paid order ended up surrounded by N abandoned pending shells.
+        // Now we look up the pending order already tied to this cart:
+        //   • same total  → reuse the order and its existing Stripe invoice as-is
+        //                    (no INSERT, no new mirror row, no second admin email)
+        //   • total moved → cancel the stale order + mirror, then build fresh below
+        //                    (a new id is required for a fresh Stripe invoice, as
+        //                     the invoice idempotency key is keyed on the order id)
+        $storeOrderId = 0;
+        $orderNumber = '';
+        $orderId = 0;
+        $reuseExisting = false;
+        $reuseOrder = null;
+        if ($cartIdForOrder) {
+            $stmt = $pdo->prepare("SELECT * FROM store_orders WHERE cart_id = :cart AND status = 'pending' AND paid_at IS NULL ORDER BY id DESC LIMIT 1");
+            $stmt->execute(['cart' => $cartIdForOrder]);
+            $reuseOrder = $stmt->fetch() ?: null;
         }
 
-        if ($discount) {
-            $stmt = $pdo->prepare('INSERT INTO store_order_discounts (order_id, discount_id, code, type, value, amount, created_at) VALUES (:order_id, :discount_id, :code, :type, :value, :amount, NOW())');
-            $stmt->execute([
-                'order_id' => $storeOrderId,
-                'discount_id' => $discount['id'],
-                'code' => $discount['code'],
-                'type' => $discount['type'],
-                'value' => $discount['value'],
-                'amount' => $totals['discount_total'],
-            ]);
+        if ($reuseOrder) {
+            if ((int) round((float) $reuseOrder['total'] * 100) === $freshTotalCents) {
+                // Cart unchanged — reuse the order and its Stripe invoice. Refresh
+                // the shipping/customer snapshot in case the address was edited
+                // (the total is identical so line items are unchanged).
+                $reuseExisting = true;
+                $storeOrderId = (int) $reuseOrder['id'];
+                $orderNumber  = (string) $reuseOrder['order_number'];
+                $stmt = $pdo->prepare('UPDATE store_orders SET fulfillment_method = :fm, shipping_name = :sn, shipping_address_line1 = :l1, shipping_address_line2 = :l2, shipping_city = :city, shipping_state = :state, shipping_postal_code = :postal, shipping_country = :country, customer_name = :cn, customer_email = :ce, updated_at = NOW() WHERE id = :id');
+                $stmt->execute([
+                    'fm' => $fulfillment,
+                    'sn' => $fulfillment === 'shipping' ? $shipping['name'] : null,
+                    'l1' => $fulfillment === 'shipping' ? $shipping['line1'] : null,
+                    'l2' => $fulfillment === 'shipping' ? $shipping['line2'] : null,
+                    'city' => $fulfillment === 'shipping' ? $shipping['city'] : null,
+                    'state' => $fulfillment === 'shipping' ? $shipping['state'] : null,
+                    'postal' => $fulfillment === 'shipping' ? $shipping['postal'] : null,
+                    'country' => $fulfillment === 'shipping' ? 'Australia' : null,
+                    'cn' => $customerName,
+                    'ce' => $customerEmail,
+                    'id' => $storeOrderId,
+                ]);
+                $stmt = $pdo->prepare('SELECT id FROM orders WHERE order_number = :n LIMIT 1');
+                $stmt->execute(['n' => $orderNumber]);
+                $orderId = (int) ($stmt->fetchColumn() ?: 0);
+            } else {
+                // Cart changed since this order was built — cancel the stale order
+                // and its mirror so it can't linger as a pending duplicate, then
+                // fall through to build a fresh order + invoice with a new id.
+                $stmt = $pdo->prepare("UPDATE store_orders SET status = 'cancelled', updated_at = NOW() WHERE id = :id AND status = 'pending'");
+                $stmt->execute(['id' => (int) $reuseOrder['id']]);
+                $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', payment_status = 'failed', updated_at = NOW() WHERE order_number = :n AND status = 'pending'");
+                $stmt->execute(['n' => (string) $reuseOrder['order_number']]);
+            }
         }
 
-        try {
-            NotificationService::dispatch('store_admin_order_placed', [
-                'primary_email' => '',
-                'admin_emails' => NotificationService::getAdminEmails(),
+        if (!$reuseExisting) {
+            $orderNumber = store_generate_order_number();
+
+            $orderPayload = [
                 'order_number' => $orderNumber,
-                'customer_name' => NotificationService::escape($customerName !== '' ? $customerName : '—'),
-                'customer_email' => NotificationService::escape($customerEmail !== '' ? $customerEmail : '—'),
-                'fulfillment_method' => NotificationService::escape(ucfirst((string) $fulfillment)),
-                'items_html' => store_order_items_html($itemsWithDiscount),
-                'totals_html' => store_order_totals_html($orderPayload),
-                'admin_link' => NotificationService::escape(BaseUrlService::buildUrl('/admin/store/order_view.php?id=' . $storeOrderId)),
-            ]);
-        } catch (Throwable $e) {
-            error_log('[api.create-payment-intent] store_admin_order_placed dispatch failed: ' . $e->getMessage());
-        }
-
-        $orderSubtotal = max(0.0, $totals['subtotal'] - $totals['discount_total'] + $totals['processing_fee_total']);
-        $orderItems = array_map(function ($item) {
-            return [
-                'product_id' => $item['product_id'],
-                'name' => $item['title_snapshot'] . ($item['variant_snapshot'] ? ' (' . $item['variant_snapshot'] . ')' : ''),
-                'quantity' => (int) $item['quantity'],
-                'unit_price' => (float) $item['unit_price_final'],
-                'is_physical' => ($item['type'] ?? '') === 'physical' ? 1 : 0,
+                'user_id' => $user['id'] ?? null,
+                'member_id' => $user['member_id'] ?? null,
+                'cart_id' => $cartIdForOrder,
+                'status' => 'pending',
+                'subtotal' => $totals['subtotal'],
+                'discount_total' => $totals['discount_total'],
+                'shipping_total' => $totals['shipping_total'],
+                'processing_fee_total' => $totals['processing_fee_total'],
+                'total' => $totals['total'],
+                'discount_code' => $cart['discount_code'] ?? null,
+                'discount_id' => $discount['id'] ?? null,
+                'fulfillment_method' => $fulfillment,
+                'shipping_name' => $fulfillment === 'shipping' ? $shipping['name'] : null,
+                'shipping_address_line1' => $fulfillment === 'shipping' ? $shipping['line1'] : null,
+                'shipping_address_line2' => $fulfillment === 'shipping' ? $shipping['line2'] : null,
+                'shipping_city' => $fulfillment === 'shipping' ? $shipping['city'] : null,
+                'shipping_state' => $fulfillment === 'shipping' ? $shipping['state'] : null,
+                'shipping_postal_code' => $fulfillment === 'shipping' ? $shipping['postal'] : null,
+                'shipping_country' => $fulfillment === 'shipping' ? 'Australia' : null,
+                'pickup_instructions_snapshot' => $fulfillment === 'pickup' ? ($settingsStore['pickup_instructions'] ?? '') : null,
+                'customer_name' => $customerName,
+                'customer_email' => $customerEmail,
             ];
-        }, $itemsWithDiscount);
-        if ($totals['processing_fee_total'] > 0) {
-            $orderItems[] = [
-                'product_id' => null,
-                'name' => 'Payment processing fee',
-                'quantity' => 1,
-                'unit_price' => (float) $totals['processing_fee_total'],
-                'is_physical' => 0,
-            ];
-        }
 
-        $orderId = OrderService::createOrder([
-            'order_number' => $orderNumber,
-            'user_id' => $user['id'] ?? null,
-            'status' => 'pending',
-            'order_type' => 'store',
-            'currency' => 'AUD',
-            'subtotal' => $orderSubtotal,
-            'tax_total' => $totals['tax_total'] ?? 0,
-            'shipping_total' => $totals['shipping_total'],
-            'total' => $totals['total'],
-            'channel_id' => $channelId,
-            'shipping_required' => $requiresShipping ? 1 : 0,
-            'shipping_address_json' => json_encode([
-                'fulfillment' => $fulfillment,
-                'shipping' => $fulfillment === 'shipping' ? $shipping : null,
-                'pickup_instructions' => $fulfillment === 'pickup' ? ($settingsStore['pickup_instructions'] ?? '') : null,
-                'store_order_id' => $storeOrderId,
-                'store_order_number' => $orderNumber,
-            ]),
-        ], $orderItems);
+            $stmt = $pdo->prepare('INSERT INTO store_orders (order_number, user_id, member_id, cart_id, status, subtotal, discount_total, shipping_total, processing_fee_total, total, discount_code, discount_id, fulfillment_method, shipping_name, shipping_address_line1, shipping_address_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, pickup_instructions_snapshot, customer_name, customer_email, created_at) VALUES (:order_number, :user_id, :member_id, :cart_id, :status, :subtotal, :discount_total, :shipping_total, :processing_fee_total, :total, :discount_code, :discount_id, :fulfillment_method, :shipping_name, :shipping_address_line1, :shipping_address_line2, :shipping_city, :shipping_state, :shipping_postal_code, :shipping_country, :pickup_instructions_snapshot, :customer_name, :customer_email, NOW())');
+            $stmt->execute($orderPayload);
+            $storeOrderId = (int) $pdo->lastInsertId();
+
+            foreach ($itemsWithDiscount as $item) {
+                $stmt = $pdo->prepare('INSERT INTO store_order_items (order_id, product_id, variant_id, title_snapshot, variant_snapshot, sku_snapshot, type, event_name_snapshot, quantity, unit_price, unit_price_final, line_total, created_at) VALUES (:order_id, :product_id, :variant_id, :title_snapshot, :variant_snapshot, :sku_snapshot, :type, :event_name_snapshot, :quantity, :unit_price, :unit_price_final, :line_total, NOW())');
+                $stmt->execute([
+                    'order_id' => $storeOrderId,
+                    'product_id' => $item['product_id'],
+                    'variant_id' => $item['variant_id'],
+                    'title_snapshot' => $item['title_snapshot'],
+                    'variant_snapshot' => $item['variant_snapshot'],
+                    'sku_snapshot' => $item['sku_snapshot'],
+                    'type' => $item['type'],
+                    'event_name_snapshot' => $item['event_name'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'unit_price_final' => $item['unit_price_final'],
+                    'line_total' => $item['line_total'],
+                ]);
+            }
+
+            if ($discount) {
+                $stmt = $pdo->prepare('INSERT INTO store_order_discounts (order_id, discount_id, code, type, value, amount, created_at) VALUES (:order_id, :discount_id, :code, :type, :value, :amount, NOW())');
+                $stmt->execute([
+                    'order_id' => $storeOrderId,
+                    'discount_id' => $discount['id'],
+                    'code' => $discount['code'],
+                    'type' => $discount['type'],
+                    'value' => $discount['value'],
+                    'amount' => $totals['discount_total'],
+                ]);
+            }
+
+            try {
+                NotificationService::dispatch('store_admin_order_placed', [
+                    'primary_email' => '',
+                    'admin_emails' => NotificationService::getAdminEmails(),
+                    'order_number' => $orderNumber,
+                    'customer_name' => NotificationService::escape($customerName !== '' ? $customerName : '—'),
+                    'customer_email' => NotificationService::escape($customerEmail !== '' ? $customerEmail : '—'),
+                    'fulfillment_method' => NotificationService::escape(ucfirst((string) $fulfillment)),
+                    'items_html' => store_order_items_html($itemsWithDiscount),
+                    'totals_html' => store_order_totals_html($orderPayload),
+                    'admin_link' => NotificationService::escape(BaseUrlService::buildUrl('/admin/store/order_view.php?id=' . $storeOrderId)),
+                ]);
+            } catch (Throwable $e) {
+                error_log('[api.create-payment-intent] store_admin_order_placed dispatch failed: ' . $e->getMessage());
+            }
+
+            $orderSubtotal = max(0.0, $totals['subtotal'] - $totals['discount_total'] + $totals['processing_fee_total']);
+            $orderItems = array_map(function ($item) {
+                return [
+                    'product_id' => $item['product_id'],
+                    'name' => $item['title_snapshot'] . ($item['variant_snapshot'] ? ' (' . $item['variant_snapshot'] . ')' : ''),
+                    'quantity' => (int) $item['quantity'],
+                    'unit_price' => (float) $item['unit_price_final'],
+                    'is_physical' => ($item['type'] ?? '') === 'physical' ? 1 : 0,
+                ];
+            }, $itemsWithDiscount);
+            if ($totals['processing_fee_total'] > 0) {
+                $orderItems[] = [
+                    'product_id' => null,
+                    'name' => 'Payment processing fee',
+                    'quantity' => 1,
+                    'unit_price' => (float) $totals['processing_fee_total'],
+                    'is_physical' => 0,
+                ];
+            }
+
+            $orderId = OrderService::createOrder([
+                'order_number' => $orderNumber,
+                'user_id' => $user['id'] ?? null,
+                'status' => 'pending',
+                'order_type' => 'store',
+                'currency' => 'AUD',
+                'subtotal' => $orderSubtotal,
+                'tax_total' => $totals['tax_total'] ?? 0,
+                'shipping_total' => $totals['shipping_total'],
+                'total' => $totals['total'],
+                'channel_id' => $channelId,
+                'shipping_required' => $requiresShipping ? 1 : 0,
+                'shipping_address_json' => json_encode([
+                    'fulfillment' => $fulfillment,
+                    'shipping' => $fulfillment === 'shipping' ? $shipping : null,
+                    'pickup_instructions' => $fulfillment === 'pickup' ? ($settingsStore['pickup_instructions'] ?? '') : null,
+                    'store_order_id' => $storeOrderId,
+                    'store_order_number' => $orderNumber,
+                ]),
+            ], $orderItems);
+        }
 
         if ($paymentMethod === 'bank_transfer') {
             $stmt = $pdo->prepare('UPDATE orders SET payment_method = "bank_transfer", payment_status = "pending", updated_at = NOW() WHERE id = :id');

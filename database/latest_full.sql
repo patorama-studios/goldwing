@@ -831,6 +831,7 @@ CREATE TABLE store_orders (
   order_number VARCHAR(30) UNIQUE NOT NULL,
   user_id INT NULL,
   member_id INT NULL,
+  cart_id INT NULL,
   status ENUM('pending','paid','fulfilled','cancelled','refunded') NOT NULL DEFAULT 'pending',
   subtotal DECIMAL(10,2) NOT NULL,
   discount_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,

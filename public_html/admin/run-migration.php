@@ -3253,6 +3253,50 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 036 — store_orders.cart_id (idempotent checkout)
+// Links each store_order back to the store_carts row it was created from so the
+// /api/stripe/create-payment-intent endpoint can REUSE an existing pending order
+// for the same cart instead of inserting a brand-new one on every page load /
+// revisit. Without this, opening the checkout Payment step repeatedly spawned a
+// fresh pending store_order (+ mirror orders row + admin "order placed" email)
+// each time — the duplicate-orders bug. Nullable so legacy rows are unaffected.
+// Mirrors database/migrations/2026_06_13_store_orders_cart_id.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_036_store_orders_cart_id';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 036 — store_orders.cart_id', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $applied = [];
+    $errors  = [];
+    $tryExec = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'duplicate') !== false || stripos($msg, 'exists') !== false) {
+                $applied[] = $label . ' (already present)';
+            } else {
+                $errors[] = $label . ': ' . $msg;
+            }
+        }
+    };
+
+    $tryExec("ALTER TABLE store_orders ADD COLUMN cart_id INT NULL AFTER member_id", 'store_orders.cart_id');
+    $tryExec("ALTER TABLE store_orders ADD INDEX idx_store_orders_cart_pending (cart_id, status)", 'idx_store_orders_cart_pending');
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 036 — store_orders.cart_id', 'status' => 'error', 'note' => implode('; ', $errors)];
+    } else {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 036 — store_orders.cart_id', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
