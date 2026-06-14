@@ -47,40 +47,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'rsvp') {
         calendar_require_login();
+        $rsvpStatus = $_POST['rsvp_status'] ?? '';
+        $validStatuses = ['going', 'maybe', 'not_going'];
         if ($isCancelled || !$event['rsvp_enabled']) {
             $error = 'RSVPs are not available for this event.';
         } elseif ($salesClosed) {
             $error = 'RSVPs are closed for this event.';
+        } elseif ($rsvpStatus === 'clear') {
+            // Member is withdrawing their response entirely (back to blank).
+            $stmt = $pdo->prepare('DELETE FROM calendar_event_rsvps WHERE event_id = :event_id AND user_id = :user_id');
+            $stmt->execute(['event_id' => $event['id'], 'user_id' => $user['id']]);
+            $message = 'Your response has been cleared.';
+        } elseif (!in_array($rsvpStatus, $validStatuses, true)) {
+            $error = 'Please choose a response.';
         } else {
             $qty = max(1, (int) ($_POST['qty'] ?? 1));
             $notes = trim($_POST['notes'] ?? '');
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM calendar_event_rsvps WHERE event_id = :event_id AND user_id = :user_id');
-            $stmt->execute(['event_id' => $event['id'], 'user_id' => $user['id']]);
-            if ($stmt->fetchColumn() > 0) {
-                $error = 'You have already RSVP\'d for this event.';
-            } else {
-                $capacity = $event['capacity'] ? (int) $event['capacity'] : null;
-                if ($capacity !== null) {
-                    $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status = "going"');
-                    $stmt->execute(['event_id' => $event['id']]);
-                    $rsvpCount = (int) $stmt->fetchColumn();
-                    $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_tickets WHERE event_id = :event_id');
-                    $stmt->execute(['event_id' => $event['id']]);
-                    $ticketCount = (int) $stmt->fetchColumn();
-                    if ($rsvpCount + $ticketCount + $qty > $capacity) {
-                        $error = 'Not enough remaining capacity for this RSVP.';
-                    }
+            // Attending and Maybe both reserve a spot; Not attending never does.
+            $consumesSpot = in_array($rsvpStatus, ['going', 'maybe'], true);
+            $capacity = $event['capacity'] ? (int) $event['capacity'] : null;
+            if ($consumesSpot && $capacity !== null) {
+                // Count spots already taken by OTHER members (going + maybe) plus
+                // paid tickets, so changing our own qty/status never double-counts.
+                $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND user_id <> :user_id AND status IN ("going","maybe")');
+                $stmt->execute(['event_id' => $event['id'], 'user_id' => $user['id']]);
+                $othersCount = (int) $stmt->fetchColumn();
+                $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_tickets WHERE event_id = :event_id');
+                $stmt->execute(['event_id' => $event['id']]);
+                $ticketCount = (int) $stmt->fetchColumn();
+                if ($othersCount + $ticketCount + $qty > $capacity) {
+                    $error = 'Not enough remaining capacity for this response.';
                 }
-                if ($error === '') {
-                    $stmt = $pdo->prepare('INSERT INTO calendar_event_rsvps (event_id, user_id, qty, notes, status, created_at) VALUES (:event_id, :user_id, :qty, :notes, "going", NOW())');
-                    $stmt->execute([
-                        'event_id' => $event['id'],
-                        'user_id' => $user['id'],
-                        'qty' => $qty,
-                        'notes' => $notes,
-                    ]);
-                    $message = 'RSVP confirmed.';
-                }
+            }
+            if ($error === '') {
+                $stmt = $pdo->prepare('INSERT INTO calendar_event_rsvps (event_id, user_id, qty, notes, status, created_at) VALUES (:event_id, :user_id, :qty, :notes, :status, NOW()) ON DUPLICATE KEY UPDATE qty = VALUES(qty), notes = VALUES(notes), status = VALUES(status)');
+                $stmt->execute([
+                    'event_id' => $event['id'],
+                    'user_id' => $user['id'],
+                    'qty' => $qty,
+                    'notes' => $notes,
+                    'status' => $rsvpStatus,
+                ]);
+                $statusMessages = ['going' => 'Attending', 'maybe' => 'Maybe', 'not_going' => 'Not attending'];
+                $message = 'Your response has been saved: ' . $statusMessages[$rsvpStatus] . '.';
             }
         }
     }
@@ -95,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $qty = max(1, (int) ($_POST['qty'] ?? 1));
             $capacity = $event['capacity'] ? (int) $event['capacity'] : null;
             if ($capacity !== null) {
-                $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status = "going"');
+                $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status IN ("going","maybe")');
                 $stmt->execute(['event_id' => $event['id']]);
                 $rsvpCount = (int) $stmt->fetchColumn();
                 $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_tickets WHERE event_id = :event_id');
@@ -158,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status = "going"');
+$stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status IN ("going","maybe")');
 $stmt->execute(['event_id' => $event['id']]);
 $rsvpCount = (int) $stmt->fetchColumn();
 $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_tickets WHERE event_id = :event_id');
@@ -188,6 +197,20 @@ $formAction = 'event_view.php?slug=' . urlencode($event['slug']) . ($embed ? '&e
 <?php
 ob_start();
 ?>
+<style>
+    .rsvp-box { margin-top: 8px; }
+    .rsvp-current { margin: 0 0 12px; font-size: 15px; }
+    .rsvp-form { display: grid; gap: 12px; }
+    .rsvp-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+    .rsvp-fields label { display: grid; gap: 4px; font-size: 13px; color: #475569; }
+    .rsvp-fields input { padding: 8px 10px; border: 1px solid #d9dee6; border-radius: 6px; font-size: 14px; }
+    .rsvp-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+    .rsvp-choice { background: #fff; border: 1px solid #2f5f8d; color: #2f5f8d; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .rsvp-choice:hover { background: #eef4fa; }
+    .rsvp-choice.is-active { background: #2f5f8d; color: #fff; }
+    .rsvp-choice.is-active:hover { background: #27507a; }
+    .rsvp-clear { background: none; border: none; color: #b42318; cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0; justify-self: start; }
+</style>
 <div class="calendar-container">
     <a class="link" href="<?php echo calendar_e($backUrl); ?>" data-calendar-back>&larr; Back to events</a>
 
@@ -244,23 +267,42 @@ ob_start();
 
         <?php if ($event['rsvp_enabled'] && !$salesClosed && !$isCancelled) : ?>
             <?php if ($user) : ?>
-                <?php if ($userRsvp) : ?>
-                    <div class="alert info">You are RSVP'd for this event.</div>
-                <?php else : ?>
-                    <form method="post" class="inline-form" action="<?php echo calendar_e($formAction); ?>" data-calendar-embed-form="1">
+                <?php
+                    $currentStatus = $userRsvp['status'] ?? '';
+                    $currentQty = isset($userRsvp['qty']) ? max(1, (int) $userRsvp['qty']) : 1;
+                    $currentNotes = $userRsvp['notes'] ?? '';
+                    $statusLabels = ['going' => 'Attending', 'maybe' => 'Maybe', 'not_going' => 'Not attending'];
+                ?>
+                <div class="rsvp-box">
+                    <?php if ($currentStatus !== '') : ?>
+                        <p class="rsvp-current">Your response: <strong><?php echo calendar_e($statusLabels[$currentStatus] ?? 'Saved'); ?></strong>
+                            <span class="muted">— change it or clear it any time.</span></p>
+                    <?php else : ?>
+                        <p class="rsvp-current">Are you coming along? Let the organiser know.</p>
+                    <?php endif; ?>
+                    <form method="post" class="rsvp-form" action="<?php echo calendar_e($formAction); ?>" data-calendar-embed-form="1">
                         <?php echo calendar_csrf_field(); ?>
                         <input type="hidden" name="action" value="rsvp">
-                        <label>
-                            Qty
-                            <input type="number" name="qty" min="1" value="1">
-                        </label>
-                        <label>
-                            Notes
-                            <input type="text" name="notes" placeholder="Optional">
-                        </label>
-                        <button type="submit" class="btn">RSVP</button>
+                        <div class="rsvp-fields">
+                            <label>
+                                Number coming
+                                <input type="number" name="qty" min="1" value="<?php echo (int) $currentQty; ?>">
+                            </label>
+                            <label>
+                                Notes
+                                <input type="text" name="notes" value="<?php echo calendar_e($currentNotes); ?>" placeholder="Optional">
+                            </label>
+                        </div>
+                        <div class="rsvp-choices">
+                            <button type="submit" name="rsvp_status" value="going" class="rsvp-choice<?php echo $currentStatus === 'going' ? ' is-active' : ''; ?>">Attending</button>
+                            <button type="submit" name="rsvp_status" value="maybe" class="rsvp-choice<?php echo $currentStatus === 'maybe' ? ' is-active' : ''; ?>">Maybe</button>
+                            <button type="submit" name="rsvp_status" value="not_going" class="rsvp-choice<?php echo $currentStatus === 'not_going' ? ' is-active' : ''; ?>">Not attending</button>
+                        </div>
+                        <?php if ($currentStatus !== '') : ?>
+                            <button type="submit" name="rsvp_status" value="clear" class="rsvp-clear">Clear my response</button>
+                        <?php endif; ?>
                     </form>
-                <?php endif; ?>
+                </div>
             <?php else : ?>
                 <p class="muted">Please <a href="<?php echo calendar_e(calendar_config('login_url', '/login.php')); ?>">log in</a> to RSVP.</p>
             <?php endif; ?>

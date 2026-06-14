@@ -55,8 +55,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $pdo->query('SELECT e.*, ' . calendar_chapter_name_sql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN chapters c ON c.id = e.chapter_id ORDER BY e.start_at DESC');
+$viewMode = ($_GET['view'] ?? 'list') === 'month' ? 'month' : 'list';
+$chapterFilter = $_GET['chapter_id'] ?? '';
+$hasChapterId = calendar_events_has_chapter_id($pdo);
+$chapters = [];
+try {
+    $chapters = calendar_list_chapters_for_dropdown($pdo);
+} catch (Throwable $e) {
+    $chapters = [];
+}
+
+$listSql = 'SELECT e.*, ' . calendar_chapter_name_sql($pdo) . ' AS chapter_name FROM calendar_events e LEFT JOIN chapters c ON c.id = e.chapter_id';
+$listParams = [];
+if ($chapterFilter !== '' && $hasChapterId) {
+    $listSql .= ' WHERE (e.scope = "NATIONAL" OR e.chapter_id = :chapter_id)';
+    $listParams['chapter_id'] = (int) $chapterFilter;
+}
+$listSql .= ' ORDER BY e.start_at DESC';
+$stmt = $pdo->prepare($listSql);
+$stmt->execute($listParams);
 $events = $stmt->fetchAll();
+$chapterQuery = $chapterFilter !== '' ? '&chapter_id=' . urlencode((string) $chapterFilter) : '';
 
 $pageTitle = 'Calendar Events';
 $activePage = 'calendar-events';
@@ -89,6 +108,52 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+          <a href="events.php?view=list<?php echo $chapterQuery; ?>" class="px-4 py-2 text-sm font-semibold <?php echo $viewMode === 'list' ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:bg-gray-50'; ?>">List</a>
+          <a href="events.php?view=month<?php echo $chapterQuery; ?>" class="px-4 py-2 text-sm font-semibold <?php echo $viewMode === 'month' ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:bg-gray-50'; ?>">Month</a>
+        </div>
+        <form method="get" class="flex items-center gap-2">
+          <input type="hidden" name="view" value="<?php echo calendar_e($viewMode); ?>">
+          <label class="text-sm text-gray-500" for="chapter_id">Chapter</label>
+          <select id="chapter_id" name="chapter_id" onchange="this.form.submit()" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+            <option value="">All chapters</option>
+            <?php foreach ($chapters as $chapter) : ?>
+              <option value="<?php echo (int) $chapter['id']; ?>" <?php echo ((string) $chapterFilter === (string) $chapter['id']) ? 'selected' : ''; ?>>
+                <?php echo calendar_e($chapter['display_label'] ?? $chapter['name']); ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <noscript><button type="submit" class="rounded-lg border border-gray-200 px-3 py-2 text-sm">Apply</button></noscript>
+        </form>
+      </div>
+
+      <?php if ($viewMode === 'month') : ?>
+      <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+        <div id="admin-calendar"></div>
+      </section>
+      <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+      <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          var el = document.getElementById('admin-calendar');
+          if (!el || typeof FullCalendar === 'undefined') { return; }
+          var calendar = new FullCalendar.Calendar(el, {
+            initialView: 'dayGridMonth',
+            firstDay: 1,
+            height: 760,
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+            events: 'admin_events_feed.php?chapter_id=<?php echo urlencode((string) $chapterFilter); ?>',
+            eventDidMount: function (info) {
+              if (info.event.extendedProps.status === 'cancelled') {
+                info.el.style.opacity = '0.6';
+              }
+            }
+          });
+          calendar.render();
+        });
+      </script>
+      <?php else : ?>
       <section data-tour="manage-events-list book-event-list" class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
         <?php if (empty($events)) : ?>
           <p class="text-sm text-gray-500">No events found.</p>
@@ -156,6 +221,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
         <?php endif; ?>
       </section>
+      <?php endif; ?>
     </div>
   </main>
 </div>

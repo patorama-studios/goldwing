@@ -3297,6 +3297,61 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 037 — Multi-state RSVPs (Attending / Maybe / Not attending)
+// The calendar RSVP system was one-way: members could only ever say "going" and
+// could never change or cancel it. The new model lets a member move freely
+// between Attending (going), Maybe (maybe), Not attending (not_going), or blank
+// (no row at all). Widen calendar_event_rsvps.status to support the new states.
+//
+// The legacy enum was ('going','cancelled') and nothing ever wrote 'cancelled',
+// but to be safe we preserve any such rows as 'not_going'. Because 'not_going'
+// isn't a valid value under the old enum, we first widen to a SUPERSET, convert
+// the legacy rows, then narrow to the final enum.
+// Mirrors calendar/sql/schema.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_037_rsvp_status_states';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 037 — Multi-state RSVPs', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $applied = [];
+    $errors  = [];
+    $tryExec = function (string $sql, string $label) use ($pdo, &$applied, &$errors) {
+        try {
+            $pdo->exec($sql);
+            $applied[] = $label;
+        } catch (\Throwable $e) {
+            $errors[] = $label . ': ' . $e->getMessage();
+        }
+    };
+
+    // 1. Widen to a superset so 'not_going' becomes assignable.
+    $tryExec(
+        "ALTER TABLE calendar_event_rsvps MODIFY COLUMN status ENUM('going','maybe','not_going','cancelled') NOT NULL DEFAULT 'going'",
+        'status enum widened to superset'
+    );
+    // 2. Preserve any legacy withdrawals as 'not_going'.
+    $tryExec(
+        "UPDATE calendar_event_rsvps SET status = 'not_going' WHERE status = 'cancelled'",
+        'legacy cancelled rows converted to not_going'
+    );
+    // 3. Narrow to the final enum.
+    $tryExec(
+        "ALTER TABLE calendar_event_rsvps MODIFY COLUMN status ENUM('going','maybe','not_going') NOT NULL DEFAULT 'going'",
+        'status enum finalised'
+    );
+
+    if ($errors) {
+        $results[] = ['label' => 'Migration 037 — Multi-state RSVPs', 'status' => 'error', 'note' => implode('; ', $errors)];
+    } else {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 037 — Multi-state RSVPs', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

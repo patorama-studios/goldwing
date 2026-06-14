@@ -33,8 +33,9 @@ if ($hasMemberVehicles) {
 
 if ($type === 'rsvp') {
     $paidSelect = $eventIsPaid ? 'CASE WHEN t.user_id IS NULL THEN "No" ELSE "Yes" END AS paid' : '"N/A" AS paid';
+    $responseSelect = 'CASE r.status WHEN \'going\' THEN \'Attending\' WHEN \'maybe\' THEN \'Maybe\' WHEN \'not_going\' THEN \'Not attending\' ELSE r.status END AS response';
     $sql = 'SELECT m.id AS member_id, m.first_name, m.last_name, u.name AS user_name, u.email, '
-        . $primaryBikeSelect . ', r.qty, r.notes, r.created_at, ' . $paidSelect
+        . $primaryBikeSelect . ', ' . $responseSelect . ', r.qty, r.notes, r.created_at, ' . $paidSelect
         . ' FROM calendar_event_rsvps r'
         . ' JOIN users u ON u.id = r.user_id'
         . ' LEFT JOIN members m ON m.id = u.member_id';
@@ -45,7 +46,7 @@ if ($type === 'rsvp') {
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['event_id' => $eventId]);
     $rows = $stmt->fetchAll();
-    $headers = ['member_id', 'name', 'email', 'primary_bike', 'qty', 'notes', 'paid', 'created_at'];
+    $headers = ['member_id', 'name', 'response', 'email', 'primary_bike', 'qty', 'notes', 'paid', 'created_at'];
 } else {
     $sql = 'SELECT m.id AS member_id, m.first_name, m.last_name, u.name AS user_name, u.email, '
         . $primaryBikeSelect . ', t.qty, t.ticket_code, t.created_at, "Yes" AS paid'

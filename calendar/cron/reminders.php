@@ -28,7 +28,7 @@ foreach ($events as $event) {
         continue;
     }
 
-    $stmt = $pdo->prepare('SELECT r.user_id, u.email FROM calendar_event_rsvps r JOIN users u ON u.id = r.user_id WHERE r.event_id = :event_id AND r.status = "going"');
+    $stmt = $pdo->prepare('SELECT r.user_id, u.email FROM calendar_event_rsvps r JOIN users u ON u.id = r.user_id WHERE r.event_id = :event_id AND r.status IN ("going","maybe")');
     $stmt->execute(['event_id' => $event['id']]);
     $rsvpUsers = $stmt->fetchAll();
 

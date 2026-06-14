@@ -234,6 +234,7 @@ foreach ($rsvpRows as $row) {
         'email' => $row['email'] ?? '',
         'primary_bike' => $row['primary_bike'] ?? '',
         'paid' => (int) ($row['paid'] ?? 0),
+        'status' => $row['status'] ?? 'going',
     ];
 }
 
@@ -258,6 +259,7 @@ if ((int) $event['is_paid'] === 1) {
                 'email' => $row['email'] ?? '',
                 'primary_bike' => $row['primary_bike'] ?? '',
                 'paid' => 1,
+                'status' => 'going',
             ];
         } else {
             $attendeeByUser[$userId]['paid'] = 1;
@@ -269,6 +271,21 @@ $attendees = array_values($attendeeByUser);
 usort($attendees, function ($a, $b) {
     return strcasecmp($a['name'], $b['name']);
 });
+
+$rsvpStatusLabels = ['going' => 'Attending', 'maybe' => 'Maybe', 'not_going' => 'Not attending'];
+$rsvpStatusBadges = [
+    'going' => 'bg-emerald-100 text-emerald-800',
+    'maybe' => 'bg-amber-100 text-amber-800',
+    'not_going' => 'bg-gray-200 text-gray-700',
+];
+$responseCounts = ['going' => 0, 'maybe' => 0, 'not_going' => 0];
+foreach ($attendees as $att) {
+    $s = $att['status'] ?? 'going';
+    if (!isset($responseCounts[$s])) {
+        $s = 'going';
+    }
+    $responseCounts[$s]++;
+}
 
 $timezoneOptions = [
     'Australia/Sydney',
@@ -537,13 +554,19 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php if (empty($attendees)) : ?>
               <p class="text-sm text-gray-500">No attendees yet.</p>
             <?php else : ?>
-              <div class="text-xs text-gray-500">Total attendees: <?php echo count($attendees); ?></div>
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="text-gray-500">Total responses: <?php echo count($attendees); ?></span>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 font-semibold bg-emerald-100 text-emerald-800">Attending <?php echo (int) $responseCounts['going']; ?></span>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 font-semibold bg-amber-100 text-amber-800">Maybe <?php echo (int) $responseCounts['maybe']; ?></span>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 font-semibold bg-gray-200 text-gray-700">Not attending <?php echo (int) $responseCounts['not_going']; ?></span>
+              </div>
               <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                   <thead class="text-left text-xs uppercase text-gray-500 border-b">
                     <tr>
                       <th class="py-2 pr-3">Member ID</th>
                       <th class="py-2 pr-3">Name</th>
+                      <th class="py-2 pr-3">Response</th>
                       <th class="py-2 pr-3">Email</th>
                       <th class="py-2 pr-3">Primary Bike</th>
                       <?php if ((int) $event['is_paid'] === 1) : ?>
@@ -553,9 +576,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </thead>
                   <tbody class="divide-y">
                     <?php foreach ($attendees as $attendee) : ?>
+                      <?php $attStatus = $attendee['status'] ?? 'going'; if (!isset($rsvpStatusLabels[$attStatus])) { $attStatus = 'going'; } ?>
                       <tr>
                         <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e((string) ($attendee['member_id'] ?? '—')); ?></td>
                         <td class="py-2 pr-3 text-gray-900 font-medium"><?php echo calendar_e($attendee['name']); ?></td>
+                        <td class="py-2 pr-3">
+                          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold <?php echo $rsvpStatusBadges[$attStatus]; ?>">
+                            <?php echo calendar_e($rsvpStatusLabels[$attStatus]); ?>
+                          </span>
+                        </td>
                         <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e($attendee['email']); ?></td>
                         <td class="py-2 pr-3 text-gray-700"><?php echo calendar_e($attendee['primary_bike'] !== '' ? $attendee['primary_bike'] : '—'); ?></td>
                         <?php if ((int) $event['is_paid'] === 1) : ?>

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS calendar_event_rsvps (
     user_id INT NOT NULL,
     qty INT NOT NULL DEFAULT 1,
     notes VARCHAR(500) DEFAULT NULL,
-    status ENUM('going','cancelled') NOT NULL DEFAULT 'going',
+    status ENUM('going','maybe','not_going') NOT NULL DEFAULT 'going',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_event_user (event_id, user_id),
     INDEX idx_event_id (event_id)

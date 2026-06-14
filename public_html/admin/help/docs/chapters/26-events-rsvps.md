@@ -4,7 +4,7 @@
 
 ### What this is
 
-The **ride calendar**. It's the public-facing list of rides, meetings, breakfasts, rallies, and social events the club runs. Members browse it, click an event, and **RSVP** to say they're coming — that's how we know how many bikes to expect at the start point or how many breakfasts to order.
+The **ride calendar**. It's the public-facing list of rides, meetings, breakfasts, rallies, and social events the club runs. Members browse it, click an event, and **RSVP** — choosing **Attending**, **Maybe**, or **Not attending** (or clearing their response to leave it blank). They can change or clear that response any time they log back in. That's how we know how many bikes to expect at the start point or how many breakfasts to order.
 
 Some events are open to everyone (national rallies, AGM); others are scoped to a single chapter (a chapter's monthly breakfast). Free events take RSVPs; a small number of paid events take ticket purchases through Stripe.
 
@@ -12,7 +12,7 @@ Some events are open to everyone (national rallies, AGM); others are scoped to a
 
 - **Create an event** — a ride, meeting, social, or rally — with date, time, location, and description.
 - **Edit an existing event** — fix a typo, change the start point, push the time back an hour.
-- **See who's RSVP'd** — full attendee list with each member's name, RSVP quantity (e.g. member + pillion), and any notes they left.
+- **See who's RSVP'd** — full attendee list showing each member's **response** (Attending / Maybe / Not attending), RSVP quantity (e.g. member + pillion), and any notes they left, plus a tally of each response at the top.
 - **Cancel an event** and notify everyone who RSVP'd.
 - **Set the chapter scope** — make an event visible to one chapter only, or to every member.
 - **Approve member-submitted events** — members can propose events too; they land as `pending` for an admin to publish.
@@ -30,10 +30,10 @@ If you don't see the **Create Event** button, your role doesn't have calendar pe
 
 Two routes, same calendar:
 
-1. **Admin sidebar → Calendar** — the full list of every event (`/calendar/events.php`).
+1. **Admin sidebar → Calendar** — every event (`/calendar/events.php`). Switch between a **List** view and a **Month** view with the toggle at the top, and narrow either view to a single **chapter** with the chapter filter. The month view shows every status (pending, published, cancelled) colour-coded; clicking an event opens its edit page.
 2. **Admin dashboard → Upcoming Events card** — a quick glance at the next few events from the home screen.
 
-The public calendar (what members see) lives at `/calendar/` on the site.
+The public calendar (what members see) lives at `/calendar/` on the site — members already get Month / List / Day views and the same chapter filter there.
 
 ### How to create an event (step by step)
 
@@ -61,11 +61,13 @@ Admin sidebar → **Calendar** → click the event title → **Attendees**.
 
 You'll see:
 
+- Each member's **response** — **Attending**, **Maybe**, or **Not attending** — shown as a coloured badge.
+- A **tally** at the top (Attending / Maybe / Not attending counts) so you can size catering at a glance.
 - Each member's **name** and **RSVP quantity** (1 = themselves, 2 = themselves + pillion, etc.).
 - Any **notes** they added when RSVPing ("bringing a friend", "leaving early at lunch").
-- A **CSV export** button — handy for handing the list to the ride leader.
+- A **CSV export** button — now includes the response column — handy for handing the list to the ride leader.
 
-The number at the top is the total head count, not the number of RSVPs — so 8 RSVPs × an average of 1.5 each = a total of 12.
+For a **capacity-limited** (or paid) event, both **Attending and Maybe** count against the cap — a Maybe holds a spot. **Not attending** never consumes capacity.
 
 ### How to cancel an event and notify attendees
 
@@ -126,7 +128,7 @@ Most of what the club does is rides, breakfasts, and meetings, and the website's
 
 - **A separate `calendar/` top-level directory** — the module shipped as a near-standalone bolt-on (its own `lib/`, `config/`, `cron/`, `sql/`, `public/`). It shares `users`, `chapters`, `members`, `media`, `notices`, and `settings_*` tables but otherwise owns its own world. That isolation let the feature ship without destabilising the main admin.
 - **A new `calendar_events` table, not the old `events` table.** The legacy `events` table is still in the DB (`EventService::updateDescription()` + `event_versions` still target it), but all new event work writes to `calendar_events` — see Gotchas.
-- **RSVPs vs paid tickets are two different stores.** Free events use `calendar_event_rsvps` (going / cancelled + qty + notes). Paid events use `calendar_event_tickets` + `calendar_orders` + the Stripe webhook in `calendar/public/webhook_stripe.php`. Matches how the club runs events — mostly free with RSVP for catering/insurance counts, a few paid.
+- **RSVPs vs paid tickets are two different stores.** Free events use `calendar_event_rsvps` (`going` / `maybe` / `not_going` + qty + notes; one row per member, **upserted** so a member can change or clear their response — clearing deletes the row). Paid events use `calendar_event_tickets` + `calendar_orders` + the Stripe webhook in `calendar/public/webhook_stripe.php`. Matches how the club runs events — mostly free with RSVP for catering/insurance counts, a few paid.
 - **Chapter scope is a first-class field.** Every event is `CHAPTER` (one chapter) or `NATIONAL` (everyone). The weekly digest filters on this so members don't get spammed.
 
 ### How it works
@@ -136,7 +138,7 @@ Most of what the club does is rides, breakfasts, and meetings, and the website's
 `calendar/sql/schema.sql` creates:
 
 - **`calendar_events`** — the modern event table. Columns: `title`, `slug`, `description` (sanitised HTML from the WYSIWYG editor, utf8mb4 so emoji are safe), `media_id` (thumbnail), `scope` (`CHAPTER`/`NATIONAL`), `chapter_id`, `event_type` (`in_person`/`online`/`hybrid`), `timezone`, `start_at`, `end_at`, `all_day`, `recurrence_rule` (RRULE), `rsvp_enabled`, `is_paid`, `ticket_product_id`, `capacity`, `sales_close_at`, `map_url`, `map_zoom`, `online_url`, `meeting_point`, `destination`, `status` (`published`/`cancelled`, plus an implicit `pending` for member-submitted events awaiting admin approval), `created_by`, `created_at`.
-- **`calendar_event_rsvps`** — one row per `(event_id, user_id)` (unique key), `qty`, `notes`, `status` (`going`/`cancelled`).
+- **`calendar_event_rsvps`** — one row per `(event_id, user_id)` (unique key), `qty`, `notes`, `status` (`going` = Attending / `maybe` = Maybe / `not_going` = Not attending). Written by `event_view.php` as an `INSERT … ON DUPLICATE KEY UPDATE` upsert; a "clear" deletes the row. The enum was widened from the legacy `('going','cancelled')` by **Migration 037** in `run-migration.php` (and `calendar/sql/schema.sql` for fresh installs).
 - **`calendar_event_tickets`** — paid-event tickets, linked to a `calendar_orders` row + Stripe payment.
 - **`calendar_refund_requests`** — refund queue for paid tickets.
 - **`calendar_event_notifications_queue`** — append-only log of sent notifications; the reminder cron uses it to dedupe.
@@ -146,8 +148,8 @@ Most of what the club does is rides, breakfasts, and meetings, and the website's
 #### The module
 
 - `calendar/lib/` — `db.php` (its own PDO connection), `auth.php` (`calendar_require_login`, `calendar_require_role` — reuses the main site session), `csrf.php`, `utils.php`, `mailer.php`, `calendar_occurrences.php` (the RRULE expander).
-- `calendar/public/` — `events.php` (admin list — sidebar links here), `admin_event_create.php`, `admin_event_view.php` (attendee list + refund actions), `events_public.php` (public calendar), `event_view.php` (public detail + RSVP form), `member_event_submit.php` (members propose events; land as `pending`), `ics.php` (single-event .ics), `ics_feed.php` (subscribable feed), `webhook_stripe.php`, `dashboard_events.php`, `export_attendees.php`.
-- `calendar/cron/` — `reminders.php` (hourly: 7-day and 24-hour emails to anyone with a `going` RSVP or a ticket; deduped via the queue table) and `weekly_digest.php` (per-user digest of upcoming events in their chapter plus recent notices, gated by `notifications.weekly_digest_enabled` and per-user `notification_preferences`).
+- `calendar/public/` — `events.php` (admin calendar — sidebar links here; **List/Month toggle + chapter filter** via `?view=` and `?chapter_id=` GET params), `admin_events_feed.php` (JSON feed powering the admin Month view — all statuses, links to the edit page, admin-only), `admin_event_create.php`, `admin_event_view.php` (attendee list with response badges + refund actions), `events_public.php` (public calendar), `api_events_feed.php` (public JSON feed), `event_view.php` (public detail + RSVP control), `member_event_submit.php` (members propose events; land as `pending`), `ics.php` (single-event .ics), `ics_feed.php` (subscribable feed), `webhook_stripe.php`, `dashboard_events.php`, `export_attendees.php`.
+- `calendar/cron/` — `reminders.php` (hourly: 7-day and 24-hour emails to anyone with a `going` **or `maybe`** RSVP or a ticket; deduped via the queue table) and `weekly_digest.php` (per-user digest of upcoming events in their chapter plus recent notices, gated by `notifications.weekly_digest_enabled` and per-user `notification_preferences`).
 - `calendar/config/config.php` — DB + Stripe + mail config for the module, per environment.
 
 #### Recurring events
@@ -182,7 +184,7 @@ The legacy `?page=events` route still exists by direct URL but isn't linked anyw
 #### Notifications
 
 - **New event created** — not currently broadcast on save. Members find out via the next weekly digest or by visiting `/calendar/`.
-- **Reminders** — `calendar/cron/reminders.php` hourly, 7-day + 24-hour emails to confirmed attendees, deduped via the queue table.
+- **Reminders** — `calendar/cron/reminders.php` hourly, 7-day + 24-hour emails to **Attending and Maybe** RSVPs plus ticket holders, deduped via the queue table.
 - **Weekly digest** — gated by `notifications.weekly_digest_enabled` plus per-user `notification_preferences.weekly_digest`. Filters to `NATIONAL` + the user's `chapter_id`.
 
 #### Dashboard widget
@@ -216,6 +218,7 @@ Reminder/digest behaviour comes from `notifications.event_reminders_enabled` and
 - **The admin dashboard "Upcoming Events" card reads the legacy table.** `/admin/index.php` ~line 1524 does `SELECT * FROM events WHERE event_date >= CURDATE()`. On any environment where `events` is empty, the widget shows "No upcoming events" even if `/calendar/` is full. Migrate to `calendar_events` next time you're in that file.
 - **Chapter-scoped events are only filtered in the digest, not the public calendar.** `/calendar/` shows all `published` events; the `chapter_id` filter only kicks in when a user picks it from the dropdown. "Only my chapter" by default for logged-in members would need to be added.
 - **Timezones are per-event.** `calendar_events.timezone` overrides everything; if empty, fallback is `calendar_config('timezone_default', 'UTC')` — *not* the global `site.timezone`. Keep `calendar/config/config.php`'s `timezone_default` aligned with `site.timezone` (both default to `Australia/Sydney`).
+- **Capacity counts `going` + `maybe`.** Every spot-counting query in `event_view.php` (the RSVP capacity check, the "X of Y spots filled" line, the `buy_ticket` check) uses `status IN ('going','maybe')` plus ticket qty. The capacity check on an upsert deliberately excludes the member's *own* existing row (`user_id <> :user_id`) so changing your qty/status never double-counts. `not_going` and "blank" never consume capacity.
 - **RRULE support is partial.** `FREQ=DAILY|WEEKLY|MONTHLY` + `INTERVAL`, `BYDAY`, `UNTIL`. No yearly, no `BYSETPOS` ("last Sunday of the month" doesn't work), no exception dates.
 - **The calendar module has its own session bootstrap and CSRF.** `app/bootstrap.php` does **not** run on `/calendar/` requests. Helpers like `db()`, `current_user()`, `e()` aren't available — use `calendar_db()`, `calendar_current_user()`, `calendar_e()`.
 - **No event-creation broadcast.** Members aren't emailed when a new event is published. Discovery is via the weekly digest and the public calendar. Instant notify-on-publish would need wiring to `App\Services\NotificationService`.
