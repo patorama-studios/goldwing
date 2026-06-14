@@ -141,11 +141,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <p class="text-gray-900 font-semibold"><?= e(yesNoLabel(!empty($application['assist_tools']))) ?></p>
                 </div>
                 <div>
-                  <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Exclude printed magazine</p>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Exclude from Member Directory</p>
                   <p class="text-gray-900 font-semibold"><?= e(yesNoLabel(!empty($application['exclude_printed']))) ?></p>
                 </div>
                 <div>
-                  <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Exclude electronic magazine</p>
+                  <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Exclude from Electronic Directory</p>
                   <p class="text-gray-900 font-semibold"><?= e(yesNoLabel(!empty($application['exclude_electronic']))) ?></p>
                 </div>
               </div>

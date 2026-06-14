@@ -374,6 +374,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined text-sm">local_post_office</span>
               Printed mailing list
             </a>
+            <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/export.php?list=email_pdf" title="Every current member with an email address — the full electronic Wings PDF distribution list. Ignores print/digital preference and directory opt-outs (everyone is emailed the PDF).">
+              <span class="material-icons-outlined text-sm">mark_email_read</span>
+              Email PDF list
+            </a>
             <details class="relative">
               <summary class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300 cursor-pointer">
                 <span class="material-icons-outlined text-sm">upload</span>
@@ -542,9 +546,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Wings magazine
                 <select name="wings_preference" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
-                  <option value="" <?= $filters['wings_preference'] === '' ? 'selected' : '' ?>>All (everyone gets the email PDF)</option>
-                  <option value="printed" <?= $filters['wings_preference'] === 'printed' ? 'selected' : '' ?>>Needs a printed copy</option>
-                  <option value="digital" <?= $filters['wings_preference'] === 'digital' ? 'selected' : '' ?>>Email PDF only</option>
+                  <option value="" <?= $filters['wings_preference'] === '' ? 'selected' : '' ?>>All members (everyone is emailed the PDF)</option>
+                  <option value="printed" <?= $filters['wings_preference'] === 'printed' ? 'selected' : '' ?>>Needs a printed copy posted</option>
+                  <option value="digital" <?= $filters['wings_preference'] === 'digital' ? 'selected' : '' ?>>Email-only (no posted copy)</option>
                 </select>
               </label>
             </div>

@@ -17,6 +17,12 @@ if (!is_array($directoryPrefInput)) {
     $directoryPrefInput = $directoryPrefInput === '' ? [] : [$directoryPrefInput];
 }
 
+// "Email PDF list" mode — the electronic Wings distribution list. Everyone is
+// emailed the PDF regardless of their print/digital preference or any directory
+// opt-out, so this mode ignores the wings_preference filter entirely and only
+// keeps members who actually have an email address (see the output loop below).
+$emailPdfList = ($_GET['list'] ?? '') === 'email_pdf';
+
 $filters = [
     'q' => trim((string) ($_GET['q'] ?? '')),
     'membership_type_id' => isset($_GET['membership_type_id']) && $_GET['membership_type_id'] !== '' ? (int) $_GET['membership_type_id'] : null,
@@ -33,7 +39,7 @@ $filters = [
     'has_trailer' => $_GET['has_trailer'] ?? null,
     'has_sidecar' => $_GET['has_sidecar'] ?? null,
     'has_historic_rego' => $_GET['has_historic_rego'] ?? null,
-    'wings_preference' => in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both', 'printed'], true) ? $_GET['wings_preference'] : '',
+    'wings_preference' => (!$emailPdfList && in_array($_GET['wings_preference'] ?? '', ['digital', 'print', 'both', 'printed'], true)) ? $_GET['wings_preference'] : '',
 ];
 if (isset($_GET['sort_by'])) {
     $filters['sort_by'] = $_GET['sort_by'];
@@ -67,11 +73,16 @@ ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.export', [
 SecurityAlertService::send('member_export', 'Security alert: member export', '<p>Member export performed by ' . e($user['email'] ?? '') . '.</p>');
 
 header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="members.csv"');
+header('Content-Disposition: attachment; filename="' . ($emailPdfList ? 'wings_email_list.csv' : 'members.csv') . '"');
 $out = fopen('php://output', 'w');
 fputcsv($out, ['Member #', 'Name', 'Email', 'Phone', 'Address 1', 'Address 2', 'Suburb', 'State', 'Postcode', 'Country', 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences']);
 
 foreach ($members as $member) {
+    // Email PDF list: a member with no email address can't receive the emailed
+    // magazine, so leave them off this list (they belong on the printed list).
+    if ($emailPdfList && trim((string) ($member['email'] ?? '')) === '') {
+        continue;
+    }
     $prefs = [];
     foreach ($directoryPrefs as $letter => $info) {
         if (!empty($member[$info['column']])) {
