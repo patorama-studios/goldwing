@@ -5733,7 +5733,7 @@ if ($renewModalEligible) {
           <?php if ($renewPartnerMember && $renewPartnerOfferable): ?>
             <div data-tour="renew-partner">
               <label class="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
-                <input type="checkbox" value="1" data-pay-drawer-partner
+                <input type="checkbox" value="1" data-pay-drawer-partner checked
                   class="mt-0.5 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-600">
                 <div class="flex-1">
                   <p class="text-sm font-semibold text-gray-900">Also pay for my <?= e(strtolower($renewPartnerTypeLabel)) ?> member</p>
