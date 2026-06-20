@@ -136,6 +136,22 @@ The dispatcher in `stripe_webhook.php` routes on `$event['type']`:
 
 Anything else gets recorded in `webhook_events` but no further action runs.
 
+> **Membership payments now use Stripe Invoices (June 2026).** The member-facing
+> Stripe flows — join (`/apply.php`, `/become-a-member`), the renewal lightbox
+> (`/api/payments/membership-intent`), and the billing-page "Pay now"
+> (`/api/payments/intent`) — build an **itemized Stripe Invoice** via
+> `MembershipInvoiceService` and the customer pays the invoice's PaymentIntent,
+> so the dashboard shows line items + a hosted PDF + the Customer. Because a PI
+> tied to an invoice short-circuits `payment_intent.succeeded` (see the table),
+> activation for these flows now runs through **`invoice.paid`**:
+> `handleInvoicePaid()` activates **every** `order_type=membership` row stamped
+> with that `stripe_invoice_id` (so a partner renewal billed on the same invoice
+> is activated too). New-member **application** invoices carry
+> `metadata.context=membership_application` and have no order row yet, so
+> `handleInvoicePaid()` skips them quietly — activation stays with `apply.php`'s
+> POST handler + admin approval. The admin application-approval path still uses a
+> Checkout Session (also itemized).
+
 > **Cart conversion happens here, not at checkout-create time.** For store orders, `markStoreOrderPaid()` (called by `handleInvoicePaid`, `handleCheckoutCompleted`, and `handlePaymentIntentSucceeded`) is what flips `store_carts.status` from `active` to `converted`. The `/api/stripe/create-payment-intent` endpoint deliberately leaves the cart `active` so a card decline or abandoned session doesn't lock the member out. The cart is looked up by `metadata.cart_id` on the PI/Session, with a fallback to the user's currently-active cart row.
 
 After the dispatcher, `markProcessed($eventId, 'processed' | 'failed', $error)` updates the row, logs to `ActivityLogger`, and on failure calls `alertOnFailures()` which checks the threshold and may fire a Security Alert email.

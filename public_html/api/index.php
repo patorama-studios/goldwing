@@ -10,6 +10,7 @@ use App\Services\PaymentSettingsService;
 use App\Services\PaymentWebhookService;
 use App\Services\StepUpService;
 use App\Services\StoreInvoiceService;
+use App\Services\MembershipInvoiceService;
 use App\Services\StripeErrorLogger;
 use App\Services\StripeService;
 use App\Services\StripeSettingsService;
@@ -500,30 +501,38 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     if ($feeCents > 0) {
         $metadata['processing_fee_cents'] = (string) $feeCents;
     }
-    $orderNumbers = array_map(static fn($r) => $r['order_number'], $renewers);
-    try {
-        $pi = StripeService::createPaymentIntent([
-            'amount' => $grandTotalCents,
-            'currency' => strtolower($currency),
-            'description' => 'AGA membership — ' . implode(' + ', $orderNumbers) . ' (' . $term . ')',
-            'metadata' => $metadata,
-            'automatic_payment_methods' => ['enabled' => true],
-        ]);
-    } catch (Throwable $e) {
-        error_log('[/api/payments/membership-intent] PI create failed: ' . $e->getMessage());
-        json_response(['error' => 'Stripe could not start the payment.'], 502);
-    }
-    if (!$pi || empty($pi['id']) || empty($pi['client_secret'])) {
-        json_response(['error' => 'Stripe could not start the payment.'], 502);
-    }
+    // Build one itemized Stripe Invoice covering all renewers, so the dashboard
+    // shows line items + a hosted PDF and groups under the member's Customer.
+    // The invoice's PaymentIntent is what the lightbox pays; the invoice.paid
+    // webhook activates every stamped order (primary + partner).
+    $renewerLines = [];
     foreach ($renewers as $r) {
-        try {
-            $stmt = $pdo->prepare('UPDATE orders SET stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['pi' => (string) $pi['id'], 'id' => $r['order_id']]);
-        } catch (Throwable $e) {
-            error_log('[/api/payments/membership-intent] PI cache-back failed: ' . $e->getMessage());
-        }
+        $renewerLines[] = [
+            'order_id' => (int) $r['order_id'],
+            'label'    => (string) $r['label'],
+            'cents'    => (int) $r['cents'],
+        ];
     }
+    try {
+        $resolved = MembershipInvoiceService::createRenewalInvoice(
+            (int) $member['id'],
+            (string) ($member['email'] ?? ''),
+            trim(((string) ($member['first_name'] ?? '')) . ' ' . ((string) ($member['last_name'] ?? ''))),
+            $renewerLines,
+            $feeCents,
+            $currency,
+            $metadata
+        );
+    } catch (Throwable $e) {
+        error_log('[/api/payments/membership-intent] invoice create failed: ' . $e->getMessage());
+        json_response(['error' => 'Stripe could not start the payment.'], 502);
+    }
+    if (empty($resolved['client_secret'])) {
+        json_response(['error' => 'Stripe could not start the payment.'], 502);
+    }
+    // createRenewalInvoice() already stamped each renewer order with the invoice
+    // + PaymentIntent id.
+    $pi = ['id' => $resolved['payment_intent_id'], 'client_secret' => $resolved['client_secret']];
 
     $lines = [];
     foreach ($renewers as $r) {
@@ -617,6 +626,38 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'inte
             'order' => $order,
         ];
         $intentTable = 'orders';
+
+        // Itemized Stripe Invoice for this single pending membership order, so
+        // the dashboard shows the line item + PDF and groups under the member's
+        // Customer. Refresh-safe (reuses an open invoice). The invoice.paid
+        // webhook activates the order via its stamped invoice id.
+        $lineLabel = trim((string) ($order['item_name'] ?? '')) !== ''
+            ? (string) $order['item_name']
+            : ('AGA membership — order ' . ($order['order_number'] ?? ('#' . $orderId)));
+        try {
+            $resolved = MembershipInvoiceService::createOrderInvoice(
+                $order,
+                (string) ($user['email'] ?? ''),
+                trim((string) ($user['name'] ?? '')),
+                [['description' => $lineLabel, 'cents' => $amountCents]],
+                [
+                    'order_id'  => (string) $orderId,
+                    'member_id' => (string) ($order['member_id'] ?? ''),
+                    'period_id' => (string) ($order['membership_period_id'] ?? ''),
+                    'context'   => $context,
+                ]
+            );
+        } catch (Throwable $e) {
+            error_log('[/api/payments/intent] membership invoice create failed: ' . $e->getMessage());
+            json_response(['error' => 'Could not start the payment with Stripe.'], 502);
+        }
+        json_response([
+            'client_secret'   => $resolved['client_secret'],
+            'publishable_key' => (string) $activeKeys['publishable_key'],
+            'amount_label'    => $intentArgs['amount_label'],
+            'description'     => $intentArgs['description'],
+            'invoice_id'      => $resolved['invoice_id'],
+        ]);
 
     } elseif ($context === 'store_order' && $orderId > 0) {
         $stmt = $pdo->prepare('SELECT * FROM store_orders WHERE id = :id AND user_id = :user_id LIMIT 1');
@@ -798,6 +839,69 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Primary member name and email are required.'], 422);
         }
 
+        $invoiceMeta = [
+            'membership_full' => $fullSelected ? '1' : '0',
+            'membership_associate' => $associateSelected ? '1' : '0',
+            'full_magazine_type' => $fullMagazineType,
+            'full_period_key' => $fullPeriodKey,
+            'associate_period_key' => $associatePeriodKey,
+            'associate_add' => $associateAdd,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'processing_fee_cents' => (string) $processingFeeCents,
+            'total_with_fee_cents' => (string) $totalWithFeeCents,
+        ];
+
+        // Card → itemized Stripe Invoice (line items + PDF + Customer in the
+        // dashboard). The invoice's PaymentIntent is what the Payment Element
+        // pays. Activation stays with apply.php's POST handler + admin approval,
+        // so the invoice.paid webhook is a no-op for these (skipped by context).
+        if ($paymentMethod === 'card') {
+            $labelFor = static function (string $magazine, string $type, string $key): string {
+                foreach (MembershipPricingService::getJoinOptions($magazine, $type) as $opt) {
+                    if (($opt['key'] ?? '') === $key) {
+                        return (string) ($opt['label'] ?? '');
+                    }
+                }
+                return '';
+            };
+            $magLabel = static fn(string $m): string => $m === 'PDF' ? 'Digital Wings' : 'Printed Wings';
+            $lines = [];
+            if ($fullSelected) {
+                $periodLabel = $labelFor($fullMagazineType, 'FULL', $fullPeriodKey);
+                $lines[] = [
+                    'description' => trim('Full membership' . ($periodLabel !== '' ? ' — ' . $periodLabel : '') . ' (' . $magLabel($fullMagazineType) . ')'),
+                    'cents' => (int) $fullPriceCents,
+                ];
+            }
+            if ($associateSelected) {
+                $assocMag = $fullSelected ? $fullMagazineType : 'PRINTED';
+                $periodLabel = $labelFor($assocMag, 'ASSOCIATE', $associatePeriodKey);
+                $lines[] = [
+                    'description' => trim('Associate membership' . ($periodLabel !== '' ? ' — ' . $periodLabel : '') . ' (' . $magLabel($assocMag) . ')'),
+                    'cents' => (int) $associatePriceCents,
+                ];
+            }
+            try {
+                $resolved = MembershipInvoiceService::createApplicationInvoice(
+                    $email,
+                    trim($firstName . ' ' . $lastName),
+                    $lines,
+                    $processingFeeCents,
+                    $invoiceMeta
+                );
+            } catch (\Throwable $e) {
+                error_log('[create-application-payment-intent] invoice create failed: ' . $e->getMessage());
+                json_response(['error' => 'Unable to create Stripe payment.'], 500);
+            }
+            json_response([
+                'client_secret' => $resolved['client_secret'],
+                'payment_intent_id' => $resolved['payment_intent_id'],
+                'invoice_id' => $resolved['invoice_id'],
+            ]);
+        }
+
+        // Non-card (bank transfer) — bare PaymentIntent, unchanged.
         $requestId = trim((string) ($body['request_id'] ?? ''));
         $intentIdempotency = $requestId !== '' ? $requestId : 'membership_application_' . bin2hex(random_bytes(6));
         $payload = [

@@ -405,6 +405,15 @@ class PaymentWebhookService
         $pdo = Database::connection();
         $order = null;
         $invoiceMetadata = is_array($invoice['metadata'] ?? null) ? $invoice['metadata'] : [];
+
+        // New-member application invoices have no order row — activation happens
+        // via apply.php's POST handler + admin approval. The invoice is a billing
+        // artifact only, so skip quietly (don't log a "order not found" error).
+        if (($invoiceMetadata['context'] ?? '') === 'membership_application'
+            || ($invoiceMetadata['purpose'] ?? '') === 'membership_application') {
+            return;
+        }
+
         if ($invoiceId !== '') {
             $stmt = $pdo->prepare('SELECT * FROM orders WHERE stripe_invoice_id = :invoice_id LIMIT 1');
             $stmt->execute(['invoice_id' => $invoiceId]);
@@ -493,6 +502,27 @@ class PaymentWebhookService
         if (!empty($order['user_id'])) {
             $stmt = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = :id AND is_active = 0');
             $stmt->execute(['id' => (int) $order['user_id']]);
+        }
+
+        // A combined renewal bills the partner's order on the SAME invoice.
+        // Activate every other membership order stamped with this invoice id
+        // (skip any already paid for idempotency).
+        if ($invoiceId !== '') {
+            $stmt = $pdo->prepare("SELECT * FROM orders WHERE stripe_invoice_id = :inv AND order_type = 'membership' AND id <> :id");
+            $stmt->execute(['inv' => $invoiceId, 'id' => (int) ($order['id'] ?? 0)]);
+            foreach ($stmt->fetchAll() as $extra) {
+                if (($extra['status'] ?? '') === 'paid') {
+                    continue;
+                }
+                MembershipOrderService::activateMembershipForOrder($extra, [
+                    'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+                    'period_id' => $extra['membership_period_id'] ?? null,
+                ]);
+                if (!empty($extra['user_id'])) {
+                    $stmt2 = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = :id AND is_active = 0');
+                    $stmt2->execute(['id' => (int) $extra['user_id']]);
+                }
+            }
         }
     }
 
