@@ -67,6 +67,8 @@ You'll see:
 - Any **notes** they added when RSVPing ("bringing a friend", "leaving early at lunch").
 - A **CSV export** button — now includes the response column — handy for handing the list to the ride leader.
 
+For a quick glance without scrolling the full table, a **Who's coming** roster (just the Attending and Maybe names, with a headcount badge) sits under **Location & Meeting** on the event's edit page.
+
 For a **capacity-limited** (or paid) event, both **Attending and Maybe** count against the cap — a Maybe holds a spot. **Not attending** never consumes capacity.
 
 ### How to cancel an event and notify attendees

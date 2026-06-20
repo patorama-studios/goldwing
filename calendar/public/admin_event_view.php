@@ -235,6 +235,7 @@ foreach ($rsvpRows as $row) {
         'primary_bike' => $row['primary_bike'] ?? '',
         'paid' => (int) ($row['paid'] ?? 0),
         'status' => $row['status'] ?? 'going',
+        'qty' => max(1, (int) ($row['qty'] ?? 1)),
     ];
 }
 
@@ -260,6 +261,7 @@ if ((int) $event['is_paid'] === 1) {
                 'primary_bike' => $row['primary_bike'] ?? '',
                 'paid' => 1,
                 'status' => 'going',
+                'qty' => max(1, (int) ($row['qty'] ?? 1)),
             ];
         } else {
             $attendeeByUser[$userId]['paid'] = 1;
@@ -279,12 +281,24 @@ $rsvpStatusBadges = [
     'not_going' => 'bg-gray-200 text-gray-700',
 ];
 $responseCounts = ['going' => 0, 'maybe' => 0, 'not_going' => 0];
+$attendingList = [];
+$maybeList = [];
+$attendingHeads = 0;
+$maybeHeads = 0;
 foreach ($attendees as $att) {
     $s = $att['status'] ?? 'going';
     if (!isset($responseCounts[$s])) {
         $s = 'going';
     }
     $responseCounts[$s]++;
+    $qty = max(1, (int) ($att['qty'] ?? 1));
+    if ($s === 'going') {
+        $attendingList[] = ['name' => $att['name'], 'qty' => $qty];
+        $attendingHeads += $qty;
+    } elseif ($s === 'maybe') {
+        $maybeList[] = ['name' => $att['name'], 'qty' => $qty];
+        $maybeHeads += $qty;
+    }
 }
 
 $timezoneOptions = [
@@ -417,6 +431,50 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               Online Meeting URL
               <input type="text" name="online_url" value="<?php echo calendar_e($event['online_url'] ?? ''); ?>" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
             </label>
+          </section>
+
+          <section class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+            <div class="flex items-center gap-2 text-gray-900 font-semibold">
+              <span class="material-icons-outlined text-primary">groups</span>
+              Who's coming
+            </div>
+            <p class="text-xs text-gray-500">Quick roster of Attending and Maybe responses. Full attendee table and CSV export are in the Attendees panel.</p>
+            <?php if (empty($attendingList) && empty($maybeList)) : ?>
+              <p class="text-sm text-gray-500">No-one has responded Attending or Maybe yet.</p>
+            <?php else : ?>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-emerald-700">Attending</span>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"><?php echo count($attendingList); ?><?php echo $attendingHeads !== count($attendingList) ? ' · ' . (int) $attendingHeads . ' coming' : ''; ?></span>
+                  </div>
+                  <?php if (empty($attendingList)) : ?>
+                    <p class="text-sm text-gray-400">—</p>
+                  <?php else : ?>
+                    <ul class="text-sm text-gray-700 space-y-1">
+                      <?php foreach ($attendingList as $a) : ?>
+                        <li><?php echo calendar_e($a['name']); ?><?php if ($a['qty'] > 1) : ?> <span class="text-gray-400">&times;<?php echo (int) $a['qty']; ?></span><?php endif; ?></li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php endif; ?>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-amber-700">Maybe</span>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800"><?php echo count($maybeList); ?><?php echo $maybeHeads !== count($maybeList) ? ' · ' . (int) $maybeHeads . ' coming' : ''; ?></span>
+                  </div>
+                  <?php if (empty($maybeList)) : ?>
+                    <p class="text-sm text-gray-400">—</p>
+                  <?php else : ?>
+                    <ul class="text-sm text-gray-700 space-y-1">
+                      <?php foreach ($maybeList as $a) : ?>
+                        <li><?php echo calendar_e($a['name']); ?><?php if ($a['qty'] > 1) : ?> <span class="text-gray-400">&times;<?php echo (int) $a['qty']; ?></span><?php endif; ?></li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php endif; ?>
+                </div>
+              </div>
+            <?php endif; ?>
           </section>
         </form>
 
