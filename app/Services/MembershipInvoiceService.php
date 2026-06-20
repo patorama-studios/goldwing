@@ -156,9 +156,12 @@ class MembershipInvoiceService
      *
      * @param array<string,mixed> $order
      * @param array<int,array{description:string,cents:int,quantity?:int}> $lines
+     * @param bool $persist Stamp orders.stripe_invoice_id. Pass false for TEST-mode
+     *   previews so a throwaway test invoice id doesn't poison the production row
+     *   (which would make the later LIVE run skip the order).
      * @return array{invoice_id:string,hosted_invoice_url:?string,status:string}
      */
-    public static function backfillPaidInvoiceForOrder(array $order, array $lines, string $email, string $name): array
+    public static function backfillPaidInvoiceForOrder(array $order, array $lines, string $email, string $name, bool $persist = true): array
     {
         $orderId = (int) ($order['id'] ?? 0);
         $memberId = (int) ($order['member_id'] ?? 0);
@@ -217,7 +220,7 @@ class MembershipInvoiceService
             throw new \RuntimeException('Stripe invoice could not be marked paid out of band.');
         }
 
-        if ($orderId > 0) {
+        if ($persist && $orderId > 0) {
             $pdo = Database::connection();
             $stmt = $pdo->prepare('UPDATE orders SET stripe_invoice_id = :inv, updated_at = NOW() WHERE id = :id AND (stripe_invoice_id IS NULL OR stripe_invoice_id = "")');
             $stmt->execute(['inv' => $invoiceId, 'id' => $orderId]);

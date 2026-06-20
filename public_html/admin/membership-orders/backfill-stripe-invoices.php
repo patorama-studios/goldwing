@@ -108,7 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $order,
                     $lines,
                     (string) ($order['email'] ?? ''),
-                    $name
+                    $name,
+                    $isLive // only stamp the order row on a LIVE run
                 );
                 $runResults['ok'][] = [
                     'order' => $order['order_number'] ?? ('#' . $order['id']),
@@ -172,6 +173,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 class="font-semibold text-gray-900">Run complete (<?= e($runResults['mode']) ?> mode)</h2>
           <p class="text-sm text-gray-600"><?= count($runResults['ok']) ?> invoice(s) created · <?= count($runResults['failed']) ?> failed · <?= (int) $totalCandidates ?> still remaining.</p>
+          <?php if ($runResults['mode'] === 'TEST'): ?>
+            <p class="text-xs text-amber-700">Test mode — order rows were <strong>not</strong> stamped, so these still appear as candidates for the live run (and re-running test mode will create duplicate test invoices).</p>
+          <?php endif; ?>
           <?php if ($runResults['ok']): ?>
             <details class="text-sm"><summary class="cursor-pointer font-medium text-green-700">Created (<?= count($runResults['ok']) ?>)</summary>
               <ul class="mt-2 space-y-1 text-gray-700">
