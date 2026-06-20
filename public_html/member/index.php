@@ -5027,6 +5027,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $selectCols = implode(",\n                ", array_filter([
             'm.id', 'm.first_name', 'm.last_name', 'm.member_type',
             'm.phone', 'm.email', 'm.member_number_base', 'm.member_number_suffix', $memberNumberExpr,
+            'COALESCE(NULLIF(m.suburb, \'\'), m.city) AS suburb',
             $colAcceptCalls ? "m.$colAcceptCalls" : null,
             $colCollectMoto ? "m.$colCollectMoto" : null,
             $colBedOrTent   ? "m.$colBedOrTent"   : null,
@@ -5059,6 +5060,37 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         } catch (\Throwable $e) {
             $directoryMembers = [];
         }
+
+        // Authoritative committee/area-rep assignments (Migration 015) — keyed
+        // by member_id. We display from this rather than the legacy
+        // is_committee/committee_role columns on `members`, because those flags
+        // can be stale for associate members whose role was assigned before
+        // CommitteeService::syncLegacyFlags() was wired in.
+        $dirRoleMap = [];
+        try {
+            $rolesStmt = $pdo->query("
+                SELECT a.member_id, r.name, r.category, r.sort_order
+                FROM member_committee_assignments a
+                JOIN committee_roles r ON r.id = a.role_id
+                WHERE r.is_active = 1
+                ORDER BY r.sort_order ASC, r.name ASC
+            ");
+            if ($rolesStmt) {
+                foreach ($rolesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $mid = (int) $r['member_id'];
+                    if (!isset($dirRoleMap[$mid])) {
+                        $dirRoleMap[$mid] = ['national' => [], 'chapter' => []];
+                    }
+                    $cat = (string) $r['category'];
+                    if (isset($dirRoleMap[$mid][$cat])) {
+                        $dirRoleMap[$mid][$cat][] = (string) $r['name'];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $dirRoleMap = [];
+        }
+
         $dirChapters = [];
         foreach ($directoryMembers as $dm) {
           if (!empty($dm['chapter_name'])) {
@@ -5123,7 +5155,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 
           <!-- Table -->
           <div class="overflow-x-auto -mx-2" data-tour="find-member-table">
-            <table class="w-full text-sm min-w-[700px]" id="dir-table">
+            <table class="w-full text-sm min-w-[780px]" id="dir-table">
               <thead class="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
                 <tr>
                   <th class="py-2 px-2 w-10"></th>
@@ -5131,6 +5163,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <th class="py-2 px-2 whitespace-nowrap">Member #</th>
                   <th class="py-2 px-2">Type</th>
                   <th class="py-2 px-2">Chapter</th>
+                  <th class="py-2 px-2">Suburb</th>
                   <th class="py-2 px-2">Phone</th>
                   <th class="py-2 px-2">Email</th>
                   <th class="py-2 px-2">Assistance</th>
@@ -5218,12 +5251,26 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                             <span class="material-icons-outlined text-[10px] leading-none">star</span>Life
                           </span>
                         <?php endif; ?>
-                        <?php if (!empty($dm['is_committee'])): ?>
+                        <?php
+                          $dmRoles = $dirRoleMap[(int) $dm['id']] ?? ['national' => [], 'chapter' => []];
+                          $dmNationalRoles = $dmRoles['national'];
+                          $dmIsAreaRep     = !empty($dmRoles['chapter']);
+                          // Legacy fallback for any server where the assignments
+                          // table is empty but the cached flags on `members`
+                          // still carry the role.
+                          if (!$dmNationalRoles && !empty($dm['is_committee'])) {
+                              $dmNationalRoles = [!empty($dm['committee_role']) ? $dm['committee_role'] : 'Committee'];
+                          }
+                          if (!$dmIsAreaRep && !empty($dm['is_area_rep'])) {
+                              $dmIsAreaRep = true;
+                          }
+                        ?>
+                        <?php foreach ($dmNationalRoles as $dmRoleName): ?>
                           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700">
-                            <?= e(!empty($dm['committee_role']) ? $dm['committee_role'] : 'Committee') ?>
+                            <?= e($dmRoleName) ?>
                           </span>
-                        <?php endif; ?>
-                        <?php if (!empty($dm['is_area_rep'])): ?>
+                        <?php endforeach; ?>
+                        <?php if ($dmIsAreaRep): ?>
                           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-indigo-100 text-indigo-700">Area Rep</span>
                         <?php endif; ?>
                       </div>
@@ -5238,6 +5285,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       </span>
                     </td>
                     <td class="py-3 px-2 text-gray-600 whitespace-nowrap"><?= e($dmChapterLabel ?: '—') ?></td>
+                    <td class="py-3 px-2 text-gray-600 whitespace-nowrap"><?= e(trim((string) ($dm['suburb'] ?? '')) ?: '—') ?></td>
                     <td class="py-3 px-2 whitespace-nowrap">
                       <?php if (!empty($dm['phone'])): ?>
                         <a href="tel:<?= e($dm['phone']) ?>" class="text-primary hover:underline"><?= e($dm['phone']) ?></a>
