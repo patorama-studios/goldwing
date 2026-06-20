@@ -1544,24 +1544,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                   Both</option>
                               </select>
                             </label>
-                            <label class="text-sm font-medium text-gray-700">
-                              Directory privacy
-                              <select name="privacy_level"
-                                class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                <option value="A" <?= $profileMember['privacy_level'] === 'A' ? 'selected' : '' ?>>A — Name
-                                  only</option>
-                                <option value="B" <?= $profileMember['privacy_level'] === 'B' ? 'selected' : '' ?>>B — Name +
-                                  Address</option>
-                                <option value="C" <?= $profileMember['privacy_level'] === 'C' ? 'selected' : '' ?>>C — Name +
-                                  Address + Phone</option>
-                                <option value="D" <?= $profileMember['privacy_level'] === 'D' ? 'selected' : '' ?>>D — Name +
-                                  Address + Email</option>
-                                <option value="E" <?= $profileMember['privacy_level'] === 'E' ? 'selected' : '' ?>>E — Name +
-                                  Address + Phone + Email</option>
-                                <option value="F" <?= $profileMember['privacy_level'] === 'F' ? 'selected' : '' ?>>F — Exclude
-                                  from directory</option>
-                              </select>
-                            </label>
                           </div>
                           <div class="mt-5 text-sm font-medium text-gray-700 mb-2">Assistance flags</div>
                           <input type="hidden" name="directory_pref_submitted" value="1">
