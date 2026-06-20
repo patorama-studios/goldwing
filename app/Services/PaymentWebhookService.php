@@ -406,11 +406,14 @@ class PaymentWebhookService
         $order = null;
         $invoiceMetadata = is_array($invoice['metadata'] ?? null) ? $invoice['metadata'] : [];
 
-        // New-member application invoices have no order row — activation happens
-        // via apply.php's POST handler + admin approval. The invoice is a billing
-        // artifact only, so skip quietly (don't log a "order not found" error).
-        if (($invoiceMetadata['context'] ?? '') === 'membership_application'
-            || ($invoiceMetadata['purpose'] ?? '') === 'membership_application') {
+        // Billing-artifact invoices that must NOT drive activation:
+        //  - membership_application: no order row yet (apply.php + admin approval
+        //    handle activation).
+        //  - membership_backfill: historical orders already paid + active; the
+        //    paid-out-of-band invoice is a record only, so re-activating would
+        //    wrongly re-chain the membership dates.
+        $invoiceContext = (string) ($invoiceMetadata['context'] ?? ($invoiceMetadata['purpose'] ?? ''));
+        if ($invoiceContext === 'membership_application' || $invoiceContext === 'membership_backfill') {
             return;
         }
 

@@ -151,6 +151,15 @@ Anything else gets recorded in `webhook_events` but no further action runs.
 > `handleInvoicePaid()` skips them quietly — activation stays with `apply.php`'s
 > POST handler + admin approval. The admin application-approval path still uses a
 > Checkout Session (also itemized).
+>
+> **Historical backfill.** `/admin/membership-orders/backfill-stripe-invoices.php`
+> creates itemized invoices for already-paid membership orders that predate this
+> change, via `MembershipInvoiceService::backfillPaidInvoiceForOrder()` +
+> `StripeService::payInvoiceOutOfBand()` (marks the invoice paid **without**
+> charging). Those invoices carry `metadata.context=membership_backfill` and are
+> **also skipped** by `handleInvoicePaid()` — the order is already paid/active, so
+> re-activating would wrongly re-chain the membership dates. The tool is a
+> dry-run by default and writes to whichever Stripe mode is active.
 
 > **Cart conversion happens here, not at checkout-create time.** For store orders, `markStoreOrderPaid()` (called by `handleInvoicePaid`, `handleCheckoutCompleted`, and `handlePaymentIntentSucceeded`) is what flips `store_carts.status` from `active` to `converted`. The `/api/stripe/create-payment-intent` endpoint deliberately leaves the cart `active` so a card decline or abandoned session doesn't lock the member out. The cart is looked up by `metadata.cart_id` on the PI/Session, with a fallback to the user's currently-active cart row.
 

@@ -148,6 +148,89 @@ class MembershipInvoiceService
     }
 
     /**
+     * Backfill: create an itemized Stripe Invoice for an ALREADY-PAID membership
+     * order and mark it paid out of band (no re-charge), so historical orders
+     * show as itemized invoices in the dashboard. Stamps the order's
+     * stripe_invoice_id (only if currently empty). The invoice carries
+     * context=membership_backfill so handleInvoicePaid skips it (no re-activation).
+     *
+     * @param array<string,mixed> $order
+     * @param array<int,array{description:string,cents:int,quantity?:int}> $lines
+     * @return array{invoice_id:string,hosted_invoice_url:?string,status:string}
+     */
+    public static function backfillPaidInvoiceForOrder(array $order, array $lines, string $email, string $name): array
+    {
+        $orderId = (int) ($order['id'] ?? 0);
+        $memberId = (int) ($order['member_id'] ?? 0);
+        $customerId = $memberId > 0
+            ? self::ensureCustomerByMember($memberId, $email, $name)
+            : self::ensureCustomerByEmail($email, $name);
+        if ($customerId === '') {
+            throw new \RuntimeException('Could not resolve a Stripe customer for the order.');
+        }
+
+        $invoice = StripeService::createInvoice([
+            'customer' => $customerId,
+            'collection_method' => 'charge_automatically',
+            'auto_advance' => false,
+            'pending_invoice_items_behavior' => 'exclude',
+            'description' => 'AGA membership — order ' . ($order['order_number'] ?? ('#' . $orderId)) . ' (historical)',
+            'metadata' => [
+                'order_type'     => 'membership',
+                'context'        => 'membership_backfill',
+                'order_id'       => (string) $orderId,
+                'order_number'   => (string) ($order['order_number'] ?? ''),
+                'member_id'      => (string) $memberId,
+                'backfilled'     => '1',
+            ],
+        ]);
+        if (!$invoice || empty($invoice['id'])) {
+            throw new \RuntimeException('Stripe invoice creation failed.');
+        }
+        $invoiceId = (string) $invoice['id'];
+
+        foreach ($lines as $line) {
+            $cents = (int) ($line['cents'] ?? 0);
+            if ($cents <= 0) {
+                continue;
+            }
+            $lname = trim((string) ($line['description'] ?? '')) ?: 'Membership';
+            StripeService::createInvoiceItem([
+                'customer' => $customerId,
+                'invoice'  => $invoiceId,
+                'quantity' => max(1, (int) ($line['quantity'] ?? 1)),
+                'currency' => 'aud',
+                'price_data' => [
+                    'currency' => 'aud',
+                    'product_data' => ['name' => $lname],
+                    'unit_amount' => $cents,
+                ],
+            ]);
+        }
+
+        $finalized = StripeService::finalizeInvoice($invoiceId);
+        if (!$finalized || empty($finalized['id'])) {
+            throw new \RuntimeException('Stripe invoice finalize failed.');
+        }
+        $paid = StripeService::payInvoiceOutOfBand($invoiceId);
+        if (!$paid || ($paid['status'] ?? '') !== 'paid') {
+            throw new \RuntimeException('Stripe invoice could not be marked paid out of band.');
+        }
+
+        if ($orderId > 0) {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('UPDATE orders SET stripe_invoice_id = :inv, updated_at = NOW() WHERE id = :id AND (stripe_invoice_id IS NULL OR stripe_invoice_id = "")');
+            $stmt->execute(['inv' => $invoiceId, 'id' => $orderId]);
+        }
+
+        return [
+            'invoice_id' => $invoiceId,
+            'hosted_invoice_url' => $paid['hosted_invoice_url'] ?? null,
+            'status' => (string) ($paid['status'] ?? ''),
+        ];
+    }
+
+    /**
      * @param array<int,array{description:string,cents:int}> $lines
      * @param array<string,string> $metadata
      * @return array{client_secret:string,payment_intent_id:string,invoice_id:string}

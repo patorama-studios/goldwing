@@ -488,6 +488,28 @@ class StripeService
         return $invoice->toArray();
     }
 
+    /**
+     * Mark a finalized invoice as paid WITHOUT charging (the money was collected
+     * elsewhere). Used by the historical-membership backfill so past orders show
+     * as itemized paid invoices in Stripe without re-billing the member.
+     */
+    public static function payInvoiceOutOfBand(string $invoiceId): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return null;
+        }
+        try {
+            $invoice = self::client($secret)->invoices->pay($invoiceId, ['paid_out_of_band' => true]);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.pay_out_of_band', $e, [
+                'invoice_id' => $invoiceId,
+            ]);
+            return null;
+        }
+        return $invoice->toArray();
+    }
+
     public static function retrieveCheckoutSession(string $sessionId, array $expand = []): ?array
     {
         $secret = self::activeSecretKey();
