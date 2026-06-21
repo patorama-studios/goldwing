@@ -10,6 +10,7 @@ use App\Services\Database;
 use App\Services\MemberRepository;
 use App\Services\MembershipMigrationService;
 use App\Services\MembershipOrderService;
+use App\Services\MembershipStatusService;
 use App\Services\OrderRepository;
 use App\Services\PasswordPolicyService;
 use App\Services\RefundService;
@@ -1161,7 +1162,9 @@ switch ($action) {
                 if ($inlineMember['status'] === $inlineValue) {
                     respondWithJson(['success' => true, 'label' => inlineStatusLabel($inlineValue), 'value' => $inlineValue]);
                 }
-                if (!MemberRepository::update($inlineMemberId, ['status' => $inlineValue])) {
+                try {
+                    MembershipStatusService::applyAdminUpdate($inlineMemberId, ['status' => $inlineValue]);
+                } catch (Throwable $e) {
                     respondWithJson(['success' => false, 'error' => 'Could not save status.']);
                 }
                 ActivityLogger::log('admin', $user['id'] ?? null, $inlineMemberId, 'member.status_updated', [
@@ -1272,7 +1275,9 @@ switch ($action) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'Already archived'];
                     continue;
                 }
-                if (!MemberRepository::update($memberId, ['status' => 'cancelled'])) {
+                try {
+                    MembershipStatusService::applyAdminUpdate($memberId, ['status' => 'cancelled']);
+                } catch (Throwable $e) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'Could not save status'];
                     continue;
                 }
@@ -1310,7 +1315,9 @@ switch ($action) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'Status is already ' . $statusValue];
                     continue;
                 }
-                if (!MemberRepository::update($memberId, ['status' => $statusValue])) {
+                try {
+                    MembershipStatusService::applyAdminUpdate($memberId, ['status' => $statusValue]);
+                } catch (Throwable $e) {
                     $skipped[] = ['member_id' => $memberId, 'reason' => 'Could not save status'];
                     continue;
                 }
@@ -1721,11 +1728,12 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'No membership period found.', 'error');
         }
         try {
-            $stmt = $pdo->prepare('UPDATE membership_periods SET end_date = :end_date WHERE id = :id');
-            $stmt->execute(['end_date' => $normalizedRenewal, 'id' => $period['id']]);
+            $changes = MembershipStatusService::applyAdminUpdate($memberId, ['end_date' => $normalizedRenewal]);
             ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.renewal_updated', [
                 'from' => $period['end_date'] ?? null,
                 'to' => $normalizedRenewal,
+                'period_status_from' => $changes['period_status']['from'] ?? null,
+                'period_status_to' => $changes['period_status']['to'] ?? null,
             ]);
             redirectWithFlash($memberId, $tab, 'Renewal date updated.');
         } catch (Throwable $e) {
@@ -2668,8 +2676,17 @@ switch ($action) {
         if ($newStatus === $member['status']) {
             redirectWithFlash($memberId, $tab, 'Status is already ' . $newStatus . '.', 'error');
         }
-        MemberRepository::update($memberId, ['status' => $newStatus]);
-        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.status_changed', ['from' => $member['status'], 'to' => $newStatus]);
+        try {
+            $changes = MembershipStatusService::applyAdminUpdate($memberId, ['status' => $newStatus]);
+        } catch (Throwable $e) {
+            redirectWithFlash($memberId, $tab, 'Could not save status: ' . $e->getMessage(), 'error');
+        }
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.status_changed', [
+            'from' => $member['status'],
+            'to' => $newStatus,
+            'period_status_from' => $changes['period_status']['from'] ?? null,
+            'period_status_to' => $changes['period_status']['to'] ?? null,
+        ]);
         redirectWithFlash($memberId, $tab, 'Status updated.');
         break;
 
@@ -2718,7 +2735,11 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Archiving members is restricted.', 'error');
         }
         if ($member['status'] !== 'cancelled') {
-            MemberRepository::update($memberId, ['status' => 'cancelled']);
+            try {
+                MembershipStatusService::applyAdminUpdate($memberId, ['status' => 'cancelled']);
+            } catch (Throwable $e) {
+                redirectWithFlash($memberId, $tab, 'Archive failed: ' . $e->getMessage(), 'error');
+            }
             ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.archived', [
                 'from' => $member['status'],
                 'to' => 'cancelled',

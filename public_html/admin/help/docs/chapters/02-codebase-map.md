@@ -81,7 +81,7 @@ Goldwing Website/
 
 #### `app/`
 
-`app/bootstrap.php` is the single entry point — every request `require_once`s it first. `app/Services/` holds 68 service classes (grouped below). `app/Views/partials/` holds shared HTML — `backend_head.php`, `backend_footer.php`, `backend_admin_sidebar.php`, `backend_member_sidebar.php`, `help_button.php`, `feedback_widget.php`, `committee_cards.php`, `membership_content.php`. `app/ThirdParty/stripe-php/` and `app/ThirdParty/fpdf/` are vendored libs (no Composer on cPanel). `app/storage/logs/` holds runtime logs (FIM, debug). `app/cache/` holds transient assets. `app/AI/`, `Auth/`, `Controllers/`, `Models/` are empty reserved namespace folders.
+`app/bootstrap.php` is the single entry point — every request `require_once`s it first. `app/Services/` holds 69 service classes (grouped below). `app/Views/partials/` holds shared HTML — `backend_head.php`, `backend_footer.php`, `backend_admin_sidebar.php`, `backend_member_sidebar.php`, `help_button.php`, `feedback_widget.php`, `committee_cards.php`, `membership_content.php`. `app/ThirdParty/stripe-php/` and `app/ThirdParty/fpdf/` are vendored libs (no Composer on cPanel). `app/storage/logs/` holds runtime logs (FIM, debug). `app/cache/` holds transient assets. `app/AI/`, `Auth/`, `Controllers/`, `Models/` are empty reserved namespace folders.
 
 #### `app/Services/` — the 68 services, grouped
 
@@ -125,6 +125,7 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 |---|---|
 | `MemberRepository.php` | Member CRUD + queries. |
 | `MembershipService.php` | Period lifecycle. |
+| `MembershipStatusService.php` | Single funnel for admin status / renewal-date edits — keeps `members.status` and `membership_periods.status`/`end_date` in sync. |
 | `MembershipPricingService.php` | Printed vs PDF × period matrix. |
 | `MembershipMigrationService.php` | Bulk imports + chapter moves. |
 | `AdminMemberAccess.php` | Per-admin scope. |
