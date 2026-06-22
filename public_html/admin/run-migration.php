@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/../../app/bootstrap.php';
 
+use App\Services\ActivityLogger;
 use App\Services\SettingsService;
 
 // Clear OPcache so freshly-deployed service files are picked up immediately.
@@ -3348,6 +3349,86 @@ if ($alreadyRun) {
     } else {
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
         $results[] = ['label' => 'Migration 037 — Multi-state RSVPs', 'status' => 'applied', 'note' => implode(', ', $applied)];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 038 — Re-sync membership_periods.status for members an admin
+// manually activated before the MembershipStatusService funnel landed.
+//
+// Background: the admin "Change status → Active" button used to write only
+// members.status. The renewal-date editor used to write only
+// membership_periods.end_date. Neither touched membership_periods.status, so
+// a member fixed up by an admin could end up with members.status='ACTIVE',
+// a future end_date, but membership_periods.status='LAPSED' (left over from
+// the expire cron). MembershipAccessService::effectiveStatusFrom prefers the
+// live period status over members.status for non-locked states, so those
+// members still saw the "renew now" lockdown on the dashboard.
+//
+// Conservative fix: only re-sync rows where ALL THREE conditions hold:
+//   • membership_periods.status = 'LAPSED'
+//   • membership_periods.end_date is today or later
+//   • members.status (case-insensitive) = 'ACTIVE'
+//
+// Anything else is genuinely ambiguous (e.g. lapsed member with a date
+// extension but no status flip) and is left alone — the admin can fix those
+// individually via the now-unified status form.
+//
+// Idempotent: re-running picks up zero rows once everything is in sync.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_038_resync_period_status_after_admin_activate';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 038 — Re-sync period status after admin activate', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+
+        $selectStmt = $pdo->prepare(
+            "SELECT mp.id AS period_id, m.id AS member_id, m.first_name, m.last_name, m.email, mp.end_date
+               FROM membership_periods mp
+               JOIN members m ON m.id = mp.member_id
+              WHERE mp.status = 'LAPSED'
+                AND mp.end_date >= CURDATE()
+                AND UPPER(m.status) = 'ACTIVE'"
+        );
+        $selectStmt->execute();
+        $affected = $selectStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$affected) {
+            SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+            $results[] = ['label' => 'Migration 038 — Re-sync period status after admin activate', 'status' => 'applied', 'note' => 'No mismatched members found — nothing to fix.'];
+        } else {
+            $updateStmt = $pdo->prepare(
+                "UPDATE membership_periods
+                    SET status = 'ACTIVE'
+                  WHERE id = :id AND status = 'LAPSED'"
+            );
+            $flipped = 0;
+            foreach ($affected as $row) {
+                $updateStmt->execute(['id' => (int) $row['period_id']]);
+                if ($updateStmt->rowCount() > 0) {
+                    $flipped++;
+                    ActivityLogger::log(
+                        'admin',
+                        $user['id'] ?? null,
+                        (int) $row['member_id'],
+                        'membership.period_status_resynced',
+                        [
+                            'from' => 'LAPSED',
+                            'to' => 'ACTIVE',
+                            'end_date' => $row['end_date'],
+                            'migration' => '038',
+                        ]
+                    );
+                }
+            }
+            SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+            $results[] = ['label' => 'Migration 038 — Re-sync period status after admin activate', 'status' => 'applied', 'note' => $flipped . ' membership period(s) flipped LAPSED → ACTIVE (logged to activity_log).'];
+        }
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 038 — Re-sync period status after admin activate', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 
