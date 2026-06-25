@@ -552,15 +552,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fieldErrors['expiry_month'] = 'Expiry month must be between 1 and 12.';
                 }
 
-                $memberNumberStart = (int) ($_POST['member_number_start'] ?? 1000);
-                $associateSuffixStart = (int) ($_POST['associate_suffix_start'] ?? 1);
-                $memberNumberFormatFull = trim((string) ($_POST['member_number_format_full'] ?? '{base}'));
-                $memberNumberFormatAssociate = trim((string) ($_POST['member_number_format_associate'] ?? '{base}.{suffix}'));
-                $memberNumberBasePadding = (int) ($_POST['member_number_base_padding'] ?? 0);
-                $memberNumberSuffixPadding = (int) ($_POST['member_number_suffix_padding'] ?? 0);
-                // Manual migration UI was removed from this page — keep the
-                // stored values untouched on save instead of inferring from
-                // absent form fields.
+                // Member ID numbering settings UI removed — admins now type the
+                // member number manually on approval. Stored settings are left
+                // untouched in case any legacy formatter still reads them.
 
                 $upgradeMode = trim((string) ($_POST['upgrade_mode'] ?? 'standard'));
                 if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
@@ -630,27 +624,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newChapterSortOrder = (int) ($_POST['new_chapter_sort_order'] ?? 0);
                 $newChapterActive = isset($_POST['new_chapter_active']) ? 1 : 0;
 
-                if ($memberNumberStart < 1) {
-                    $idFieldErrors['member_number_start'] = 'Start number must be 1 or greater.';
-                }
-                if ($associateSuffixStart < 1) {
-                    $idFieldErrors['associate_suffix_start'] = 'Suffix start must be 1 or greater.';
-                }
-                if ($memberNumberBasePadding < 0 || $memberNumberBasePadding > 12) {
-                    $idFieldErrors['member_number_base_padding'] = 'Base padding must be between 0 and 12.';
-                }
-                if ($memberNumberSuffixPadding < 0 || $memberNumberSuffixPadding > 12) {
-                    $idFieldErrors['member_number_suffix_padding'] = 'Suffix padding must be between 0 and 12.';
-                }
-                if (strpos($memberNumberFormatFull, '{base}') === false && strpos($memberNumberFormatFull, '{base_padded}') === false) {
-                    $idFieldErrors['member_number_format_full'] = 'Include {base} or {base_padded}.';
-                }
-                $associateHasBase = strpos($memberNumberFormatAssociate, '{base}') !== false || strpos($memberNumberFormatAssociate, '{base_padded}') !== false;
-                $associateHasSuffix = strpos($memberNumberFormatAssociate, '{suffix}') !== false || strpos($memberNumberFormatAssociate, '{suffix_padded}') !== false;
-                if (!$associateHasBase || !$associateHasSuffix) {
-                    $idFieldErrors['member_number_format_associate'] = 'Include {base} and {suffix}.';
-                }
-
                 if ($newChapterName === '' && ($newChapterState !== '' || $newChapterSortOrder > 0)) {
                     $chapterFieldErrors['new']['name'] = 'Name is required for new chapters.';
                 }
@@ -660,12 +633,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $newConfig = MembershipPricingService::defaultConfig();
                     }
                     MembershipPricingService::updateConfig((int) $user['id'], $newConfig);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.member_number_start', $memberNumberStart);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.associate_suffix_start', $associateSuffixStart);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.member_number_format_full', $memberNumberFormatFull);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.member_number_format_associate', $memberNumberFormatAssociate);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.member_number_base_padding', $memberNumberBasePadding);
-                    SettingsService::setGlobal((int) $user['id'], 'membership.member_number_suffix_padding', $memberNumberSuffixPadding);
                     SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_mode', $upgradeMode);
                     SettingsService::setGlobal((int) $user['id'], 'membership.upgrade_custom_fee_cents', $upgradeCustomFeeCents);
 
@@ -825,12 +792,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             'membership_pricing' => [
                 'membership.pricing.config',
                 'membership.pricing_matrix',
-                'membership.member_number_start',
-                'membership.associate_suffix_start',
-                'membership.member_number_format_full',
-                'membership.member_number_format_associate',
-                'membership.member_number_base_padding',
-                'membership.member_number_suffix_padding',
                 'membership.manual_migration_enabled',
                 'membership.manual_migration_expiry_days',
             ],
@@ -2983,12 +2944,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $fieldErrors = $fieldErrors ?? [];
               $idFieldErrors = $idFieldErrors ?? [];
               $chapterFieldErrors = $chapterFieldErrors ?? [];
-              $memberNumberStart = (int) SettingsService::getGlobal('membership.member_number_start', 1000);
-              $associateSuffixStart = (int) SettingsService::getGlobal('membership.associate_suffix_start', 1);
-              $memberNumberFormatFull = SettingsService::getGlobal('membership.member_number_format_full', '{base}');
-              $memberNumberFormatAssociate = SettingsService::getGlobal('membership.member_number_format_associate', '{base}.{suffix}');
-              $memberNumberBasePadding = (int) SettingsService::getGlobal('membership.member_number_base_padding', 0);
-              $memberNumberSuffixPadding = (int) SettingsService::getGlobal('membership.member_number_suffix_padding', 0);
               $upgradeMode = (string) SettingsService::getGlobal('membership.upgrade_mode', 'standard');
               if (!in_array($upgradeMode, ['standard', 'custom'], true)) {
                   $upgradeMode = 'standard';
@@ -3472,105 +3427,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </ol>
               </div>
 
-              <!-- Member-admin settings: 2-column row (Member ID + Associate Upgrade) -->
-              <div class="grid gap-6 lg:grid-cols-2">
-                <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
-                  <div class="flex items-start gap-3">
-                    <span class="material-icons-outlined text-slate-500">tag</span>
-                    <div>
-                      <h2 class="font-display text-lg font-bold text-gray-900">Member ID Sequencing</h2>
-                      <p class="text-sm text-slate-500">Control the starting number and format for full and associate member IDs.</p>
-                    </div>
-                  </div>
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <label class="text-sm text-slate-600">Full member ID start
-                      <input
-                        name="member_number_start"
-                        type="number"
-                        min="1"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $memberNumberStart) ?>"
-                        required
-                      >
-                      <?php if (isset($idFieldErrors['member_number_start'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_start']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                    <label class="text-sm text-slate-600">Associate suffix start
-                      <input
-                        name="associate_suffix_start"
-                        type="number"
-                        min="1"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['associate_suffix_start']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $associateSuffixStart) ?>"
-                        required
-                      >
-                      <?php if (isset($idFieldErrors['associate_suffix_start'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['associate_suffix_start']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                    <label class="text-sm text-slate-600">Full member ID format
-                      <input
-                        name="member_number_format_full"
-                        type="text"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_full']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $memberNumberFormatFull) ?>"
-                        placeholder="{base}"
-                        required
-                      >
-                      <?php if (isset($idFieldErrors['member_number_format_full'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_full']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                    <label class="text-sm text-slate-600">Associate member ID format
-                      <input
-                        name="member_number_format_associate"
-                        type="text"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_format_associate']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $memberNumberFormatAssociate) ?>"
-                        placeholder="{base}.{suffix}"
-                        required
-                      >
-                      <?php if (isset($idFieldErrors['member_number_format_associate'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_format_associate']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                    <label class="text-sm text-slate-600">Base padding digits
-                      <input
-                        name="member_number_base_padding"
-                        type="number"
-                        min="0"
-                        max="12"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_base_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $memberNumberBasePadding) ?>"
-                      >
-                      <?php if (isset($idFieldErrors['member_number_base_padding'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_base_padding']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                    <label class="text-sm text-slate-600">Suffix padding digits
-                      <input
-                        name="member_number_suffix_padding"
-                        type="number"
-                        min="0"
-                        max="12"
-                        class="mt-2 w-full rounded-lg border <?= isset($idFieldErrors['member_number_suffix_padding']) ? 'border-red-300' : 'border-gray-200' ?> bg-white px-3 py-2 text-sm"
-                        value="<?= e((string) $memberNumberSuffixPadding) ?>"
-                      >
-                      <?php if (isset($idFieldErrors['member_number_suffix_padding'])): ?>
-                        <div class="text-xs text-red-600 mt-1"><?= e($idFieldErrors['member_number_suffix_padding']) ?></div>
-                      <?php endif; ?>
-                    </label>
-                  </div>
-                  <p class="text-xs text-slate-500">Tokens: {base}, {suffix}, {base_padded}, {suffix_padded}. Use padding digits to left-pad numbers.</p>
-                </div>
-
+              <!-- Member-admin settings: Associate → Full Upgrade -->
+              <div class="grid gap-6">
                 <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-4">
                   <div class="flex items-start gap-3">
                     <span class="material-icons-outlined text-slate-500">trending_up</span>
                     <div>
                       <h2 class="font-display text-lg font-bold text-gray-900">Associate → Full Upgrade</h2>
-                      <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. New base member number is assigned, suffix dropped, link to primary member cleared.</p>
+                      <p class="text-sm text-slate-500">Controls what an Associate member is charged when they upgrade to a Full membership from their profile. Member numbers are assigned manually by an admin on application approval.</p>
                     </div>
                   </div>
                   <div class="space-y-3">

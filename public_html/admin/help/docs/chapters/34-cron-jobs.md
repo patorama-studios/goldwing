@@ -7,7 +7,7 @@
 A **cron job** is a small task the website runs automatically on a schedule — no one has to click a button. Goldwing's site uses a handful of them to handle the boring-but-critical jobs that absolutely have to happen on time:
 
 - Emailing members **renewal reminders** before their membership runs out.
-- Marking memberships **lapsed** the day after they expire, so member-only access turns off.
+- Marking memberships **lapsed** two months after their expiry date (grace period), so member-only access turns off.
 - Doing a **file integrity scan** to catch tampering or unexpected file changes.
 - Optionally, sending admins a **daily summary** of activity.
 
@@ -31,7 +31,7 @@ In **cPanel → Cron Jobs**. The page shows every scheduled command, the schedul
 ### The jobs that run on this site
 
 - **Renewal reminders** — runs daily. Emails (and SMS's, where a phone is on file) members who are due to renew in 60 days, and again at 30 days. Builds them a ready-to-pay Stripe checkout link.
-- **Membership expiry** — runs daily, just after midnight. Looks for any active memberships whose end date has passed, and marks them as **lapsed**. After this runs, those members lose member-only access until they renew.
+- **Membership expiry** — runs daily, just after midnight. Looks for any active memberships whose end date passed more than **2 months ago** and marks them as **lapsed**. Members whose end date has just passed enter a 2-month grace window first: the badge shows Lapsed and an amber banner appears, but member features stay accessible. Access locks off only after the grace period expires.
 - **Stale pending-order cleanup** — runs daily. Closes off abandoned card-checkout orders that never got paid (Stripe's hosted checkout link expires after about a day, so we close ours too). Without this, the orders list would slowly fill with "pending" rows that no one will ever pay.
 - **File integrity scan** — runs hourly (or nightly, depending on configuration). Compares the site's files against a saved baseline and alerts the security recipient if anything has changed unexpectedly. Cross-reference with [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity).
 - **Daily admin summary** — optional. Emails the first admin a one-paragraph digest each morning: how many active members, how many pending applications, how many memberships are due soon. A useful "is the site still alive?" heartbeat.
@@ -93,11 +93,13 @@ Walks two windows: active periods ending in exactly 60 days, and exactly 30 days
 
 ### `cron/expire_memberships.php` — daily, `5 0 * * *`
 
-One SQL pass: `WHERE status = 'ACTIVE' AND end_date < CURDATE()`. For each match: period → `LAPSED`, member → `LAPSED`. Writes `last_expire_run`. No email. Tables: `membership_periods`, `members`, `system_settings`.
+One SQL pass: `WHERE status = 'ACTIVE' AND end_date < (CURDATE() - INTERVAL 2 MONTH)`. The 2-month interval is driven by `MembershipAccessService::GRACE_MONTHS` so the cron and the member-area access gate can never disagree. For each match: period → `LAPSED`, member → `LAPSED`. Writes `last_expire_run`. No email. Tables: `membership_periods`, `members`, `system_settings`.
+
+During the grace window (`end_date` passed, but not yet `end_date + 2 months`) the period status stays `ACTIVE` in the database. `MembershipAccessService::state()` signals `in_grace: true` — the member-area pages show the Lapsed badge and the amber banner but keep features unlocked.
 
 **Idempotent by design** — the `ACTIVE`-only filter means a rerun finds nothing. Safe to invoke twice or backfill from SSH.
 
-**If it fails:** lapsed members will still show `ACTIVE`. Run `php cron/expire_memberships.php` on the server; check `last_expire_run`.
+**If it fails:** members past the grace window will still show `ACTIVE` with full access. Run `php cron/expire_memberships.php` on the server; check `last_expire_run`.
 
 ### `cron/expire_pending_orders.php` — daily
 

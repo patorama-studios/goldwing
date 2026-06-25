@@ -178,8 +178,9 @@ The pricing matrix and member number formatting. The pricing matrix is the grid 
 
 Other settings here:
 
-- **Member number start / format** — the next number to issue and how it's formatted (with or without zero padding, with associate suffixes, etc.).
 - **Manual migration link** — when on, the join form shows a link for existing members to claim their account from the old system.
+
+> **Member numbers are now assigned manually.** When an admin approves an application they type the member number directly in the approval dialog. The old auto-sequencing UI (member number start / format / padding fields) has been removed from this page; the underlying settings keys still exist in the database for legacy display formatters but are no longer written by the UI.
 
 Chapter management (adding, renaming, archiving local chapters) is on the same page and writes to the `chapters` table directly. See [Chapter 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 
@@ -463,7 +464,9 @@ The actual API key is stored separately in `ai_provider_keys` (encrypted) via `A
 
 #### Membership Settings
 
-What it controls: the membership year anchor + expiry, admin-defined renewal periods + their prices, the **new-member joining matrix** (explicit per-cell prices by term × join window) + the one-off joining fee, the pro-rata fallback engine + per-cell annual base prices, member-number formatting, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateConfig()`. Deep dive: [Ch 14 — Membership pricing](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+What it controls: the membership year anchor + expiry, admin-defined renewal periods + their prices, the **new-member joining matrix** (explicit per-cell prices by term × join window) + the one-off joining fee, the pro-rata fallback engine + per-cell annual base prices, manual migration link, Associate→Full upgrade pricing, chapters CRUD. Saved via `MembershipPricingService::updateConfig()`. Deep dive: [Ch 14 — Membership pricing](view.php?slug=14-membership-pricing), [Ch 21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
+
+**Member numbers** — no longer auto-sequenced; an admin types the number in the approval dialog. The `membership.member_number_*` keys below remain in `settings_global` for legacy display code but the Settings UI no longer exposes or writes them.
 
 | Key | Type | Default | What it does |
 |---|---|---|---|

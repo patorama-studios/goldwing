@@ -3,7 +3,12 @@ require_once __DIR__ . '/../app/bootstrap.php';
 
 $pdo = db();
 
-$stmt = $pdo->prepare('SELECT id, member_id FROM membership_periods WHERE status = "ACTIVE" AND end_date < CURDATE()');
+// Members get a grace period after end_date before they actually lock off:
+// they stay ACTIVE (full access + a warning banner) until end_date +
+// GRACE_MONTHS, then this flips them to LAPSED. Reading the constant keeps the
+// cron's flip aligned with the "still active" window in MembershipAccessService.
+$graceMonths = (int) \App\Services\MembershipAccessService::GRACE_MONTHS;
+$stmt = $pdo->prepare("SELECT id, member_id FROM membership_periods WHERE status = 'ACTIVE' AND end_date < (CURDATE() - INTERVAL $graceMonths MONTH)");
 $stmt->execute();
 $periods = $stmt->fetchAll();
 

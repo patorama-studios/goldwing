@@ -326,14 +326,27 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
         json_response(['error' => 'Life members do not need to renew.'], 422);
     }
 
-    // Inputs. Term comes as "12M"/"24M"/"36M" (bare months tolerated).
+    // Inputs. Term comes as "12M"/"36M"/… (bare months tolerated). Validate
+    // against the admin's configured renewal periods so any duration the
+    // member could pick on the renew form is accepted here too.
     $termMonths = (int) rtrim(strtoupper(trim((string) ($body['term'] ?? '12M'))), 'M');
-    if (!in_array($termMonths, [12, 24, 36], true)) {
-        $termMonths = 12;
+    $allowedRenewalMonths = array_map(
+        static fn($p) => (int) $p['duration_months'],
+        MembershipPricingService::getRenewalPeriods(true)
+    );
+    if (!in_array($termMonths, $allowedRenewalMonths, true)) {
+        $termMonths = $allowedRenewalMonths[0] ?? 12;
     }
     $term = $termMonths . 'M';
-    $termYearsLabel = $termMonths === 36 ? '3 years' : ($termMonths === 24 ? '2 years' : '1 year');
+    $termYearsLabel = $termMonths % 12 === 0
+        ? (($termMonths / 12) . ' year' . ($termMonths === 12 ? '' : 's'))
+        : ($termMonths . ' months');
     $includePartner = !empty($body['include_partner']);
+    // Payment method — 'stripe' (card, default) or 'bank_transfer' (direct
+    // deposit: no Stripe, no surcharge; admin reconciles when the EFT lands).
+    $payMethod = strtolower(trim((string) ($body['payment_method'] ?? 'stripe')));
+    if ($payMethod === 'card') { $payMethod = 'stripe'; }
+    if (!in_array($payMethod, ['stripe', 'bank_transfer'], true)) { $payMethod = 'stripe'; }
 
     // Resolve renewers — self plus (optionally) the linked partner, using
     // the same lookup as the membership_renew POST handler in /member/.
@@ -382,7 +395,7 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     // so the surcharge applies whenever it's enabled in admin settings.
     $feeCents = 0;
     $feeSettings = store_get_settings();
-    if ((int) ($feeSettings['stripe_fee_enabled'] ?? 0) === 1) {
+    if ($payMethod === 'stripe' && (int) ($feeSettings['stripe_fee_enabled'] ?? 0) === 1) {
         $fee = store_calculate_processing_fee(
             $totalCents / 100,
             (float) ($feeSettings['stripe_fee_percent'] ?? 0),
@@ -460,7 +473,7 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
             json_response(['error' => 'Could not create the renewal period.'], 500);
         }
         $order = MembershipOrderService::createMembershipOrder((int) $rMember['id'], $periodId, round($r['cents'] / 100, 2), [
-            'payment_method' => 'stripe',
+            'payment_method' => $payMethod,
             'payment_status' => 'pending',
             'fulfillment_status' => 'pending',
             'currency' => $currency,
@@ -480,6 +493,37 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
         }
     }
     unset($r);
+
+    // ── Bank transfer (direct deposit) — no Stripe. The orders stay pending
+    // for an admin to reconcile when the EFT lands; the member dashboard
+    // surfaces the bank details from the pending order. Return here before any
+    // PaymentIntent/invoice work so this path never touches Stripe. ──────────
+    if ($payMethod === 'bank_transfer') {
+        $bankInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
+        $lines = [];
+        foreach ($renewers as $r) {
+            $name = trim(((string) ($r['member']['first_name'] ?? '')) . ' ' . ((string) ($r['member']['last_name'] ?? '')));
+            $lines[] = [
+                'label'        => $r['label'],
+                'sublabel'     => trim($name . ' · Order ' . $r['order_number'], ' ·'),
+                'amount_cents' => $r['cents'],
+                'amount_label' => 'A$' . number_format($r['cents'] / 100, 2),
+            ];
+        }
+        json_response([
+            'ok'                => true,
+            'payment_method'    => 'bank_transfer',
+            'order_id'          => $primary['order_id'],
+            'order_number'      => $primary['order_number'],
+            'term'              => $term,
+            'include_partner'   => (bool) $partnerRenewer,
+            'amount_cents'      => $totalCents,
+            'amount_label'      => 'A$' . number_format($totalCents / 100, 2),
+            'bank_instructions' => $bankInstructions,
+            'lines'             => $lines,
+            'redirect'          => '/member/index.php?page=billing&renew_submitted=bank',
+        ]);
+    }
 
     // One PaymentIntent for the combined total. order_id drives the
     // primary activation in the webhook; extra_order_ids covers the

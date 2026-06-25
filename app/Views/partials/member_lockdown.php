@@ -20,24 +20,51 @@
 
 $ldUser = $user ?? (function_exists('current_user') ? current_user() : null);
 $ldState = \App\Services\MembershipAccessService::state($ldUser);
+$ldLapsed  = !empty($ldState['lapsed']);   // grace exhausted — features locked
+$ldInGrace = !empty($ldState['in_grace']); // expired but still open + warned
 
-if (!empty($ldState['lapsed'])):
+if ($ldLapsed || $ldInGrace):
+    $ldRenewUrl = '/member/index.php?page=billing&pay=1';
+    $ldDate = static function ($value): string {
+        if (empty($value)) {
+            return '';
+        }
+        return function_exists('format_date_au')
+            ? (format_date_au($value) ?: '')
+            : (string) $value;
+    };
+    $ldEndLabel = $ldDate($ldState['end_date'] ?? null);
+    $ldLockoffLabel = $ldDate($ldState['lockoff_date'] ?? null);
+endif;
+
+if ($ldInGrace):
+?>
+<!-- ── Membership expired: grace-period warning banner ─────────────────────
+     Membership has expired but the GRACE_MONTHS window is still open, so
+     features stay accessible — we only warn. No blur overlay, no lightbox. -->
+<div class="relative z-30 bg-amber-400 text-amber-950 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 shadow-sm" data-grace-banner>
+  <span class="material-icons-outlined text-xl shrink-0">event_busy</span>
+  <p class="flex-1 min-w-[12rem] text-sm font-medium leading-snug">
+    <span class="font-bold">Your membership has expired<?= $ldEndLabel !== '' ? ' on ' . e($ldEndLabel) : '' ?>.</span>
+    <?php if ($ldLockoffLabel !== ''): ?>Renew by <span class="font-semibold"><?= e($ldLockoffLabel) ?></span> to keep your access to member features.<?php else: ?>Renew now to keep your access to member features.<?php endif; ?>
+    You can still log in and update your details in the meantime.
+  </p>
+  <a href="<?= e($ldRenewUrl) ?>"
+     class="shrink-0 inline-flex items-center gap-2 rounded-lg bg-amber-950 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-900 transition-colors">
+    <span class="material-icons-outlined text-base">autorenew</span>
+    Renew membership
+  </a>
+</div>
+<?php elseif ($ldLapsed):
     $ldPageKey = $lockdownPageKey ?? null;
     $ldPageLocked = \App\Services\MembershipAccessService::isPageLocked($ldPageKey);
-    $ldRenewUrl = '/member/index.php?page=billing&pay=1';
-    $ldEndLabel = '';
-    if (!empty($ldState['end_date'])) {
-        $ldEndLabel = function_exists('format_date_au')
-            ? (format_date_au($ldState['end_date']) ?: '')
-            : (string) $ldState['end_date'];
-    }
 ?>
-<!-- ── Membership lapsed: persistent banner ─────────────────────────────── -->
+<!-- ── Membership expired & locked: persistent banner ───────────────────── -->
 <div class="relative z-30 bg-red-600 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 shadow-sm" data-lockdown-banner>
   <span class="material-icons-outlined text-xl shrink-0">lock</span>
   <p class="flex-1 min-w-[12rem] text-sm font-medium leading-snug">
-    Your membership has lapsed<?= $ldEndLabel !== '' ? ' (expired ' . e($ldEndLabel) . ')' : '' ?>.
-    Renew now to restore full access to the members area.
+    Your membership has expired<?= $ldEndLabel !== '' ? ' (on ' . e($ldEndLabel) . ')' : '' ?>.
+    You can still log in to update your details, but member features stay locked until you renew.
   </p>
   <a href="<?= e($ldRenewUrl) ?>"
      class="shrink-0 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors">
@@ -56,9 +83,9 @@ if (!empty($ldState['lapsed'])):
     </div>
     <h2 id="gw-lockdown-overlay-title" class="font-display text-xl font-bold text-gray-900">This area is locked</h2>
     <p class="mt-2 text-sm text-gray-600">
-      Your membership has lapsed, so member features like this one are
-      temporarily unavailable. Renew your membership to unlock the calendar,
-      Wings, the members directory and everything else.
+      Your membership has expired, so member features like this one are no
+      longer available. You can still log in to update your details — renew your
+      membership to unlock the calendar, Wings, the directory and everything else.
     </p>
     <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
       <a href="<?= e($ldRenewUrl) ?>"
@@ -85,10 +112,10 @@ if (!empty($ldState['lapsed'])):
       <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
         <span class="material-icons-outlined text-3xl text-red-600">lock_clock</span>
       </div>
-      <h2 id="gw-lockdown-modal-title" class="font-display text-xl font-bold text-gray-900">Your membership has lapsed</h2>
+      <h2 id="gw-lockdown-modal-title" class="font-display text-xl font-bold text-gray-900">Your membership has expired</h2>
       <p class="mt-2 text-sm text-gray-600">
-        <?= $ldEndLabel !== '' ? 'Your membership expired on ' . e($ldEndLabel) . '. ' : '' ?>While
-        it's lapsed you can still reach your dashboard, billing and profile, but
+        <?= $ldEndLabel !== '' ? 'Your membership expired on ' . e($ldEndLabel) . '. ' : '' ?>You
+        can still log in to reach your dashboard, billing and profile, but
         community features are locked. Renew now to unlock everything again.
       </p>
       <div class="mt-6 flex flex-col gap-3">

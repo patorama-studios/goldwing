@@ -64,6 +64,7 @@ $pdo = db();
 $member = null;
 $membershipPeriod = null;
 $pendingPaymentInFlight = false;
+$gwInGrace = false;
 $associates = [];
 $fullMember = null;
 $upcomingEvents = [];
@@ -147,27 +148,6 @@ function membership_renewal_amount_cents(string $magazineType, string $memberTyp
   return MembershipPricingService::renewalAmountCents($magazineType, $memberTypeKey, (int) $termMonths);
 }
 
-function normalize_membership_price_term(string $term): string
-{
-  $clean = strtoupper(trim($term));
-  $map = [
-    'THREE_YEAR' => '3Y',
-    'THREE_YEARS' => '3Y',
-    '3YEAR' => '3Y',
-    '3YEARS' => '3Y',
-    'TWO_YEAR' => '2Y',
-    'TWO_YEARS' => '2Y',
-    '2YEAR' => '2Y',
-    '2YEARS' => '2Y',
-    'ONE_YEAR' => '1Y',
-    'ONE_YEARS' => '1Y',
-    '1YEAR' => '1Y',
-    '1YEARS' => '1Y',
-    'YEAR' => '1Y',
-    'ANNUAL' => '1Y',
-  ];
-  return $map[$clean] ?? $clean;
-}
 
 function orders_member_column(\PDO $pdo): string
 {
@@ -782,9 +762,16 @@ if ($user && $user['member_id']) {
         } elseif (empty($_POST['acknowledged'])) {
           $billingError = 'Please confirm your membership details are correct before renewing.';
         } else {
-          $termMonths = (string) ($_POST['term'] ?? '12');
-          if (!in_array($termMonths, ['12', '24', '36'], true)) {
-            $termMonths = '12';
+          // Accept any duration the admin has configured as an active renewal
+          // period, not just the legacy 12/24/36 buckets, so pricing-matrix
+          // changes carry straight through to renewals.
+          $renewalPeriodMonths = array_map(
+            static fn($p) => (string) (int) $p['duration_months'],
+            MembershipPricingService::getRenewalPeriods(true)
+          );
+          $termMonths = (string) ($_POST['term'] ?? '');
+          if (!in_array($termMonths, $renewalPeriodMonths, true)) {
+            $termMonths = $renewalPeriodMonths[0] ?? '12';
           }
           $termCode = $termMonths . 'M';
           $includePartner = !empty($_POST['include_partner']);
@@ -866,7 +853,10 @@ if ($user && $user['member_id']) {
             $createdOrderRows = [];
             $createdPeriodIds = [];
             $renewError = null;
-            $termYearsLabel = $termMonths === '36' ? '3 years' : ($termMonths === '24' ? '2 years' : '1 year');
+            $tmInt = (int) $termMonths;
+            $termYearsLabel = $tmInt % 12 === 0
+              ? (($tmInt / 12) . ' year' . ($tmInt === 12 ? '' : 's'))
+              : ($tmInt . ' months');
 
             foreach ($renewers as $r) {
               $rMember = $r['member'];
@@ -1315,6 +1305,12 @@ if ($user && $user['member_id']) {
     $stmt->execute(['member_id' => $member['id']]);
     $membershipPeriod = $stmt->fetch();
 
+    // In the 2-month grace window the membership has expired but still has
+    // access. Every status badge/dot reads "Lapsed" to match the amber expiry
+    // banner; feature access itself is governed separately by
+    // MembershipAccessService::isLapsed(). See member_lockdown.php.
+    $gwInGrace = !empty(\App\Services\MembershipAccessService::state($user)['in_grace']);
+
     if ($member['member_type'] === 'FULL' || $member['member_type'] === 'LIFE') {
       $stmt = $pdo->prepare('SELECT * FROM members WHERE full_member_id = :id');
       $stmt->execute(['id' => $member['id']]);
@@ -1754,6 +1750,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         if ($pendingPaymentInFlight) {
             $statusKey = 'pending';
         }
+        // Expired-but-in-grace: still has access, but show Lapsed (red dot +
+        // badge) so the dashboard matches the amber expiry banner.
+        if ($gwInGrace) {
+            $statusKey = 'lapsed';
+        }
         $statusDot = match ($statusKey) {
           'active', 'paid' => 'bg-green-500',
           'expired', 'inactive', 'lapsed', 'cancelled', 'suspended' => 'bg-red-500',
@@ -1824,7 +1825,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         // Recent orders for the click-to-expand list.
         $recentOrders = array_slice($orderHistory, 0, 5);
         $membershipStatusLabel = strtoupper((string) ($membershipPeriod['status'] ?? ($member['status'] ?? '')));
-        $isMembershipActive = in_array($membershipStatusLabel, ['ACTIVE', 'PAID'], true);
+        // Grace = expired, so it never counts as active here (drives the amber pill below).
+        $isMembershipActive = in_array($membershipStatusLabel, ['ACTIVE', 'PAID'], true) && !$gwInGrace;
         ?>
 
         <!-- HERO: welcome left + partner card right -->
@@ -2382,7 +2384,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <?= $isMembershipActive ? 'verified' : 'schedule' ?>
                   </span>
                   <span class="font-semibold <?= $isMembershipActive ? 'text-green-800' : 'text-amber-800' ?>">
-                    Membership <?= e(ucfirst(strtolower((string) ($membershipPeriod['status'] ?? '')))) ?>
+                    Membership <?= e($gwInGrace ? 'Lapsed' : ucfirst(strtolower((string) ($membershipPeriod['status'] ?? '')))) ?>
                   </span>
                   <?php if (!empty($membershipPeriod['paid_at'])): ?>
                     <span class="text-xs text-gray-600 hidden sm:inline">· Last paid <?= e(format_date_au($membershipPeriod['paid_at'])) ?></span>
@@ -2623,6 +2625,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         ];
         $profileMembershipTypeLabel = $membershipTypeMap[strtoupper((string) ($profileMember['member_type'] ?? ''))] ?? 'Member';
         $profileMembershipStatusKey = strtolower((string) ($profileMember['status'] ?? 'pending'));
+        // Own profile in the grace window: expired but access retained — show Lapsed.
+        if ($gwInGrace && (int) $profileMemberId === (int) $member['id']) {
+          $profileMembershipStatusKey = 'lapsed';
+        }
         $profileMembershipStatusLabel = ucfirst($profileMembershipStatusKey);
         $profileAddressLines = array_filter([
           trim((string) ($profileMember['address_line1'] ?? '')),
@@ -4412,16 +4418,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             }
           }
           if (!$pendingMembershipOrder && $pendingPeriod && $member) {
-            $termKey = normalize_membership_price_term((string) ($pendingPeriod['term'] ?? ''));
             $memberTypeKey = strtoupper((string) ($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
             $magazineType = strtolower((string) ($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
-            // Translate stored term (1Y/2Y/3Y) into the months key the renewal
-            // pricing helper understands. Anything unrecognised falls back to 1Y.
-            $termMonthsForPrice = match ($termKey) {
-              '3Y' => '36',
-              '2Y' => '24',
-              default => '12',
-            };
+            // Resolve the stored term to its real length in months (handles
+            // 1Y/2Y/3Y, NNM and configured period ids) so the price matches
+            // the duration the member actually picked.
+            $termMonthsForPrice = (string) (MembershipService::termToMonths((string) ($pendingPeriod['term'] ?? '')) ?? 12);
             $priceCents = membership_renewal_amount_cents($magazineType, $memberTypeKey, $termMonthsForPrice);
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
             $amount = round($priceCents / 100, 2);
@@ -4458,6 +4460,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <p class="text-sm text-gray-500">Track membership status and pending payments.</p>
                 </div>
               </div>
+              <?php if (($_GET['renew_submitted'] ?? '') === 'bank'): ?>
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  <p class="font-semibold flex items-center gap-1.5"><span class="material-icons-outlined text-base">check_circle</span>Renewal recorded</p>
+                  <p class="text-xs mt-1">Please complete payment by direct deposit using the bank details below. Your membership activates once we receive your payment.</p>
+                </div>
+              <?php endif; ?>
               <?php
               $billingMembershipTypeLabel = 'Member';
               if ($member) {
@@ -4469,7 +4477,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   default => 'Member',
                 };
               }
-              $billingStatusLabel = $member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—';
+              // Grace window: membership has expired (access retained) — show Lapsed.
+              $billingStatusLabel = $gwInGrace ? 'Lapsed' : ($member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—');
               $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
               ?>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-600">
@@ -4541,7 +4550,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <span class="material-icons-outlined text-base">payments</span>
                     Renew my membership
                   </button>
-                  <p class="text-xs text-red-700 font-medium">Your membership <?= $membershipPeriod && strtoupper((string) ($membershipPeriod['status'] ?? '')) === 'LAPSED' ? 'has lapsed' : 'is due for renewal' ?>.</p>
+                  <p class="text-xs text-red-700 font-medium">Your membership <?= ($gwInGrace || ($membershipPeriod && strtoupper((string) ($membershipPeriod['status'] ?? '')) === 'LAPSED')) ? 'has expired' : 'is due for renewal' ?>.</p>
                 </div>
               <?php endif; ?>
               <?php if (!$customerPortalEnabled): ?>
@@ -5720,7 +5729,7 @@ if ($renewModalEligible) {
      role="dialog" aria-modal="true" aria-labelledby="pay-drawer-title"
      data-csrf="<?= e(Csrf::token()) ?>"
      data-currency="<?= e($renewCurrency) ?>"
-     data-auto-open="<?= (!empty($pendingMembershipOrder) && empty($pendingPaymentInFlight)) ? '1' : '0' ?>"
+     data-auto-open="<?= (!empty($pendingMembershipOrder) && empty($pendingPaymentInFlight) && strtolower((string) ($pendingMembershipOrder['payment_method'] ?? 'stripe')) !== 'bank_transfer') ? '1' : '0' ?>"
      data-payment-inflight="<?= !empty($pendingPaymentInFlight) ? '1' : '0' ?>"
      data-fee-enabled="<?= $renewFeeEnabled ? '1' : '0' ?>"
      data-fee-percent="<?= e(number_format($renewFeePercent, 4, '.', '')) ?>"
@@ -5791,20 +5800,42 @@ if ($renewModalEligible) {
               </label>
             </div>
           <?php endif; ?>
+          <div data-tour="renew-method">
+            <p class="text-sm font-semibold text-gray-900 mb-2">Payment method</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
+                <input type="radio" name="pay_drawer_method" value="bank_transfer" data-pay-drawer-method
+                  class="mt-0.5 h-5 w-5 text-red-600 focus:ring-red-600">
+                <span>
+                  <span class="block text-sm font-semibold text-gray-900">Direct deposit <span class="text-green-700">(no fees)</span></span>
+                  <span class="block text-xs text-gray-500">Bank details shown after you submit</span>
+                </span>
+              </label>
+              <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 cursor-pointer transition-all">
+                <input type="radio" name="pay_drawer_method" value="card" data-pay-drawer-method checked
+                  class="mt-0.5 h-5 w-5 text-red-600 focus:ring-red-600">
+                <span>
+                  <span class="block text-sm font-semibold text-gray-900">Credit or debit card</span>
+                  <span class="block text-xs text-gray-500">Pay now securely via Stripe</span>
+                </span>
+              </label>
+            </div>
+          </div>
           <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
             <div class="hidden items-center justify-between text-xs text-gray-500" data-pay-drawer-fee-row>
               <span>Card processing fee</span>
               <span data-pay-drawer-fee>—</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-600">You pay today</span>
+              <span class="text-gray-600" data-pay-drawer-total-label>You pay today</span>
               <span class="text-xl font-display font-bold text-gray-900" data-pay-drawer-total>—</span>
             </div>
             <p class="text-xs text-gray-500 flex items-center gap-1">
               <span class="material-icons-outlined text-sm">lock</span>
-              Secure payment by card via Stripe.
+              <span data-pay-drawer-secure-text>Secure payment by card via Stripe.</span>
             </p>
           </div>
+          <?php require __DIR__ . '/../../app/Views/partials/payment_refund_notice.php'; ?>
           <label class="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer">
             <input type="checkbox" value="1" data-pay-drawer-ack
               class="mt-0.5 h-5 w-5 rounded border-amber-300 text-red-600 focus:ring-red-600">

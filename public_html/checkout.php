@@ -439,6 +439,14 @@ if ($cartItems) {
               function () use ($cardEnabled, $bankTransferEnabled, $bankTransferInstructions) { ?>
                 <div id="payment-method-error" class="hidden bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2 text-sm mb-3"></div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Payment method">
+                  <label class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors <?= $bankTransferEnabled ? '' : 'opacity-50 cursor-not-allowed' ?>">
+                    <input type="radio" name="payment_method" value="bank_transfer" data-payment-toggle="bank_transfer" class="text-primary focus:ring-primary" <?= $bankTransferEnabled ? '' : 'disabled' ?>>
+                    <span class="material-icons-outlined text-gray-700">account_balance</span>
+                    <span class="flex-1">
+                      <span class="block text-sm font-semibold text-gray-900">Direct deposit / bank transfer <span class="text-green-700">(no fees)</span></span>
+                      <span class="block text-xs text-gray-500">Manual EFT — order held until received</span>
+                    </span>
+                  </label>
                   <label class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors <?= $cardEnabled ? '' : 'opacity-50 cursor-not-allowed' ?>">
                     <input type="radio" name="payment_method" value="card" data-payment-toggle="card" class="text-primary focus:ring-primary" <?= $cardEnabled ? '' : 'disabled' ?>>
                     <span class="material-icons-outlined text-gray-700">credit_card</span>
@@ -447,15 +455,8 @@ if ($cartItems) {
                       <span class="block text-xs text-gray-500">Visa, Mastercard, Amex · Apple Pay · Google Pay</span>
                     </span>
                   </label>
-                  <label class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors <?= $bankTransferEnabled ? '' : 'opacity-50 cursor-not-allowed' ?>">
-                    <input type="radio" name="payment_method" value="bank_transfer" data-payment-toggle="bank_transfer" class="text-primary focus:ring-primary" <?= $bankTransferEnabled ? '' : 'disabled' ?>>
-                    <span class="material-icons-outlined text-gray-700">account_balance</span>
-                    <span class="flex-1">
-                      <span class="block text-sm font-semibold text-gray-900">Bank transfer</span>
-                      <span class="block text-xs text-gray-500">Manual EFT — order held until received</span>
-                    </span>
-                  </label>
                 </div>
+                <?php require __DIR__ . '/../app/Views/partials/payment_refund_notice.php'; ?>
 
                 <div class="mt-4 hidden" data-payment-panel="card">
                   <?php

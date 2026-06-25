@@ -3433,6 +3433,49 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 039 — Re-link orphaned ASSOCIATE members to their full member
+// Some associates show in the directory with no full member attached because
+// their members.full_member_id is NULL/0. The member-number convention ties an
+// associate (base.suffix, suffix>0) to the full member sharing its base with
+// suffix 0 — exactly how import_from_datafile.php resolves the link. This re-runs
+// that resolution for any associate currently missing it. Idempotent and safe:
+// only fills NULL/0 links, only ever points at an existing non-associate full
+// member with the same base. Verified targets include Brooks 1697, Campbell 1659,
+// Langley 585, Murray 1188, Nott 1694, Snell 1457, Wall 1627, Wilkinson 1628.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_039_relink_orphan_associates';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 039 — Re-link orphaned associates', 'status' => 'skipped', 'note' => 'Already applied. Clear the migrations.' . $migrationKey . ' setting to re-run.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->query(
+            'UPDATE members a
+               JOIN members f
+                 ON f.member_number_base = a.member_number_base
+                AND f.member_number_suffix = 0
+                AND f.id <> a.id
+                AND f.member_type <> "ASSOCIATE"
+                SET a.full_member_id = f.id, a.updated_at = NOW()
+             WHERE a.member_type = "ASSOCIATE"
+               AND (a.full_member_id IS NULL OR a.full_member_id = 0)'
+        );
+        $linked = $stmt ? (int) $stmt->rowCount() : 0;
+
+        ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.associates_relinked', [
+            'linked'    => $linked,
+            'migration' => '039',
+        ]);
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 039 — Re-link orphaned associates', 'status' => 'applied', 'note' => $linked . ' orphaned associate(s) re-linked to their full member by member number. (0 = links were already intact.)'];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 039 — Re-link orphaned associates', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

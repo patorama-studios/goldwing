@@ -421,6 +421,15 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
             <fieldset style="border:1px solid #e2e8f0;border-radius:0.75rem;padding:1.25rem;">
                 <legend style="font-weight:600;padding:0 0.5rem;">Payment method</legend>
                 <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                    <?php if (!empty($event['allow_bank_transfer'])): ?>
+                        <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer;">
+                            <input type="radio" name="payment_method" value="bank_transfer" <?= ($formData['payment_method'] ?? '') === 'bank_transfer' ? 'checked' : '' ?>>
+                            <span>
+                                <strong>Direct deposit / bank transfer <span style="color:#15803d;">(no fees)</span></strong>
+                                <span style="display:block;font-size:0.875rem;color:#64748b;">Submit your registration now and we'll confirm once payment lands. Bank details will be shown after you submit.</span>
+                            </span>
+                        </label>
+                    <?php endif; ?>
                     <?php if (!empty($event['allow_stripe'])): ?>
                         <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer;">
                             <input type="radio" name="payment_method" value="stripe" <?= ($formData['payment_method'] ?? 'stripe') === 'stripe' ? 'checked' : '' ?>>
@@ -436,16 +445,8 @@ require __DIR__ . '/../../app/Views/partials/nav_public.php';
                           ?>
                         </div>
                     <?php endif; ?>
-                    <?php if (!empty($event['allow_bank_transfer'])): ?>
-                        <label style="display:flex;align-items:flex-start;gap:0.5rem;cursor:pointer;">
-                            <input type="radio" name="payment_method" value="bank_transfer" <?= ($formData['payment_method'] ?? '') === 'bank_transfer' ? 'checked' : '' ?>>
-                            <span>
-                                <strong>Bank transfer</strong>
-                                <span style="display:block;font-size:0.875rem;color:#64748b;">Submit your registration now and we'll confirm once payment lands. Bank details will be shown after you submit.</span>
-                            </span>
-                        </label>
-                    <?php endif; ?>
                 </div>
+                <?php require __DIR__ . '/../../app/Views/partials/payment_refund_notice.php'; ?>
             </fieldset>
 
             <div style="display:flex;justify-content:flex-end;">

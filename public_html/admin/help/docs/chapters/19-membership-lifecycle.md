@@ -14,12 +14,15 @@ You'll wear your "membership secretary" hat for most of this. Day-to-day it's ch
 
 1. **Application** — someone fills out the form on the website (Full, Associate, or Life).
 2. **Review** — an admin opens the application, checks the details, approves or rejects.
-3. **Approval** — the system creates their member record, gives them a member number, and emails them a password-reset link so they can set up their login. A membership "period" is created with an end date of 31 July (our membership year runs Aug–Jul).
+3. **Approval** — an admin assigns a member number in the approval dialog, the system creates their member record, and emails them a password-reset link so they can set up their login. A membership "period" is created with an end date of 31 July (our membership year runs Aug–Jul).
 4. **Payment** — if they paid by card during the application, they're already active. If they chose bank transfer, the period stays "pending payment" until the treasurer marks the payment received.
 5. **Active** — they can log in, see member-only content, book rides, buy from the store.
 6. **Renewal reminders** — 60 days before their expiry, an automatic email goes out with a Stripe link to renew. If they don't pay, a second reminder goes out at 30 days.
-7. **Renew or expire** — within 60 days of expiry (or once lapsed) members see a prominent red **Renew now** call-to-action on their dashboard and billing page. Clicking it opens a renewal lightbox where they pick a term — the list comes from the admin-defined renewal periods (ships with 1 Year and 3 Years, but admins can add/remove/rename any of them at `/admin/settings/index.php?section=membership_pricing`) — optionally bundle their partner's renewal (Full members can renew their Associate and vice-versa), confirm their details are current, and pay through Stripe. If they don't renew before 31 July, a nightly cron job marks them as **lapsed** the day after expiry.
-8. **Lapsed** — they can still log in but member-only stuff is locked. They can come back any time by paying again — there's no penalty.
+7. **Renew or expire** — within 60 days of expiry (or once lapsed) members see a prominent red **Renew now** call-to-action on their dashboard and billing page. Clicking it opens a renewal lightbox where they pick a term — the list comes from the admin-defined renewal periods (ships with 1 Year and 3 Years, but admins can add/remove/rename any of them at `/admin/settings/index.php?section=membership_pricing`) — optionally bundle their partner's renewal (Full members can renew their Associate and vice-versa), confirm their details are current, and pay by card (Stripe) or bank transfer.
+8. **Grace period (2 months)** — if expiry passes without a renewal the member's status badge immediately shows **Lapsed** and an amber warning banner appears at the top of every member-area page. However member features stay fully accessible during this 2-month window. The banner shows the exact date access will lock if they don't renew.
+9. **Locked out** — once the 2-month grace window closes, member-only features (calendar, Wings, directory, etc.) lock behind a blur overlay. They can still log in, view their dashboard, and update their billing/profile details. No features are restored until a renewal payment clears.
+10. **Cancellation request** — members can choose **Cancel my membership** from the renewal lightbox. This is a "do not renew" intent, not a hard cancellation: they keep access until their current paid period ends, the committee gets notified, and the member's record is flagged so staff can follow up. Withdrawable at any time.
+11. **Life members** — never expire, never get reminders, never lapse.
 9. **Cancellation request** — members can choose **Cancel my membership** from the renewal lightbox. This is a "do not renew" intent, not a hard cancellation: they keep access until their current paid period ends, the committee gets notified, and the member's record is flagged so staff can follow up. Withdrawable at any time.
 10. **Life members** — never expire, never get reminders, never lapse.
 
@@ -28,7 +31,8 @@ You'll wear your "membership secretary" hat for most of this. Day-to-day it's ch
 - **Application stage** — approve, reject (with a reason), or just view the details (vehicles, chapter request, magazine preference, associate sub-application).
 - **Active stage** — view the member's profile, change their chapter, send them a manual payment link if they need one, edit details.
 - **Renewal stage** — issue a Stripe checkout link manually if the automatic reminder didn't work for them.
-- **Lapsed stage** — encourage them to rejoin; once they pay they're active again.
+- **Grace period stage** — the amber banner tells you when access will lock. Encourage them to renew while features are still accessible.
+- **Locked-out stage** — encourage them to rejoin; once they pay they're active again.
 - **Life members** — same as active, but no renewal admin needed.
 
 ### Who's allowed
@@ -93,7 +97,7 @@ In addition to the 60/30-day reminder emails, members can renew on demand from i
 
 - A high-contrast red **Renew now** button **auto-appears** on the member's dashboard and on **Billing & Payments** as soon as their period is within 60 days of expiry (or already lapsed). Life members never see it. Members outside the 60-day window don't see it either — only members who actually need to act. Nothing pops up on its own; the button is a visible CTA, not a modal that opens itself.
 - Clicking it opens the **renewal lightbox** — a focused, full-screen modal that handles the whole renewal in one place. Inside the lightbox they:
-  1. Pick a **term** — 1, 2, or 3 years. Each option shows the price for their member type and magazine preference; greyed-out options mean that term has no AUD amount set in the pricing matrix.
+  1. Pick a **term** — the options come straight from the admin-defined renewal periods (ships with 1 Year and 3 Years; add/rename/remove them under Settings → Membership pricing). Each option shows the price for their member type and magazine preference; greyed-out options mean that term has no AUD amount set in the pricing matrix. Whatever length a period is set to is exactly how far the renewal date advances — a 3-year renewal always moves the date three whole years on, even if the member had already lapsed.
   2. Optionally tick **"Also renew my partner"** — visible only when the member has a linked partner (Full ↔ Associate, either direction) AND a partner price is configured for at least one term. When ticked, the modal shows the combined total live. If the card-surcharge setting is on (Settings Hub → Store → "pass Stripe fees", shared with the store checkout and the application form), a **card processing fee** line appears in the running total and in the order summary, and is included in the Stripe charge.
   3. Confirm the **"details are correct"** acknowledgement.
   4. Click **Continue to payment** — the lightbox slides to a second view with the order summary and an embedded Stripe card form (Payment Element). They enter their card and click **Pay** without ever leaving the site; no redirect to a Stripe-hosted checkout page.
@@ -175,7 +179,7 @@ Split into small tables + cron jobs, not a single `members.expiry_date` column, 
 The wizard at `public_html/apply.php` (also `/become-a-member`). On submit:
 
 1. CSRF + email-uniqueness check (`MemberRepository::isEmailAvailable`).
-2. Allocate a member number — **Full**: `MAX(member_number_base) + 1`. **Associate** linked to a full: reuse the full's base, bump `member_number_suffix`. Rendered by `MembershipService::displayMembershipNumber()` per `membership.member_number_format_*` (defaults `{base}` / `{base}.{suffix}`).
+2. Insert `members` row with `member_number_base = 0` (unassigned). Member numbers are **not** auto-allocated on application submit — an admin types the number manually in the approval dialog.
 3. Insert `members` row with `status = 'PENDING'` and `member_type` of `FULL`, `ASSOCIATE`, or `LIFE`.
 4. Insert `membership_applications` row with `status = 'PENDING'` and a JSON `notes` blob (magazine type, period key, requested chapter, vehicles, associate sub-application, payment method).
 5. Send confirmation email.
@@ -193,8 +197,9 @@ Lists applications filtered by `pending / approved / rejected`. Each row links t
 
 The approve handler (`admin/index.php` ~L220), in order:
 
-1. Application → `APPROVED`, stamps `approved_by` / `approved_at`.
-2. Reads the term from `notes` (`membership.full.period_key` etc.); defaults to `'1Y'`, or `'LIFE'`.
+1. **Reads the member number** typed in the approval dialog, parses it via `MembershipService::parseMemberNumberString()`, and duplicate-checks against existing members. Aborts with an error if the field is blank or the number is already in use. Writes `member_number_base`, `member_number_suffix`, and the legacy `member_number` display string onto the `members` row.
+2. Application → `APPROVED`, stamps `approved_by` / `approved_at`.
+3. Reads the term from `notes` (`membership.full.period_key` etc.); defaults to `'1Y'`, or `'LIFE'`.
 3. `MembershipService::createMembershipPeriod()` inserts a `membership_periods` row with `status = 'PENDING_PAYMENT'`. Expiry via `calculateExpiry()` is **always 31 July**, N years out (membership year is Aug–Jul). `LIFE` rows have `end_date = NULL`.
 4. If a paid `payments` row already exists (bank-transfer-upfront or admin-recorded), `markPaid()` flips the period to `ACTIVE` immediately.
 5. Creates a `users` row + `member` role assignment + password-reset email via `NotificationService::dispatch('member_set_password', …)` if no user exists for that email.
@@ -218,10 +223,11 @@ Two paths land here:
    - **Cancels any prior pending/failed membership orders for the involved members and deletes their `PENDING_PAYMENT` periods.** Without this, the second renewal attempt would short-circuit on the existing pending order and Stripe would charge the original term's price regardless of what the member just picked.
    - Creates one fresh `membership_periods` (`PENDING_PAYMENT`) and one `MembershipOrderService::createMembershipOrder()` per renewer (self + optional partner).
    - Pulls each renewer's amount via `membership_renewal_amount_cents()`. That helper calls `MembershipPricingService::findRenewalPeriodByMonths()` to match the chosen term to an admin-defined renewal period and reads its price from `renewal_prices`. The pricing config at `/admin/settings/index.php?section=membership_pricing` is the single source of truth for AUD amounts. No Stripe Price IDs are needed for member renewals. (A safety-net fallback for terms with no matching period derives `12 × N` from the legacy ONE_YEAR matrix lookup.)
+   - **Payment method choice** — member picks **Card** (Stripe, default) or **Direct deposit / bank transfer** (no Stripe, no surcharge). Bank transfer path: calls `/api/payments/membership-intent` with `payment_method=bank_transfer`, creates the pending orders with no PaymentIntent, redirects to the billing page which then shows the bank details from the pending order. Card path continues as below.
    - Builds one combined `StripeService::createCheckoutSessionWithLineItems()` call with one `price_data` line item per renewer (so a member + partner renewal pays for both in one Stripe session).
    - Acknowledgement is server-enforced — missing `acknowledged=1` aborts with an error.
 
-Member clicks, pays. The Stripe webhook ([Chapter 16](view.php?slug=16-webhooks-idempotency)) calls `MembershipService::markPaid($periodId, $paymentId)` — new period `ACTIVE`, `members.status = 'ACTIVE'`. Old period stays with its original expiry.
+Member clicks, pays (card). The Stripe webhook ([Chapter 16](view.php?slug=16-webhooks-idempotency)) calls `MembershipService::markPaid($periodId, $paymentId)` — new period `ACTIVE`, `members.status = 'ACTIVE'`. Old period stays with its original expiry. Bank-transfer renewals stay `PENDING_PAYMENT` until the Treasurer marks payment received.
 
 #### 6a. Member cancellation request
 
@@ -233,9 +239,15 @@ The same lightbox has a small **Cancel my membership instead** link. It opens a 
 
 The member keeps access until their current `membership_periods.end_date`. Nothing is auto-terminated — staff follow up before expiry. Withdrawable (`undo=1` flips the flag back to 0).
 
-#### 7. Expiry (`cron/expire_memberships.php`)
+#### 7. Grace period + Expiry (`cron/expire_memberships.php`)
 
-Daily. `SELECT … FROM membership_periods WHERE status = 'ACTIVE' AND end_date < CURDATE()`. Each match: period → `LAPSED`, member → `LAPSED`. Writes `last_expire_run` into `system_settings`.
+When `end_date` passes the member's status badge and all in-app labels immediately switch to **Lapsed**, but `MembershipAccessService` grants a **2-month grace window** before any content is locked. During grace, `membership_periods.status` remains `ACTIVE`; the member sees an amber banner showing the lockoff date. The cron runs daily:
+
+`SELECT … FROM membership_periods WHERE status = 'ACTIVE' AND end_date < (CURDATE() - INTERVAL 2 MONTH)`
+
+After that interval each match: period → `LAPSED`, member → `LAPSED`. Writes `last_expire_run` into `system_settings`. The grace period constant lives in `MembershipAccessService::GRACE_MONTHS` — the cron reads it so both stay in sync.
+
+The `in_grace` flag is computed in `MembershipAccessService::state()` (`!lapsed && end_date < today`). The member-area pages check `$gwInGrace` to show the Lapsed badge/dot while keeping feature gates open.
 
 #### 8. Lapsed → Reactivation
 

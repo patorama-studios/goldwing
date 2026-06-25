@@ -6,7 +6,6 @@ use App\Services\Validator;
 use App\Services\AuditService;
 use App\Services\MembershipPricingService;
 use App\Services\SettingsService;
-use App\Services\MembershipService;
 use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
 use App\Services\NotificationService;
@@ -67,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastName = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $privacy = $_POST['privacy_level'] ?? 'A';
-    $fullMemberNumber = trim($_POST['full_member_number'] ?? '');
     $referralSource = trim($_POST['referral_source'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $addressLine1 = trim($_POST['address_line1'] ?? '');
@@ -150,40 +148,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
     if (!$error) {
+      // Member numbers are NOT auto-assigned on signup. An admin types the
+      // member number manually when approving the application.
       $memberNumberBase = 0;
       $memberNumberSuffix = 0;
       $fullMemberId = null;
-      $memberNumberStart = (int) SettingsService::getGlobal('membership.member_number_start', 1000);
-      $associateSuffixStart = (int) SettingsService::getGlobal('membership.associate_suffix_start', 1);
-
-      if ($memberType === 'ASSOCIATE' && $fullMemberNumber !== '') {
-        $parsedFull = MembershipService::parseMemberNumberString($fullMemberNumber);
-        if (!$parsedFull || ($parsedFull['suffix'] ?? 0) !== 0) {
-          $error = 'Full member number not found.';
-        }
-        if (!$error) {
-          $stmt = $pdo->prepare('SELECT id, member_number_base FROM members WHERE member_number_base = :base AND member_number_suffix = 0 LIMIT 1');
-          $stmt->execute(['base' => (int) $parsedFull['base']]);
-          $full = $stmt->fetch();
-          if (!$full) {
-            $error = 'Full member number not found.';
-          } else {
-            $fullMemberId = $full['id'];
-            $memberNumberBase = (int) $full['member_number_base'];
-            $stmt = $pdo->prepare('SELECT MAX(member_number_suffix) as max_suffix FROM members WHERE full_member_id = :full_id');
-            $stmt->execute(['full_id' => $fullMemberId]);
-            $row = $stmt->fetch();
-            $maxSuffix = (int) ($row['max_suffix'] ?? 0);
-            $memberNumberSuffix = max($maxSuffix, $associateSuffixStart - 1) + 1;
-          }
-        }
-      } else {
-        $stmt = $pdo->query('SELECT MAX(member_number_base) as max_base FROM members');
-        $row = $stmt->fetch();
-        $maxBase = (int) ($row['max_base'] ?? 0);
-        $start = max($memberNumberStart, 1);
-        $memberNumberBase = max($maxBase, $start - 1) + 1;
-      }
 
       $pricingCurrency = $pricingData['currency'] ?? 'AUD';
       $fullPriceCents = null;
@@ -243,14 +212,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'exclude_electronic' => $excludeElectronic,
         ]);
         $memberId = (int) $pdo->lastInsertId();
-        if (MemberRepository::hasMemberNumberColumn($pdo)) {
-          $memberNumberDisplay = MembershipService::displayMembershipNumber($memberNumberBase, $memberNumberSuffix);
-          $stmt = $pdo->prepare('UPDATE members SET member_number = :member_number WHERE id = :id');
-          $stmt->execute([
-            'member_number' => $memberNumberDisplay,
-            'id' => $memberId,
-          ]);
-        }
 
         $fullVehicles = json_decode($fullVehiclePayload, true);
         $associateVehicles = json_decode($associateVehiclePayload, true);
@@ -865,16 +826,17 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                 <span class="form-label">Payment Method</span>
                 <div class="form-checkboxes">
                   <label class="form-checkbox">
+                    <input type="radio" name="payment_method" value="bank_transfer" data-required="true"
+                      data-payment-toggle="bank">
+                    Direct Deposit / Bank Transfer <span style="color:#15803d;font-weight:600;">(no fees)</span>
+                  </label>
+                  <label class="form-checkbox">
                     <input type="radio" name="payment_method" value="card" data-required="true"
                       data-payment-toggle="card">
                     Credit Card (Stripe)
                   </label>
-                  <label class="form-checkbox">
-                    <input type="radio" name="payment_method" value="bank_transfer" data-required="true"
-                      data-payment-toggle="bank">
-                    Bank Transfer
-                  </label>
                 </div>
+                <?php require __DIR__ . '/../app/Views/partials/payment_refund_notice.php'; ?>
                 <div class="form-alert error" id="payment-method-error" role="alert" hidden></div>
               </div>
 

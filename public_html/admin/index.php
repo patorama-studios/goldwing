@@ -228,11 +228,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt = $pdo->prepare('SELECT status, member_id, member_type, notes FROM membership_applications WHERE id = :id');
       $stmt->execute(['id' => $appId]);
       $row = $stmt->fetch();
+      $memberNumberInput = trim((string) ($_POST['member_number_input'] ?? ''));
+      $parsedMemberNumber = $memberNumberInput !== ''
+        ? MembershipService::parseMemberNumberString($memberNumberInput)
+        : null;
       if (!$row) {
         $alerts[] = ['type' => 'error', 'message' => 'Application not found.'];
       } elseif ($row['status'] === 'APPROVED') {
         $alerts[] = ['type' => 'error', 'message' => 'Application already approved.'];
+      } elseif (!$parsedMemberNumber) {
+        $alerts[] = ['type' => 'error', 'message' => 'Enter a valid Member ID before approving (e.g. 1234 for a Full member or 1234.2 for an Associate).'];
       } else {
+        $dupStmt = $pdo->prepare('SELECT id FROM members WHERE member_number_base = :base AND member_number_suffix = :suffix AND id <> :self LIMIT 1');
+        $dupStmt->execute([
+          'base' => $parsedMemberNumber['base'],
+          'suffix' => $parsedMemberNumber['suffix'],
+          'self' => (int) $row['member_id'],
+        ]);
+        if ($dupStmt->fetchColumn()) {
+          $alerts[] = ['type' => 'error', 'message' => 'Member ID ' . $parsedMemberNumber['display'] . ' is already used by another member. Pick a different number.'];
+          goto approve_application_end;
+        }
+
+        $memberNumberColumns = 'member_number_base = :base, member_number_suffix = :suffix';
+        $memberNumberParams = [
+          'base' => $parsedMemberNumber['base'],
+          'suffix' => $parsedMemberNumber['suffix'],
+          'id' => (int) $row['member_id'],
+        ];
+        if (MemberRepository::hasMemberNumberColumn($pdo)) {
+          $memberNumberColumns .= ', member_number = :member_number';
+          $memberNumberParams['member_number'] = $parsedMemberNumber['display'];
+        }
+        $pdo->prepare('UPDATE members SET ' . $memberNumberColumns . ' WHERE id = :id')->execute($memberNumberParams);
+
         $stmt = $pdo->prepare('UPDATE membership_applications SET status = "APPROVED", approved_by = :user_id, approved_at = NOW(), rejected_by = NULL, rejected_at = NULL, rejection_reason = NULL WHERE id = :id');
         $stmt->execute(['user_id' => $user['id'], 'id' => $appId]);
 
@@ -660,6 +689,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ? 'Application approved. Payment instructions sent.'
             : 'Application approved. Payment already recorded; no payment email sent.',
         ];
+        approve_application_end:
       }
     }
     if ($page === 'applications' && isset($_POST['reject_id'])) {
@@ -1950,7 +1980,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $statusCounts[$status] = (int) $row['total'];
           }
         }
-        $stmt = $pdo->prepare('SELECT a.*, m.first_name, m.last_name, m.email, m.phone, m.chapter_id, ' . ChapterRepository::displayNameSql($pdo) . ' as chapter_name, c.state as chapter_state FROM membership_applications a JOIN members m ON m.id = a.member_id LEFT JOIN chapters c ON c.id = m.chapter_id WHERE a.status = :status ORDER BY a.created_at ASC');
+        $hasMemberNumberColumn = MemberRepository::hasMemberNumberColumn($pdo);
+        $stmt = $pdo->prepare('SELECT a.*, m.first_name, m.last_name, m.email, m.phone, m.chapter_id, m.member_number_base, m.member_number_suffix' . ($hasMemberNumberColumn ? ', m.member_number' : '') . ', ' . ChapterRepository::displayNameSql($pdo) . ' as chapter_name, c.state as chapter_state FROM membership_applications a JOIN members m ON m.id = a.member_id LEFT JOIN chapters c ON c.id = m.chapter_id WHERE a.status = :status ORDER BY a.created_at ASC');
         $stmt->execute(['status' => $statusFilter]);
         $applications = $stmt->fetchAll();
         $chapters = ChapterRepository::listForSelection($pdo, false);
@@ -1961,12 +1992,19 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $notes = [];
           }
           $application['notes_data'] = $notes;
+          $primaryBase = (int) ($application['member_number_base'] ?? 0);
+          $primarySuffix = (int) ($application['member_number_suffix'] ?? 0);
+          $primaryMemberNumber = $primaryBase > 0
+            ? MembershipService::displayMembershipNumber($primaryBase, $primarySuffix)
+            : trim((string) ($application['member_number'] ?? ''));
           $applicationRows[] = [
             'application' => $application,
             'display_name' => trim($application['first_name'] . ' ' . $application['last_name']),
             'display_type' => $application['member_type'],
             'linked_label' => null,
             'display_email' => $application['email'] ?? '',
+            'member_number_display' => $primaryMemberNumber,
+            'is_primary' => true,
           ];
           $associateSelected = $notes['membership']['associate_selected'] ?? false;
           $associateAdd = $notes['membership']['associate_add'] ?? '';
@@ -1979,6 +2017,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               'display_type' => 'ASSOCIATE',
               'linked_label' => 'Linked to application #' . (string) $application['id'],
               'display_email' => $associate['email'] ?? '',
+              'member_number_display' => '',
+              'is_primary' => false,
             ];
           }
         }
@@ -2044,6 +2084,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <th class="py-3 pr-4">Type</th>
                   <th class="py-3 pr-4">Submitted</th>
                   <th class="py-3 pr-4">Status</th>
+                  <th class="py-3 pr-4">Member ID</th>
                   <th class="py-3 pr-4">Chapter</th>
                   <th class="py-3 pr-4">Assign Chapter</th>
                   <th class="py-3 pr-4">Approve</th>
@@ -2091,6 +2132,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <?= e($statusMeta['label']) ?>
                       </span>
                     </td>
+                    <td class="py-4 pr-4 text-gray-700 font-medium">
+                      <?php if (!empty($row['member_number_display'])): ?>
+                        <?= e($row['member_number_display']) ?>
+                      <?php elseif (!$row['is_primary']): ?>
+                        <span class="text-xs text-gray-400 italic">Assigned with primary</span>
+                      <?php else: ?>
+                        <span class="text-xs text-gray-400">Not assigned</span>
+                      <?php endif; ?>
+                    </td>
                     <td class="py-4 pr-4 text-gray-600">
                       <?= e($application['chapter_name'] ? $application['chapter_name'] . ' (' . $application['chapter_state'] . ')' : 'Unassigned') ?>
                       <?php if ($requestedChapterName): ?>
@@ -2115,11 +2165,19 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </td>
                     <td class="py-4 pr-4">
                       <?php if ($canApprove): ?>
+                        <?php
+                        $approveDialogBase = (int) ($application['member_number_base'] ?? 0);
+                        $approveDialogSuffix = (int) ($application['member_number_suffix'] ?? 0);
+                        $approveDialogMemberNumber = $approveDialogBase > 0
+                          ? MembershipService::displayMembershipNumber($approveDialogBase, $approveDialogSuffix)
+                          : '';
+                        ?>
                         <button type="button"
                           <?= $isFirstApplicationRow ? 'data-tour="approve-app-button"' : '' ?>
                           class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 h-9 w-9 hover:bg-emerald-100"
                           data-approve-open data-app-id="<?= e((string) $application['id']) ?>"
-                          data-app-name="<?= e($row['display_name']) ?>">
+                          data-app-name="<?= e(trim($application['first_name'] . ' ' . $application['last_name'])) ?>"
+                          data-member-number="<?= e($approveDialogMemberNumber) ?>">
                           <span class="material-icons-outlined text-base">check</span>
                         </button>
                       <?php else: ?>
@@ -2180,8 +2238,15 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <div>
               <h2 class="text-lg font-semibold text-gray-900">Approve application</h2>
               <p class="text-sm text-gray-600">You're about to approve <span class="font-semibold"
-                  id="approve-name"></span>. Do you accept?</p>
+                  id="approve-name"></span>.</p>
             </div>
+            <label class="block space-y-1">
+              <span class="text-sm font-medium text-gray-800">Member ID</span>
+              <input type="text" name="member_number_input" id="approve-member-number" required
+                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/30"
+                placeholder="e.g. 1234 (Full) or 1234.2 (Associate)" autocomplete="off">
+              <span class="block text-xs text-gray-500">Type the member number you want to assign. For applications with an associate, the associate gets the next suffix off this number automatically.</span>
+            </label>
             <div class="flex flex-wrap gap-2">
               <button class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-gray-900"
                 type="submit">Yes, approve</button>
@@ -2222,6 +2287,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             const rejectId = document.getElementById('reject-id');
             const approveName = document.getElementById('approve-name');
             const rejectName = document.getElementById('reject-name');
+            const approveMemberNumber = document.getElementById('approve-member-number');
 
             if (!approveDialog || !rejectDialog || typeof approveDialog.showModal !== 'function') {
               return;
@@ -2231,6 +2297,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               button.addEventListener('click', () => {
                 approveId.value = button.dataset.appId || '';
                 approveName.textContent = button.dataset.appName || 'this applicant';
+                if (approveMemberNumber) {
+                  approveMemberNumber.value = button.dataset.memberNumber || '';
+                  setTimeout(() => approveMemberNumber.focus(), 0);
+                }
                 approveDialog.showModal();
               });
             });

@@ -158,23 +158,42 @@ class MembershipOrderService
         $startDate = $today->format('Y-m-d');
         $endDate = null;
 
-        if ($term !== 'LIFE') {
+        // Duration comes from the period's term, resolved against the pricing
+        // config so a configured "3 Years" (or any custom period) always
+        // advances the date by its real length. null => LIFE (no expiry).
+        $months = MembershipService::termToMonths($term);
+        if ($months !== null) {
+            // Existing future-dated active coverage to extend from.
             $stmt = $pdo->prepare('SELECT end_date FROM membership_periods WHERE member_id = :member_id AND status = "ACTIVE" AND end_date IS NOT NULL ORDER BY end_date DESC LIMIT 1');
             $stmt->execute(['member_id' => $memberId]);
             $activeEnd = $stmt->fetchColumn();
-            if ($activeEnd) {
-                $activeEndDate = new DateTimeImmutable((string) $activeEnd);
-                if ($activeEndDate >= $today) {
-                    $startDate = $activeEndDate->modify('+1 day')->format('Y-m-d');
-                }
+            $activeEndDate = $activeEnd ? new DateTimeImmutable((string) $activeEnd) : null;
+
+            // Any prior (non-pending) membership period means this purchase is a
+            // renewal, not a brand-new pro-rata join.
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM membership_periods WHERE member_id = :member_id AND id <> :id AND status <> "PENDING_PAYMENT"');
+            $stmt->execute(['member_id' => $memberId, 'id' => $periodId]);
+            $isRenewal = ((int) $stmt->fetchColumn()) > 0;
+
+            // 31 Jul that ends the membership year containing the payment date.
+            $currentYearEnd = new DateTimeImmutable(MembershipService::calculateExpiry($startDate, 1));
+
+            if ($activeEndDate && $activeEndDate >= $today) {
+                // Active renewal: stack the full term on top of existing cover.
+                $startDate = $activeEndDate->modify('+1 day')->format('Y-m-d');
+                $endDate = $activeEndDate->modify("+{$months} months")->format('Y-m-d');
+            } elseif ($isRenewal) {
+                // Lapsed / expired renewal: give the full term from the current
+                // membership-year end, active immediately. A full-price N-year
+                // renewal always advances the date N whole years — never short.
+                $endDate = $currentYearEnd->modify("+{$months} months")->format('Y-m-d');
+            } else {
+                // Brand-new pro-rata join: rest of the current membership year
+                // plus any whole years beyond the first (the joining-window
+                // price already accounts for the partial first year).
+                $extraMonths = max(0, $months - 12);
+                $endDate = $currentYearEnd->modify("+{$extraMonths} months")->format('Y-m-d');
             }
-            $termYears = 1;
-            if ($term === '3Y') {
-                $termYears = 3;
-            } elseif ($term === '2Y') {
-                $termYears = 2;
-            }
-            $endDate = MembershipService::calculateExpiry($startDate, $termYears);
         }
 
         $paymentReference = (string) ($metadata['payment_reference'] ?? '');

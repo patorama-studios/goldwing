@@ -4,10 +4,13 @@
  * Markup lives inline in /member/index.php (#pay-membership-drawer).
  *
  * View 1 (select) — renewal term cards (server-rendered prices), optional
- *   "also pay for my associate" checkbox, live "You pay today" total, and
- *   the mandatory confirm-details checkbox. The Continue button POSTs
- *   /api/payments/membership-intent {term, include_partner}, which creates
- *   the pending order(s) + PaymentIntent, then slides to View 2.
+ *   "also pay for my associate" checkbox, a payment-method choice (direct
+ *   deposit / card), live "You pay today" total, and the mandatory
+ *   confirm-details checkbox. The Continue button POSTs
+ *   /api/payments/membership-intent {term, include_partner, payment_method}:
+ *   - card → creates the pending order(s) + PaymentIntent, then slides to View 2.
+ *   - bank_transfer → creates the pending order(s) with no Stripe and redirects
+ *     to the dashboard, which shows the bank details from the pending order.
  *
  * View 2 (pay) — order summary lines from the API response, Stripe Payment
  *   Element (mounted before the slide so it's ready when visible), and the
@@ -62,6 +65,14 @@
     var a = get('[data-pay-drawer-ack]');
     return !!(a && a.checked);
   }
+  // 'card' (Stripe) or 'bank_transfer' (direct deposit). Card is the default.
+  function selectedMethod() {
+    var m = get('[data-pay-drawer-method]:checked');
+    return m ? m.value : 'card';
+  }
+  function continueIdleLabel() {
+    return selectedMethod() === 'bank_transfer' ? 'Submit renewal' : 'Continue to payment';
+  }
   function signature() {
     var t = selectedTerm();
     return (t ? t.value : '') + '|' + (partnerChecked() ? '1' : '0');
@@ -95,7 +106,17 @@
     var self = parseFloat(t.dataset.selfAmount || '0');
     var partner = parseFloat(t.dataset.partnerAmount || '0');
     var base = self + (partnerChecked() ? partner : 0);
-    var fee = feeFor(base);
+    var isBank = selectedMethod() === 'bank_transfer';
+    var fee = isBank ? 0 : feeFor(base);
+    var secureText = get('[data-pay-drawer-secure-text]');
+    if (secureText) secureText.textContent = isBank
+      ? 'No card fees — pay by direct deposit after submitting.'
+      : 'Secure payment by card via Stripe.';
+    var totalLabel = get('[data-pay-drawer-total-label]');
+    if (totalLabel) totalLabel.textContent = isBank ? 'Amount due' : 'You pay today';
+    var contLbl = get('[data-pay-drawer-continue-label]');
+    var contBtn = get('[data-pay-drawer-continue]');
+    if (contLbl && contBtn && !contBtn.disabled) contLbl.textContent = continueIdleLabel();
     if (feeRow) {
       if (fee > 0) {
         feeRow.classList.remove('hidden');
@@ -134,7 +155,9 @@
     var btn = get('[data-pay-drawer-continue]');
     var lbl = get('[data-pay-drawer-continue-label]');
     if (btn) btn.disabled = !!isBusy;
-    if (lbl) lbl.textContent = isBusy ? 'Preparing secure form…' : 'Continue to payment';
+    if (lbl) lbl.textContent = isBusy
+      ? (selectedMethod() === 'bank_transfer' ? 'Submitting…' : 'Preparing secure form…')
+      : continueIdleLabel();
   }
 
   function setPayBusy(isBusy) {
@@ -206,6 +229,7 @@
       body: JSON.stringify({
         term: (t ? t.value : '12') + 'M',
         include_partner: partnerChecked(),
+        payment_method: 'card',
       }),
     });
     var data = {};
@@ -264,6 +288,10 @@
       setError('select', 'Please confirm your membership details are correct before continuing.');
       return;
     }
+    if (selectedMethod() === 'bank_transfer') {
+      await submitBankTransfer();
+      return;
+    }
     var sig = signature();
     if (sig === intentSig && paymentElement) {
       // Same selection as the mounted intent — just slide across.
@@ -282,6 +310,38 @@
     } catch (e) {
       setError('select', e.message || 'Could not start the payment.');
     } finally {
+      busy = false;
+      setContinueBusy(false);
+    }
+  }
+
+  // ---- Direct deposit (View 1, no Stripe) ---------------------------------
+  // Records pending bank-transfer order(s) and lands on the dashboard, which
+  // shows the bank details from the pending order. No card / no PaymentIntent.
+  async function submitBankTransfer() {
+    busy = true;
+    setContinueBusy(true);
+    try {
+      var t = selectedTerm();
+      var resp = await fetch('/api/payments/membership-intent', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': root.dataset.csrf || '' },
+        body: JSON.stringify({
+          term: (t ? t.value : '12') + 'M',
+          include_partner: partnerChecked(),
+          payment_method: 'bank_transfer',
+        }),
+      });
+      var data = {};
+      try { data = await resp.json(); } catch (e) { /* non-JSON 5xx */ }
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ('Could not record the renewal (HTTP ' + resp.status + ').'));
+      }
+      // Success navigates away — leave the button busy so it can't double-fire.
+      window.location.assign(data.redirect || '/member/index.php?page=billing&renew_submitted=bank');
+    } catch (e) {
+      setError('select', e.message || 'Could not record the renewal.');
       busy = false;
       setContinueBusy(false);
     }
@@ -368,6 +428,12 @@
         if (signature() !== intentSig) unmountElement();
       });
     }
+    getAll('[data-pay-drawer-method]').forEach(function (i) {
+      i.addEventListener('change', function () {
+        setError('select', '');
+        recalc();
+      });
+    });
 
     var cont = get('[data-pay-drawer-continue]');
     if (cont) cont.addEventListener('click', continueToPayment);

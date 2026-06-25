@@ -5,35 +5,6 @@ use DateTimeImmutable;
 
 class MembershipService
 {
-    private static function normalizeMembershipTerm(string $term): string
-    {
-        $clean = strtoupper(trim($term));
-        if ($clean === '') {
-            return '1Y';
-        }
-        $aliases = [
-            'THREE_YEAR' => '3Y',
-            'THREE_YEARS' => '3Y',
-            '3YEAR' => '3Y',
-            '3YEARS' => '3Y',
-            '36M' => '3Y',
-            'TWO_YEAR' => '2Y',
-            'TWO_YEARS' => '2Y',
-            '2YEAR' => '2Y',
-            '2YEARS' => '2Y',
-            '24M' => '2Y',
-            'ONE_YEAR' => '1Y',
-            'ONE_YEARS' => '1Y',
-            '1YEAR' => '1Y',
-            '1YEARS' => '1Y',
-            '12M' => '1Y',
-        ];
-        if (isset($aliases[$clean])) {
-            return $aliases[$clean];
-        }
-        return $clean;
-    }
-
     public static function calculateExpiry(string $startDate, int $termYears): string
     {
         $start = new DateTimeImmutable($startDate);
@@ -45,6 +16,86 @@ class MembershipService
         }
         $expiryYear = $year + ($termYears - 1);
         return sprintf('%04d-07-31', $expiryYear);
+    }
+
+    /**
+     * Resolve any term / pricing-period key to a whole number of months, so a
+     * configured renewal-period duration always carries through to the stored
+     * membership dates. Understands: 'NNM' (months), 'NY'/bare 'N' (years),
+     * legacy word keys (ONE_YEAR/THREE_YEARS/...), and pricing-config renewal
+     * period ids — including the JOIN_<id> / JOIN_PLUS_<id> option keys
+     * produced by MembershipPricingService::getJoinOptions().
+     *
+     * Returns null for LIFE (no expiry). Falls back to 12 months only when
+     * nothing else resolves, so a stray value never silently becomes zero.
+     */
+    public static function termToMonths(string $term): ?int
+    {
+        $t = strtoupper(trim($term));
+        if ($t === '') {
+            return 12;
+        }
+        if ($t === 'LIFE') {
+            return null;
+        }
+        if (preg_match('/^(\d+)\s*M$/', $t, $m)) {
+            return max(1, (int) $m[1]);
+        }
+        if (preg_match('/^(\d+)\s*Y$/', $t, $m)) {
+            return max(1, (int) $m[1]) * 12;
+        }
+        if (ctype_digit($t)) {
+            return max(1, (int) $t); // bare month count, e.g. "36"
+        }
+
+        $legacy = [
+            'ONE_THIRD' => 4, 'TWO_THIRDS' => 8, 'ONE_YEAR' => 12,
+            'TWO_YEARS' => 24, 'TWO_ONE_THIRDS' => 28, 'TWO_TWO_THIRDS' => 32,
+            'THREE_YEARS' => 36,
+        ];
+        if (isset($legacy[$t])) {
+            return $legacy[$t];
+        }
+
+        // Pricing-config renewal-period id, possibly wrapped in a join key.
+        // JOIN_<id> = buy that period as a new joiner (joining-window pricing
+        // bakes in the partial first year). JOIN_PLUS_<id> = pro-rata rest of
+        // year + the period on top, so add the implicit first year back.
+        $pid = $t;
+        $plus = 0;
+        if ($pid === 'JOIN_ONLY') {
+            return 12; // pro-rata "rest of the current year" bucket
+        }
+        if (str_starts_with($pid, 'JOIN_PLUS_')) {
+            $pid = substr($pid, strlen('JOIN_PLUS_'));
+            $plus = 12;
+        } elseif (str_starts_with($pid, 'JOIN_')) {
+            $pid = substr($pid, strlen('JOIN_'));
+        }
+        try {
+            foreach (MembershipPricingService::getRenewalPeriods(false) as $period) {
+                if (strtoupper((string) ($period['id'] ?? '')) === $pid) {
+                    return max(1, (int) $period['duration_months']) + $plus;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Pricing config unavailable (e.g. CLI without DB) — fall through.
+        }
+        return 12;
+    }
+
+    /**
+     * Canonical string stored in membership_periods.term. Whole years render
+     * as 'NY' (so existing '1Y'/'2Y'/'3Y' comparisons keep working), other
+     * durations as 'NNM', LIFE as 'LIFE'.
+     */
+    public static function canonicalTerm(string $term): string
+    {
+        $months = self::termToMonths($term);
+        if ($months === null) {
+            return 'LIFE';
+        }
+        return $months % 12 === 0 ? ((int) ($months / 12)) . 'Y' : $months . 'M';
     }
 
     public static function displayMembershipNumber(int $base, int $suffix): string
@@ -155,22 +206,25 @@ class MembershipService
 
     public static function createMembershipPeriod(int $memberId, string $term, string $startDate): int
     {
-        $term = self::normalizeMembershipTerm($term);
+        $months = self::termToMonths($term);
+        $canonical = self::canonicalTerm($term);
         $expiry = null;
-        if ($term !== 'LIFE') {
-            $termYears = 1;
-            if ($term === '3Y') {
-                $termYears = 3;
-            } elseif ($term === '2Y') {
-                $termYears = 2;
-            }
-            $expiry = self::calculateExpiry($startDate, $termYears);
+        if ($months !== null) {
+            // Provisional new-joiner expiry: the rest of the current membership
+            // year plus any whole years beyond the first. Paid renewals
+            // re-derive the authoritative end date in
+            // MembershipOrderService::activateMembershipForOrder(); this value
+            // stands for periods activated straight through markPaid()
+            // (e.g. associate members approved by an admin).
+            $currentYearEnd = new DateTimeImmutable(self::calculateExpiry($startDate, 1));
+            $extraMonths = max(0, $months - 12);
+            $expiry = $currentYearEnd->modify("+{$extraMonths} months")->format('Y-m-d');
         }
         $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, NOW())');
         $stmt->execute([
             'member_id' => $memberId,
-            'term' => $term,
+            'term' => $canonical,
             'start_date' => $startDate,
             'end_date' => $expiry,
             'status' => 'PENDING_PAYMENT',

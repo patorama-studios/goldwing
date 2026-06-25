@@ -42,6 +42,15 @@ class MembershipAccessService
     /** Normalised status values that mean the membership is locked down. */
     public const LAPSED_STATUSES = ['expired', 'lapsed', 'cancelled', 'suspended', 'inactive'];
 
+    /**
+     * Grace period after a membership's end_date before features lock off.
+     * The member stays expired-but-open during this window: full feature
+     * access, a warning banner, and they can still log in and update details.
+     * The expiry cron must use the same value (it reads this constant) so the
+     * "still active" window and the cron's LAPSED flip can never disagree.
+     */
+    public const GRACE_MONTHS = 2;
+
     /** Per-request memo keyed by user/member id so each page hits the DB once. */
     private static array $stateCache = [];
 
@@ -101,7 +110,12 @@ class MembershipAccessService
     /**
      * Resolve the membership access state for a session user.
      *
-     * @return array{lapsed:bool, status:string, member_type:string, end_date:?string, reason:string}
+     * `lapsed`   - features are locked off (grace exhausted, or an admin/cron
+     *              set a locked status). `in_grace` - expired but still inside
+     *              the GRACE_MONTHS window: features stay open, show a warning.
+     * `lockoff_date` - the day features lock off (end_date + GRACE_MONTHS).
+     *
+     * @return array{lapsed:bool, in_grace:bool, status:string, member_type:string, end_date:?string, lockoff_date:?string, reason:string}
      */
     public static function state(?array $user): array
     {
@@ -114,9 +128,11 @@ class MembershipAccessService
 
         $result = [
             'lapsed' => false,
+            'in_grace' => false,
             'status' => '',
             'member_type' => '',
             'end_date' => null,
+            'lockoff_date' => null,
             'reason' => 'no-member',
         ];
 
@@ -145,7 +161,11 @@ class MembershipAccessService
             $stmt = $pdo->prepare('SELECT status, end_date FROM membership_periods WHERE member_id = :mid ORDER BY end_date DESC LIMIT 1');
             $stmt->execute([':mid' => $memberId]);
             $period = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-            $result['end_date'] = $period['end_date'] ?? null;
+            $endDate = $period['end_date'] ?? null;
+            $result['end_date'] = $endDate;
+            $result['lockoff_date'] = $endDate
+                ? date('Y-m-d', strtotime($endDate . ' +' . self::GRACE_MONTHS . ' months'))
+                : null;
 
             // members.status wins for admin/cron-set locked states; otherwise
             // the live period status is used. See effectiveStatusFrom().
@@ -160,8 +180,20 @@ class MembershipAccessService
                 return self::$stateCache[$cacheKey] = $result;
             }
 
-            $result['lapsed'] = self::isLockedStatus($statusKey);
-            $result['reason'] = $result['lapsed'] ? 'lapsed' : 'active';
+            // Locked off when an admin/cron set a locked status, OR the grace
+            // window has run out (date safety-net in case the cron is late).
+            // Between end_date and lockoff_date the member is "in grace":
+            // expired but still has full access — we only warn them.
+            $today = strtotime('today');
+            $pastLockoff = !empty($result['lockoff_date'])
+                && strtotime((string) $result['lockoff_date']) < $today;
+            $expiredByDate = $endDate && strtotime((string) $endDate) < $today;
+
+            $result['lapsed'] = self::isLockedStatus($statusKey) || $pastLockoff;
+            $result['in_grace'] = !$result['lapsed'] && $expiredByDate;
+            $result['reason'] = $result['lapsed']
+                ? 'lapsed'
+                : ($result['in_grace'] ? 'grace' : 'active');
         } catch (Throwable $e) {
             // Fail open — never trap a member behind a DB hiccup.
             error_log('[MembershipAccessService] state failed: ' . $e->getMessage());
