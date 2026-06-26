@@ -891,6 +891,21 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Joined Date</h4>
                             <p class="text-sm font-medium text-gray-900"><?= e(formatDate($member['join_date'] ?? $member['created_at'] ?? null)) ?></p>
+                            <?php if ($canEditFullProfile): ?>
+                              <details class="mt-1">
+                                <summary class="cursor-pointer text-xs text-gray-400 hover:text-gray-700 select-none">Edit join date</summary>
+                                <form method="post" action="/admin/members/actions.php" class="mt-2 flex flex-wrap items-end gap-2">
+                                  <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                                  <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                                  <input type="hidden" name="tab" value="overview">
+                                  <input type="hidden" name="action" value="member_join_date_update">
+                                  <input type="date" name="join_date" value="<?= e($member['join_date'] ?? '') ?>"
+                                    class="rounded-lg border border-gray-200 px-2 py-1 text-sm text-gray-900">
+                                  <button type="submit" class="rounded-lg bg-primary px-3 py-1 text-sm font-semibold text-gray-900">Save</button>
+                                </form>
+                                <p class="mt-1 text-[11px] text-gray-400">Leave blank to clear (falls back to record-created date).</p>
+                              </details>
+                            <?php endif; ?>
                           </div>
                           <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Renewal Date</h4>
@@ -2753,6 +2768,69 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       </form>
                     </div>
                   <?php endif; ?>
+
+                  <?php if ($canManualFix && !empty($member['email'])):
+                    // Build pricing reference: show this member's renewal price per active period.
+                    $payReqMagType   = strtolower((string)($member['wings_preference'] ?? 'digital')) === 'digital' ? 'PDF' : 'PRINTED';
+                    $payReqMemberType = strtoupper((string)($member['member_type'] ?? 'FULL')) === 'ASSOCIATE' ? 'ASSOCIATE' : 'FULL';
+                    $payReqPeriods   = [];
+                    foreach (\App\Services\MembershipPricingService::getRenewalPeriods(true) as $pPeriod) {
+                        $pCents = \App\Services\MembershipPricingService::renewalAmountCents($payReqMagType, $payReqMemberType, (int)$pPeriod['duration_months']);
+                        if ($pCents > 0) {
+                            $payReqPeriods[] = ['label' => $pPeriod['label'], 'amount' => number_format($pCents / 100, 2)];
+                        }
+                    }
+                  ?>
+                  <div class="rounded-3xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <h3 class="text-base font-semibold text-gray-900">Request payment from member</h3>
+                        <p class="text-sm text-gray-500">Creates a new Stripe checkout link and emails it to the member. No new membership period is created.</p>
+                      </div>
+                      <span class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">Admin only</span>
+                    </div>
+                    <?php if ($payReqPeriods): ?>
+                      <div>
+                        <p class="text-xs font-medium text-gray-500 mb-1.5">Pricing reference for this member (<?= e($payReqMemberType) ?> / <?= e($payReqMagType) ?>)</p>
+                        <div class="flex flex-wrap gap-2">
+                          <?php foreach ($payReqPeriods as $pp): ?>
+                            <button type="button" onclick="document.getElementById('pay-req-amount').value='<?= e($pp['amount']) ?>';document.getElementById('pay-req-desc').value='<?= e(addslashes($pp['label'])) ?> membership renewal'"
+                              class="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-50">
+                              <?= e($pp['label']) ?> — $<?= e($pp['amount']) ?>
+                            </button>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                    <?php endif; ?>
+                    <form method="post" action="/admin/members/actions.php" class="space-y-3">
+                      <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                      <input type="hidden" name="member_id" value="<?= e($memberId) ?>">
+                      <input type="hidden" name="tab" value="orders">
+                      <input type="hidden" name="orders_section" value="membership">
+                      <input type="hidden" name="action" value="membership_payment_request">
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="text-sm font-medium text-gray-700">
+                          Amount (AUD)
+                          <input id="pay-req-amount" type="number" step="0.01" min="0.01" name="req_amount"
+                            placeholder="0.00" required
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                          Description (shown on invoice)
+                          <input id="pay-req-desc" type="text" name="req_description" maxlength="120"
+                            placeholder="e.g. 3-year membership renewal top-up"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                        </label>
+                      </div>
+                      <p class="text-xs text-gray-500">Link sent to: <strong><?= e($member['email']) ?></strong></p>
+                      <button type="submit"
+                        class="w-full rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+                        Send payment link
+                      </button>
+                    </form>
+                  </div>
+                  <?php endif; ?>
+
                 </div>
               <?php else: ?>
                 <div class="space-y-6">

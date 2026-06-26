@@ -4424,16 +4424,21 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             // 1Y/2Y/3Y, NNM and configured period ids) so the price matches
             // the duration the member actually picked.
             $termMonthsForPrice = (string) (MembershipService::termToMonths((string) ($pendingPeriod['term'] ?? '')) ?? 12);
+            $termKey = MembershipService::canonicalTerm((string) ($pendingPeriod['term'] ?? ''));
             $priceCents = membership_renewal_amount_cents($magazineType, $memberTypeKey, $termMonthsForPrice);
             $pricingCurrency = MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
             $amount = round($priceCents / 100, 2);
+            $tmInt = (int) $termMonthsForPrice;
+            $termLabel = $tmInt % 12 === 0
+              ? (($tmInt / 12) . ' year' . ($tmInt === 12 ? '' : 's'))
+              : ($tmInt . ' months');
             $order = MembershipOrderService::createMembershipOrder((int) $member['id'], (int) ($pendingPeriod['id'] ?? 0), $amount, [
               'payment_method' => 'stripe',
               'payment_status' => 'pending',
               'fulfillment_status' => 'pending',
               'currency' => $pricingCurrency,
               'term' => $termKey,
-              'item_name' => 'Membership renewal ' . $termKey,
+              'item_name' => 'Membership renewal (' . $termLabel . ')',
             ]);
             if ($order) {
               $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');

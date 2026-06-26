@@ -638,7 +638,7 @@ if ($requiresMemberContext) {
     }
 }
 
-$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'membership_order_refund', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member', 'create_member'];
+$sensitiveActions = ['save_profile', 'refund_submit', 'manual_order_fix', 'order_resync', 'send_reset_link', 'set_password', 'change_status', 'twofa_force', 'twofa_exempt', 'twofa_reset', 'member_number_update', 'member_archive', 'member_delete', 'send_migration_link', 'disable_migration_link', 'enable_migration_link', 'manual_membership_order', 'membership_renewal_update', 'membership_order_accept', 'membership_order_reject', 'membership_order_send_link', 'membership_payment_request', 'membership_order_note', 'membership_order_void', 'membership_order_unvoid', 'membership_order_delete', 'membership_order_refund', 'store_order_void', 'store_order_unvoid', 'store_order_delete', 'resend_notification', 'roles_update', 'member_settings_update', 'member_avatar_update', 'twofa_toggle', 'chapter_request_decision', 'request_chapter', 'assign_chapter', 'bike_add', 'bike_update', 'bike_delete', 'impersonate_member', 'create_member'];
 if (in_array($action, $sensitiveActions, true)) {
     require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 }
@@ -1741,6 +1741,30 @@ switch ($action) {
         }
         break;
 
+    case 'member_join_date_update':
+        if (!AdminMemberAccess::canEditFullProfile($user)) {
+            redirectWithFlash($memberId, $tab, 'Join date edits are restricted.', 'error');
+        }
+        $pdo = Database::connection();
+        $joinDateRaw = trim($_POST['join_date'] ?? '');
+        $normalizedJoin = null;
+        if ($joinDateRaw !== '') {
+            $parsedJoin = DateTime::createFromFormat('Y-m-d', $joinDateRaw);
+            if (!$parsedJoin || $parsedJoin->format('Y-m-d') !== $joinDateRaw) {
+                redirectWithFlash($memberId, $tab, 'Enter a valid join date (YYYY-MM-DD).', 'error');
+            }
+            $normalizedJoin = $parsedJoin->format('Y-m-d');
+        }
+        $oldJoin = $member['join_date'] ?? null;
+        $stmt = $pdo->prepare('UPDATE members SET join_date = :join_date, updated_at = NOW() WHERE id = :member_id');
+        $stmt->execute(['join_date' => $normalizedJoin, 'member_id' => $memberId]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'member.join_date_updated', [
+            'from' => $oldJoin,
+            'to' => $normalizedJoin,
+        ]);
+        redirectWithFlash($memberId, $tab, 'Join date updated.');
+        break;
+
     case 'manual_membership_order':
         if (!AdminMemberAccess::canManualOrderFix($user)) {
             redirectWithFlash($memberId, $tab, 'Manual membership orders are restricted.', 'error');
@@ -1938,6 +1962,73 @@ switch ($action) {
             'actor_roles' => $user['roles'] ?? [],
         ]);
         redirectWithFlash($memberId, $tab, 'Checkout link sent.');
+        break;
+
+    case 'membership_payment_request':
+        // Create a standalone charge order for any amount and send the member
+        // a Stripe checkout link — used for top-up payments, corrections, etc.
+        // Does NOT create a new membership period.
+        if (!AdminMemberAccess::canManualOrderFix($user)) {
+            redirectWithFlash($memberId, $tab, 'Payment requests are restricted.', 'error');
+        }
+        $pdo = Database::connection();
+        $reqAmountRaw = trim($_POST['req_amount'] ?? '');
+        $reqDesc = trim($_POST['req_description'] ?? '');
+        $reqAmount = $reqAmountRaw !== '' ? (float) $reqAmountRaw : 0.0;
+        if ($reqAmount <= 0) {
+            redirectWithFlash($memberId, $tab, 'Enter an amount greater than $0.00.', 'error');
+        }
+        if ($reqDesc === '') {
+            $reqDesc = 'Membership payment';
+        }
+        $pricingCurrency = \App\Services\MembershipPricingService::getMembershipPricing()['currency'] ?? 'AUD';
+        // Create order with no linked period (period_id = 0 → stored as NULL).
+        $order = \App\Services\MembershipOrderService::createMembershipOrder($memberId, 0, $reqAmount, [
+            'payment_method' => 'stripe',
+            'payment_status' => 'pending',
+            'fulfillment_status' => 'pending',
+            'currency' => $pricingCurrency,
+            'item_name' => $reqDesc,
+            'admin_notes' => 'Admin payment request',
+            'actor_user_id' => $user['id'] ?? null,
+        ]);
+        if (!$order) {
+            redirectWithFlash($memberId, $tab, 'Unable to create the payment order.', 'error');
+        }
+        $orderId = (int) ($order['id'] ?? 0);
+        $amountCents = (int) round($reqAmount * 100);
+        $lineItems = [[
+            'name' => $reqDesc,
+            'unit_amount' => $amountCents,
+            'quantity' => 1,
+            'currency' => strtolower($pricingCurrency),
+        ]];
+        $successUrl = \App\Services\BaseUrlService::buildUrl('/member/?renewed=1');
+        $cancelUrl  = \App\Services\BaseUrlService::buildUrl('/member/index.php?page=billing&cancel=1');
+        $metadata = [
+            'order_id'   => (string) $orderId,
+            'order_type' => 'membership',
+            'member_id'  => (string) $memberId,
+        ];
+        $session = \App\Services\StripeService::createCheckoutSessionWithLineItems($lineItems, $member['email'] ?? '', $successUrl, $cancelUrl, $metadata);
+        if (!$session || empty($session['id'])) {
+            redirectWithFlash($memberId, $tab, 'Unable to create a Stripe checkout link.', 'error');
+        }
+        $stmt = $pdo->prepare('UPDATE orders SET stripe_session_id = :session_id, updated_at = NOW() WHERE id = :id');
+        $stmt->execute(['session_id' => $session['id'], 'id' => $orderId]);
+        NotificationService::dispatch('membership_order_created', [
+            'primary_email' => $member['email'] ?? '',
+            'admin_emails'  => NotificationService::getAdminEmails(),
+            'member_name'   => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')),
+            'order_number'  => $order['order_number'] ?? '',
+            'payment_link'  => NotificationService::escape($session['url'] ?? ''),
+        ]);
+        ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.payment_request_sent', [
+            'order_id'    => $orderId,
+            'amount'      => $reqAmount,
+            'description' => $reqDesc,
+        ]);
+        redirectWithFlash($memberId, $tab, 'Payment link sent to ' . ($member['email'] ?? 'member') . '. Order #' . ($order['order_number'] ?? '') . '.');
         break;
 
     case 'membership_order_note':
