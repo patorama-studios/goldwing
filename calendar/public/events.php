@@ -131,10 +131,46 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
       <?php if ($viewMode === 'month') : ?>
       <section class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+        <p class="text-sm text-gray-500 mb-3 flex items-center gap-2">
+          <span class="material-icons-outlined text-base text-amber-500">touch_app</span>
+          Click any day to add a ride on that date, or click an event to open it.
+        </p>
         <div id="admin-calendar"></div>
       </section>
+      <style>
+        #admin-calendar{--fc-border-color:#e8e6df;--fc-today-bg-color:#fbf7e8;--fc-page-bg-color:transparent;font-size:14px}
+        #admin-calendar .fc-toolbar-title{font-family:'Playfair Display',serif;font-weight:700;color:#111827}
+        #admin-calendar .fc .fc-button{background:#fff;border:1px solid #e8e6df;color:#374151;font-weight:600;text-transform:capitalize;box-shadow:none}
+        #admin-calendar .fc .fc-button:hover{background:#fbf7e8;border-color:#cfa032}
+        #admin-calendar .fc .fc-button-primary:not(:disabled).fc-button-active{background:#111827;border-color:#111827;color:#fff}
+        #admin-calendar .fc .fc-daygrid-day-number{font-weight:600;color:#4b5563}
+        #admin-calendar .fc .fc-day-today .fc-daygrid-day-number{color:#2f7d32}
+        #admin-calendar .fc-daygrid-day{transition:background .12s;cursor:pointer}
+        #admin-calendar .fc-daygrid-day:hover{background:#fffdf5}
+        #admin-calendar .fc-daygrid-event{border-radius:999px;padding:2px 9px;margin-top:2px;border:none}
+        #admin-calendar .gw-ev-time{font-weight:700;margin-right:4px}
+        #admin-calendar .gw-ev-title{font-weight:500}
+      </style>
       <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
       <script>
+        function gwFormatTime(d) {
+          return new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).format(d).toUpperCase();
+        }
+        function gwEventContent(arg) {
+          var wrap = document.createElement('div');
+          wrap.className = 'gw-ev-chip';
+          if (!arg.event.allDay && arg.event.start) {
+            var t = document.createElement('span');
+            t.className = 'gw-ev-time';
+            t.textContent = gwFormatTime(arg.event.start);
+            wrap.appendChild(t);
+          }
+          var title = document.createElement('span');
+          title.className = 'gw-ev-title';
+          title.textContent = arg.event.title;
+          wrap.appendChild(title);
+          return { domNodes: [wrap] };
+        }
         document.addEventListener('DOMContentLoaded', function () {
           var el = document.getElementById('admin-calendar');
           if (!el || typeof FullCalendar === 'undefined') { return; }
@@ -144,6 +180,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             height: 760,
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
             events: 'admin_events_feed.php?chapter_id=<?php echo urlencode((string) $chapterFilter); ?>',
+            eventContent: gwEventContent,
+            dateClick: function (info) {
+              window.location.href = 'admin_event_create.php?date=' + encodeURIComponent(info.dateStr);
+            },
             eventDidMount: function (info) {
               if (info.event.extendedProps.status === 'cancelled') {
                 info.el.style.opacity = '0.6';

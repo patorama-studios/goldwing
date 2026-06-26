@@ -111,14 +111,16 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
     <style>
         :root {
             color-scheme: light;
-            --ink: #111827;
-            --muted: #6b7280;
-            --line: #e5e7eb;
+            --ink: #1c1a17;
+            --muted: #5a5a55;
+            --line: #e3ded0;
             --panel: #ffffff;
-            --soft: #f3f4f6;
-            --accent: #3b57f0;
-            --accent-strong: #2c45d6;
-            --shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+            --soft: #f4f1e8;
+            --accent: #2f7d32;
+            --accent-strong: #25642a;
+            --gold: #9e9140;
+            --gold-strong: #7e7330;
+            --shadow: 0 18px 40px rgba(28, 26, 23, 0.10);
         }
 
         body {
@@ -352,26 +354,6 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             box-shadow: var(--shadow);
         }
 
-        .event-panel {
-            display: none;
-        }
-
-        .calendar-shell.is-event-view .calendar-controls,
-        .calendar-shell.is-event-view .calendar-header,
-        .calendar-shell.is-event-view .calendar-panel,
-        .calendar-shell.is-event-view .calendar-footer,
-        .calendar-shell.is-event-view .calendar-notice {
-            display: none;
-        }
-
-        .calendar-shell.is-event-view .event-panel {
-            display: block;
-        }
-
-        .event-panel .calendar-notice {
-            margin-top: 12px;
-        }
-
         .calendar-footer {
             display: flex;
             align-items: center;
@@ -429,7 +411,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
 
         .fc {
             --fc-border-color: var(--line);
-            --fc-today-bg-color: #f8fafc;
+            --fc-today-bg-color: #f3f7ee;
             --fc-page-bg-color: transparent;
             font-size: 14px;
         }
@@ -439,6 +421,19 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             font-size: 15px;
             font-weight: 600;
             color: #4b5563;
+        }
+
+        .fc .fc-day-today .fc-daygrid-day-number {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .fc .fc-daygrid-day-frame {
+            transition: background 0.12s ease;
+        }
+
+        .fc .fc-daygrid-day:hover .fc-daygrid-day-frame {
+            background: #fbfaf4;
         }
 
         .fc .fc-day-other .fc-daygrid-day-number {
@@ -457,8 +452,23 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
 
         .fc .fc-daygrid-event {
             border-radius: 999px;
-            padding: 2px 8px;
+            padding: 2px 9px;
             font-size: 12px;
+            border: none;
+            box-shadow: 0 1px 2px rgba(28, 26, 23, 0.12);
+        }
+
+        .fc .fc-daygrid-event .gw-ev-time {
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
+        .fc .fc-daygrid-event .gw-ev-title {
+            font-weight: 500;
+        }
+
+        .fc .fc-list-event-time {
+            text-transform: uppercase;
         }
 
         .fc .fc-list-day-cushion {
@@ -604,10 +614,6 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             <div id="calendar"></div>
         </div>
 
-        <div class="event-panel" id="eventPanel" hidden>
-            <div id="eventPanelContent"></div>
-        </div>
-
         <div class="calendar-footer">
             <a class="subscribe-button" href="<?php echo calendar_e($icsUrl); ?>">
                 Subscribe to calendar
@@ -626,7 +632,26 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="assets/event-modal.js"></script>
     <script>
+        function gwFormatTime(d) {
+            return new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).format(d).toUpperCase();
+        }
+        function gwEventContent(arg) {
+            var wrap = document.createElement('div');
+            wrap.className = 'gw-ev-chip';
+            if (!arg.event.allDay && arg.event.start) {
+                var t = document.createElement('span');
+                t.className = 'gw-ev-time';
+                t.textContent = gwFormatTime(arg.event.start);
+                wrap.appendChild(t);
+            }
+            var title = document.createElement('span');
+            title.className = 'gw-ev-title';
+            title.textContent = arg.event.title;
+            wrap.appendChild(title);
+            return { domNodes: [wrap] };
+        }
         document.addEventListener('DOMContentLoaded', function () {
             var calendarEl = document.getElementById('calendar');
             var titleEl = document.getElementById('calendarTitle');
@@ -634,9 +659,6 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
             var actionButtons = document.querySelectorAll('[data-action]');
             var monthPicker = document.getElementById('monthPicker');
             var monthTrigger = document.getElementById('monthPickerTrigger');
-            var shellEl = document.querySelector('.calendar-shell');
-            var eventPanel = document.getElementById('eventPanel');
-            var eventPanelContent = document.getElementById('eventPanelContent');
             var dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
             function formatMonthValue(date) {
@@ -659,83 +681,6 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                 });
             }
 
-            function buildEmbedUrl(url) {
-                if (!url) {
-                    return '';
-                }
-                if (url.indexOf('embed=1') !== -1) {
-                    return url;
-                }
-                return url + (url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
-            }
-
-            function hideEventPanel() {
-                shellEl.classList.remove('is-event-view');
-                eventPanel.hidden = true;
-                eventPanelContent.innerHTML = '';
-            }
-
-            function bindEventPanel() {
-                var backLinks = eventPanelContent.querySelectorAll('[data-calendar-back]');
-                backLinks.forEach(function (link) {
-                    link.addEventListener('click', function (event) {
-                        event.preventDefault();
-                        hideEventPanel();
-                    });
-                });
-
-                var embedForms = eventPanelContent.querySelectorAll('form[data-calendar-embed-form="1"]');
-                embedForms.forEach(function (form) {
-                    form.addEventListener('submit', function (event) {
-                        event.preventDefault();
-                        var action = buildEmbedUrl(form.getAttribute('action') || '');
-                        if (!action) {
-                            return;
-                        }
-                        var formData = new FormData(form);
-                        fetch(action, {
-                            method: 'POST',
-                            body: formData,
-                            credentials: 'same-origin'
-                        })
-                            .then(function (response) {
-                                return response.text();
-                            })
-                            .then(function (html) {
-                                eventPanelContent.innerHTML = html;
-                                bindEventPanel();
-                            })
-                            .catch(function () {
-                                eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to update this event right now.</div>';
-                            });
-                    });
-                });
-            }
-
-            function showEventPanel(url) {
-                var embedUrl = buildEmbedUrl(url);
-                if (!embedUrl) {
-                    return;
-                }
-                eventPanelContent.innerHTML = '<div class="calendar-notice">Loading event...</div>';
-                eventPanel.hidden = false;
-                shellEl.classList.add('is-event-view');
-                fetch(embedUrl, { credentials: 'same-origin' })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Request failed');
-                        }
-                        return response.text();
-                    })
-                    .then(function (html) {
-                        eventPanelContent.innerHTML = html;
-                        bindEventPanel();
-                    })
-                    .catch(function () {
-                        eventPanelContent.innerHTML = '<div class="calendar-notice">Unable to load this event. <a href="' + url + '">Open in a new page</a>.</div>';
-                    });
-            }
-
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 headerToolbar: false,
@@ -745,6 +690,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                 },
                 height: 700,
                 events: '<?php echo calendar_e($feedUrl); ?>',
+                eventContent: gwEventContent,
                 datesSet: function () {
                     updateTitle();
                     updateViewButtons();
@@ -752,7 +698,11 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                 eventClick: function (info) {
                     if (info.event.url) {
                         info.jsEvent.preventDefault();
-                        showEventPanel(info.event.url);
+                        if (window.GoldwingEventModal) {
+                            window.GoldwingEventModal.open(info.event.url);
+                        } else {
+                            window.location.href = info.event.url;
+                        }
                     }
                 },
                 eventDidMount: function (info) {

@@ -39,6 +39,11 @@ $old = function (string $key, $default = '') {
     return $_POST[$key] ?? $default;
 };
 
+// Prefill start/end when arriving from the month-view "click a day to add" link.
+$prefillDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '') ? $_GET['date'] : '';
+$prefillStart = $prefillDate ? $prefillDate . 'T09:00' : '';
+$prefillEnd = $prefillDate ? $prefillDate . 'T12:00' : '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     calendar_csrf_verify();
 
@@ -411,11 +416,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </label>
             <label class="block text-sm font-medium text-gray-700">
               Start
-              <input type="datetime-local" name="start_at" value="<?php echo calendar_e($old('start_at')); ?>" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+              <input type="datetime-local" name="start_at" value="<?php echo calendar_e($old('start_at', $prefillStart)); ?>" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
             </label>
             <label class="block text-sm font-medium text-gray-700">
               End
-              <input type="datetime-local" name="end_at" value="<?php echo calendar_e($old('end_at')); ?>" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
+              <input type="datetime-local" name="end_at" value="<?php echo calendar_e($old('end_at', $prefillEnd)); ?>" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" required>
             </label>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label class="block text-sm font-medium text-gray-700">

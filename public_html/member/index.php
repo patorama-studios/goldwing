@@ -2064,7 +2064,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <?php foreach ($upcomingEvents as $event): ?>
                   <li>
                     <a class="flex items-center justify-between gap-3 rounded-xl border border-transparent hover:border-teal-200 hover:bg-teal-50 px-3 py-2.5 transition"
-                      href="<?= e($event['url']) ?>">
+                      href="<?= e($event['url']) ?>" data-event-modal>
                       <div class="min-w-0">
                         <p class="text-sm font-semibold text-gray-900 truncate"><?= e($event['title']) ?></p>
                         <p class="text-xs text-gray-500 mt-0.5">
@@ -2091,6 +2091,19 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </a>
               </div>
             <?php endif; ?>
+            <script src="/calendar/assets/event-modal.js" defer></script>
+            <script>
+              (function () {
+                if (window.__gwEventModalBound) { return; }
+                window.__gwEventModalBound = true;
+                document.addEventListener('click', function (e) {
+                  var a = e.target.closest ? e.target.closest('a[data-event-modal]') : null;
+                  if (!a || !window.GoldwingEventModal) { return; }
+                  e.preventDefault();
+                  window.GoldwingEventModal.open(a.getAttribute('href'));
+                });
+              })();
+            </script>
           </div>
 
           <!-- Quick actions -->

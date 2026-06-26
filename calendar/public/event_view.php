@@ -191,8 +191,8 @@ if ($event['capacity']) {
 }
 
 $locationText = $event['event_type'] === 'online' ? ($event['online_url'] ?? '') : ($event['map_url'] ?? '');
-$backUrl = 'events_public.php';
-$formAction = 'event_view.php?slug=' . urlencode($event['slug']) . ($embed ? '&embed=1' : '');
+$backUrl = '/calendar/events_public.php';
+$formAction = '/calendar/event_view.php?slug=' . urlencode($event['slug']) . ($embed ? '&embed=1' : '');
 ?>
 <?php
 ob_start();
@@ -205,10 +205,10 @@ ob_start();
     .rsvp-fields label { display: grid; gap: 4px; font-size: 13px; color: #475569; }
     .rsvp-fields input { padding: 8px 10px; border: 1px solid #d9dee6; border-radius: 6px; font-size: 14px; }
     .rsvp-choices { display: flex; gap: 8px; flex-wrap: wrap; }
-    .rsvp-choice { background: #fff; border: 1px solid #2f5f8d; color: #2f5f8d; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
-    .rsvp-choice:hover { background: #eef4fa; }
-    .rsvp-choice.is-active { background: #2f5f8d; color: #fff; }
-    .rsvp-choice.is-active:hover { background: #27507a; }
+    .rsvp-choice { background: #fff; border: 1px solid #2f7d32; color: #2f7d32; padding: 10px 18px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .rsvp-choice:hover { background: #eef7ec; }
+    .rsvp-choice.is-active { background: #2f7d32; color: #fff; }
+    .rsvp-choice.is-active:hover { background: #25642a; }
     .rsvp-clear { background: none; border: none; color: #b42318; cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0; justify-self: start; }
 </style>
 <div class="calendar-container">
@@ -263,7 +263,7 @@ ob_start();
     </section>
 
     <section class="event-actions">
-        <a class="btn secondary" href="ics.php?event_id=<?php echo (int) $event['id']; ?>">Add to calendar (.ics)</a>
+        <a class="btn secondary" href="/calendar/ics.php?event_id=<?php echo (int) $event['id']; ?>">Add to calendar (.ics)</a>
 
         <?php if ($event['rsvp_enabled'] && !$salesClosed && !$isCancelled) : ?>
             <?php if ($user) : ?>
@@ -342,7 +342,7 @@ ob_start();
                     </li>
                 <?php endforeach; ?>
             </ul>
-            <a class="btn secondary" href="refund_request.php?event_id=<?php echo (int) $event['id']; ?>">Request refund</a>
+            <a class="btn secondary" href="/calendar/refund_request.php?event_id=<?php echo (int) $event['id']; ?>">Request refund</a>
         </section>
     <?php endif; ?>
 </div>
@@ -353,50 +353,69 @@ $content = ob_get_clean();
 <div class="calendar-event-embed">
     <style>
         .calendar-event-embed {
-            font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
-            color: #1c2b39;
+            font-family: "Manrope", "Inter", -apple-system, sans-serif;
+            color: #1c1a17;
         }
         .calendar-event-embed .calendar-container {
             background: #ffffff;
-            padding: 24px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            padding: 0 0 20px;
+            border-radius: 20px;
+            border: none;
+            box-shadow: none;
         }
-        .calendar-event-embed h1,
+        .calendar-event-embed h1 {
+            font-size: 22px;
+            line-height: 1.2;
+            margin: 0 0 8px;
+        }
         .calendar-event-embed h2 {
-            margin-top: 0;
+            font-size: 17px;
+            margin: 0 0 8px;
         }
         .calendar-event-embed .link {
             display: inline-block;
-            margin-bottom: 16px;
-            color: #2f5f8d;
+            margin: 14px 20px 4px;
+            color: #2f7d32;
             text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .calendar-event-embed .link:hover {
+            color: #25642a;
         }
         .calendar-event-embed .btn {
-            background: #2f5f8d;
+            background: #2f7d32;
             color: #fff;
-            padding: 10px 16px;
+            padding: 11px 18px;
             border: none;
-            border-radius: 6px;
+            border-radius: 11px;
             cursor: pointer;
             text-decoration: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             font-size: 14px;
+            font-weight: 600;
+        }
+        .calendar-event-embed .btn:hover {
+            background: #25642a;
         }
         .calendar-event-embed .btn.secondary {
             background: #fff;
-            border: 1px solid #2f5f8d;
-            color: #2f5f8d;
+            border: 1px solid #d8d2c2;
+            color: #1c1a17;
+        }
+        .calendar-event-embed .btn.secondary:hover {
+            background: #f4f1e8;
         }
         .calendar-event-embed .alert {
             padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
+            border-radius: 10px;
+            margin: 0 20px 14px;
         }
         .calendar-event-embed .alert.success {
-            background: #e7f5ee;
-            color: #146c43;
+            background: #eaf3e6;
+            color: #1f5b22;
         }
         .calendar-event-embed .alert.danger {
             background: #fdecea;
@@ -407,12 +426,18 @@ $content = ob_get_clean();
             color: #856404;
         }
         .calendar-event-embed .alert.info {
-            background: #e8f4fd;
-            color: #0f5132;
+            background: #eef4ea;
+            color: #1f5b22;
         }
         .calendar-event-embed .muted {
-            color: #667085;
+            color: #5a5a55;
             font-size: 14px;
+        }
+        .calendar-event-embed .event-meta {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1c1a17;
+            margin: 10px 0;
         }
         .calendar-event-embed .inline-form {
             display: flex;
@@ -422,36 +447,55 @@ $content = ob_get_clean();
         }
         .calendar-event-embed .inline-form input {
             padding: 8px 10px;
-            border: 1px solid #d9dee6;
-            border-radius: 6px;
+            border: 1px solid #d8d2c2;
+            border-radius: 8px;
             font-size: 14px;
         }
         .calendar-event-embed .badge {
-            background: #f5f7fa;
-            border: 1px solid #d9dee6;
-            padding: 4px 8px;
-            border-radius: 12px;
+            background: #f4f1e8;
+            border: 1px solid #e3ded0;
+            padding: 4px 10px;
+            border-radius: 999px;
             font-size: 12px;
-            margin-right: 6px;
+            font-weight: 600;
+            color: #5a5a55;
+            margin-right: 0;
         }
         .calendar-event-embed .event-detail {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
+            display: block;
+            padding: 0 20px;
         }
         .calendar-event-embed .event-thumb {
-            width: 260px;
+            width: 100%;
             height: 180px;
             object-fit: cover;
-            border-radius: 10px;
-            border: 1px solid #d9dee6;
+            border-radius: 14px;
+            border: 1px solid #e3ded0;
+            margin-bottom: 14px;
+            display: block;
         }
         .calendar-event-embed .event-badges {
             margin: 8px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
         }
         .calendar-event-embed .event-description {
-            margin-top: 16px;
+            margin: 16px 20px 0;
             line-height: 1.6;
+            font-size: 14.5px;
+        }
+        .calendar-event-embed .event-actions {
+            padding: 0 20px;
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .calendar-event-embed .event-actions .rsvp-box,
+        .calendar-event-embed .event-actions form.rsvp-form {
+            width: 100%;
         }
     </style>
     <?php echo $content; ?>

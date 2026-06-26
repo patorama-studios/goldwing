@@ -69,6 +69,14 @@ foreach ($events as $event) {
         if ($allDay) {
             $endOut->modify('+1 day');
         }
+        // Brand colours: green = chapter ride, gold = national event, grey = cancelled.
+        if ($event['status'] === 'cancelled') {
+            $colour = '#9aa0a6';
+        } elseif (($event['scope'] ?? '') === 'NATIONAL') {
+            $colour = '#9e9140';
+        } else {
+            $colour = '#2f7d32';
+        }
         $items[] = [
             'id' => $event['id'] . '-' . $start->format('YmdHis'),
             'title' => $event['title'],
@@ -76,8 +84,8 @@ foreach ($events as $event) {
             'end' => $endOut->format('c'),
             'allDay' => $allDay,
             'url' => 'event_view.php?slug=' . urlencode($event['slug']),
-            'backgroundColor' => $event['status'] === 'cancelled' ? '#9aa0a6' : '#2f5f8d',
-            'borderColor' => $event['status'] === 'cancelled' ? '#9aa0a6' : '#2f5f8d',
+            'backgroundColor' => $colour,
+            'borderColor' => $colour,
             'textColor' => '#ffffff',
             'extendedProps' => [
                 'status' => $event['status'],
