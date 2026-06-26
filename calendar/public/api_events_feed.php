@@ -18,9 +18,11 @@ $startParam = $_GET['start'] ?? null;
 $endParam = $_GET['end'] ?? null;
 $rangeStartUtc = $startParam ? new DateTime($startParam, new DateTimeZone('UTC')) : new DateTime('now', new DateTimeZone('UTC'));
 $rangeEndUtc = $endParam ? new DateTime($endParam, new DateTimeZone('UTC')) : (clone $rangeStartUtc)->modify('+90 days');
-$capEnd = (new DateTime('now', new DateTimeZone('UTC')))->modify('+90 days');
-if ($rangeEndUtc > $capEnd) {
-    $rangeEndUtc = $capEnd;
+// Bound the span relative to the requested window (FullCalendar only asks for the visible ~6 weeks),
+// not to "now" — otherwise any month beyond now+90d returns empty and the grid goes blank. Matches ics_feed.php.
+$maxRangeEnd = (clone $rangeStartUtc)->modify('+180 days');
+if ($rangeEndUtc > $maxRangeEnd) {
+    $rangeEndUtc = $maxRangeEnd;
 }
 
 $sql = 'SELECT e.*, m.path AS thumbnail_url FROM calendar_events e LEFT JOIN media m ON m.id = e.media_id WHERE e.status IN ("published", "cancelled")';

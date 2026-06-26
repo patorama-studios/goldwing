@@ -97,6 +97,20 @@ if ($isMembershipPage) {
     ));
     usort($renewalPeriods, static fn($a, $b) => (int) $b['duration_months'] <=> (int) $a['duration_months']);
     $renewalPrices = $pricingConfig['renewal_prices'] ?? [];
+    // Become-a-Member is the public JOIN page → the period cards must show
+    // NEW-member (joining) pricing, not renewal pricing. Flatten the joining
+    // matrix to the current joining window so the cards read it with the same
+    // [magazine][type][periodId] shape as $renewalPrices.
+    $joiningWindow = MembershipPricingService::joiningWindowForDate();
+    $joiningPrices = [];
+    foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
+        foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
+            foreach ($renewalPeriods as $p) {
+                $pid = (string) $p['id'];
+                $joiningPrices[$mt][$tt][$pid] = MembershipPricingService::getJoiningPriceCents($mt, $tt, $pid, $joiningWindow);
+            }
+        }
+    }
     $proRataEnabled = !empty($pricingConfig['prorata_enabled']);
     $monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];

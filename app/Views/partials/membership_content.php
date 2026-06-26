@@ -76,6 +76,7 @@ $ordinalSuffix = static function ($n): string {
       <?php
         // One card per active renewal period — admin-defined.
         $renewalPeriods = $renewalPeriods ?? [];
+        $joiningPrices = $joiningPrices ?? [];
         $featuredPeriodId = $featuredPeriodId ?? null;
         $anchorMonthName = $anchorMonthName ?? 'August';
         $expiryMonthName = $expiryMonthName ?? 'July';
@@ -84,9 +85,9 @@ $ordinalSuffix = static function ($n): string {
           $isFeatured = ($periodId === $featuredPeriodId);
           $headerModifier = $isFeatured ? '' : ' membership-plan__header--dark';
           $articleModifier = $isFeatured ? ' membership-plan--featured' : '';
-          $printedFull = $renewalPrices['PRINTED']['FULL'][$periodId] ?? null;
-          $pdfFull = $renewalPrices['PDF']['FULL'][$periodId] ?? null;
-          $printedAssociate = $renewalPrices['PRINTED']['ASSOCIATE'][$periodId] ?? null;
+          $printedFull = $joiningPrices['PRINTED']['FULL'][$periodId] ?? null;
+          $pdfFull = $joiningPrices['PDF']['FULL'][$periodId] ?? null;
+          $printedAssociate = $joiningPrices['PRINTED']['ASSOCIATE'][$periodId] ?? null;
       ?>
       <article class="membership-plan<?= $articleModifier ?>">
         <div class="membership-plan__header<?= $headerModifier ?>">
