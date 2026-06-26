@@ -97,7 +97,7 @@ try {
     $prevStmt = $pdo->prepare(
         'SELECT end_date FROM membership_periods
           WHERE member_id = :mid AND id <> :pid AND end_date IS NOT NULL
-            AND (start_date < :start OR (start_date = :start AND id < :pid))
+            AND (start_date < :start OR (start_date = :start2 AND id < :pid2))
        ORDER BY end_date DESC LIMIT 1'
     );
     $priorCountStmt = $pdo->prepare(
@@ -115,7 +115,7 @@ try {
         }
         $report['scanned']++;
 
-        $prevStmt->execute(['mid' => $mid, 'pid' => (int) $period['id'], 'start' => $period['start_date']]);
+        $prevStmt->execute(['mid' => $mid, 'pid' => (int) $period['id'], 'start' => $period['start_date'], 'start2' => $period['start_date'], 'pid2' => (int) $period['id']]);
         $prevEnd = $prevStmt->fetchColumn() ?: null;
 
         $priorCountStmt->execute(['mid' => $mid, 'pid' => (int) $period['id']]);
