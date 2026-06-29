@@ -46,7 +46,8 @@
         { "slug": "15-orders-checkout",       "title": "Orders & checkout flow",           "file": "chapters/15-orders-checkout.md",       "watched_files": ["app/Services/OrderService.php", "app/Services/OrderRepository.php", "app/Services/MembershipOrderService.php", "app/Services/StoreInvoiceService.php", "app/Services/MembershipInvoiceService.php", "public_html/checkout.php", "public_html/checkout/", "public_html/order/", "public_html/api/index.php"] },
         { "slug": "16-webhooks-idempotency",  "title": "Webhooks & idempotency",           "file": "chapters/16-webhooks-idempotency.md",  "watched_files": ["app/Services/PaymentWebhookService.php", "app/Services/MembershipInvoiceService.php", "public_html/api/stripe_webhook.php"] },
         { "slug": "17-refunds",               "title": "Refunds",                          "file": "chapters/17-refunds.md",               "watched_files": ["app/Services/RefundService.php"] },
-        { "slug": "18-invoices",              "title": "Invoices",                         "file": "chapters/18-invoices.md",              "watched_files": ["app/Services/InvoiceService.php", "app/Services/PdfInvoiceService.php", "app/ThirdParty/fpdf/"] }
+        { "slug": "18-invoices",              "title": "Invoices",                         "file": "chapters/18-invoices.md",              "watched_files": ["app/Services/InvoiceService.php", "app/Services/PdfInvoiceService.php", "app/ThirdParty/fpdf/"] },
+        { "slug": "38-stripe-payouts-explainer", "title": "Stripe payouts — how payments reach the bank", "file": "chapters/38-stripe-payouts-explainer.md", "watched_files": ["app/Services/StripeService.php", "app/Services/MembershipInvoiceService.php"] }
       ]
     },
     {

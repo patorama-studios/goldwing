@@ -759,7 +759,10 @@ class NotificationService
             return false;
         }
 
-        $visibility = $options['visibility'] ?? ((string) ($settings['recipient_mode'] ?? 'primary') === 'admin' ? 'admin' : 'member');
+        $isAdminOnly = isset($settings['send_to_member'])
+            ? (empty($settings['send_to_member']) && !empty($settings['send_to_admin']))
+            : ((string) ($settings['recipient_mode'] ?? 'primary') === 'admin');
+        $visibility = $options['visibility'] ?? ($isAdminOnly ? 'admin' : 'member');
         $metadata = [
             'member_id' => $memberId,
             'user_id' => $context['user_id'] ?? null,
@@ -848,10 +851,27 @@ class NotificationService
 
     private static function resolveRecipients(array $settings, array $context, bool $allowPrimary): array
     {
-        $mode = (string) ($settings['recipient_mode'] ?? 'primary');
         $primary = self::normalizeEmails($context['primary_email'] ?? '');
-        $admin = self::normalizeEmails($context['admin_emails'] ?? '');
-        $custom = self::normalizeEmails($settings['custom_recipients'] ?? '');
+        $admin   = self::normalizeEmails($context['admin_emails'] ?? '');
+        $custom  = self::normalizeEmails($settings['custom_recipients'] ?? '');
+
+        // New checkbox storage: send_to_member / send_to_admin / custom_recipients
+        if (isset($settings['send_to_member']) || isset($settings['send_to_admin'])) {
+            $out = [];
+            if (!empty($settings['send_to_member']) && $allowPrimary) {
+                $out = array_merge($out, $primary);
+            }
+            if (!empty($settings['send_to_admin'])) {
+                $out = array_merge($out, $admin);
+            }
+            if ($custom) {
+                $out = array_merge($out, $custom);
+            }
+            return self::uniqueEmails($out);
+        }
+
+        // Legacy recipient_mode fallback
+        $mode = (string) ($settings['recipient_mode'] ?? 'primary');
         switch ($mode) {
             case 'admin':
                 return $admin;

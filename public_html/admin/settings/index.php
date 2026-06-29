@@ -292,7 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $subject = normalize_text($_POST['notification_subject'][$key] ?? ($current['subject'] ?? ''));
                     $body = trim((string) ($_POST['notification_body'][$key] ?? ($current['body'] ?? '')));
-                    $mode = normalize_text($_POST['notification_recipient_mode'][$key] ?? ($current['recipient_mode'] ?? 'primary'));
+                    $sendToMember = isset($_POST['notification_send_to_member'][$key]) ? 1 : 0;
+                    $sendToAdmin  = isset($_POST['notification_send_to_admin'][$key])  ? 1 : 0;
                     $entryFromName = normalize_text($_POST['notification_from_name'][$key] ?? ($current['from_name'] ?? ''));
                     $entryFromEmail = normalize_text($_POST['notification_from_email'][$key] ?? ($current['from_email'] ?? ''));
                     $entryReplyTo = normalize_text($_POST['notification_reply_to'][$key] ?? ($current['reply_to'] ?? ''));
@@ -302,12 +303,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($entryReplyTo !== '' && !filter_var($entryReplyTo, FILTER_VALIDATE_EMAIL)) {
                         $errors[] = 'Notification "' . ($definition['label'] ?? $key) . '" has an invalid reply-to address.';
                     }
-                    if (!in_array($mode, ['primary', 'admin', 'both', 'custom'], true)) {
-                        $mode = $current['recipient_mode'] ?? 'primary';
-                    }
                     $updatedCatalog[$key] = [
                         'enabled' => isset($_POST['notification_enabled'][$key]),
-                        'recipient_mode' => $mode,
+                        'send_to_member' => $sendToMember,
+                        'send_to_admin'  => $sendToAdmin,
                         'custom_recipients' => normalize_text($_POST['notification_custom_recipients'][$key] ?? ''),
                         'subject' => $subject,
                         'body' => $body,
@@ -1750,12 +1749,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             $notificationDefinitions = NotificationService::definitions();
             $notificationCatalog = NotificationService::getCatalogSettings();
             $defaultNotificationKey = array_key_first($notificationDefinitions) ?? '';
-            $recipientLabels = [
-                'primary' => 'Primary recipient',
-                'admin' => 'Admin emails',
-                'both' => 'Primary + admin',
-                'custom' => 'Custom list',
-            ];
             $categoryMeta = [
                 'security' => ['label' => 'Security & Sign-in', 'icon' => 'lock_outline'],
                 'payments' => ['label' => 'Payments & Membership', 'icon' => 'payments'],
@@ -1970,19 +1963,34 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
                         <!-- Tab: Recipients -->
                         <div class="notification-tab-panel mt-5 space-y-4 hidden" data-tab="recipients">
-                          <label class="block text-sm">
-                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Recipient mode</span>
-                            <select name="notification_recipient_mode[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
-                              <?php foreach ($recipientLabels as $value => $label): ?>
-                                <option value="<?= e($value) ?>" <?= ($settings['recipient_mode'] ?? 'primary') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
-                              <?php endforeach; ?>
-                            </select>
-                          </label>
-                          <label class="block text-sm">
-                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Custom recipients (comma-separated)</span>
-                            <input name="notification_custom_recipients[<?= e($key) ?>]" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['custom_recipients'] ?? '') ?>" placeholder="addr1@example.com, addr2@example.com">
-                            <span class="mt-1 block text-xs text-slate-400">Used when recipient mode is "Custom list".</span>
-                          </label>
+                          <?php
+                            // Migrate legacy recipient_mode to checkbox values if not yet converted
+                            if (isset($settings['send_to_member']) || isset($settings['send_to_admin'])) {
+                                $chkMember = !empty($settings['send_to_member']);
+                                $chkAdmin  = !empty($settings['send_to_admin']);
+                            } else {
+                                $legacyMode = $settings['recipient_mode'] ?? $definition['defaults']['recipient_mode'] ?? 'primary';
+                                $chkMember = in_array($legacyMode, ['primary', 'both'], true);
+                                $chkAdmin  = in_array($legacyMode, ['admin', 'both'], true);
+                            }
+                          ?>
+                          <div>
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Send this email to</span>
+                            <div class="space-y-2">
+                              <label class="flex items-center gap-3 cursor-pointer select-none">
+                                <input type="checkbox" name="notification_send_to_member[<?= e($key) ?>]" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $chkMember ? 'checked' : '' ?>>
+                                <span class="text-sm text-gray-800 font-medium">Member <span class="font-normal text-slate-500">(the person this email is about)</span></span>
+                              </label>
+                              <label class="flex items-center gap-3 cursor-pointer select-none">
+                                <input type="checkbox" name="notification_send_to_admin[<?= e($key) ?>]" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $chkAdmin ? 'checked' : '' ?>>
+                                <span class="text-sm text-gray-800 font-medium">Admins <span class="font-normal text-slate-500">(the admin email list in Sender Identity)</span></span>
+                              </label>
+                            </div>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Also send to these addresses <span class="font-normal normal-case text-slate-400">(optional, comma-separated)</span></label>
+                            <input name="notification_custom_recipients[<?= e($key) ?>]" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e($settings['custom_recipients'] ?? '') ?>" placeholder="addr1@example.com, addr2@example.com">
+                          </div>
                         </div>
 
                         <!-- Tab: Sender overrides -->
