@@ -33,7 +33,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
       <?php if (!$isLive): ?>
         <!-- COMING SOON TEASER -->
-        <section class="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-100 p-8 md:p-12 shadow-sm">
+        <section class="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-100 p-8 md:p-12 shadow-sm" data-tour="awards-teaser">
           <div class="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-amber-200/40 blur-3xl"></div>
           <div class="absolute -left-16 -bottom-12 w-72 h-72 rounded-full bg-amber-300/30 blur-3xl"></div>
           <div class="relative max-w-2xl">
@@ -101,7 +101,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
       <?php else: ?>
         <!-- LIVE WALL OF AWARDS -->
-        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4" data-tour="awards-wall-header">
           <div>
             <h1 class="font-display text-3xl md:text-4xl font-bold text-gray-900 flex items-center gap-3">
               <span class="material-icons-outlined text-amber-500 text-4xl">workspace_premium</span>
@@ -109,7 +109,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </h1>
             <p class="text-gray-600 mt-2">Every trophy, every winner — celebrating the riders of the Australian Goldwing Association.</p>
           </div>
-          <form method="get" class="flex items-center gap-2">
+          <form method="get" class="flex items-center gap-2" data-tour="awards-wall-year">
             <label class="text-sm font-semibold text-gray-700">Year:</label>
             <select name="year" onchange="this.form.submit()" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold">
               <?php foreach ($years as $y): ?>
@@ -123,7 +123,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         <?php $rendered = false; foreach ($groupOrder as $groupKey): ?>
           <?php if (empty($grouped[$groupKey])) continue; ?>
           <?php $rendered = true; ?>
-          <section>
+          <section data-tour="awards-wall-group">
             <h2 class="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <span class="h-px bg-amber-300 flex-1"></span>
               <span class="px-3 text-amber-700 uppercase text-sm tracking-wider"><?= $groupKey === '_ungrouped' ? 'Individual Trophies' : e($groupKey) ?></span>

@@ -37,7 +37,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     <?php $topbarTitle = $pageTitle; require __DIR__ . '/../../../app/Views/partials/backend_mobile_topbar.php'; ?>
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between" data-tour="categories-header">
         <div>
           <a href="/admin/awards/" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
             <span class="material-icons-outlined text-base">arrow_back</span> Back to awards
@@ -46,7 +46,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <p class="text-sm text-gray-500 mt-1">The 16 trophy types awarded at the AGM. Rarely changed.</p>
         </div>
         <?php if ($canManage): ?>
-          <a href="/admin/awards/categories.php?new=1" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-primary/90">
+          <a href="/admin/awards/categories.php?new=1" data-tour="categories-new-btn" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-primary/90">
             <span class="material-icons-outlined text-base">add</span> New Category
           </a>
         <?php endif; ?>
@@ -59,7 +59,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       <?php endif; ?>
 
       <?php if ($canManage && ($editing || $isNew)): ?>
-        <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm" data-tour="categories-form">
           <h2 class="font-display text-lg font-bold text-gray-900 mb-4">
             <?= $editing ? 'Edit Category' : 'New Category' ?>
           </h2>
@@ -127,7 +127,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </section>
       <?php endif; ?>
 
-      <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden" data-tour="categories-table">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
             <tr>

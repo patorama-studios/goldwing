@@ -1,6 +1,89 @@
 {
   "$schema_doc": "Single source of truth for every tour. PHP (validator, linter, impact-check) and JS (tour engine) both read this file. Adding a new tour = adding an entry here + a steps file under public_html/assets/js/tours/tours/.",
   "tours": {
+    "admin-awards-dashboard": {
+      "slug": "admin-awards-dashboard",
+      "name": "How to manage AGM Awards — the dashboard",
+      "blurb": "Walk me through the Awards dashboard, the visibility toggle, and the trophy list.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/awards/",
+      "page_match": "admin/awards/index",
+      "steps_file": "/assets/js/tours/tours/admin-awards-dashboard.js",
+      "selectors": [
+        "[data-tour=\"awards-header\"]",
+        "[data-tour=\"awards-feature-toggle\"]",
+        "[data-tour=\"awards-year-selector\"]",
+        "[data-tour=\"awards-trophy-group\"]",
+        "[data-tour=\"awards-manage-trophies-btn\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/awards/index.php",
+        "public_html/assets/js/tours/tours/admin-awards-dashboard.js"
+      ]
+    },
+    "admin-awards-add-winner": {
+      "slug": "admin-awards-add-winner",
+      "name": "How to record a trophy winner",
+      "blurb": "Walk me through adding a winner, uploading a bike photo, and setting the primary image.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/awards/",
+      "page_match": "admin/awards/edit",
+      "starthint": "Tour ready: <strong>Record a trophy winner</strong>.<br>Click <strong>Add Winner</strong> on any trophy row (or open an existing winner) to start the tour.",
+      "steps_file": "/assets/js/tours/tours/admin-awards-add-winner.js",
+      "selectors": [
+        "[data-tour=\"winner-form\"]",
+        "[data-tour=\"winner-member-picker\"]",
+        "[data-tour=\"winner-bike-fields\"]",
+        "[data-tour=\"winner-photos\"]",
+        "[data-tour=\"winner-save\"]",
+        "[data-tour=\"winner-photo-gallery\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/awards/edit.php",
+        "public_html/assets/js/tours/tours/admin-awards-add-winner.js"
+      ]
+    },
+    "admin-awards-categories": {
+      "slug": "admin-awards-categories",
+      "name": "How to manage trophy categories",
+      "blurb": "Walk me through setting up or editing the 16 AGM trophy types.",
+      "audience": "admin",
+      "roles": ["admin"],
+      "page_url": "/admin/awards/categories.php",
+      "page_match": "admin/awards/categories",
+      "steps_file": "/assets/js/tours/tours/admin-awards-categories.js",
+      "selectors": [
+        "[data-tour=\"categories-header\"]",
+        "[data-tour=\"categories-table\"]",
+        "[data-tour=\"categories-new-btn\"]"
+      ],
+      "watched_files": [
+        "public_html/admin/awards/categories.php",
+        "public_html/assets/js/tours/tours/admin-awards-categories.js"
+      ]
+    },
+    "member-awards-wall": {
+      "slug": "member-awards-wall",
+      "name": "How to view the Wall of Awards",
+      "blurb": "Show me how to browse AGM trophy winners and find my own wins.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/members/awards/",
+      "page_match": "members/awards",
+      "steps_file": "/assets/js/tours/tours/member-awards-wall.js",
+      "selectors": [
+        "[data-tour=\"awards-teaser\"]",
+        "[data-tour=\"awards-wall-header\"]",
+        "[data-tour=\"awards-wall-year\"]",
+        "[data-tour=\"awards-wall-group\"]"
+      ],
+      "watched_files": [
+        "public_html/members/awards/index.php",
+        "public_html/assets/js/tours/tours/member-awards-wall.js"
+      ]
+    },
     "member-update-profile-pic": {
       "slug": "member-update-profile-pic",
       "name": "How to update your profile photo",

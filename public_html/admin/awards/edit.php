@@ -69,7 +69,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-      <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+      <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm" data-tour="winner-form">
         <form method="post" action="/admin/awards/actions.php" enctype="multipart/form-data" class="space-y-5">
           <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
           <input type="hidden" name="action" value="save_winner">
@@ -103,7 +103,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="block" data-member-picker>
+            <div class="block" data-member-picker data-tour="winner-member-picker">
               <span class="text-sm font-semibold text-gray-700">Assign Member</span>
               <input type="hidden" name="member_id" id="member-id-input"
                      value="<?= (int) ($winner['member_id'] ?? 0) > 0 ? (int) $winner['member_id'] : '' ?>">
@@ -168,7 +168,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </label>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4" data-tour="winner-bike-fields">
             <label class="block">
               <span class="text-sm font-semibold text-gray-700">Bike Description</span>
               <input type="text" name="bike_description" maxlength="255"
@@ -195,7 +195,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </label>
 
           <?php if ($canManage): ?>
-            <label class="block">
+            <label class="block" data-tour="winner-photos">
               <span class="text-sm font-semibold text-gray-700">Add Photos</span>
               <input type="file" name="photos[]" multiple accept="image/jpeg,image/png,image/webp"
                      class="mt-1 block w-full text-sm">
@@ -204,7 +204,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <?php endif; ?>
 
           <?php if ($canManage): ?>
-            <div class="flex flex-wrap items-center gap-2 pt-2">
+            <div class="flex flex-wrap items-center gap-2 pt-2" data-tour="winner-save">
               <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-primary/90">
                 <span class="material-icons-outlined text-base">save</span>
                 <?= $winner ? 'Save changes' : 'Add winner' ?>
@@ -217,7 +217,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
       <?php if ($winner): ?>
         <!-- Photos gallery -->
-        <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm" data-tour="winner-photo-gallery">
           <h2 class="font-display text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <span class="material-icons-outlined text-amber-500">photo_library</span>
             Photos

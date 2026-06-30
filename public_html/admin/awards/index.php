@@ -66,18 +66,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       <?php endif; ?>
 
       <!-- Header row -->
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4" data-tour="awards-header">
         <div>
           <h1 class="font-display text-3xl font-bold text-gray-900">AGM Awards</h1>
           <p class="text-sm text-gray-500 mt-1">Manage trophy winners across the years and control when members see the awards page.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <a href="/admin/awards/categories.php" class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+          <a href="/admin/awards/categories.php" data-tour="awards-manage-trophies-btn" class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
             <span class="material-icons-outlined text-base">category</span>
             Manage Trophies
           </a>
           <?php if ($canManage): ?>
-            <a href="/admin/awards/edit.php?year=<?= (int) $selectedYear ?>" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-primary/90">
+            <a href="/admin/awards/edit.php?year=<?= (int) $selectedYear ?>" data-tour="awards-add-winner-btn" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-primary/90">
               <span class="material-icons-outlined text-base">add</span>
               Add Winner
             </a>
@@ -86,7 +86,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       </div>
 
       <!-- Feature toggle card -->
-      <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+      <section class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm" data-tour="awards-feature-toggle">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h2 class="font-display text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -130,7 +130,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       </section>
 
       <!-- Year selector + summary -->
-      <section class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+      <section class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm" data-tour="awards-year-selector">
         <form method="get" class="flex flex-wrap items-center gap-3">
           <label class="text-sm font-semibold text-gray-700">AGM Year:</label>
           <select name="year" onchange="this.form.submit()" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
@@ -156,7 +156,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       <?php foreach ($groupOrder as $groupKey): ?>
         <?php if (empty($grouped[$groupKey])) continue; ?>
         <?php $groupItems = $grouped[$groupKey]; ?>
-        <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden" data-tour="awards-trophy-group">
           <header class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
             <span class="material-icons-outlined text-amber-500">emoji_events</span>
             <h3 class="font-display text-lg font-bold text-gray-900">
