@@ -277,7 +277,7 @@ class MembershipInvoiceService
                 'invoice'  => $invoiceId,
                 'amount'   => $feeCents,
                 'currency' => 'aud',
-                'description' => 'Card processing fee',
+                'description' => 'Card processing fee (Stripe)',
             ]);
         }
 

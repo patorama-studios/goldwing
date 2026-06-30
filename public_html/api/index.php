@@ -1249,7 +1249,7 @@ if ($resource === 'stripe') {
             if ($totals['processing_fee_total'] > 0) {
                 $orderItems[] = [
                     'product_id' => null,
-                    'name' => 'Payment processing fee',
+                    'name' => 'Card processing fee (Stripe)',
                     'quantity' => 1,
                     'unit_price' => (float) $totals['processing_fee_total'],
                     'is_physical' => 0,
@@ -2177,7 +2177,7 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
         if ($totals['processing_fee_total'] > 0) {
             $orderItems[] = [
                 'product_id' => null,
-                'name' => 'Payment processing fee',
+                'name' => 'Card processing fee (Stripe)',
                 'quantity' => 1,
                 'unit_price' => (float) $totals['processing_fee_total'],
                 'is_physical' => 0,
@@ -2247,7 +2247,7 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
                 'price_data' => [
                     'currency' => 'aud',
                     'product_data' => [
-                        'name' => 'Payment processing fee',
+                        'name' => 'Card processing fee (Stripe)',
                     ],
                     'unit_amount' => (int) round($totals['processing_fee_total'] * 100),
                 ],

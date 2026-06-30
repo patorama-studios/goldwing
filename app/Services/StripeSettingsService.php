@@ -332,6 +332,11 @@ class StripeSettingsService
         SettingsService::setGlobal($actorUserId, 'payments.membership_allow_both_types', !empty($payload['membership_allow_both_types']));
         SettingsService::setGlobal($actorUserId, 'payments.bank_transfer_instructions', $bankTransferInstructions);
 
+        // Card processing fee pass-through — shared by store checkout and membership checkout
+        SettingsService::setGlobal($actorUserId, 'store.pass_stripe_fees', !empty($payload['store_pass_fees']));
+        SettingsService::setGlobal($actorUserId, 'store.stripe_fee_percent', (float) ($payload['store_fee_percent'] ?? 0));
+        SettingsService::setGlobal($actorUserId, 'store.stripe_fee_fixed', (float) ($payload['store_fee_fixed'] ?? 0));
+
         $existingPrices = SettingsService::getGlobal('payments.membership_prices', []);
         if (!is_array($existingPrices)) {
             $existingPrices = [];

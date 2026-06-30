@@ -204,7 +204,7 @@ class StoreInvoiceService
                 'invoice' => $invoiceId,
                 'amount' => (int) round($processingFee * 100),
                 'currency' => 'aud',
-                'description' => 'Payment processing fee',
+                'description' => 'Card processing fee (Stripe)',
             ]);
         }
 

@@ -232,9 +232,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SettingsService::setGlobal((int) $user['id'], 'store.members_only', isset($_POST['store_members_only']));
                 SettingsService::setGlobal((int) $user['id'], 'store.shipping_region', normalize_text($_POST['store_shipping_region'] ?? 'AU'));
                 SettingsService::setGlobal((int) $user['id'], 'store.gst_enabled', isset($_POST['store_gst_enabled']));
-                SettingsService::setGlobal((int) $user['id'], 'store.pass_stripe_fees', isset($_POST['store_pass_fees']));
-                SettingsService::setGlobal((int) $user['id'], 'store.stripe_fee_percent', (float) ($_POST['store_fee_percent'] ?? 0));
-                SettingsService::setGlobal((int) $user['id'], 'store.stripe_fee_fixed', (float) ($_POST['store_fee_fixed'] ?? 0));
                 SettingsService::setGlobal((int) $user['id'], 'store.shipping_flat_enabled', isset($_POST['store_shipping_flat_enabled']));
                 SettingsService::setGlobal((int) $user['id'], 'store.shipping_flat_rate', $_POST['store_shipping_flat_rate'] !== '' ? (float) $_POST['store_shipping_flat_rate'] : null);
                 SettingsService::setGlobal((int) $user['id'], 'store.shipping_free_enabled', isset($_POST['store_shipping_free_enabled']));
@@ -1114,21 +1111,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                       <p class="text-sm text-slate-500">Stripe fee handling, shipping, and pickup options.</p>
                     </div>
                   </div>
-                  <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
-                    <div>
-                      <div class="text-sm font-medium text-gray-900">Pass Stripe fees to buyer</div>
-                      <div class="text-xs text-slate-500">Add the processing surcharge at checkout</div>
-                    </div>
-                    <input type="checkbox" name="store_pass_fees" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.pass_stripe_fees', true) ? 'checked' : '' ?>>
-                  </label>
-                  <div class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label for="store_fee_percent" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fee percent</label>
-                      <input id="store_fee_percent" name="store_fee_percent" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_percent', 0)) ?>">
-                    </div>
-                    <div>
-                      <label for="store_fee_fixed" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fee fixed</label>
-                      <input id="store_fee_fixed" name="store_fee_fixed" type="number" step="0.01" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_fixed', 0)) ?>">
+                  <div class="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-3">
+                    <span class="material-icons-outlined text-primary text-base mt-0.5">info</span>
+                    <div class="text-sm text-slate-700">
+                      Card processing fee settings have moved to <a href="/admin/settings/index.php?section=payments#fee-passthrough" class="font-semibold text-primary hover:underline">Payments (Stripe) settings</a> — they apply to both store checkouts and membership payments from one place.
                     </div>
                   </div>
                   <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
@@ -1628,6 +1614,44 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 </div>
                 <p class="text-sm text-slate-500">This text is displayed to users who opt for manual payment. It should include the BSB, Account Number, and Reference formatting.</p>
                 <textarea name="bank_transfer_instructions" rows="6" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono"><?= e((string) $bankTransferInstructions) ?></textarea>
+              </div>
+
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6 space-y-5">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">percent</span>
+                  <div>
+                    <h2 class="font-display text-lg font-bold text-gray-900">Card Processing Fee Pass-through</h2>
+                    <p class="text-sm text-slate-500 mt-1">When enabled, Stripe's processing fee is added to the checkout total and clearly labelled as a "Card processing fee (Stripe)" line item. Applies to both store purchases and membership payments.</p>
+                  </div>
+                </div>
+                <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer border border-gray-100">
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">Pass card processing fee to member</div>
+                    <div class="text-xs text-slate-500">Member pays the Stripe fee — Goldwing receives the full membership/order amount</div>
+                  </div>
+                  <input type="checkbox" name="store_pass_fees" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.pass_stripe_fees', false) ? 'checked' : '' ?>>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label for="pay_fee_percent" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fee % (e.g. 1.75)</label>
+                    <div class="relative mt-2">
+                      <input id="pay_fee_percent" name="store_fee_percent" type="number" step="0.01" min="0" max="10" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm pr-7" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_percent', 0)) ?>">
+                      <span class="absolute inset-y-0 right-2.5 flex items-center text-slate-400 text-sm pointer-events-none">%</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Check Stripe Dashboard → Settings → Pricing for your exact rate</p>
+                  </div>
+                  <div>
+                    <label for="pay_fee_fixed" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Fixed amount (e.g. 0.30)</label>
+                    <div class="relative mt-2">
+                      <span class="absolute inset-y-0 left-2.5 flex items-center text-slate-400 text-sm pointer-events-none">$</span>
+                      <input id="pay_fee_fixed" name="store_fee_fixed" type="number" step="0.01" min="0" max="5" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm pl-6" value="<?= e((string) SettingsService::getGlobal('store.stripe_fee_fixed', 0)) ?>">
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Stripe's per-transaction fixed fee — ~$0.30 for most AU accounts</p>
+                  </div>
+                </div>
+                <div class="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-xs text-amber-800">
+                  <strong>Note:</strong> Since Goldwing is not GST-registered, the GST Stripe charges on their own fee cannot be claimed back. Setting the fee pass-through ensures the club is not out of pocket on processing costs. The fee shown to members covers both the Stripe % rate and the per-transaction fixed amount.
+                </div>
               </div>
 
               <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">

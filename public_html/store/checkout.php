@@ -210,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($totals['processing_fee_total'] > 0) {
               $orderItems[] = [
                 'product_id' => null,
-                'name' => 'Payment processing fee',
+                'name' => 'Card processing fee (Stripe)',
                 'quantity' => 1,
                 'unit_price' => (float) $totals['processing_fee_total'],
                 'is_physical' => 0,
@@ -265,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($totals['processing_fee_total'] > 0) {
               $lineItems[] = [
-                'name' => 'Payment processing fee',
+                'name' => 'Card processing fee (Stripe)',
                 'unit_amount' => (int) round($totals['processing_fee_total'] * 100),
                 'quantity' => 1,
                 'currency' => 'aud',
@@ -442,7 +442,7 @@ $pageTitle = 'Checkout';
               <td>$<?= e(store_money($totals['shipping_total'])) ?></td>
             </tr>
             <tr>
-              <td>Payment processing fee</td>
+              <td>Card processing fee (Stripe)</td>
               <td>$<?= e(store_money($totals['processing_fee_total'])) ?></td>
             </tr>
             <tr>

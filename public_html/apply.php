@@ -873,7 +873,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             </div>
             <div class="summary-detail" data-summary-associate-detail>Not selected</div>
             <div class="summary-row" data-summary-processing-row hidden>
-              <span>Payment processing fee</span>
+              <span>Card processing fee (Stripe)</span>
               <strong data-summary-processing-fee>$0.00</strong>
             </div>
             <div class="summary-row summary-total">

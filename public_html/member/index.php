@@ -5841,7 +5841,7 @@ if ($renewModalEligible) {
           </div>
           <div class="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm space-y-2">
             <div class="hidden items-center justify-between text-xs text-gray-500" data-pay-drawer-fee-row>
-              <span>Card processing fee</span>
+              <span>Card processing fee (Stripe)</span>
               <span data-pay-drawer-fee>—</span>
             </div>
             <div class="flex items-center justify-between">
