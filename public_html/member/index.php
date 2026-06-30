@@ -3480,7 +3480,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php if ($profileError): ?>
               <div class="rounded-lg bg-red-50 text-red-700 px-4 py-2 text-sm"><?= e($profileError) ?></div>
             <?php endif; ?>
-            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100" data-tour="settings-panel">
               <div class="flex items-center gap-3 mb-6">
                 <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
                   <span class="material-icons-outlined">settings</span>
@@ -3499,7 +3499,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
                       value="<?= e($userTimezone) ?>" placeholder="Australia/Sydney">
                   </label>
-                  <div>
+                  <div data-tour="profile-image-field">
                     <p class="text-sm font-medium text-gray-700">Profile image</p>
                     <div class="mt-2 flex items-center gap-3">
                       <div id="avatar-preview"
@@ -3515,7 +3515,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                       <button type="button"
                         class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700"
                         data-upload-trigger data-upload-target="avatar-url-input" data-upload-preview="avatar-preview"
-                        data-upload-context="avatars">Upload image</button>
+                        data-upload-context="avatars" data-tour="profile-image-upload-btn">Upload image</button>
                     </div>
                   </div>
                 </div>
@@ -3596,7 +3596,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <a class="text-sm text-slate-500" href="/member/index.php?page=settings">Cancel</a>
                   <button
                     class="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-gray-900 text-sm font-semibold"
-                    type="submit">Save settings</button>
+                    type="submit" data-tour="settings-save-btn">Save settings</button>
                 </div>
               </form>
             </div>

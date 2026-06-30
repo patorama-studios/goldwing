@@ -1,6 +1,26 @@
 {
   "$schema_doc": "Single source of truth for every tour. PHP (validator, linter, impact-check) and JS (tour engine) both read this file. Adding a new tour = adding an entry here + a steps file under public_html/assets/js/tours/tours/.",
   "tours": {
+    "member-update-profile-pic": {
+      "slug": "member-update-profile-pic",
+      "name": "How to update your profile photo",
+      "blurb": "Show me how to upload or change my profile picture.",
+      "audience": "member",
+      "roles": ["member", "area_rep", "store_manager", "admin"],
+      "page_url": "/member/index.php?page=settings",
+      "page_match": "page=settings",
+      "steps_file": "/assets/js/tours/tours/member-update-profile-pic.js",
+      "selectors": [
+        "[data-tour=\"settings-panel\"]",
+        "[data-tour=\"profile-image-field\"]",
+        "[data-tour=\"profile-image-upload-btn\"]",
+        "[data-tour=\"settings-save-btn\"]"
+      ],
+      "watched_files": [
+        "public_html/member/index.php",
+        "public_html/assets/js/tours/tours/member-update-profile-pic.js"
+      ]
+    },
     "member-update-contact": {
       "slug": "member-update-contact",
       "name": "How to update your phone or email",
