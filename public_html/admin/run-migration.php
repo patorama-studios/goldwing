@@ -3515,6 +3515,28 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DIAGNOSTIC — Dump raw Brooks 1697 rows (read-only, always runs, no flag)
+// Migration 040 reported 0 rows fixed, meaning either the row was already
+// correct or it doesn't exist at all. This just shows what's actually in the
+// table so we can tell which. Safe to delete once resolved.
+// ─────────────────────────────────────────────────────────────────────────────
+try {
+    $pdo = db();
+    $rows = $pdo->query(
+        'SELECT id, first_name, last_name, email, member_type, status,
+                member_number_base, member_number_suffix, full_member_id, deleted_at
+           FROM members
+          WHERE member_number_base = 1697
+             OR (last_name = "Brooks" AND first_name IN ("Ashley", "Trudy"))'
+    )->fetchAll(\PDO::FETCH_ASSOC);
+
+    $note = empty($rows) ? 'No rows found at all for base=1697 or Ashley/Trudy Brooks.' : json_encode($rows);
+    $results[] = ['label' => 'Diagnostic — Brooks 1697 raw rows', 'status' => 'info', 'note' => $note];
+} catch (\Throwable $e) {
+    $results[] = ['label' => 'Diagnostic — Brooks 1697 raw rows', 'status' => 'error', 'note' => $e->getMessage()];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
