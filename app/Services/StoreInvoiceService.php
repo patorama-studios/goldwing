@@ -250,7 +250,18 @@ class StoreInvoiceService
             $existingCustomerId = (string) ($stmt->fetchColumn() ?: '');
         }
         if ($existingCustomerId !== '') {
-            return $existingCustomerId;
+            // Verify the stored customer exists in the current Stripe mode (test vs live
+            // have separate customer namespaces; a live ID is invalid in test mode).
+            $check = StripeService::retrieveCustomerSimple($existingCustomerId);
+            if ($check && empty($check['deleted'])) {
+                return $existingCustomerId;
+            }
+            // Stale ID — clear it and fall through to find-or-create.
+            if ($memberId > 0) {
+                $pdo->prepare('UPDATE members SET stripe_customer_id = NULL WHERE id = :id')
+                    ->execute(['id' => $memberId]);
+            }
+            $existingCustomerId = '';
         }
 
         $email = trim((string) ($order['customer_email'] ?? ''));

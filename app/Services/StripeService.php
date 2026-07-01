@@ -411,6 +411,15 @@ class StripeService
         return $product->toArray();
     }
 
+    public static function retrieveCustomerSimple(string $customerId): ?array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '' || $customerId === '') {
+            return null;
+        }
+        return self::retrieveCustomer($secret, $customerId);
+    }
+
     public static function createCustomerSimple(array $payload): ?array
     {
         $secret = self::activeSecretKey();

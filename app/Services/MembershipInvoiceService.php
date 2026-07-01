@@ -302,7 +302,15 @@ class MembershipInvoiceService
             $stmt->execute(['id' => $memberId]);
             $existing = (string) ($stmt->fetchColumn() ?: '');
             if ($existing !== '') {
-                return $existing;
+                // Verify the stored customer exists in the current Stripe mode (test vs live
+                // have separate customer namespaces; a live ID is invalid in test mode).
+                $check = StripeService::retrieveCustomerSimple($existing);
+                if ($check && empty($check['deleted'])) {
+                    return $existing;
+                }
+                // Customer not found in this mode — clear the stale ID and fall through.
+                $pdo->prepare('UPDATE members SET stripe_customer_id = NULL WHERE id = :id')
+                    ->execute(['id' => $memberId]);
             }
         }
 
