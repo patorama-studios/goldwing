@@ -230,6 +230,7 @@
         term: (t ? t.value : '12') + 'M',
         include_partner: partnerChecked(),
         payment_method: 'card',
+        csrf_token: root.dataset.csrf || '',
       }),
     });
     var data = {};
