@@ -6306,5 +6306,22 @@ if ($renewModalEligible) {
 <script src="/assets/js/stripe-inline-payment.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/stripe-inline-payment.js')) ?>" defer></script>
 <!-- Pay-membership slide-out drawer controller. -->
 <script src="/assets/js/pay-membership-drawer.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/pay-membership-drawer.js')) ?>" defer></script>
+<script>
+// Session-expiry poller: check every 10 min. If the server says the session
+// is gone, redirect to login with a friendly "your login expired" notice.
+(function () {
+  var INTERVAL = 10 * 60 * 1000;
+  function check() {
+    fetch('/api/ping', { credentials: 'include' })
+      .then(function (r) {
+        if (r.status === 401) {
+          window.location.href = '/login.php?session_expired=1';
+        }
+      })
+      .catch(function () { /* network hiccup — ignore, try again next tick */ });
+  }
+  setInterval(check, INTERVAL);
+})();
+</script>
 
 <?php require __DIR__ . '/../../app/Views/partials/backend_footer.php'; ?>

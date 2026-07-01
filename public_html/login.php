@@ -10,10 +10,13 @@ $success = '';
 if (isset($_GET['reset'])) {
   $success = 'Password updated. Please log in with your new password.';
 }
+if (isset($_GET['session_expired'])) {
+  $success = 'Your login has expired. Please sign in again to continue.';
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $token = $_POST['csrf_token'] ?? '';
   if (!Csrf::verify($token)) {
-    $error = 'Invalid CSRF token.';
+    $error = 'Your login session expired. Please refresh the page and try again.';
   } else {
     $identifier = trim($_POST['identifier'] ?? '');
     $password = $_POST['password'] ?? '';

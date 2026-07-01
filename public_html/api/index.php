@@ -295,6 +295,16 @@ if (empty($segments)) {
 
 $resource = $segments[0];
 
+// /api/ping — lightweight session check. Returns 200+ok if the user has an
+// active session, 401 if not. Used by the client-side session-expiry poller.
+if ($resource === 'ping' && count($segments) === 1) {
+    $u = current_user();
+    if (!$u) {
+        json_response(['ok' => false], 401);
+    }
+    json_response(['ok' => true]);
+}
+
 // /api/payments/membership-intent — drives the pay-membership lightbox.
 // POST {term, include_partner?} → server resolves the member's own tier +
 // magazine preference (and optionally their linked partner, same lookup as
