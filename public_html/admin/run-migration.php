@@ -3524,7 +3524,7 @@ try {
     $pdo = db();
     $rows = $pdo->query(
         'SELECT id, first_name, last_name, email, member_type, status,
-                member_number_base, member_number_suffix, full_member_id, deleted_at
+                member_number_base, member_number_suffix, full_member_id
            FROM members
           WHERE member_number_base = 1697
              OR (last_name = "Brooks" AND first_name IN ("Ashley", "Trudy"))'
