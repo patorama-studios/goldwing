@@ -296,13 +296,34 @@ if (empty($segments)) {
 $resource = $segments[0];
 
 // /api/ping — lightweight session check. Returns 200+ok if the user has an
-// active session, 401 if not. Used by the client-side session-expiry poller.
+// active session, 401 + fresh csrf_token if not (token used by reauth modal).
 if ($resource === 'ping' && count($segments) === 1) {
     $u = current_user();
     if (!$u) {
-        json_response(['ok' => false], 401);
+        json_response(['ok' => false, 'csrf_token' => Csrf::token()], 401);
     }
     json_response(['ok' => true]);
+}
+
+// /api/reauth — re-authenticate from the session-expiry lightbox without
+// leaving the page. POST {identifier, password, csrf_token}.
+if ($resource === 'reauth' && count($segments) === 1) {
+    if ($method !== 'POST') {
+        json_response(['error' => 'Method not allowed.'], 405);
+    }
+    require_csrf_json($body);
+    $identifier = trim((string) ($body['identifier'] ?? ''));
+    $password   = (string) ($body['password'] ?? '');
+    if ($identifier === '' || $password === '') {
+        json_response(['error' => 'Email and password are required.'], 422);
+    }
+    $result = \App\Services\AuthService::attemptLogin($identifier, $password);
+    if ($result['status'] !== 'ok') {
+        $msg = $result['status'] === 'locked' ? 'Too many attempts. Try again later.' : 'Incorrect email or password.';
+        json_response(['error' => $msg], 401);
+    }
+    // Regenerate CSRF token for the resumed session.
+    json_response(['ok' => true, 'csrf_token' => Csrf::token()]);
 }
 
 // /api/payments/membership-intent — drives the pay-membership lightbox.

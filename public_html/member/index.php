@@ -6306,20 +6306,116 @@ if ($renewModalEligible) {
 <script src="/assets/js/stripe-inline-payment.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/stripe-inline-payment.js')) ?>" defer></script>
 <!-- Pay-membership slide-out drawer controller. -->
 <script src="/assets/js/pay-membership-drawer.js?v=<?= e((string) filemtime(__DIR__ . '/../assets/js/pay-membership-drawer.js')) ?>" defer></script>
+
+<!-- Session-expiry re-auth modal -->
+<div id="reauth-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/50 p-4" aria-modal="true" role="dialog">
+  <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200">
+    <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100">
+      <span class="material-icons-outlined text-amber-500 text-4xl mb-2 block">lock_clock</span>
+      <h2 class="font-display text-lg font-bold text-gray-900">Your login has expired</h2>
+      <p class="mt-1 text-sm text-gray-500">Please sign in again to continue where you left off.</p>
+    </div>
+    <div class="p-6 space-y-4">
+      <div id="reauth-error" class="hidden rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700"></div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1" for="reauth-email">Email address</label>
+        <input id="reauth-email" type="email" autocomplete="email"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          placeholder="you@example.com">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1" for="reauth-password">Password</label>
+        <input id="reauth-password" type="password" autocomplete="current-password"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          placeholder="••••••••">
+      </div>
+      <button id="reauth-submit"
+        class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-primary/90 disabled:opacity-50 transition-colors">
+        Sign in &amp; continue
+      </button>
+      <p class="text-center text-xs text-gray-400">
+        <a href="/login.php" class="underline hover:text-gray-600">Go to the login page instead</a>
+      </p>
+    </div>
+  </div>
+</div>
+
 <script>
-// Session-expiry poller: check every 10 min. If the server says the session
-// is gone, redirect to login with a friendly "your login expired" notice.
 (function () {
   var INTERVAL = 10 * 60 * 1000;
+  var modal = document.getElementById('reauth-modal');
+  var emailInput = document.getElementById('reauth-email');
+  var passInput = document.getElementById('reauth-password');
+  var submitBtn = document.getElementById('reauth-submit');
+  var errorBox = document.getElementById('reauth-error');
+  var csrfToken = '';
+
+  function showModal() {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    emailInput.focus();
+  }
+
+  function hideModal() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    passInput.value = '';
+    errorBox.classList.add('hidden');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Sign in & continue';
+  }
+
+  function setError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Sign in & continue';
+  }
+
   function check() {
     fetch('/api/ping', { credentials: 'include' })
       .then(function (r) {
         if (r.status === 401) {
-          window.location.href = '/login.php?session_expired=1';
+          return r.json().then(function (d) {
+            csrfToken = d.csrf_token || '';
+            showModal();
+          });
         }
       })
-      .catch(function () { /* network hiccup — ignore, try again next tick */ });
+      .catch(function () { /* network hiccup — try again next tick */ });
   }
+
+  submitBtn.addEventListener('click', function () {
+    var email = emailInput.value.trim();
+    var pass  = passInput.value;
+    if (!email || !pass) { setError('Please enter your email and password.'); return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in…';
+    errorBox.classList.add('hidden');
+    fetch('/api/reauth', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ identifier: email, password: pass, csrf_token: csrfToken }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { setError(res.d.error || 'Sign-in failed. Please try again.'); return; }
+        // Update all data-csrf attributes on the page with the fresh token.
+        csrfToken = res.d.csrf_token || csrfToken;
+        document.querySelectorAll('[data-csrf]').forEach(function (el) {
+          el.dataset.csrf = csrfToken;
+        });
+        hideModal();
+      })
+      .catch(function () { setError('Could not reach the server. Please check your connection.'); });
+  });
+
+  // Allow Enter key in password field to submit.
+  passInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') submitBtn.click();
+  });
+
   setInterval(check, INTERVAL);
 })();
 </script>
