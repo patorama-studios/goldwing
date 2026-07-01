@@ -3476,6 +3476,45 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 040 — Restore Brooks 1697 (Ashley) as active FULL member
+// Ashley Brooks (member 1697, suffix 0) is missing from the directory even
+// though her associate Trudy (1697.1) shows and links to her fine — meaning
+// her row exists but its status/type isn't what import_main_life.csv expects
+// (FULL, active). This corrects that one row only if it's currently wrong.
+// Idempotent and narrowly scoped: touches only member_number_base=1697,
+// suffix=0, and only if status/member_type differ from the expected values.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_040_fix_brooks_1697';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'skipped', 'note' => 'Already applied. Clear the migrations.' . $migrationKey . ' setting to re-run.'];
+} else {
+    try {
+        $pdo = db();
+        $stmt = $pdo->prepare(
+            'UPDATE members
+                SET status = "active", member_type = "FULL", updated_at = NOW()
+              WHERE member_number_base = 1697
+                AND member_number_suffix = 0
+                AND (status <> "active" OR member_type <> "FULL")'
+        );
+        $stmt->execute();
+        $fixed = $stmt->rowCount();
+
+        ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.status_corrected', [
+            'member_number_base' => 1697,
+            'fixed'              => $fixed,
+            'migration'          => '040',
+        ]);
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'applied', 'note' => $fixed . ' row(s) corrected to active/FULL. (0 = record was already correct.)'];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
