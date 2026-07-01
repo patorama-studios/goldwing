@@ -3476,41 +3476,60 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MIGRATION 040 — Restore Brooks 1697 (Ashley) as active FULL member
-// Ashley Brooks (member 1697, suffix 0) is missing from the directory even
-// though her associate Trudy (1697.1) shows and links to her fine — meaning
-// her row exists but its status/type isn't what import_main_life.csv expects
-// (FULL, active). This corrects that one row only if it's currently wrong.
-// Idempotent and narrowly scoped: touches only member_number_base=1697,
-// suffix=0, and only if status/member_type differ from the expected values.
+// MIGRATION 041 — Restore Brooks 1697 (Ashley) as active FULL member
+// Diagnostic confirmed Ashley's row was never inserted at all — only her
+// associate Trudy (id 242, base 1697 suffix 1) exists, with full_member_id
+// NULL because there was nothing to link to. This inserts the missing FULL
+// member row (data from scripts/data/import_main_life.csv line 110 +
+// scripts/data/migration_renewal_dates.csv line 145) and links Trudy to it.
+// Idempotent: only runs if no row exists yet at base=1697, suffix=0.
 // ─────────────────────────────────────────────────────────────────────────────
-$migrationKey = 'migration_040_fix_brooks_1697';
+$migrationKey = 'migration_041_fix_brooks_1697';
 $alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
 
 if ($alreadyRun) {
-    $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'skipped', 'note' => 'Already applied. Clear the migrations.' . $migrationKey . ' setting to re-run.'];
+    $results[] = ['label' => 'Migration 041 — Fix Brooks 1697 (Ashley)', 'status' => 'skipped', 'note' => 'Already applied. Clear the migrations.' . $migrationKey . ' setting to re-run.'];
 } else {
     try {
         $pdo = db();
-        $stmt = $pdo->prepare(
-            'UPDATE members
-                SET status = "active", member_type = "FULL", updated_at = NOW()
-              WHERE member_number_base = 1697
-                AND member_number_suffix = 0
-                AND (status <> "active" OR member_type <> "FULL")'
-        );
-        $stmt->execute();
-        $fixed = $stmt->rowCount();
+        $exists = $pdo->query(
+            'SELECT id FROM members WHERE member_number_base = 1697 AND member_number_suffix = 0 LIMIT 1'
+        )->fetchColumn();
+
+        if ($exists) {
+            $note = 'Row already exists (id ' . $exists . ') — nothing to insert.';
+        } else {
+            $stmt = $pdo->prepare(
+                'INSERT INTO members
+                    (member_type, status, member_number_base, member_number_suffix,
+                     chapter_id, first_name, last_name, email, phone,
+                     address_line1, city, state, postal_code, country,
+                     privacy_level, exclude_electronic, created_at, join_date)
+                 VALUES
+                    ("FULL", "ACTIVE", 1697, 0,
+                     (SELECT id FROM chapters WHERE LOWER(TRIM(name)) = LOWER("South Australian Chapter") LIMIT 1),
+                     "Ashley", "Brooks", "ashntrudy@outlook.com", "0418 830 867",
+                     "7 Ular7 Ulaka Road", "INGLE FARM", "SA", "5098", "Australia",
+                     "B", 0, NOW(), "2024-12-29")'
+            );
+            $stmt->execute();
+            $newId = (int) $pdo->lastInsertId();
+
+            $pdo->prepare('UPDATE members SET full_member_id = ?, updated_at = NOW() WHERE id = 242')
+                ->execute([$newId]);
+
+            $note = 'Inserted Ashley as member id ' . $newId . ' and linked Trudy (id 242) to her.';
+        }
 
         ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.status_corrected', [
             'member_number_base' => 1697,
-            'fixed'              => $fixed,
-            'migration'          => '040',
+            'note'               => $note,
+            'migration'          => '041',
         ]);
         SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
-        $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'applied', 'note' => $fixed . ' row(s) corrected to active/FULL. (0 = record was already correct.)'];
+        $results[] = ['label' => 'Migration 041 — Fix Brooks 1697 (Ashley)', 'status' => 'applied', 'note' => $note];
     } catch (\Throwable $e) {
-        $results[] = ['label' => 'Migration 040 — Fix Brooks 1697 (Ashley)', 'status' => 'error', 'note' => $e->getMessage()];
+        $results[] = ['label' => 'Migration 041 — Fix Brooks 1697 (Ashley)', 'status' => 'error', 'note' => $e->getMessage()];
     }
 }
 
