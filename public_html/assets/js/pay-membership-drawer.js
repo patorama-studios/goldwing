@@ -235,6 +235,9 @@
     var data = {};
     try { data = await resp.json(); } catch (e) { /* non-JSON 5xx */ }
     if (!resp.ok || !data.client_secret) {
+      if (resp.status === 401 || (resp.status === 403 && (!data.error || data.error.toLowerCase().includes('csrf') || data.error.toLowerCase().includes('forbidden')))) {
+        throw new Error('Your session may have expired. Please refresh the page and try again.');
+      }
       throw new Error(data.error || ('Could not start the payment (HTTP ' + resp.status + ').'));
     }
     return data;
