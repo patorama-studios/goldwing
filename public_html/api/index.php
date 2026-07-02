@@ -531,6 +531,31 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     // PaymentIntent/invoice work so this path never touches Stripe. ──────────
     if ($payMethod === 'bank_transfer') {
         $bankInstructions = trim((string) SettingsService::getGlobal('payments.bank_transfer_instructions', ''));
+
+        // Tell the member their renewal is in and their membership is pending
+        // until the bank transfer is confirmed. The order now shows in the
+        // admin Notification Hub for a manual approve/deny. Reuses the existing
+        // "membership order created" template (carries the bank instructions).
+        $billingLink = BaseUrlService::buildUrl('/member/index.php?page=billing');
+        foreach ($renewers as $r) {
+            $email = trim((string) ($r['member']['email'] ?? ''));
+            if ($email === '') {
+                continue;
+            }
+            try {
+                NotificationService::dispatch('membership_order_created', [
+                    'primary_email' => $email,
+                    'member_name'   => trim(((string) ($r['member']['first_name'] ?? '')) . ' ' . ((string) ($r['member']['last_name'] ?? ''))),
+                    'order_number'  => $r['order_number'],
+                    'payment_link'  => NotificationService::escape($billingLink),
+                    'payment_method' => 'Bank transfer',
+                    'bank_transfer_instructions' => NotificationService::escape($bankInstructions),
+                ]);
+            } catch (Throwable $e) {
+                error_log('[/api/payments/membership-intent] bank-transfer notice failed: ' . $e->getMessage());
+            }
+        }
+
         $lines = [];
         foreach ($renewers as $r) {
             $name = trim(((string) ($r['member']['first_name'] ?? '')) . ' ' . ((string) ($r['member']['last_name'] ?? '')));

@@ -180,6 +180,17 @@ class MembershipAccessService
                 return self::$stateCache[$cacheKey] = $result;
             }
 
+            // A submitted bank-transfer renewal awaiting an admin's manual
+            // payment check locks the member out until it's approved (which
+            // activates them) or denied. Account/billing/renewal pages stay
+            // open (see OPEN_PAGES) so they can still see status and details.
+            if (!self::isLockedStatus($statusKey) && self::hasPendingBankTransferRenewal($pdo, $memberId)) {
+                $result['status'] = 'awaiting-payment';
+                $result['lapsed'] = true;
+                $result['reason'] = 'awaiting-payment';
+                return self::$stateCache[$cacheKey] = $result;
+            }
+
             // Locked off when an admin/cron set a locked status, OR the grace
             // window has run out (date safety-net in case the cron is late).
             // Between end_date and lockoff_date the member is "in grace":
@@ -202,6 +213,27 @@ class MembershipAccessService
         }
 
         return self::$stateCache[$cacheKey] = $result;
+    }
+
+    /**
+     * True when the member has a bank-transfer membership order still awaiting
+     * an admin's manual payment confirmation. Fails open on any DB error so a
+     * hiccup never traps a member behind the lockdown.
+     */
+    private static function hasPendingBankTransferRenewal(PDO $pdo, int $memberId): bool
+    {
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT 1 FROM orders
+                 WHERE member_id = :mid AND order_type = 'membership'
+                       AND payment_method = 'bank_transfer' AND payment_status = 'pending'
+                 LIMIT 1"
+            );
+            $stmt->execute([':mid' => $memberId]);
+            return (bool) $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     /**

@@ -71,6 +71,7 @@ function reqStatusPill(array $item): array {
     return match ($item['type']) {
         'feedback'       => ['label' => 'Requires Triage',       'dot' => 'bg-blue-500',  'text' => 'text-blue-700',  'bg' => 'bg-blue-50'],
         'store_order'    => ['label' => 'Action Required',        'dot' => 'bg-rose-500',  'text' => 'text-rose-700',  'bg' => 'bg-rose-50'],
+        'membership_payment' => ['label' => 'Check Bank & Approve', 'dot' => 'bg-rose-500', 'text' => 'text-rose-700', 'bg' => 'bg-rose-50'],
         'chapter_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
         'profile_change' => ['label' => 'Pending Admin Approval', 'dot' => 'bg-amber-500', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
         'profile_update' => ['label' => 'No Action Needed',       'dot' => 'bg-sky-500',   'text' => 'text-sky-700',   'bg' => 'bg-sky-50'],

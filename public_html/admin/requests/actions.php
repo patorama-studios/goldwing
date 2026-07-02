@@ -63,22 +63,36 @@ PendingRequestsService::addMessage($type, $id, 'admin', (int) ($user['id'] ?? 0)
 // Dispatch email notification to submitter (skip for archive — housekeeping action).
 $submitterEmail = $result['submitter_email'] ?? '';
 if ($submitterEmail && $action !== 'archive') {
-    $notificationKey = match ($action) {
-        'approve'  => 'request_approved',
-        'reject'   => 'request_denied',
-        'feedback' => 'request_feedback',
-        default    => null,
-    };
-    if ($notificationKey) {
-        NotificationService::dispatch($notificationKey, [
-            'primary_email'  => $submitterEmail,
-            'submitter_name' => $result['submitter_name'] ?? 'Member',
-            'request_type'   => $result['type_label'] ?? $type,
-            'request_title'  => $result['title'] ?? '',
-            'message'        => $message !== '' ? nl2br(NotificationService::escape($message)) : '',
-            'site_name'      => 'Australian Goldwing Association',
-            'portal_url'     => '/member/notifications.php?type=' . urlencode($type) . '&id=' . $id,
-        ]);
+    if ($type === PendingRequestsService::TYPE_MEMBERSHIP_PAYMENT && in_array($action, ['approve', 'reject'], true)) {
+        // Bank-transfer renewal: use the payment-specific templates so the
+        // member is told their membership is active (or the renewal declined).
+        NotificationService::dispatch(
+            $action === 'approve' ? 'membership_order_approved' : 'membership_order_rejected',
+            [
+                'primary_email'    => $submitterEmail,
+                'member_name'      => $result['submitter_name'] ?? 'Member',
+                'order_number'     => $result['order_number'] ?? '',
+                'rejection_reason' => $message !== '' ? NotificationService::escape($message) : '',
+            ]
+        );
+    } else {
+        $notificationKey = match ($action) {
+            'approve'  => 'request_approved',
+            'reject'   => 'request_denied',
+            'feedback' => 'request_feedback',
+            default    => null,
+        };
+        if ($notificationKey) {
+            NotificationService::dispatch($notificationKey, [
+                'primary_email'  => $submitterEmail,
+                'submitter_name' => $result['submitter_name'] ?? 'Member',
+                'request_type'   => $result['type_label'] ?? $type,
+                'request_title'  => $result['title'] ?? '',
+                'message'        => $message !== '' ? nl2br(NotificationService::escape($message)) : '',
+                'site_name'      => 'Australian Goldwing Association',
+                'portal_url'     => '/member/notifications.php?type=' . urlencode($type) . '&id=' . $id,
+            ]);
+        }
     }
 }
 

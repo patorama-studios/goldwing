@@ -113,6 +113,20 @@ In addition to the 60/30-day reminder emails, members can renew on demand from i
 <!-- SCREENSHOT: The cancel-membership confirmation step (click "Cancel my membership instead" from the lightbox), showing the reason textarea. Save as 19-cancel-request.png. -->
 <!-- ![Cancel-membership request modal](../images/19-cancel-request.png) -->
 
+### Bank-transfer renewals — approve or deny in the Notification Hub
+
+Card renewals are automatic: the Stripe webhook confirms the payment and activates the membership with no admin action. **Bank-transfer renewals need a human to confirm the money landed**, so they run through the Notification Hub:
+
+1. **Member picks bank transfer** in the renewal lightbox. We create the renewal order (unpaid), show them the bank details, and email them a "your membership is pending confirmation" notice. **Their membership is locked immediately** — until you approve it, their member-only features (calendar, Wings, directory, store) are blurred behind the lockdown, though they keep dashboard/billing/profile access. This is the "log back in once we confirm your payment" state.
+2. **You get a to-do in the Notification Hub** (`/admin/requests/`) under **Renewal — Bank Transfer**. It shows the member, the term they chose, the amount, and the order number.
+3. **Check the bank.** Once the transfer has cleared, open the request and hit **Approve** or **Deny**:
+   - **Approve** → activates the membership exactly like a card payment would: sets them active and sets the new renewal date from the term they chose (a 3-year renewal advances three whole years, etc.). The member is emailed that their membership is active.
+   - **Deny** → **expires the membership immediately** (regardless of any remaining cover) and emails the member the reason you typed. A reason is required to deny. Use this if the payment never arrives.
+
+The member sees the same request — pending, then approved/denied — in their own notifications area (`/member/notifications.php`).
+
+> **Heads-up:** because bank transfer locks the member the moment they submit, a member who renews *early* (while still active) loses feature access until you approve. Approve promptly, or ask them to pay by card if they need uninterrupted access.
+
 ### How renewal reminder emails work
 
 - **60 days before expiry** — first reminder goes out. Includes their member name, what they're renewing, the price, and a Stripe checkout link.
