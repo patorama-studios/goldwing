@@ -23,6 +23,20 @@ if (!function_exists('current_admin_can') || !current_admin_can('admin.settings.
     die('Not authorised. Admin settings permission required.');
 }
 
+// DIAGNOSTIC (temporary): this runner is admin-only and one-time, so surface any
+// fatal directly instead of a blank 500. Remove once the current issue is fixed.
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+register_shutdown_function(static function () {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_RECOVERABLE_ERROR], true)) {
+        http_response_code(500);
+        echo "<pre style='background:#fee2e2;color:#991b1b;padding:1rem;white-space:pre-wrap;'>"
+            . "FATAL: " . htmlspecialchars($e['message']) . "\n  in " . htmlspecialchars($e['file'])
+            . " line " . (int) $e['line'] . "</pre>";
+    }
+});
+
 $results = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
