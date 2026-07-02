@@ -75,7 +75,18 @@ SecurityAlertService::send('member_export', 'Security alert: member export', '<p
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . ($emailPdfList ? 'wings_email_list.csv' : 'members.csv') . '"');
 $out = fopen('php://output', 'w');
-fputcsv($out, ['Member #', 'Name', 'Email', 'Phone', 'Address 1', 'Address 2', 'Suburb', 'State', 'Postcode', 'Country', 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences']);
+
+// Printed-Wings mailing-list export (?wings_preference=printed): this CSV is the
+// artifact handed to Australia Post, so include the admin-only presort/Zone code
+// (members.australia_presort_code, migration 043) alongside the postal address.
+$printedList = ($filters['wings_preference'] === 'printed');
+
+$header = ['Member #', 'Name', 'Email', 'Phone', 'Address 1', 'Address 2', 'Suburb', 'State', 'Postcode', 'Country'];
+if ($printedList) {
+    $header[] = 'Zone';
+}
+array_push($header, 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences');
+fputcsv($out, $header);
 
 foreach ($members as $member) {
     // Email PDF list: a member with no email address can't receive the emailed
@@ -89,7 +100,7 @@ foreach ($members as $member) {
             $prefs[] = $letter;
         }
     }
-    fputcsv($out, [
+    $row = [
         $member['member_number_display'] ?? '—',
         ($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''),
         $member['email'] ?? '',
@@ -100,13 +111,20 @@ foreach ($members as $member) {
         $member['state'] ?? '',
         $member['postal_code'] ?? '',
         $member['country'] ?? '',
+    ];
+    if ($printedList) {
+        $row[] = $member['australia_presort_code'] ?? '';
+    }
+    array_push(
+        $row,
         $member['chapter_name'] ?? '',
         $member['membership_type_name'] ?? '',
         ucfirst($member['status'] ?? ''),
         $member['last_login_at'] ? date('Y-m-d H:i:s', strtotime($member['last_login_at'])) : 'Never',
         $member['created_at'] ?? '',
         implode(', ', $prefs),
-    ]);
+    );
+    fputcsv($out, $row);
 }
 fclose($out);
 exit;

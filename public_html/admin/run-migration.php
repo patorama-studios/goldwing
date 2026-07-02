@@ -3556,6 +3556,41 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 043 — members.australia_presort_code (mailing-list Zone)
+// Admin-only presort/Zone code printed on the Australia Post printed-Wings
+// mailing list. Surfaced as the "Zone" column in the printed export
+// (?wings_preference=printed) in public_html/admin/members/export.php.
+// Idempotent: only adds the column if it isn't already present.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_043_members_australia_presort_code';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    try {
+        $pdo = db();
+        $existing = $pdo->query("SHOW COLUMNS FROM members")->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array('australia_presort_code', $existing, true)) {
+            // postal_code should exist; fall back to a plain ADD if the AFTER
+            // target is missing.
+            try {
+                $pdo->exec("ALTER TABLE members ADD COLUMN australia_presort_code VARCHAR(32) NULL AFTER postal_code");
+            } catch (Throwable $inner) {
+                $pdo->exec("ALTER TABLE members ADD COLUMN australia_presort_code VARCHAR(32) NULL");
+            }
+            $note = 'australia_presort_code added';
+        } else {
+            $note = 'australia_presort_code already present';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'applied', 'note' => $note];
+    } catch (Throwable $e) {
+        $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
