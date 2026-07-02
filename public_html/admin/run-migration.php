@@ -3556,7 +3556,6 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-<<<<<<< Updated upstream
 // MIGRATION 043 — members.australia_presort_code (mailing-list Zone)
 // Admin-only presort/Zone code printed on the Australia Post printed-Wings
 // mailing list. Surfaced as the "Zone" column in the printed export
@@ -3588,7 +3587,8 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'applied', 'note' => $note];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'error', 'note' => $e->getMessage()];
-=======
+    }
+}
 // MIGRATION 042 — Insert members skipped by the email-less import bug
 // import_from_datafile.php rejects any non-associate row without a valid email
 // ("Missing required fields"), so these FULL/LIFE members were never inserted.
@@ -3739,7 +3739,6 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 044 — Presort backfill + print tag', 'status' => 'applied', 'note' => $note];
     } catch (\Throwable $e) {
         $results[] = ['label' => 'Migration 044 — Presort backfill + print tag', 'status' => 'error', 'note' => $e->getMessage()];
->>>>>>> Stashed changes
     }
 }
 
