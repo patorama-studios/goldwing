@@ -277,11 +277,17 @@ if ($user && $user['member_id']) {
               // membership cost (printed-magazine surcharge applied via MembershipUpgradeService
               // and the apply/renew flows), so members must contact admin to change it.
               // The admin Vehicles/Profile view is the only place this flag can be flipped.
-              'privacy_level' => $_POST['privacy_level'] ?? $targetMember['privacy_level'],
+              // Associates inherit directory visibility from their Full Member —
+              // they don't choose their own, so never overwrite these columns.
+              'privacy_level' => empty($targetMember['full_member_id'])
+                ? ($_POST['privacy_level'] ?? $targetMember['privacy_level'])
+                : $targetMember['privacy_level'],
               'is_historic' => isset($_POST['is_historic']) ? 1 : 0,
             ];
-            foreach (MemberRepository::directoryPreferences() as $letter => $info) {
-              $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
+            if (empty($targetMember['full_member_id'])) {
+              foreach (MemberRepository::directoryPreferences() as $letter => $info) {
+                $payload['directory_pref_' . $letter] = isset($_POST['directory_pref_' . $letter]) ? 1 : 0;
+              }
             }
             $updated = MemberRepository::update($targetMemberId, $payload);
             if ($updated && $targetMemberId === (int) $member['id'] && !empty($user['id'])) {
@@ -319,13 +325,15 @@ if ($user && $user['member_id']) {
                   'old'   => !empty($targetMember['is_historic']) ? 'Yes' : 'No',
                   'new'   => !empty($payload['is_historic']) ? 'Yes' : 'No',
                 ];
-                foreach (MemberRepository::directoryPreferences() as $letter => $info) {
-                  $profileChanges[] = [
-                    'field' => $info['column'],
-                    'label' => 'Directory: ' . $info['label'],
-                    'old'   => !empty($targetMember[$info['column']]) ? 'Yes' : 'No',
-                    'new'   => !empty($payload['directory_pref_' . $letter]) ? 'Yes' : 'No',
-                  ];
+                if (empty($targetMember['full_member_id'])) {
+                  foreach (MemberRepository::directoryPreferences() as $letter => $info) {
+                    $profileChanges[] = [
+                      'field' => $info['column'],
+                      'label' => 'Directory: ' . $info['label'],
+                      'old'   => !empty($targetMember[$info['column']]) ? 'Yes' : 'No',
+                      'new'   => !empty($payload['directory_pref_' . $letter]) ? 'Yes' : 'No',
+                    ];
+                  }
                 }
                 \App\Services\PendingRequestsService::recordProfileUpdate($targetMemberId, $profileChanges, 'member');
               } catch (Throwable $e) {
@@ -2966,6 +2974,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           </div>
                           <p class="mt-1 text-xs text-gray-500">Affects your membership cost — contact the webmaster to change.</p>
                         </div>
+                        <?php if (empty($profileMember['full_member_id'])): ?>
                         <label class="text-sm font-medium text-gray-700">
                           Directory privacy
                           <select name="privacy_level"
@@ -2984,7 +2993,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                               from directory</option>
                           </select>
                         </label>
+                        <?php endif; ?>
                       </div>
+                      <?php if (empty($profileMember['full_member_id'])): ?>
                       <div>
                         <p class="text-sm font-medium text-gray-700 mb-3">Directory preferences &amp; assistance</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
@@ -2998,6 +3009,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <?php endforeach; ?>
                         </div>
                       </div>
+                      <?php else: ?>
+                      <div class="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4">
+                        <p class="text-sm font-medium text-gray-700 mb-1">Directory preferences</p>
+                        <p class="text-xs text-gray-500">Your Members Directory listing is inherited from your Full Member — you appear in the directory with their privacy and assistance preferences. Contact the webmaster if this needs to change.</p>
+                      </div>
+                      <?php endif; ?>
                       <div class="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4">
                         <p class="text-sm font-medium text-gray-700 mb-1">Historic vehicle registration</p>
                         <p class="text-xs text-gray-500 mb-3">Tick if this member's motorcycle qualifies as a historic vehicle (25+ years old). AGA club membership proof may be required for state-based historic registration concessions.</p>
