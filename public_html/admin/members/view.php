@@ -1559,6 +1559,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                                   Both</option>
                               </select>
                             </label>
+                            <label class="text-sm font-medium text-gray-700">
+                              Australia Post presort code (Zone)
+                              <input type="text" name="australia_presort_code" maxlength="10"
+                                value="<?= e($profileMember['australia_presort_code'] ?? '') ?>"
+                                placeholder="e.g. 254"
+                                class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                              <span class="mt-1 block text-xs font-normal text-gray-500">Admin only &mdash; not shown to members. For Australia Post printed-Wings sorting.</span>
+                            </label>
                           </div>
                           <div class="mt-5 text-sm font-medium text-gray-700 mb-2">Assistance flags</div>
                           <input type="hidden" name="directory_pref_submitted" value="1">

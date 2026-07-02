@@ -34,6 +34,7 @@ CREATE TABLE members (
   postal_code VARCHAR(20) NULL,
   country VARCHAR(100) NULL,
   wings_preference VARCHAR(50) NOT NULL DEFAULT 'digital',
+  australia_presort_code VARCHAR(10) NULL,
   privacy_level CHAR(1) NOT NULL DEFAULT 'A',
   assist_ute TINYINT(1) NOT NULL DEFAULT 0,
   assist_phone TINYINT(1) NOT NULL DEFAULT 0,

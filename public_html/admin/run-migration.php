@@ -3556,6 +3556,7 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+<<<<<<< Updated upstream
 // MIGRATION 043 — members.australia_presort_code (mailing-list Zone)
 // Admin-only presort/Zone code printed on the Australia Post printed-Wings
 // mailing list. Surfaced as the "Zone" column in the printed export
@@ -3587,6 +3588,158 @@ if ($alreadyRun) {
         $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'applied', 'note' => $note];
     } catch (Throwable $e) {
         $results[] = ['label' => 'Migration 043 — members.australia_presort_code', 'status' => 'error', 'note' => $e->getMessage()];
+=======
+// MIGRATION 042 — Insert members skipped by the email-less import bug
+// import_from_datafile.php rejects any non-associate row without a valid email
+// ("Missing required fields"), so these FULL/LIFE members were never inserted.
+// Data from scripts/data/import_main_life.csv + migration_renewal_dates.csv.
+// Wicks 1613 is intentionally excluded — already present on prod.
+// For households with an associate partner, links any orphaned associate row
+// (base N, suffix 1, full_member_id NULL) to the newly inserted full member.
+// Idempotent: each member only inserted if no row exists at its base/suffix 0.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_042_insert_emailless_members';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 042 — Insert email-less members', 'status' => 'skipped', 'note' => 'Already applied. Clear migrations.' . $migrationKey . ' to re-run.'];
+} else {
+    try {
+        $pdo = db();
+        // base => [type, chapter, first, last, phone, addr1, city, state, postcode, privacy, join_date]
+        $missing = [
+            148 => ['FULL', 'Holiday Coast Chapter', 'Kristopher', 'Farrell', '0421 391 560', '58 River Street', 'MACLEAN', 'NSW', '2463', 'A', '1987-12-26'],
+            343 => ['LIFE', 'South Australian Chapter', 'Frank', 'Milligan', '0412 247 489', '4 Winklebury Road', 'ELIZABETH VALE', 'SA', '5112', 'B', '1991-04-01'],
+            694 => ['FULL', 'NFC Chapter', 'Bruce', 'Dugan', '0427 309 271', '40 Bangalore Place', 'TIRRANNAVILLE', 'NSW', '2580', 'A', '1995-03-01'],
+            950 => ['LIFE', 'Sydney Chapter', 'Peter', 'Brannan', '', '11 Arietta Circuit', 'HARRINGTON PARK', 'NSW', '2567', 'B', '1998-04-01'],
+        ];
+        // members.email is NOT NULL with no default; these members have no email
+        // on file, so insert an empty string (members has no UNIQUE on email).
+        $ins = $pdo->prepare(
+            'INSERT INTO members
+                (member_type, status, member_number_base, member_number_suffix,
+                 chapter_id, first_name, last_name, email, phone,
+                 address_line1, city, state, postal_code, country,
+                 privacy_level, created_at, join_date)
+             VALUES
+                (:type, "ACTIVE", :base, 0,
+                 (SELECT id FROM chapters WHERE LOWER(TRIM(name)) = LOWER(:chapter) LIMIT 1),
+                 :first, :last, "", :phone,
+                 :addr1, :city, :state, :postcode, "Australia",
+                 :privacy, NOW(), :join_date)'
+        );
+        $findFull   = $pdo->prepare('SELECT id FROM members WHERE member_number_base = ? AND member_number_suffix = 0 LIMIT 1');
+        $findAssoc  = $pdo->prepare('SELECT id FROM members WHERE member_number_base = ? AND member_number_suffix = 1 AND full_member_id IS NULL LIMIT 1');
+        $linkAssoc  = $pdo->prepare('UPDATE members SET full_member_id = ?, updated_at = NOW() WHERE id = ?');
+        $done = [];
+        foreach ($missing as $base => $m) {
+            $findFull->execute([$base]);
+            if ($findFull->fetchColumn()) { $done[] = "$base (exists)"; continue; }
+            $ins->execute([
+                'type' => $m[0], 'base' => $base, 'chapter' => $m[1],
+                'first' => $m[2], 'last' => $m[3], 'phone' => $m[4] ?: null,
+                'addr1' => $m[5], 'city' => $m[6], 'state' => $m[7], 'postcode' => $m[8],
+                'privacy' => $m[9], 'join_date' => $m[10],
+            ]);
+            $newId = (int) $pdo->lastInsertId();
+            $findAssoc->execute([$base]);
+            $assocId = (int) $findAssoc->fetchColumn();
+            if ($assocId > 0) { $linkAssoc->execute([$newId, $assocId]); }
+            $done[] = "$base=>id$newId" . ($assocId ? " +assoc$assocId" : '');
+        }
+        $note = 'Processed: ' . implode(', ', $done);
+        ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.import', ['migration' => '042', 'note' => $note]);
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 042 — Insert email-less members', 'status' => 'applied', 'note' => $note];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 042 — Insert email-less members', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 043 — Add members.australia_presort_code column
+// Australia Post presort ("Zone") code for the printed-Wings mailing list.
+// Admin-only, nullable. Idempotent via information_schema check.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_043_add_presort_code';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 043 — Add australia_presort_code', 'status' => 'skipped', 'note' => 'Already applied. Clear migrations.' . $migrationKey . ' to re-run.'];
+} else {
+    try {
+        $pdo = db();
+        $has = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'members'
+                AND COLUMN_NAME = 'australia_presort_code'"
+        )->fetchColumn();
+        if ($has) {
+            $note = 'Column already exists.';
+        } else {
+            $pdo->exec("ALTER TABLE members ADD COLUMN australia_presort_code VARCHAR(10) NULL AFTER wings_preference");
+            $note = 'Column added.';
+        }
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 043 — Add australia_presort_code', 'status' => 'applied', 'note' => $note];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 043 — Add australia_presort_code', 'status' => 'error', 'note' => $e->getMessage()];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 044 — Backfill presort codes + print tag for July 2026 label list
+// Source: "LABELS FOR EDITOR ... Wings Mag July 2026.xlsx" (printed-copy list).
+// Zone codes matched to member_number_base via the import roster (69 households,
+// couples resolved to the full member; 6 unmatched rows left for manual entry).
+// Sets australia_presort_code, and upgrades wings_preference digital=>print so
+// they appear under the "Needs a printed copy posted" filter. Members already
+// print/both keep their setting. Idempotent (plain UPDATE by base).
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_044_presort_backfill';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 044 — Presort backfill + print tag', 'status' => 'skipped', 'note' => 'Already applied. Clear migrations.' . $migrationKey . ' to re-run.'];
+} else {
+    try {
+        $pdo = db();
+        $zones = [
+            7 => '262', 27 => '717', 33 => '293', 38 => '220', 148 => '294', 160 => '262',
+            219 => '410', 280 => '262', 295 => '220', 297 => '420', 343 => '520', 536 => '220',
+            585 => '530', 694 => '254', 731 => '295', 795 => '266', 836 => '220', 909 => '220',
+            942 => '520', 949 => '220', 950 => '216', 1097 => '530', 1110 => '258', 1185 => '258',
+            1188 => '150', 1264 => '293', 1301 => '262', 1312 => '270', 1348 => '520',
+            1372 => '254', 1376 => '430', 1417 => '216', 1436 => '470', 1441 => '520',
+            1462 => '420', 1467 => '266', 1476 => '266', 1493 => '254', 1511 => '710',
+            1528 => '480', 1550 => '266', 1560 => '270', 1566 => '450', 1580 => '220',
+            1581 => '262', 1584 => '254', 1586 => '530', 1587 => '717', 1596 => '620',
+            1612 => '520', 1613 => '290', 1618 => '520', 1624 => '450', 1632 => '420',
+            1633 => '266', 1656 => '620', 1662 => '450', 1666 => '262', 1668 => '258',
+            1679 => '294', 1685 => '430', 1690 => '374', 1691 => '220', 1694 => '270',
+            1696 => '254', 1699 => '410', 1701 => '410', 1704 => '450', 1709 => '520',
+        ];
+        $upd = $pdo->prepare(
+            "UPDATE members
+                SET australia_presort_code = :zone,
+                    wings_preference = CASE WHEN LOWER(COALESCE(wings_preference,'digital')) = 'digital'
+                                            THEN 'print' ELSE wings_preference END,
+                    updated_at = NOW()
+              WHERE member_number_base = :base AND member_number_suffix = 0"
+        );
+        $updated = 0; $notFound = [];
+        foreach ($zones as $base => $zone) {
+            $upd->execute(['zone' => $zone, 'base' => $base]);
+            if ($upd->rowCount() > 0) { $updated++; } else { $notFound[] = $base; }
+        }
+        $note = "Zone set on $updated / " . count($zones) . ' full members.';
+        if ($notFound) { $note .= ' No row for base: ' . implode(',', $notFound) . '.'; }
+        ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.import', ['migration' => '044', 'note' => $note]);
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 044 — Presort backfill + print tag', 'status' => 'applied', 'note' => $note];
+    } catch (\Throwable $e) {
+        $results[] = ['label' => 'Migration 044 — Presort backfill + print tag', 'status' => 'error', 'note' => $e->getMessage()];
+>>>>>>> Stashed changes
     }
 }
 

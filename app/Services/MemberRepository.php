@@ -277,6 +277,7 @@ class MemberRepository
             'full_member_id' => 'full_member_id',
             'status' => 'status',
             'wings_preference' => 'wings_preference',
+            'australia_presort_code' => 'australia_presort_code',
             'privacy_level' => 'privacy_level',
             'is_historic' => 'is_historic',
         ];

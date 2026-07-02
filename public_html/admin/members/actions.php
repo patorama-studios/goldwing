@@ -982,6 +982,9 @@ switch ($action) {
                     $payload['wings_preference'] = $wp;
                 }
             }
+            if (array_key_exists('australia_presort_code', $_POST)) {
+                $payload['australia_presort_code'] = substr(trim((string) $_POST['australia_presort_code']), 0, 10);
+            }
             if (array_key_exists('privacy_level', $_POST)) {
                 $pl = strtoupper(trim((string) $_POST['privacy_level']));
                 if (in_array($pl, ['A', 'B', 'C', 'D', 'E', 'F'], true)) {
