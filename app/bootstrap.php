@@ -34,6 +34,19 @@ if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
     $secure = true;
 }
 
+// DB-backed sessions (DbSessionHandler) store their own expires_at, which is
+// only pushed forward when PHP writes the session. PHP's default lazy_write
+// SKIPS that write when $_SESSION is unchanged, so an active member who is
+// only reading pages would still expire ~gc_maxlifetime after their last
+// session change and get bounced with "your session may have expired"
+// mid-checkout (before any card is charged). Set an explicit idle timeout and
+// disable lazy_write so every request slides the expiry forward.
+$sessionTtl = (int) ($sessionConfig['gc_maxlifetime'] ?? 7200);
+if ($sessionTtl > 0) {
+    ini_set('session.gc_maxlifetime', (string) $sessionTtl);
+}
+ini_set('session.lazy_write', '0');
+
 session_name($sessionConfig['name']);
 // SameSite=Lax (not Strict) so the session cookie is sent on top-level GET
 // navigations from external sites — specifically Stripe Checkout, which

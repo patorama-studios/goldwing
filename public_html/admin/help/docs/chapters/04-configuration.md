@@ -119,7 +119,7 @@ Static return array. Keys in current use:
 - `app_name` — hard-coded "Australian Goldwing Association".
 - `base_url` — from `APP_BASE_URL`.
 - `env` — hard-coded `'production'`. Always. See Gotchas.
-- `session.{name,secure,httponly,samesite}` — cookie params. **`samesite` is overridden in bootstrap to `Strict`**.
+- `session.{name,secure,httponly,samesite,gc_maxlifetime}` — session cookie params plus the DB-session idle timeout. Bootstrap reads `samesite` from here (currently `Lax`, so the session cookie survives the Stripe return redirect) and applies `gc_maxlifetime` (default 7200s / 2h) as a **sliding** idle timeout — see Gotchas.
 - `email.{from,from_name}` — default `From:` headers. Most code reads SMTP from `settings_global` instead.
 - `stripe.{secret_key,webhook_secret,membership_prices.*}` — empty defaults; `StripeSettingsService` reads `settings_global` first.
 - `ai.{default_provider,default_model,provider,api_key,model,providers.kie.*}` — wired to `KIE_API_KEY` / `AI_DEFAULT_MODEL`.
@@ -158,7 +158,8 @@ This chapter doesn't own user-facing settings. The full catalogue of `settings_g
 - **Never commit `.env` or `.env.local`.** Both are in `.gitignore`. If you ever do, rotate every secret and re-encrypt anything that was under the old `APP_KEY` (Ch 10).
 - **Rotating `APP_KEY` breaks encrypted secrets at rest.** `CryptoService` derives its key from `APP_KEY`; Stripe keys and OAuth secrets saved via the UI become unreadable. Follow the [Ch 10](view.php?slug=10-encryption-secrets) procedure — never rotate cold.
 - **`config('env')` always returns `'production'`.** There is no real environment switch. Don't write `if (config('env') === 'local')`. Key off `APP_BASE_URL` or the hostname if you need one.
-- **`session.samesite` in `config/app.php` is vestigial.** Bootstrap hard-codes `Strict` after loading the config, so the config value never wins. Edit `app/bootstrap.php` instead.
+- **`session.samesite` is `Lax`, on purpose.** Bootstrap reads it from `config/app.php` (default `Lax`). It is deliberately *not* `Strict` — under `Strict` the session cookie is dropped on Stripe's top-level redirect back to the site, landing the member on `/login.php` instead of the success page. Lax still blocks the cross-site POSTs that matter for CSRF.
+- **DB sessions use a sliding expiry, not lazy_write.** Sessions live in the `sessions` table (`DbSessionHandler`); a row's `expires_at` only moves forward when PHP *writes* the session. Bootstrap disables `session.lazy_write` and sets `session.gc_maxlifetime` from `config/app.php` so every request refreshes `expires_at` — otherwise an active member who is only *reading* pages would silently expire ~`gc_maxlifetime` after their last session change and get bounced with "your session may have expired" mid-checkout. Raise/lower the idle window via `session.gc_maxlifetime`; don't re-enable lazy_write.
 - **`config/database.php` has real production credentials as fallbacks.** Forgetting `DB_*` in `.env.local` silently connects to the live DB. Always populate `.env.local` on a fresh checkout.
 - **`settings_global` beats env for Stripe and SMTP.** If "I updated `STRIPE_SECRET_KEY` and nothing changed", check `/admin/settings/payments` — the DB row is winning.
 - **`config()` re-reads the file on every call.** Cache it locally inside hot loops.

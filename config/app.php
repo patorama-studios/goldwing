@@ -9,6 +9,12 @@ return [
         'secure' => false,
         'httponly' => true,
         'samesite' => 'Lax',
+        // Server-side idle timeout for DB-backed sessions (seconds). The
+        // session slides forward on every request (bootstrap disables PHP's
+        // lazy_write), so this is a true idle timeout, not a hard cap — it
+        // gives members ample time to work through a renewal/checkout without
+        // being bounced with "your session may have expired" mid-payment.
+        'gc_maxlifetime' => 7200,
     ],
     'email' => [
         'from' => 'no-reply@example.com',
