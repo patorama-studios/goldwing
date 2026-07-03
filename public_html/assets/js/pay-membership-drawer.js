@@ -236,8 +236,14 @@
     var data = {};
     try { data = await resp.json(); } catch (e) { /* non-JSON 5xx */ }
     if (!resp.ok || !data.client_secret) {
-      if (resp.status === 401 || (resp.status === 403 && (!data.error || data.error.toLowerCase().includes('csrf') || data.error.toLowerCase().includes('forbidden')))) {
+      if (resp.status === 401 || (resp.status === 403 && data.error && data.error.toLowerCase().includes('csrf'))) {
         throw new Error('Your session may have expired. Please refresh the page and try again.');
+      }
+      // Do NOT dress other 403s up as session expiry — a gate/WAF "Forbidden"
+      // is a site configuration problem, and mislabelling it cost days of
+      // debugging during the July 2026 renewal outage.
+      if (resp.status === 403) {
+        throw new Error('The payment service refused this request (Forbidden). Please contact the webmaster and mention error code 403.');
       }
       throw new Error(data.error || ('Could not start the payment (HTTP ' + resp.status + ').'));
     }

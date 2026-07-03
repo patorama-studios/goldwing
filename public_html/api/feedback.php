@@ -1,11 +1,21 @@
 <?php
 require_once __DIR__ . '/../../app/bootstrap.php';
+use App\Services\Csrf;
 use App\Services\EmailService;
 
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+    exit;
+}
+
+// The access-control gate whitelists this path (the widget serves guests and
+// members alike), so CSRF is this endpoint's own spam/abuse shield.
+$csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!Csrf::verify($csrfToken)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Your session may have refreshed — please reload the page and try again.']);
     exit;
 }
 

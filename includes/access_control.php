@@ -667,6 +667,25 @@ function access_control_is_always_allowed(string $path): bool
     if (str_starts_with($path, '/api/stripe/')) {
         return true;
     }
+    // Self-authenticating member/public API endpoints. The registry's
+    // '/api/*' catch-all row is admin-only, so any member-facing endpoint
+    // NOT whitelisted here (or covered by its own registry row) gets a 403
+    // "Forbidden" for every non-admin — which the payment drawer surfaces
+    // as "your session may have expired" (July 2026 renewal outage: members
+    // could not pay via /api/payments/membership-intent; admins, passing the
+    // gate, could not reproduce). These handlers all enforce their own
+    // CSRF + login/ownership checks inline, same as /api/stripe/ above.
+    // If you add a new member-facing /api resource, add it here too.
+    if (str_starts_with($path, '/api/payments/')) {
+        return true;
+    }
+    if ($path === '/api/ping' || $path === '/api/reauth') {
+        return true;
+    }
+    // Site-wide feedback widget (guests + members); endpoint enforces CSRF.
+    if ($path === '/api/feedback.php' || $path === '/api/feedback') {
+        return true;
+    }
     foreach (access_control_always_allowed_paths() as $allowed) {
         if ($allowed === $path) {
             return true;

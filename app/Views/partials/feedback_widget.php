@@ -100,7 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/feedback.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': <?= json_encode(\App\Services\Csrf::token()) ?>,
+                },
                 body: JSON.stringify({ message })
             });
             const data = await res.json();
