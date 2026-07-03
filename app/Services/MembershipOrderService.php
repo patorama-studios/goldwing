@@ -175,6 +175,19 @@ class MembershipOrderService
             $stmt->execute(['member_id' => $memberId, 'id' => $periodId]);
             $isRenewal = ((int) $stmt->fetchColumn()) > 0;
 
+            // Migrated/legacy members have NO period-history rows, so the count
+            // above misclassified their renewals as brand-new pro-rata joins and
+            // shorted them by up to a year (July 2026: 1Y renewals expiring
+            // 31/07/2026, 3Y renewals 31/07/2028). An established member — any
+            // status other than a not-yet-approved PENDING applicant — renewing
+            // through this path is always a renewal, period history or not.
+            if (!$isRenewal) {
+                $stmt = $pdo->prepare('SELECT status FROM members WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $memberId]);
+                $memberStatus = strtoupper(trim((string) ($stmt->fetchColumn() ?: '')));
+                $isRenewal = $memberStatus !== '' && $memberStatus !== 'PENDING';
+            }
+
             // 31 Jul that ends the membership year containing the payment date.
             $currentYearEnd = new DateTimeImmutable(MembershipService::calculateExpiry($startDate, 1));
 

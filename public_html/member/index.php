@@ -1309,7 +1309,10 @@ if ($user && $user['member_id']) {
       error_log('[/member/] payment reconcile failed: ' . $e->getMessage());
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY end_date DESC LIMIT 1');
+    // Prefer real (activated/expired) periods over never-paid PENDING_PAYMENT
+    // rows — a pending renewal's provisional end date must not show as the
+    // member's expiry (it reads "about to expire" or over-promises the term).
+    $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY (status <> "PENDING_PAYMENT") DESC, end_date DESC LIMIT 1');
     $stmt->execute(['member_id' => $member['id']]);
     $membershipPeriod = $stmt->fetch();
 

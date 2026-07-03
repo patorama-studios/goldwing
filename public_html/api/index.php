@@ -470,6 +470,21 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
     $renewerIds = array_map(static fn($r) => (int) $r['member']['id'], $renewers);
     $idPlaceholders = implode(',', array_fill(0, count($renewerIds), '?'));
     try {
+        // Void the superseded attempts' Stripe invoices FIRST — they stay
+        // payable in Stripe otherwise, and a stale tab / hosted-invoice link
+        // could charge the member for an attempt whose period rows we are
+        // about to delete (charged-but-never-activated).
+        $stmt = $pdo->prepare(
+            'SELECT DISTINCT stripe_invoice_id FROM orders '
+            . 'WHERE member_id IN (' . $idPlaceholders . ') '
+            . 'AND order_type = "membership" '
+            . 'AND payment_status IN ("pending", "failed", "unpaid") '
+            . 'AND COALESCE(stripe_invoice_id, "") != ""'
+        );
+        $stmt->execute($renewerIds);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $staleInvoiceId) {
+            StripeService::voidInvoice((string) $staleInvoiceId); // best effort
+        }
         $stmt = $pdo->prepare(
             'UPDATE orders SET status = "cancelled", payment_status = "cancelled", updated_at = NOW(), '
             . 'internal_notes = CASE WHEN internal_notes IS NULL OR internal_notes = "" '

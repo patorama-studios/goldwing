@@ -484,6 +484,36 @@ class PaymentWebhookService
             return;
         }
 
+        // Guard: never activate off an underpaid invoice. A code bug once let
+        // invoices finalize with only the card-fee line (July 2026 — members
+        // charged $2.40 for a $72.40 renewal), and invoice.paid fires as long
+        // as the INVOICE is fully paid, regardless of what it covers. Compare
+        // what Stripe collected against every membership order stamped with
+        // this invoice; on shortfall, log + alert instead of activating.
+        $membershipOrdersDueCents = (int) round(((float) ($order['total'] ?? 0)) * 100);
+        if ($invoiceId !== '') {
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(total), 0) FROM orders WHERE stripe_invoice_id = :inv AND order_type = 'membership' AND id <> :id");
+            $stmt->execute(['inv' => $invoiceId, 'id' => (int) ($order['id'] ?? 0)]);
+            $membershipOrdersDueCents += (int) round(((float) $stmt->fetchColumn()) * 100);
+        }
+        $amountPaidCents = (int) ($invoice['amount_paid'] ?? 0);
+        if ($membershipOrdersDueCents > 0 && $amountPaidCents < $membershipOrdersDueCents) {
+            StripeErrorLogger::logWebhookSkip(__METHOD__, 'invoice underpaid vs membership orders — activation blocked', [
+                'event_id' => $event['id'] ?? null,
+                'stripe_invoice_id' => $invoiceId,
+                'order_id' => $order['id'] ?? null,
+                'amount_paid_cents' => $amountPaidCents,
+                'orders_due_cents' => $membershipOrdersDueCents,
+            ]);
+            ActivityLogger::log('system', null, (int) ($order['member_id'] ?? 0), 'membership.activation_blocked_underpaid', [
+                'order_id' => $order['id'] ?? null,
+                'stripe_invoice_id' => $invoiceId,
+                'amount_paid_cents' => $amountPaidCents,
+                'orders_due_cents' => $membershipOrdersDueCents,
+            ]);
+            return;
+        }
+
         MembershipOrderService::activateMembershipForOrder($order, [
             'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
             'period_id' => $order['membership_period_id'] ?? null,

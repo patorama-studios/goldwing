@@ -198,16 +198,16 @@ class MembershipInvoiceService
                 continue;
             }
             $lname = trim((string) ($line['description'] ?? '')) ?: 'Membership';
+            // amount+description shape — price_data.product_data is rejected by
+            // the Invoice Items API (see buildInvoice); the old shape silently
+            // produced $0 historical backfill records.
+            $qty = max(1, (int) ($line['quantity'] ?? 1));
             StripeService::createInvoiceItem([
                 'customer' => $customerId,
                 'invoice'  => $invoiceId,
-                'quantity' => max(1, (int) ($line['quantity'] ?? 1)),
+                'amount'   => $cents * $qty,
                 'currency' => 'aud',
-                'price_data' => [
-                    'currency' => 'aud',
-                    'product_data' => ['name' => $lname],
-                    'unit_amount' => $cents,
-                ],
+                'description' => $qty > 1 ? ($lname . ' × ' . $qty) : $lname,
             ]);
         }
 
@@ -253,37 +253,67 @@ class MembershipInvoiceService
         }
         $invoiceId = (string) $invoice['id'];
 
+        // Every line uses the plain amount+description shape — the Invoice
+        // Items API does NOT accept Checkout-style price_data.product_data.
+        // That wrong shape made Stripe reject every membership line while the
+        // fee line (already amount-shaped) survived, silently charging members
+        // only the card fee (July 2026: $2.40/$7.48 fee-only renewals). Any
+        // failed line now aborts the whole invoice instead of undercharging.
+        $expectedCents = 0;
         foreach ($lines as $line) {
             $cents = (int) ($line['cents'] ?? 0);
             if ($cents <= 0) {
                 continue;
             }
             $name = trim((string) ($line['description'] ?? ''));
-            StripeService::createInvoiceItem([
+            $item = StripeService::createInvoiceItem([
                 'customer' => $customerId,
                 'invoice'  => $invoiceId,
+                'amount'   => $cents,
                 'currency' => 'aud',
-                'price_data' => [
-                    'currency' => 'aud',
-                    'product_data' => ['name' => $name !== '' ? $name : 'Membership'],
-                    'unit_amount' => $cents,
-                ],
+                'description' => $name !== '' ? $name : 'Membership',
             ]);
+            if (!$item || empty($item['id'])) {
+                StripeService::deleteInvoice($invoiceId); // draft cleanup, best effort
+                throw new \RuntimeException('Stripe invoice line "' . ($name !== '' ? $name : 'Membership') . '" could not be added — payment aborted so you are not undercharged. Please try again.');
+            }
+            $expectedCents += $cents;
+        }
+        if ($expectedCents <= 0) {
+            StripeService::deleteInvoice($invoiceId);
+            throw new \RuntimeException('Stripe invoice has no membership lines — payment aborted.');
         }
 
         if ($feeCents > 0) {
-            StripeService::createInvoiceItem([
+            $feeItem = StripeService::createInvoiceItem([
                 'customer' => $customerId,
                 'invoice'  => $invoiceId,
                 'amount'   => $feeCents,
                 'currency' => 'aud',
                 'description' => 'Card processing fee (Stripe)',
             ]);
+            if (!$feeItem || empty($feeItem['id'])) {
+                StripeService::deleteInvoice($invoiceId);
+                throw new \RuntimeException('Stripe invoice fee line could not be added — payment aborted. Please try again.');
+            }
+            $expectedCents += $feeCents;
         }
 
         $finalized = StripeService::finalizeInvoice($invoiceId);
         if (!$finalized || empty($finalized['id'])) {
             throw new \RuntimeException('Stripe invoice finalize failed.');
+        }
+
+        // Belt and braces: the member must never be charged a different amount
+        // than the drawer displays. Any mismatch voids the invoice and aborts.
+        $amountDue = (int) ($finalized['amount_due'] ?? -1);
+        if ($amountDue !== $expectedCents) {
+            StripeService::voidInvoice($invoiceId);
+            throw new \RuntimeException(sprintf(
+                'Stripe invoice total (%d cents) does not match the expected total (%d cents) — payment aborted.',
+                $amountDue,
+                $expectedCents
+            ));
         }
 
         $resolved = self::resolveClientSecret($finalized);

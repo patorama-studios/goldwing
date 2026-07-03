@@ -593,6 +593,28 @@ class StripeService
         return $invoice->toArray();
     }
 
+    /**
+     * Delete a DRAFT invoice. Stripe only allows delete on drafts (finalized
+     * invoices must be voided instead) — use this to clean up an invoice that
+     * failed before finalize. Best-effort; swallows API errors.
+     */
+    public static function deleteInvoice(string $invoiceId): bool
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return false;
+        }
+        try {
+            $deleted = self::client($secret)->invoices->delete($invoiceId);
+            return (bool) ($deleted->deleted ?? false);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.delete', $e, [
+                'invoice_id' => $invoiceId,
+            ]);
+            return false;
+        }
+    }
+
     public static function retrievePaymentIntentSimple(string $paymentIntentId): ?array
     {
         $secret = self::activeSecretKey();
