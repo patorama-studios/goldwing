@@ -17,7 +17,7 @@ You'll wear your "membership secretary" hat for most of this. Day-to-day it's ch
 3. **Approval** — an admin assigns a member number in the approval dialog, the system creates their member record, and emails them a password-reset link so they can set up their login. A membership "period" is created with an end date of 31 July (our membership year runs Aug–Jul).
 4. **Payment** — if they paid by card during the application, they're already active. If they chose bank transfer, the period stays "pending payment" until the treasurer marks the payment received.
 5. **Active** — they can log in, see member-only content, book rides, buy from the store.
-6. **Renewal reminders** — 60 days before their expiry, an automatic email goes out with a Stripe link to renew. If they don't pay, a second reminder goes out at 30 days.
+6. **Renewal reminders** — 60 days before their expiry, an automatic email goes out with a link to renew from their member billing page. If they don't pay, a second reminder goes out at 30 days. (The reminder only sends the email; the renewal period and Stripe checkout are created when the member actually renews, not before.)
 7. **Renew or expire** — within 60 days of expiry (or once lapsed) members see a prominent red **Renew now** call-to-action on their dashboard and billing page. Clicking it opens a renewal lightbox where they pick a term — the list comes from the admin-defined renewal periods (ships with 1 Year and 3 Years, but admins can add/remove/rename any of them at `/admin/settings/index.php?section=membership_pricing`) — optionally bundle their partner's renewal (Full members can renew their Associate and vice-versa), confirm their details are current, and pay by card (Stripe) or bank transfer.
 8. **Grace period (2 months)** — if expiry passes without a renewal the member's status badge immediately shows **Lapsed** and an amber warning banner appears at the top of every member-area page. However member features stay fully accessible during this 2-month window. The banner shows the exact date access will lock if they don't renew.
 9. **Locked out** — once the 2-month grace window closes, member-only features (calendar, Wings, directory, etc.) lock behind a blur overlay. They can still log in, view their dashboard, and update their billing/profile details. No features are restored until a renewal payment clears.
@@ -73,7 +73,7 @@ To **reject**: click Reject, type a short reason (the applicant sees this), subm
 A member's expiry has passed and they're now **lapsed**. What you do depends on the cause:
 
 1. **Open Admin → Members**, find the member, click into their profile.
-2. Check the **Periods** section — is there a "pending payment" period? That means a renewal Stripe link was created but never paid.
+2. Check the **Periods** section — is there a "pending payment" period? That means a renewal was started (the member began checkout, or an admin created a manual order) but the payment never cleared.
 3. Check the **Notifications log** — did the reminder emails actually go out 60 and 30 days before expiry?
 4. If reminders went out and they ignored them: send a personal email (a real one, not the templated kind) asking if they want to renew. Include a fresh Stripe link (see below).
 5. If reminders never went out (e.g. SMTP was down on the day): apologise, send a manual link, and consider extending their expiry as a goodwill gesture if you can.

@@ -208,7 +208,10 @@ $migrationStatusLabel = 'Not sent';
 $migrationStatusDetail = '';
 
 try {
-  $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC, end_date DESC LIMIT 1');
+  // Prefer the member's ACTIVE (paid) period so an unpaid PENDING_PAYMENT
+  // renewal never masquerades as their paid-through date. Fall back to the
+  // latest period when there is no ACTIVE one.
+  $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY (status = "ACTIVE") DESC, start_date DESC, end_date DESC LIMIT 1');
   $stmt->execute(['member_id' => $memberId]);
   $membershipPeriod = $stmt->fetch();
 } catch (Throwable $e) {

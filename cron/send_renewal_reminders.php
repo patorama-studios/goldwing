@@ -3,9 +3,7 @@ require_once __DIR__ . '/../app/bootstrap.php';
 
 use App\Services\BaseUrlService;
 use App\Services\EmailService;
-use App\Services\MembershipService;
 use App\Services\SmsService;
-use App\Services\StripeService;
 
 $pdo = db();
 $intervals = [60, 30];
@@ -24,22 +22,11 @@ foreach ($intervals as $days) {
         if ($check->fetch()) {
             continue;
         }
-        $nextStart = date('Y-m-d', strtotime($period['end_date'] . ' +1 day'));
-        $existing = $pdo->prepare("SELECT id FROM membership_periods WHERE member_id = :member_id AND start_date = :start_date AND status = 'PENDING_PAYMENT'");
-        $existing->execute(['member_id' => $period['member_id'], 'start_date' => $nextStart]);
-        $nextPeriod = $existing->fetch();
-        $nextPeriodId = $nextPeriod['id'] ?? MembershipService::createMembershipPeriod((int) $period['member_id'], '1Y', $nextStart);
-
-        $priceKey = $period['member_type'] . '_1Y';
-        $priceId = config('stripe.membership_prices.' . $priceKey, '');
-        $session = null;
-        if ($priceId) {
-            $session = StripeService::createCheckoutSession($priceId, $period['email'], [
-                'period_id' => $nextPeriodId,
-                'member_id' => $period['member_id'],
-            ]);
-        }
-        $paymentLink = $session['url'] ?? BaseUrlService::emailLink('/member/index.php?page=billing');
+        // Just remind and link to the member's billing page. The renewal
+        // period (and Stripe checkout) is created when the member actually
+        // pays there — pre-creating a PENDING_PAYMENT period here made every
+        // current member look like they already owed for next year.
+        $paymentLink = BaseUrlService::emailLink('/member/index.php?page=billing');
 
         $subject = 'Membership renewal reminder';
         $body = '<p>Hi ' . e($period['first_name']) . ',</p>'
