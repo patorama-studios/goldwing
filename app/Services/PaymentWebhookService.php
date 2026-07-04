@@ -521,6 +521,30 @@ class PaymentWebhookService
 
         $internal = json_decode((string) ($order['internal_notes'] ?? ''), true);
         if (is_array($internal)) {
+            // Combined RENEWAL: the partner has their own order + period. Activate
+            // it here too, so the partner is never stranded if the shared-invoice
+            // lookup below misses (e.g. the partner order's stripe_invoice_id
+            // stamp didn't land). Guarded on paid status — activation stacks
+            // expiry and is NOT idempotent; the guard plus recordEvent's unique
+            // event id keep it to exactly one activation.
+            $partnerOrderId = (int) ($internal['partner_order_id'] ?? 0);
+            if ($partnerOrderId > 0 && $partnerOrderId !== (int) ($order['id'] ?? 0)) {
+                $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :id AND order_type = 'membership' LIMIT 1");
+                $stmt->execute(['id' => $partnerOrderId]);
+                $partnerOrder = $stmt->fetch();
+                if ($partnerOrder && ($partnerOrder['status'] ?? '') !== 'paid') {
+                    MembershipOrderService::activateMembershipForOrder($partnerOrder, [
+                        'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+                        'period_id' => $partnerOrder['membership_period_id'] ?? null,
+                    ]);
+                    if (!empty($partnerOrder['user_id'])) {
+                        $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = :id AND is_active = 0')
+                            ->execute(['id' => (int) $partnerOrder['user_id']]);
+                    }
+                }
+            }
+
+            // Legacy JOIN: the associate is period-only (no separate order row).
             $associatePeriodId = (int) ($internal['associate_period_id'] ?? 0);
             if ($associatePeriodId > 0) {
                 MembershipService::markPaid($associatePeriodId, $paymentIntentId !== '' ? $paymentIntentId : $invoiceId);

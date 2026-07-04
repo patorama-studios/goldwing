@@ -416,7 +416,13 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
         }
         $r['type'] = $rType;
         $r['cents'] = $cents;
-        $r['label'] = ucfirst(strtolower($rType)) . ' membership renewal (' . $termYearsLabel . ')';
+        // Name the renewer on the line so both invoices (Stripe + our internal
+        // PDF) make it explicit WHOSE membership this covers — in particular the
+        // associate on a combined renewal, who is otherwise indistinguishable
+        // from a generic "Associate membership renewal" line.
+        $rName = trim(((string) ($rMember['first_name'] ?? '')) . ' ' . ((string) ($rMember['last_name'] ?? '')));
+        $r['label'] = ucfirst(strtolower($rType)) . ' membership renewal (' . $termYearsLabel . ')'
+            . ($rName !== '' ? ' — ' . $rName : '');
         $totalCents += $cents;
     }
     unset($r);
@@ -539,6 +545,25 @@ if ($resource === 'payments' && count($segments) === 2 && $segments[1] === 'memb
         }
     }
     unset($r);
+
+    // Record the partner link on the primary order (matches the join flow's
+    // internal_notes shape). Two reasons: (1) a combined renewal is auditable
+    // later — you can see which associate rode along without walking Stripe;
+    // (2) the invoice.paid webhook gets a second, order-id-based way to activate
+    // the partner if the shared stripe_invoice_id stamp ever goes missing.
+    if ($partnerRenewer) {
+        try {
+            $partnerNotes = json_encode([
+                'renewal_with_partner' => true,
+                'partner_member_id'    => (int) $partnerRenewer['member']['id'],
+                'partner_order_id'     => (int) $partnerRenewer['order_id'],
+            ], JSON_UNESCAPED_SLASHES);
+            $pdo->prepare('UPDATE orders SET internal_notes = :n, updated_at = NOW() WHERE id = :id')
+                ->execute(['n' => $partnerNotes, 'id' => (int) $primary['order_id']]);
+        } catch (Throwable $e) {
+            error_log('[/api/payments/membership-intent] partner link stamp failed: ' . $e->getMessage());
+        }
+    }
 
     // ── Bank transfer (direct deposit) — no Stripe. The orders stay pending
     // for an admin to reconcile when the EFT lands; the member dashboard

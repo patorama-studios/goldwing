@@ -147,7 +147,11 @@ Anything else gets recorded in `webhook_events` but no further action runs.
 > activation for these flows now runs through **`invoice.paid`**:
 > `handleInvoicePaid()` activates **every** `order_type=membership` row stamped
 > with that `stripe_invoice_id` (so a partner renewal billed on the same invoice
-> is activated too). New-member **application** invoices carry
+> is activated too). Belt-and-braces: a combined renewal also records the partner
+> on the **primary order's `internal_notes`** (`partner_order_id`), and
+> `handleInvoicePaid()` activates the partner from that note as well (guarded on
+> paid-status, since activation stacks expiry) — so the partner still activates if
+> the shared-invoice stamp is ever missing. New-member **application** invoices carry
 > `metadata.context=membership_application` and have no order row yet, so
 > `handleInvoicePaid()` skips them quietly — activation stays with `apply.php`'s
 > POST handler + admin approval. The admin application-approval path still uses a
