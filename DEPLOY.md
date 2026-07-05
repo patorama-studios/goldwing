@@ -40,8 +40,6 @@
 Add the following cPanel cron jobs:
 - `0 6 * * * /usr/bin/php /path/to/cron/send_renewal_reminders.php`
 - `5 0 * * * /usr/bin/php /path/to/cron/expire_memberships.php`
-- Optional daily summary:
-  - `15 6 * * * /usr/bin/php /path/to/cron/daily_summary_admin.php`
 
 ## 8) Admin login
 - Login at `/login.php` using the seeded admin account:

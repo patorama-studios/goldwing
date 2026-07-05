@@ -228,7 +228,6 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 |---|---|---|
 | `send_renewal_reminders.php` | `0 6 * * *` | Emails members whose membership is about to lapse. |
 | `expire_memberships.php` | `5 0 * * *` | Marks past-end-date periods as expired. |
-| `daily_summary_admin.php` | `15 6 * * *` (optional) | Daily activity digest to first seeded admin. |
 | `fim_scan.php` | Hourly (configurable) | File integrity scan; alerts on hash drift. |
 
 #### `scripts/`

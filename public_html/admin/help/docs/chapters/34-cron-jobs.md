@@ -115,10 +115,6 @@ No email, no member notification — this is house-keeping. Activity log gets a 
 
 **If it fails:** stale pending rows accumulate. Run `php cron/expire_pending_orders.php` manually; nothing bad happens if it runs twice in a day.
 
-### `cron/daily_summary_admin.php` — optional, `15 6 * * *`
-
-Picks the first admin user, counts active members + pending applications + members due within 60 days, emails a one-paragraph summary, writes `last_daily_summary_run`. Disable by removing the cron entry — no settings toggle. Non-fatal if it fails.
-
 ### `cron/fim_scan.php` — hourly or nightly
 
 Wraps `FileIntegrityService::scan()` over the configured paths. If the baseline differs from disk it records `CHANGES_DETECTED`, emails the security-alert recipient via `SecurityAlertService::send('fim_changes', …)`, and logs `security.fim_changes_detected`. Exits early when `fim_enabled` is false. Baseline / alert model is in [Chapter 11](view.php?slug=11-file-integrity).
@@ -133,7 +129,6 @@ In cPanel → **Cron Jobs**, add an entry per script with the schedule on the le
 0 6 * * *    /usr/bin/php /home2/goldwing/cron/send_renewal_reminders.php
 5 0 * * *    /usr/bin/php /home2/goldwing/cron/expire_memberships.php
 15 0 * * *   /usr/bin/php /home2/goldwing/cron/expire_pending_orders.php
-15 6 * * *   /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
 0 * * * *    /usr/bin/php /home2/goldwing/cron/fim_scan.php
 ```
 
@@ -146,7 +141,6 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 - **Schedules and the entry list:** cPanel → Cron Jobs. Live edits take effect on the next minute boundary.
 - **Reminder windows (60 / 30 days):** hard-coded in `cron/send_renewal_reminders.php`'s `$intervals` array.
 - **FIM enable / paths / excludes:** Admin → Security & Authentication. The cron honours the DB toggle.
-- **Daily-summary recipient:** the first admin in the `users` table. To send elsewhere, edit the script.
 - **Pricing the reminder uses:** `stripe.membership_prices` in `config/app.php`.
 
 ## Settings
@@ -157,7 +151,7 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 | `fim_paths`, `fim_exclude_paths` (Security) | What `fim_scan.php` hashes. |
 | `site.contact_email` | Fallback recipient when `SecurityAlertService` has no configured target. |
 | `stripe.membership_prices.{TYPE}_1Y` (`config/app.php`) | Price IDs the renewal reminder builds checkout links from. |
-| `system_settings.last_renewal_reminder_run` / `last_expire_run` / `last_daily_summary_run` | Heartbeat markers. If these stop advancing, cron is broken. |
+| `system_settings.last_renewal_reminder_run` / `last_expire_run` | Heartbeat markers. If these stop advancing, cron is broken. |
 
 ## Gotchas
 

@@ -165,11 +165,48 @@ class AuthService
         $adminRoles = ['admin', 'area_rep', 'store_manager'];
         if ($isNewDevice && count(array_intersect($roleList, $adminRoles)) > 0) {
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-            $safeEmail = htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8');
-            $safeIp = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
-            SecurityAlertService::send('new_admin_device', 'Security alert: new admin device', '<p>Admin login from a new device for ' . $safeEmail . ' at IP ' . $safeIp . '.</p>');
-            ActivityLogger::log('admin', (int) $user['id'], null, 'security.admin_new_device', ['ip' => $ip]);
+            $country = self::ipCountry($ip);
+            // Only alert when the login is confirmed to come from outside Australia.
+            // Unknown/private/local IPs (empty country) are treated as domestic and stay silent.
+            if ($country !== '' && $country !== 'AU') {
+                $safeEmail = htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8');
+                $safeIp = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
+                $safeCountry = htmlspecialchars($country, ENT_QUOTES, 'UTF-8');
+                SecurityAlertService::send('new_admin_device', 'Security alert: overseas admin login', '<p>Admin login from a new device outside Australia for ' . $safeEmail . ' at IP ' . $safeIp . ' (' . $safeCountry . ').</p>');
+                ActivityLogger::log('admin', (int) $user['id'], null, 'security.admin_new_device', ['ip' => $ip, 'country' => $country]);
+            }
         }
+    }
+
+    /**
+     * Best-effort ISO country code for an IP via ip-api.com (free, no key).
+     * Returns '' when the country can't be determined (private IP, lookup error, timeout).
+     */
+    private static function ipCountry(string $ip): string
+    {
+        if ($ip === '' || !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return '';
+        }
+        try {
+            $ch = curl_init('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,countryCode');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 3,
+                CURLOPT_CONNECTTIMEOUT => 2,
+            ]);
+            $response = curl_exec($ch);
+            curl_close($ch);
+            if (!is_string($response)) {
+                return '';
+            }
+            $data = json_decode($response, true);
+            if (is_array($data) && ($data['status'] ?? '') === 'success') {
+                return (string) ($data['countryCode'] ?? '');
+            }
+        } catch (\Throwable $e) {
+            error_log('[AuthService] ipCountry lookup failed: ' . $e->getMessage());
+        }
+        return '';
     }
 
     private static function setPendingTwoFa(int $userId, string $purpose): void
