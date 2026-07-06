@@ -288,6 +288,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $paymentKey = 'manual-' . $paidPayment['id'];
           }
         }
+
+        // A payment made during signup already created a membership order with
+        // no period attached yet. Adopt it below instead of creating a second
+        // order. If it was paid by card at signup, that counts as payment
+        // recorded — don't email a "pay now" link to someone who already paid.
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE member_id = :member_id AND order_type = 'membership' AND membership_period_id IS NULL AND status <> 'cancelled' ORDER BY id DESC LIMIT 1");
+        $stmt->execute(['member_id' => $row['member_id']]);
+        $existingOrder = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $cardPaidAtSignup = $existingOrder && ($existingOrder['payment_status'] ?? '') === 'accepted';
+
         $periodId = MembershipService::createMembershipPeriod((int) $row['member_id'], $term, date('Y-m-d'));
 
         $stmt = $pdo->prepare('SELECT first_name, last_name, email, phone FROM members WHERE id = :id');
@@ -349,7 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $totalCents += (int) ($notes['membership']['associate']['price_cents'] ?? 0);
         }
         $amount = round($totalCents / 100, 2);
-        $paymentRecorded = (bool) $paidPayment || $amount <= 0;
+        $paymentRecorded = $cardPaidAtSignup || (bool) $paidPayment || $amount <= 0;
         $paymentStatus = $paymentRecorded ? 'accepted' : 'pending';
         $fulfillmentStatus = $paymentRecorded ? 'active' : 'pending';
 
@@ -398,6 +408,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $associateLast = trim((string) ($associateDetails['last_name'] ?? ''));
         $associateEmail = trim((string) ($associateDetails['email'] ?? ''));
         $associatePhone = trim((string) ($associateDetails['phone'] ?? ''));
+        $associateDob = trim((string) ($associateDetails['date_of_birth'] ?? '')) ?: null;
         $associateAddressDiff = strtolower(trim((string) ($associateDetails['address_diff'] ?? '')));
         $associateAddressLine1 = trim((string) ($associateDetails['address_line1'] ?? ''));
         $associateCity = trim((string) ($associateDetails['city'] ?? ''));
@@ -466,8 +477,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               $country = 'Australia';
             }
 
-            $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone, address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES ("ASSOCIATE", "PENDING", :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone, :address1, :address2, :city, :state, :postal, :country, :privacy, 0, 0, 0, 0, 0, 0, NOW())');
-            $stmt->execute([
+            $hasDobColumn = MemberRepository::hasMemberColumn($pdo, 'date_of_birth');
+            $dobColumnSql = $hasDobColumn ? ', date_of_birth' : '';
+            $dobValueSql = $hasDobColumn ? ', :date_of_birth' : '';
+            $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone' . $dobColumnSql . ', address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES ("ASSOCIATE", "PENDING", :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone' . $dobValueSql . ', :address1, :address2, :city, :state, :postal, :country, :privacy, 0, 0, 0, 0, 0, 0, NOW())');
+            $associateParams = [
               'base' => $memberNumberBase,
               'suffix' => $associateSuffix,
               'full_id' => $row['member_id'],
@@ -483,7 +497,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               'postal' => $postal !== '' ? $postal : null,
               'country' => $country,
               'privacy' => $memberMeta['privacy_level'] ?? 'A',
-            ]);
+            ];
+            if ($hasDobColumn) {
+              $associateParams['date_of_birth'] = $associateDob;
+            }
+            $stmt->execute($associateParams);
             $associateMemberId = (int) $pdo->lastInsertId();
             if ($associateMemberId > 0 && MemberRepository::hasMemberNumberColumn($pdo)) {
               $memberNumberDisplay = MembershipService::displayMembershipNumber($memberNumberBase, $associateSuffix);
@@ -602,17 +620,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           ], JSON_UNESCAPED_SLASHES);
         }
 
-        $order = MembershipOrderService::createMembershipOrder((int) $row['member_id'], $periodId, $amount, [
-          'payment_method' => $paymentMethod,
-          'payment_status' => $paymentStatus,
-          'fulfillment_status' => $fulfillmentStatus,
-          'currency' => $currency !== '' ? $currency : 'AUD',
-          'items' => $items,
-          'actor_user_id' => $user['id'] ?? null,
-          'term' => $term,
-          'admin_notes' => 'Application approval',
-          'internal_notes' => $internalNotes,
-        ]);
+        if ($existingOrder) {
+          // Adopt the signup order: attach the freshly created period and the
+          // associate linkage. Keep its charged total, items and Stripe stamps
+          // as-is (the amount actually paid is authoritative).
+          $pdo->prepare('UPDATE orders SET membership_period_id = :period_id, internal_notes = :internal, updated_at = NOW() WHERE id = :id')
+            ->execute([
+              'period_id' => $periodId > 0 ? $periodId : null,
+              'internal' => $internalNotes,
+              'id' => (int) $existingOrder['id'],
+            ]);
+          $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+          $stmt->execute(['id' => (int) $existingOrder['id']]);
+          $order = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } else {
+          $order = MembershipOrderService::createMembershipOrder((int) $row['member_id'], $periodId, $amount, [
+            'payment_method' => $paymentMethod,
+            'payment_status' => $paymentStatus,
+            'fulfillment_status' => $fulfillmentStatus,
+            'currency' => $currency !== '' ? $currency : 'AUD',
+            'items' => $items,
+            'actor_user_id' => $user['id'] ?? null,
+            'term' => $term,
+            'admin_notes' => 'Application approval',
+            'internal_notes' => $internalNotes,
+          ]);
+        }
         if ($order && $paymentRecorded) {
           MembershipOrderService::activateMembershipForOrder($order, [
             'payment_reference' => $paymentKey !== '' ? $paymentKey : null,

@@ -144,21 +144,17 @@ A **store checkout writes both rows.** `store_orders` is created first; then `Or
 
 #### The membership checkout flow
 
-**New applications** (`/apply.php`) and **member-initiated renewals** (the in-portal renewal lightbox) both use `MembershipOrderService`. Two payment paths are available:
+Both **new applications** (`/apply.php`) and **member-initiated renewals** (the in-portal renewal lightbox) use `MembershipOrderService`, but they differ in *when* the order is created and *how* activation happens.
 
-**Card (Stripe):**
-1. **Apply** at `/apply.php` (new) or *Renew* in the member portal renewal lightbox.
-2. **`MembershipPricingService`** (Ch 14) prices the term + chapter + pro-rata month.
-3. **`MembershipOrderService::createMembershipOrder()`** inserts an `orders` row with `order_type='membership'`, `status='pending'`, and a sequential `order_number` (e.g. `M-2026-000482`). One `order_items` row is inserted for the membership line.
-4. **`StripeService::createCheckoutSession()`** / `createCheckoutSessionWithLineItems()` is called with the order ID in metadata.
-5. **Success URL** returns to `/memberships/success` or the billing page. The order is still `pending` here; activation happens on the webhook.
-6. **Webhook** (Ch 16) calls `MembershipOrderService::activateMembershipForOrder()`, which flips `orders.status` to `paid`, sets the `membership_periods` row to `ACTIVE` with calculated start/end dates (respecting any existing active period so renewals don't overlap), sets `members.status='ACTIVE'`, and writes an activity log entry.
+**New applications (`/apply.php`) — the order is created at signup.** As soon as the applicant submits, `apply.php` writes the `members` row (`PENDING`) + `membership_applications` row **and** calls `MembershipOrderService::createMembershipOrder()` to insert the `orders` row linked to the member — so the signup and its payment are visible in admin (and on the member profile after approval) straight away, not only after approval.
+- **Card:** `/api/stripe/create-application-payment-intent` builds an itemized Stripe **Invoice** (`MembershipInvoiceService::createApplicationInvoice`, context `membership_application`) and returns its PaymentIntent to the inline Payment Element. On submit, `apply.php` **verifies the PaymentIntent against Stripe** (status `succeeded` + amount covers the total) before creating the order with `payment_status='accepted'` (→ `status='paid'`), `fulfillment_status='pending'`, stamped with the Stripe payment-intent + invoice ids. The membership is **not** active yet.
+- **Bank transfer:** the same order is created with `payment_status='pending'`.
+- The **`invoice.paid` webhook is a no-op** for `membership_application` invoices (Ch 16) — activation waits for admin approval, because the member number is assigned by hand there.
+- At **approval** (`/admin` Applications → Approve), the admin flow *adopts that existing signup order* (attaches the freshly created `membership_periods` row) rather than creating a second one, then `activateMembershipForOrder()` flips it to `paid` / `fulfillment='active'` and sets `members.status='ACTIVE'`. A card payer is recognised as already paid, so **no "pay now" email is sent**; a bank-transfer applicant is emailed payment instructions and the Treasurer marks it paid when it lands.
 
-**Direct deposit / bank transfer (renewal lightbox only):**
-1. Member picks "Direct deposit / bank transfer" in the renewal lightbox (View 1) and clicks **Submit renewal**.
-2. The lightbox POSTs `{payment_method: 'bank_transfer'}` to `/api/payments/membership-intent`. The API creates the `membership_periods` and `orders` rows (`payment_method='bank_transfer'`, `payment_status='pending'`) with **no Stripe call** and returns bank details from the `payments.bank_transfer_instructions` setting.
-3. The member is redirected to `/member/?page=billing&renew_submitted=bank`, which shows a confirmation and the bank details from the pending order.
-4. The Treasurer marks the order paid in admin (manual reconciliation) — same path as a bank-transfer application payment.
+**Renewals (member portal lightbox) — order created at checkout:**
+1. **Card:** `MembershipOrderService::createMembershipOrder()` inserts a `pending` `orders` row (sequential `order_number`, e.g. `M-2026-000482`) + one `order_items` line, then `StripeService::createCheckoutSession()` / `createCheckoutSessionWithLineItems()` is called with the order ID in metadata. The success URL returns to the billing page with the order still `pending`; the **webhook** (Ch 16) calls `activateMembershipForOrder()`, which flips `orders.status` to `paid`, sets the `membership_periods` row `ACTIVE` with calculated start/end dates (respecting any existing active period so renewals don't overlap), sets `members.status='ACTIVE'`, and writes an activity log entry.
+2. **Direct deposit / bank transfer:** the lightbox POSTs `{payment_method: 'bank_transfer'}` to `/api/payments/membership-intent`. The API creates the `membership_periods` and `orders` rows (`payment_method='bank_transfer'`, `payment_status='pending'`) with **no Stripe call** and returns bank details from the `payments.bank_transfer_instructions` setting. The member lands on `/member/?page=billing&renew_submitted=bank` with the bank details; the Treasurer marks the order paid in admin (manual reconciliation).
 
 #### The store checkout flow
 

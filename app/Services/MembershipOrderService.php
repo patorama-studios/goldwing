@@ -78,6 +78,8 @@ class MembershipOrderService
             'shipping_address_json' => null,
             'admin_notes' => $adminNotes,
             'internal_notes' => $internalNotes,
+            'stripe_payment_intent_id' => $options['stripe_payment_intent_id'] ?? null,
+            'stripe_invoice_id' => $options['stripe_invoice_id'] ?? null,
         ];
         $insertColumns = [];
         $placeholders = [];

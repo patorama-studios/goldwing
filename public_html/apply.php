@@ -10,6 +10,8 @@ use App\Services\MemberRepository;
 use App\Services\ChapterRepository;
 use App\Services\NotificationService;
 use App\Services\BaseUrlService;
+use App\Services\StripeService;
+use App\Services\MembershipOrderService;
 
 if (!function_exists('json_response')) {
   function json_response(array $data, int $status = 200): void
@@ -74,6 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $state = trim($_POST['state'] ?? '');
     $postalCode = trim($_POST['postal_code'] ?? '');
     $country = trim($_POST['country'] ?? '');
+    $dob = MemberRepository::composeDateOfBirth($_POST['dob_year'] ?? '', $_POST['dob_month'] ?? '', $_POST['dob_day'] ?? '');
+    $associateDob = MemberRepository::composeDateOfBirth($_POST['associate_dob_year'] ?? '', $_POST['associate_dob_month'] ?? '', $_POST['associate_dob_day'] ?? '');
     $assistUte = isset($_POST['assist_ute']) ? 1 : 0;
     $assistPhone = isset($_POST['assist_phone']) ? 1 : 0;
     $assistBed = isset($_POST['assist_bed']) ? 1 : 0;
@@ -185,8 +189,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 
       if (!$error) {
-        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone, address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES (:member_type, :status, :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone, :address1, :address2, :city, :state, :postal, :country, :privacy, :assist_ute, :assist_phone, :assist_bed, :assist_tools, :exclude_printed, :exclude_electronic, NOW())');
-        $stmt->execute([
+        // date_of_birth is guarded: if the column migration hasn't been applied
+        // yet on this environment, still create the member rather than 500.
+        $hasDobColumn = MemberRepository::hasMemberColumn($pdo, 'date_of_birth');
+        $dobColumnSql = $hasDobColumn ? ', date_of_birth' : '';
+        $dobValueSql = $hasDobColumn ? ', :date_of_birth' : '';
+        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone' . $dobColumnSql . ', address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES (:member_type, :status, :base, :suffix, :full_id, :chapter_id, :first_name, :last_name, :email, :phone' . $dobValueSql . ', :address1, :address2, :city, :state, :postal, :country, :privacy, :assist_ute, :assist_phone, :assist_bed, :assist_tools, :exclude_printed, :exclude_electronic, NOW())');
+        $memberParams = [
           'member_type' => $memberType,
           'status' => 'PENDING',
           'base' => $memberNumberBase,
@@ -210,7 +219,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'assist_tools' => $assistTools,
           'exclude_printed' => $excludePrinted,
           'exclude_electronic' => $excludeElectronic,
-        ]);
+        ];
+        if ($hasDobColumn) {
+          $memberParams['date_of_birth'] = $dob;
+        }
+        $stmt->execute($memberParams);
         $memberId = (int) $pdo->lastInsertId();
 
         $fullVehicles = json_decode($fullVehiclePayload, true);
@@ -300,6 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'last_name' => $associateLastName,
             'email' => $associateEmail,
             'phone' => $associatePhone,
+            'date_of_birth' => $associateDob,
             'address_line1' => $associateAddressLine1,
             'city' => $associateCity,
             'state' => $associateState,
@@ -343,6 +357,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'status' => 'PENDING',
           'notes' => $notesJson ?: null,
         ]);
+
+        // Create the membership billing order now, at signup, so the member's
+        // payment is tied to them from the start — visible on their profile and
+        // in admin — instead of only appearing after admin approval. Card
+        // payments are verified against Stripe before the order is marked paid;
+        // the membership period is attached and activated later at approval.
+        // A failure here must not sink the application: approval falls back to
+        // creating the order if none exists.
+        try {
+          $orderItems = [];
+          if ($fullSelected) {
+            $orderItems[] = [
+              'product_id' => null,
+              'name' => 'Full membership ' . $fullPeriodKey,
+              'quantity' => 1,
+              'unit_price' => round((int) ($fullPriceCents ?? 0) / 100, 2),
+              'is_physical' => 0,
+            ];
+          }
+          if ($associateSelected && $associateAdd === 'yes') {
+            $orderItems[] = [
+              'product_id' => null,
+              'name' => 'Associate membership ' . $associatePeriodKey,
+              'quantity' => 1,
+              'unit_price' => round((int) ($associatePriceCents ?? 0) / 100, 2),
+              'is_physical' => 0,
+            ];
+          }
+
+          $orderPaymentStatus = 'pending';
+          $stripePaymentIntentId = trim((string) ($_POST['payment_intent_id'] ?? ''));
+          $stripeInvoiceId = '';
+          if ($paymentMethod === 'card' && $stripePaymentIntentId !== '') {
+            $intent = StripeService::retrievePaymentIntent($stripePaymentIntentId);
+            $intentPaid = is_array($intent)
+              && ($intent['status'] ?? '') === 'succeeded'
+              && (int) ($intent['amount_received'] ?? 0) >= $totalCents;
+            if ($intentPaid) {
+              $orderPaymentStatus = 'accepted';
+              $stripeInvoiceId = (string) ($intent['invoice'] ?? '');
+            } else {
+              error_log('[apply.php] card payment intent not confirmed paid at signup: ' . $stripePaymentIntentId);
+            }
+          }
+
+          MembershipOrderService::createMembershipOrder($memberId, 0, round($totalCents / 100, 2), [
+            'payment_method' => $paymentMethod === 'card' ? 'card' : 'bank_transfer',
+            'payment_status' => $orderPaymentStatus,
+            'fulfillment_status' => 'pending',
+            'currency' => $pricingCurrency !== '' ? $pricingCurrency : 'AUD',
+            'items' => $orderItems,
+            'term' => $fullSelected ? $fullPeriodKey : $associatePeriodKey,
+            'admin_notes' => 'Membership signup',
+            'stripe_payment_intent_id' => $stripePaymentIntentId !== '' ? $stripePaymentIntentId : null,
+            'stripe_invoice_id' => $stripeInvoiceId !== '' ? $stripeInvoiceId : null,
+          ]);
+        } catch (\Throwable $e) {
+          error_log('[apply.php] membership order creation failed: ' . $e->getMessage());
+        }
 
         AuditService::log(null, 'application_submitted', 'New membership application submitted.');
         $message = 'Application submitted. We will confirm your membership and payment details shortly.';
