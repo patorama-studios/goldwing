@@ -3757,6 +3757,34 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 045 — members.date_of_birth
+// The apply form has always asked for Date of Birth but silently discarded it
+// (no column, never read on POST). Add the column so DOB is captured on new
+// applications and editable in the member + admin profile. Nullable — existing
+// members have no stored DOB (it was never saved) until entered manually.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_045_members_date_of_birth';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 045 — members.date_of_birth', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    try {
+        $pdo->exec("ALTER TABLE members ADD COLUMN date_of_birth DATE NULL AFTER phone");
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $results[] = ['label' => 'Migration 045 — members.date_of_birth', 'status' => 'applied', 'note' => 'Column added.'];
+    } catch (\Throwable $e) {
+        if (stripos($e->getMessage(), 'duplicate') !== false) {
+            SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+            $results[] = ['label' => 'Migration 045 — members.date_of_birth', 'status' => 'applied', 'note' => 'Column already present.'];
+        } else {
+            $results[] = ['label' => 'Migration 045 — members.date_of_birth', 'status' => 'error', 'note' => $e->getMessage()];
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

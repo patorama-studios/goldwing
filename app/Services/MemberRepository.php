@@ -60,6 +60,22 @@ class MemberRepository
         return self::$memberColumnCache[$column];
     }
 
+    /**
+     * Build a YYYY-MM-DD date string from separate day/month/year parts
+     * (as posted by the apply form's DOB dropdowns). Returns null if any part
+     * is missing or the combination isn't a real calendar date.
+     */
+    public static function composeDateOfBirth($year, $month, $day): ?string
+    {
+        $y = (int) $year;
+        $m = (int) $month;
+        $d = (int) $day;
+        if ($y <= 0 || $m <= 0 || $d <= 0 || !checkdate($m, $d, $y)) {
+            return null;
+        }
+        return sprintf('%04d-%02d-%02d', $y, $m, $d);
+    }
+
     private static function hasOrderColumn(PDO $pdo, string $column): bool
     {
         if (array_key_exists($column, self::$orderColumnCache)) {
@@ -265,6 +281,7 @@ class MemberRepository
             'last_name' => 'last_name',
             'email' => 'email',
             'phone' => 'phone',
+            'date_of_birth' => 'date_of_birth',
             'address_line1' => 'address_line1',
             'address_line2' => 'address_line2',
             'suburb' => 'city',

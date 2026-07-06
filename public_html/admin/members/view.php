@@ -871,6 +871,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Phone</h4>
                             <p class="text-sm font-medium text-gray-900"><?= e($member['phone'] ?? '—') ?></p>
                           </div>
+                          <div>
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Date of Birth</h4>
+                            <p class="text-sm font-medium text-gray-900"><?= !empty($member['date_of_birth']) ? e(date('j M Y', strtotime((string) $member['date_of_birth']))) : '—' ?></p>
+                          </div>
                         </div>
                       </div>
                       <div class="space-y-6">
@@ -1488,6 +1492,13 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <div>
                             <label class="text-sm font-medium text-gray-700">Phone</label>
                             <input type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
+                              class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              <?= $canEditContact ? '' : 'disabled' ?>>
+                          </div>
+                          <div>
+                            <label class="text-sm font-medium text-gray-700">Date of birth</label>
+                            <input type="date" name="date_of_birth" value="<?= e($profileMember['date_of_birth'] ?? '') ?>"
+                              max="<?= e(date('Y-m-d')) ?>"
                               class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                               <?= $canEditContact ? '' : 'disabled' ?>>
                           </div>

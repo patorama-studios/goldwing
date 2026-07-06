@@ -27,6 +27,7 @@ CREATE TABLE members (
   last_name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL,
   phone VARCHAR(50) NULL,
+  date_of_birth DATE NULL,
   address_line1 VARCHAR(150) NULL,
   address_line2 VARCHAR(150) NULL,
   city VARCHAR(100) NULL,

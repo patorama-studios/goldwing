@@ -267,6 +267,7 @@ if ($user && $user['member_id']) {
             $payload = [
               'email' => $newEmail,
               'phone' => trim($_POST['phone'] ?? ''),
+              'date_of_birth' => trim($_POST['date_of_birth'] ?? ''),
               'address_line1' => trim($_POST['address_line1'] ?? ''),
               'address_line2' => trim($_POST['address_line2'] ?? ''),
               'suburb' => trim($_POST['suburb'] ?? ''),
@@ -2913,6 +2914,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <div>
                           <label class="text-sm font-medium text-gray-700">Phone</label>
                           <input data-tour="profile-phone" type="text" name="phone" value="<?= e($profileMember['phone'] ?? '') ?>"
+                            class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                          <label class="text-sm font-medium text-gray-700">Date of birth</label>
+                          <input type="date" name="date_of_birth" value="<?= e($profileMember['date_of_birth'] ?? '') ?>"
+                            max="<?= e(date('Y-m-d')) ?>"
                             class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary/20">
                         </div>
                         <div class="md:col-span-2">

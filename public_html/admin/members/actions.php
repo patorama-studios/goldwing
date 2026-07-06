@@ -954,6 +954,7 @@ switch ($action) {
             $payload['last_name'] = trim($_POST['last_name'] ?? $targetMember['last_name']);
             $payload['email'] = trim($_POST['email'] ?? $targetMember['email']);
             $payload['phone'] = trim($_POST['phone'] ?? $targetMember['phone'] ?? '');
+            $payload['date_of_birth'] = trim($_POST['date_of_birth'] ?? $targetMember['date_of_birth'] ?? '');
         }
         if (AdminMemberAccess::canEditAddress($user)) {
             $payload['address_line1'] = trim($_POST['address_line1'] ?? $targetMember['address_line1'] ?? '');
