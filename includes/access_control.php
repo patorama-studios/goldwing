@@ -686,6 +686,22 @@ function access_control_is_always_allowed(string $path): bool
     if ($path === '/api/feedback.php' || $path === '/api/feedback') {
         return true;
     }
+    // Stripe webhooks: anonymous POSTs from Stripe that authenticate via the
+    // Stripe-Signature header (constructEvent), not a session. The '/api/*'
+    // admin catch-all otherwise 401s them before the handler can verify the
+    // signature — silently dropping payment confirmations. stripe_webhook_agm
+    // was missing this and returned {"error":"Unauthorized"} to Stripe on live.
+    if ($path === '/api/stripe_webhook.php' || $path === '/api/stripe_webhook_agm.php') {
+        return true;
+    }
+    // Member card-management (setup-intent, payment-methods, portal). Every
+    // /api/billing/* handler calls require_user_json() + a member check inline
+    // (POSTs also require_csrf_json), so it self-protects without the gate.
+    // Whitelisting in code means an Access Control UI edit can't silently
+    // reintroduce the 403 class of bug the way an editable registry row can.
+    if (str_starts_with($path, '/api/billing/')) {
+        return true;
+    }
     foreach (access_control_always_allowed_paths() as $allowed) {
         if ($allowed === $path) {
             return true;
