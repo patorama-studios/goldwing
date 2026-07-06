@@ -514,10 +514,22 @@ class PaymentWebhookService
             return;
         }
 
-        MembershipOrderService::activateMembershipForOrder($order, [
-            'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
-            'period_id' => $order['membership_period_id'] ?? null,
-        ]);
+        // Route through markMembershipPaid (not a bare activateMembershipForOrder)
+        // so invoice.paid renewals send the member receipt + treasurer
+        // notification — previously they activated silently and NO receipt went
+        // out (the PaymentIntent path that sends it early-returns whenever the PI
+        // belongs to an invoice, which every membership invoice PI does).
+        // Idempotency: activation stacks expiry and is NOT idempotent. recordEvent
+        // dedupes Stripe's own retries (same event id), but a manual reconcile
+        // (admin/reconcile-stranded-payments.php, synthetic event id) or a delayed
+        // real retry would otherwise activate twice and double the term / receipt.
+        // Skip if already paid — matching the sibling loop below.
+        if (($order['status'] ?? '') !== 'paid') {
+            self::markMembershipPaid($order, [
+                'payment_intent' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+                'period_id' => $order['membership_period_id'] ?? null,
+            ]);
+        }
 
         $internal = json_decode((string) ($order['internal_notes'] ?? ''), true);
         if (is_array($internal)) {
@@ -533,8 +545,8 @@ class PaymentWebhookService
                 $stmt->execute(['id' => $partnerOrderId]);
                 $partnerOrder = $stmt->fetch();
                 if ($partnerOrder && ($partnerOrder['status'] ?? '') !== 'paid') {
-                    MembershipOrderService::activateMembershipForOrder($partnerOrder, [
-                        'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+                    self::markMembershipPaid($partnerOrder, [
+                        'payment_intent' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
                         'period_id' => $partnerOrder['membership_period_id'] ?? null,
                     ]);
                     if (!empty($partnerOrder['user_id'])) {
@@ -571,8 +583,8 @@ class PaymentWebhookService
                 if (($extra['status'] ?? '') === 'paid') {
                     continue;
                 }
-                MembershipOrderService::activateMembershipForOrder($extra, [
-                    'payment_reference' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
+                self::markMembershipPaid($extra, [
+                    'payment_intent' => $paymentIntentId !== '' ? $paymentIntentId : $invoiceId,
                     'period_id' => $extra['membership_period_id'] ?? null,
                 ]);
                 if (!empty($extra['user_id'])) {

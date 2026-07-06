@@ -9,6 +9,14 @@ class DomSnapshotService
     {
         $html = preg_replace('/data:[^\s\"\']{20,}/i', 'data:omitted', $html);
 
+        // DOMDocument::loadHTML() assumes ISO-8859-1 for markup with no charset,
+        // so UTF-8 punctuation (em-dashes, ellipses, curly quotes) gets mangled
+        // into mojibake like "Ã¢â‚¬â€" on save. Convert every non-ASCII byte to a
+        // numeric HTML entity first: the parser then only sees ASCII and
+        // saveHTML() round-trips the entities intact. (mb_encode_numericentity is
+        // the PHP 8.2+ safe replacement for the deprecated 'HTML-ENTITIES' trick.)
+        $html = mb_encode_numericentity((string) $html, [0x80, 0x10FFFF, 0, 0x10FFFF], 'UTF-8');
+
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
         $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);

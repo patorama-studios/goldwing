@@ -1532,11 +1532,39 @@ if ($user && $user['member_id']) {
       $storeItemsByOrder[$item['order_id']][] = $item;
     }
 
+    // Each order's "Renewal" chip must reflect the term THAT order bought, not
+    // the member's current period — reusing the global $membershipPeriod made
+    // every row show the same countdown (e.g. a 3-year renewal reading "25 days"
+    // because that's what's left on the member's existing coverage).
+    $orderPeriodTermMonths = [];
+    $orderPeriodIds = array_values(array_filter(array_map(
+      static fn ($o) => (int) ($o['membership_period_id'] ?? 0),
+      $membershipOrders
+    )));
+    if ($orderPeriodIds) {
+      $ph = implode(',', array_fill(0, count($orderPeriodIds), '?'));
+      $stmt = $pdo->prepare("SELECT id, term FROM membership_periods WHERE id IN ($ph)");
+      $stmt->execute($orderPeriodIds);
+      foreach ($stmt->fetchAll() as $p) {
+        $orderPeriodTermMonths[(int) $p['id']] = MembershipService::termToMonths((string) ($p['term'] ?? ''));
+      }
+    }
+    $termToLabel = static function (?int $months): ?string {
+      if ($months === null) {
+        return 'Life';
+      }
+      if ($months % 12 === 0) {
+        $years = $months / 12;
+        return $years . ' year' . ($years === 1 ? '' : 's');
+      }
+      return $months . ' month' . ($months === 1 ? '' : 's');
+    };
+
     foreach ($membershipOrders as $order) {
       $daysRemainingLabel = null;
-      if (!empty($membershipPeriod['end_date'])) {
-        $daysRemaining = (int) ceil((strtotime($membershipPeriod['end_date']) - time()) / 86400);
-        $daysRemainingLabel = $daysRemaining > 0 ? $daysRemaining . ' days' : 'Due';
+      $orderPeriodId = (int) ($order['membership_period_id'] ?? 0);
+      if ($orderPeriodId > 0 && array_key_exists($orderPeriodId, $orderPeriodTermMonths)) {
+        $daysRemainingLabel = $termToLabel($orderPeriodTermMonths[$orderPeriodId]);
       } elseif (!empty($member['member_type']) && $member['member_type'] === 'LIFE') {
         $daysRemainingLabel = 'No expiry';
       }
@@ -5565,22 +5593,36 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
 // We pull the renewal end date and member type for the message.
 $showRenewedLightbox = isset($_GET['renewed']) && $member;
 if ($showRenewedLightbox):
-  $renewEndIso = (string) ($membershipPeriod['end_date'] ?? '');
-  $renewEndLabel = $renewEndIso !== '' ? date('j F Y', strtotime($renewEndIso)) : '';
-  $renewStatus = strtoupper((string) ($membershipPeriod['status'] ?? ''));
-  $renewIsPending = $renewStatus === 'PENDING_PAYMENT' || $renewStatus === '';
+  // Source the confirmation from the order the member JUST renewed (most recent
+  // membership order) — NOT $membershipPeriod, which resolves to their existing
+  // active coverage and so showed the OLD term + end date (e.g. a fresh 3-year
+  // renewal reading "2-year ... until 31 July 2026") until the webhook activated.
+  $latestRenewalOrder = $membershipOrders[0] ?? null;
+  $latestRenewalPeriodId = (int) ($latestRenewalOrder['membership_period_id'] ?? 0);
+  $renewedPeriod = null;
+  if ($latestRenewalPeriodId > 0) {
+    $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $latestRenewalPeriodId]);
+    $renewedPeriod = $stmt->fetch() ?: null;
+  }
+  // Term comes from the period's stored term (authoritative), never a date-diff.
+  $renewMonths = $renewedPeriod ? MembershipService::termToMonths((string) ($renewedPeriod['term'] ?? '')) : null;
   $renewTermLabel = '';
-  if ($renewEndIso !== '') {
-    $start = strtotime((string) ($membershipPeriod['start_date'] ?? 'today'));
-    $diffMonths = max(1, (int) round((strtotime($renewEndIso) - $start) / (60 * 60 * 24 * 30.44)));
-    if ($diffMonths >= 34) {
-      $renewTermLabel = '3-year';
-    } elseif ($diffMonths >= 22) {
-      $renewTermLabel = '2-year';
+  if ($renewedPeriod) {
+    if ($renewMonths === null) {
+      $renewTermLabel = 'life';
+    } elseif ($renewMonths % 12 === 0) {
+      $renewTermLabel = ($renewMonths / 12) . '-year';
     } else {
-      $renewTermLabel = '1-year';
+      $renewTermLabel = $renewMonths . '-month';
     }
   }
+  // Pending = webhook hasn't activated the new period yet; only assert the new
+  // end date once it's real, so we never claim a shorter/older expiry.
+  $renewStatus = strtoupper((string) ($renewedPeriod['status'] ?? ''));
+  $renewIsPending = $renewedPeriod === null || $renewStatus === 'PENDING_PAYMENT' || $renewStatus === '';
+  $renewEndIso = !$renewIsPending ? (string) ($renewedPeriod['end_date'] ?? '') : '';
+  $renewEndLabel = $renewEndIso !== '' ? date('j F Y', strtotime($renewEndIso)) : '';
   $renewMemberTypeLabel = ucfirst(strtolower((string) ($member['member_type'] ?? 'member')));
 ?>
 <div id="renewed-lightbox"
@@ -5616,9 +5658,15 @@ if ($showRenewedLightbox):
         </p>
       <?php endif; ?>
     <?php endif; ?>
+    <?php if (!$renewIsPending): ?>
     <p class="text-xs text-gray-400 mb-6">
       A receipt has been emailed to <?= e($member['email'] ?? '') ?>. The treasurer has been notified too.
     </p>
+    <?php else: ?>
+    <p class="text-xs text-gray-400 mb-6">
+      Your receipt will be emailed to <?= e($member['email'] ?? '') ?> once payment is confirmed.
+    </p>
+    <?php endif; ?>
     <button type="button" data-renewed-dismiss
             class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm transition-colors shadow-sm">
       Continue to my dashboard
