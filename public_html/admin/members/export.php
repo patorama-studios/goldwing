@@ -6,7 +6,12 @@ use App\Services\ActivityLogger;
 use App\Services\MemberRepository;
 use App\Services\SecurityAlertService;
 
-require_permission('admin.members.import_export');
+// Read-only list export (email PDF list / printed-copy post list). Gated on
+// members.view — not import_export — so committee roles that can see members
+// can pull the lists they already see on screen; the destructive import/
+// backfill/merge tools stay behind admin.members.import_export. The chapter
+// restriction below still scopes what a restricted admin can export.
+require_permission('admin.members.view');
 require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members');
 
 $user = current_user();

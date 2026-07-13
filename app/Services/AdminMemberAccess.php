@@ -79,7 +79,12 @@ class AdminMemberAccess
 
     public static function canImpersonate(array $user): bool
     {
-        return function_exists('current_admin_can') && current_admin_can('admin.users.edit', $user);
+        // Dedicated key so committee roles (e.g. secretary) can be granted
+        // "view as member" without full user-edit rights; admin.users.edit
+        // keeps working so existing roles lose nothing.
+        return function_exists('current_admin_can')
+            && (current_admin_can('admin.members.impersonate', $user)
+                || current_admin_can('admin.users.edit', $user));
     }
 
     public static function canRefund(array $user): bool

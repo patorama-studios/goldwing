@@ -200,7 +200,9 @@ class MemberRepository
         $stmt->execute();
         $result['new_last_30_days'] = (int) $stmt->fetchColumn();
 
-        $expiringSoonSql = 'SELECT COUNT(*) FROM members m WHERE EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY))';
+        // Latest active end_date, not any active period — an already-renewed
+        // member's old (still-ACTIVE) period must not count them as expiring.
+        $expiringSoonSql = 'SELECT COUNT(*) FROM members m WHERE (SELECT MAX(mp.end_date) FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\') BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY)';
         $expiringSoonParams = $params;
         if ($whereClause !== '') {
             $expiringSoonSql .= ' AND ' . $whereClause;
@@ -596,14 +598,19 @@ class MemberRepository
         if (!empty($filters['expiring_within'])) {
             $expiringMap = ['30d' => 30, '60d' => 60, '90d' => 90];
             $expiringKey = (string) $filters['expiring_within'];
+            // Compare the member's LATEST active end_date, not any active
+            // period: after a renewal the old period stays ACTIVE until the
+            // cron flips it, so a plain EXISTS kept listing already-renewed
+            // members as "expiring" (July 2026: Strong, Dunbar, Langley).
+            $latestActiveEnd = '(SELECT MAX(mp.end_date) FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\')';
             if (isset($expiringMap[$expiringKey])) {
                 $params['expiring_days'] = $expiringMap[$expiringKey];
-                $parts[] = 'EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :expiring_days DAY))';
+                $parts[] = $latestActiveEnd . ' BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :expiring_days DAY)';
             } elseif ($expiringKey === 'eoy') {
                 $today = new DateTimeImmutable('today');
                 $cutoffYear = (int) $today->format('m') >= 8 ? (int) $today->format('Y') + 1 : (int) $today->format('Y');
                 $params['expiring_cutoff'] = $cutoffYear . '-07-31';
-                $parts[] = 'EXISTS (SELECT 1 FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\' AND mp.end_date IS NOT NULL AND mp.end_date BETWEEN CURDATE() AND :expiring_cutoff)';
+                $parts[] = $latestActiveEnd . ' BETWEEN CURDATE() AND :expiring_cutoff';
             } elseif ($expiringKey === 'expired') {
                 $statusValues = self::expandStatusFilter('expired');
                 $placeholders = [];

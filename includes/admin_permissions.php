@@ -18,6 +18,7 @@ function admin_permission_registry(): array
             ['key' => 'admin.members.renew', 'label' => 'Renew memberships'],
             ['key' => 'admin.members.manual_payment', 'label' => 'Manual payments'],
             ['key' => 'admin.members.import_export', 'label' => 'Import/export members'],
+            ['key' => 'admin.members.impersonate', 'label' => 'View site as a member'],
             ['key' => 'admin.membership_types.manage', 'label' => 'Manage membership types'],
             ['key' => 'admin.payments.view', 'label' => 'View payments'],
             ['key' => 'admin.payments.refund', 'label' => 'Refund payments'],

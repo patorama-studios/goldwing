@@ -9,7 +9,7 @@ $pdo = db();
 $intervals = [60, 30];
 
 foreach ($intervals as $days) {
-    $stmt = $pdo->prepare('SELECT mp.*, m.email, m.phone, m.first_name, m.member_type FROM membership_periods mp JOIN members m ON m.id = mp.member_id WHERE mp.status = "ACTIVE" AND mp.end_date = DATE_ADD(CURDATE(), INTERVAL :days DAY)');
+    $stmt = $pdo->prepare('SELECT mp.*, m.email, m.phone, m.first_name, m.member_type FROM membership_periods mp JOIN members m ON m.id = mp.member_id WHERE mp.status = "ACTIVE" AND mp.end_date = DATE_ADD(CURDATE(), INTERVAL :days DAY) AND NOT EXISTS (SELECT 1 FROM membership_periods mp2 WHERE mp2.member_id = mp.member_id AND mp2.status = "ACTIVE" AND mp2.end_date > mp.end_date)');
     $stmt->execute(['days' => $days]);
     $periods = $stmt->fetchAll();
 

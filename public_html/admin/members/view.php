@@ -1181,12 +1181,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         </button>
                       </form>
                     <?php else: ?>
+                      <?php // Say WHY it's disabled — a silent dead button reads as a bug.
+                        $impersonateBlockedReason = !$canImpersonate
+                            ? 'Your admin role does not include the "View as member" permission.'
+                            : 'This member has no login account yet, so there is nothing to view as.'; ?>
                       <button
                         class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-gray-200 shadow-sm text-sm font-medium rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed"
-                        type="button" disabled>
+                        type="button" disabled title="<?= e($impersonateBlockedReason) ?>">
                         <span class="material-icons-outlined mr-2 text-[18px]">visibility</span>
                         View as Member
                       </button>
+                      <p class="text-xs text-gray-400"><?= e($impersonateBlockedReason) ?></p>
                     <?php endif; ?>
                     <?php if ($canResetPassword): ?>
                       <form method="post" action="/admin/members/actions.php"

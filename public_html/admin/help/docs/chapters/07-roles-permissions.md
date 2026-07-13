@@ -145,7 +145,7 @@ At login, `App\Services\AuthService::getUserRoles()` queries the join and stuffs
 Defined in `includes/admin_permissions.php → admin_permission_registry()`, grouped into eight categories — a representative sample:
 
 - **Core Admin** — `admin.dashboard.view`, `admin.users.view/create/edit/disable`, `admin.roles.view/manage`
-- **Membership** — `admin.members.view/edit/renew`, `admin.members.manual_payment`, `admin.members.import_export`, `admin.payments.view/refund`
+- **Membership** — `admin.members.view/edit/renew`, `admin.members.manual_payment`, `admin.members.import_export`, `admin.members.impersonate` ("View site as a member" — grant this to a committee role that needs to see a member's view without full `admin.users.edit`; `admin.users.edit` still implies it), `admin.payments.view/refund`
 - **Store / Orders** — `admin.store.view`, `admin.products.manage`, `admin.orders.view/fulfil/refund_cancel`
 - **Content / Pages** — `admin.pages.view/edit/publish`, `admin.media_library.manage`, `admin.wings_magazine.manage`
 - **Events / Calendar** — `admin.calendar.view/manage`, `admin.events.manage`

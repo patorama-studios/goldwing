@@ -58,19 +58,36 @@ if ($ldInGrace):
 <?php elseif ($ldLapsed):
     $ldPageKey = $lockdownPageKey ?? null;
     $ldPageLocked = \App\Services\MembershipAccessService::isPageLocked($ldPageKey);
+    // Bank-transfer renewal submitted, waiting on an admin to confirm the
+    // money arrived — say "pending approval", never "expired" (they've paid).
+    $ldAwaiting = ($ldState['reason'] ?? '') === 'awaiting-payment';
 ?>
 <!-- ── Membership expired & locked: persistent banner ───────────────────── -->
-<div class="relative z-30 bg-red-600 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 shadow-sm" data-lockdown-banner>
-  <span class="material-icons-outlined text-xl shrink-0">lock</span>
+<div class="relative z-30 <?= $ldAwaiting ? 'bg-sky-600' : 'bg-red-600' ?> text-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 shadow-sm" data-lockdown-banner>
+  <span class="material-icons-outlined text-xl shrink-0"><?= $ldAwaiting ? 'hourglass_top' : 'lock' ?></span>
   <p class="flex-1 min-w-[12rem] text-sm font-medium leading-snug">
+    <?php if ($ldAwaiting): ?>
+    <span class="font-bold">Your renewal is pending.</span>
+    We've received your renewal and an admin is yet to confirm your payment —
+    member features unlock as soon as it's approved. No further action is needed.
+    <?php else: ?>
     Your membership has expired<?= $ldEndLabel !== '' ? ' (on ' . e($ldEndLabel) . ')' : '' ?>.
     You can still log in to update your details, but member features stay locked until you renew.
+    <?php endif; ?>
   </p>
+  <?php if ($ldAwaiting): ?>
+  <a href="/member/index.php?page=billing"
+     class="shrink-0 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors">
+    <span class="material-icons-outlined text-base">receipt_long</span>
+    View billing
+  </a>
+  <?php else: ?>
   <a href="<?= e($ldRenewUrl) ?>"
      class="shrink-0 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors">
     <span class="material-icons-outlined text-base">autorenew</span>
     Renew membership
   </a>
+  <?php endif; ?>
 </div>
 
 <?php if ($ldPageLocked): ?>
@@ -83,16 +100,24 @@ if ($ldInGrace):
     </div>
     <h2 id="gw-lockdown-overlay-title" class="font-display text-xl font-bold text-gray-900">This area is locked</h2>
     <p class="mt-2 text-sm text-gray-600">
+      <?php if ($ldAwaiting): ?>
+      Your renewal is pending — an admin is yet to confirm your payment.
+      Member features like this one unlock as soon as it's approved. No further
+      action is needed from you.
+      <?php else: ?>
       Your membership has expired, so member features like this one are no
       longer available. You can still log in to update your details — renew your
       membership to unlock the calendar, Wings, the directory and everything else.
+      <?php endif; ?>
     </p>
     <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+      <?php if (!$ldAwaiting): ?>
       <a href="<?= e($ldRenewUrl) ?>"
          class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
         <span class="material-icons-outlined text-base">autorenew</span>
         Renew membership now
       </a>
+      <?php endif; ?>
       <a href="/member/index.php"
          class="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors">
         <span class="material-icons-outlined text-base">dashboard</span>
@@ -112,18 +137,26 @@ if ($ldInGrace):
       <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
         <span class="material-icons-outlined text-3xl text-red-600">lock_clock</span>
       </div>
-      <h2 id="gw-lockdown-modal-title" class="font-display text-xl font-bold text-gray-900">Your membership has expired</h2>
+      <h2 id="gw-lockdown-modal-title" class="font-display text-xl font-bold text-gray-900"><?= $ldAwaiting ? 'Your renewal is pending' : 'Your membership has expired' ?></h2>
       <p class="mt-2 text-sm text-gray-600">
+        <?php if ($ldAwaiting): ?>
+        We've received your renewal and an admin is yet to confirm your
+        payment. You can still reach your dashboard, billing and profile —
+        community features unlock as soon as it's approved.
+        <?php else: ?>
         <?= $ldEndLabel !== '' ? 'Your membership expired on ' . e($ldEndLabel) . '. ' : '' ?>You
         can still log in to reach your dashboard, billing and profile, but
         community features are locked. Renew now to unlock everything again.
+        <?php endif; ?>
       </p>
       <div class="mt-6 flex flex-col gap-3">
+        <?php if (!$ldAwaiting): ?>
         <a href="<?= e($ldRenewUrl) ?>"
            class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
           <span class="material-icons-outlined text-base">autorenew</span>
           Renew membership now
         </a>
+        <?php endif; ?>
         <button type="button" data-lockdown-modal-close
           class="text-sm font-medium text-gray-500 hover:text-gray-700">
           Continue with limited access

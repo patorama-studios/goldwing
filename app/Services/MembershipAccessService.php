@@ -158,7 +158,12 @@ class MembershipAccessService
                 return self::$stateCache[$cacheKey] = $result;
             }
 
-            $stmt = $pdo->prepare('SELECT status, end_date FROM membership_periods WHERE member_id = :mid ORDER BY end_date DESC LIMIT 1');
+            // Prefer real (activated/expired) periods over never-paid
+            // PENDING_PAYMENT rows — a pending renewal's provisional end date
+            // must not drive the lockdown (it reads "expired on <future date>"
+            // and locks a still-covered member out). Mirrors the dashboard
+            // expiry query in /member/index.php.
+            $stmt = $pdo->prepare('SELECT status, end_date FROM membership_periods WHERE member_id = :mid ORDER BY (status <> "PENDING_PAYMENT") DESC, end_date DESC LIMIT 1');
             $stmt->execute([':mid' => $memberId]);
             $period = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
             $endDate = $period['end_date'] ?? null;
@@ -184,7 +189,13 @@ class MembershipAccessService
             // payment check locks the member out until it's approved (which
             // activates them) or denied. Account/billing/renewal pages stay
             // open (see OPEN_PAGES) so they can still see status and details.
-            if (!self::isLockedStatus($statusKey) && self::hasPendingBankTransferRenewal($pdo, $memberId)) {
+            // Only applies once their real coverage has actually ended — a
+            // member renewing EARLY (current period still running) keeps full
+            // access while the transfer awaits approval.
+            $today = strtotime('today');
+            $hasCurrentCoverage = $endDate && strtotime((string) $endDate) >= $today;
+            if (!self::isLockedStatus($statusKey) && !$hasCurrentCoverage
+                && self::hasPendingBankTransferRenewal($pdo, $memberId)) {
                 $result['status'] = 'awaiting-payment';
                 $result['lapsed'] = true;
                 $result['reason'] = 'awaiting-payment';
@@ -195,7 +206,6 @@ class MembershipAccessService
             // window has run out (date safety-net in case the cron is late).
             // Between end_date and lockoff_date the member is "in grace":
             // expired but still has full access — we only warn them.
-            $today = strtotime('today');
             $pastLockoff = !empty($result['lockoff_date'])
                 && strtotime((string) $result['lockoff_date']) < $today;
             $expiredByDate = $endDate && strtotime((string) $endDate) < $today;

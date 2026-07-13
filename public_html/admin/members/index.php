@@ -87,7 +87,11 @@ if ($statusFilter === 'archived') {
 if ($statusFilter === 'cancelled') {
     $statusFilter = 'archived';
 }
-if ($filters['status'] === '') {
+// Hide archived (cancelled/inactive) members from the default browse list —
+// but NOT from an explicit search: typing a name or member number means "find
+// this person", and silently filtering them out made archived members look
+// missing entirely (July 2026: Gannon #1514, Recoquillion #1672).
+if ($filters['status'] === '' && trim((string) ($filters['q'] ?? '')) === '') {
     $filters['exclude_statuses'] = ['cancelled'];
 }
 
