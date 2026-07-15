@@ -705,6 +705,16 @@ class MemberRepository
             $params['created_to'] = $createdTo . ' 23:59:59';
         }
 
+        // "Renewals" summary card filter: members with a paid membership order
+        // this calendar month. Mirrors the renewals_this_month stat query so the
+        // card can filter the list, not just count. Guarded on orders.member_id
+        // existing, same as the stat.
+        if (($filters['renewed'] ?? '') === 'this_month' && self::hasOrderColumn($pdo, 'member_id')) {
+            $params['renewed_start'] = (new DateTimeImmutable('first day of this month'))->setTime(0, 0, 0)->format('Y-m-d H:i:s');
+            $params['renewed_end'] = (new DateTimeImmutable('last day of this month'))->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+            $parts[] = "EXISTS (SELECT 1 FROM orders o WHERE o.member_id = m.id AND o.order_type = 'membership' AND o.status = 'paid' AND o.paid_at BETWEEN :renewed_start AND :renewed_end)";
+        }
+
         $prefList = self::normalizeDirectoryPreferences($filters['directory_prefs'] ?? []);
         if ($prefList !== []) {
             $prefConditions = [];

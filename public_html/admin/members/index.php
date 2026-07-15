@@ -36,6 +36,7 @@ $filters = [
     'directory_prefs' => $_GET['directory_pref'] ?? [],
     'created_range' => trim((string) ($_GET['created_range'] ?? '')),
     'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
+    'renewed' => ($_GET['renewed'] ?? '') === 'this_month' ? 'this_month' : '',
     'created_from' => trim((string) ($_GET['created_from'] ?? '')),
     'created_to' => trim((string) ($_GET['created_to'] ?? '')),
     'vehicle_type' => $_GET['vehicle_type'] ?? '',
@@ -288,70 +289,40 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
+<?php
+      // Every summary card is a filter shortcut. Each link resets the other
+      // filter params so a card always shows exactly its own slice, and
+      // $activeStat marks which card matches the current view.
+      $statReset = ['status' => null, 'expiring_within' => null, 'created_range' => null, 'created_from' => null, 'created_to' => null, 'renewed' => null, 'page' => 1];
+      $hasCreatedFilter = ($filters['created_range'] ?? '') !== '' || ($filters['created_from'] ?? '') !== '' || ($filters['created_to'] ?? '') !== '';
+      $activeStat = 'total';
+      if ($statusFilter === 'active') { $activeStat = 'active'; }
+      elseif ($statusFilter === 'pending') { $activeStat = 'pending'; }
+      elseif ($statusFilter === 'expired') { $activeStat = 'expired'; }
+      elseif (($filters['expiring_within'] ?? '') === '60d') { $activeStat = 'expiring'; }
+      elseif (($filters['renewed'] ?? '') === 'this_month') { $activeStat = 'renewed'; }
+      elseif (($filters['created_range'] ?? '') === '30d') { $activeStat = 'new'; }
+      elseif ($statusFilter !== '' || ($filters['expiring_within'] ?? '') !== '' || $hasCreatedFilter) { $activeStat = ''; }
+      $statCard = function (string $key, string $label, string $value, string $icon, string $iconClass, string $hover, array $override) use ($statReset, $activeStat) {
+          $href = '/admin/members?' . e(buildQuery(array_merge($statReset, $override)));
+          $ring = $activeStat === $key ? ' ring-2 ring-primary/60 border-transparent' : ' border-gray-100';
+          echo '<a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between transition-colors ' . $hover . $ring . '" href="' . $href . '">'
+             . '<div><p class="text-xs uppercase tracking-[0.3em] text-gray-500">' . e($label) . '</p>'
+             . '<p class="text-2xl font-semibold text-gray-900">' . e($value) . '</p></div>'
+             . '<div class="h-10 w-10 rounded-full ' . $iconClass . ' flex items-center justify-center">'
+             . '<span class="material-icons-outlined text-base">' . e($icon) . '</span></div></a>';
+      };
+      ?>
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Total members</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['total']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-primary/20 text-primary-strong flex items-center justify-center">
-            <span class="material-icons-outlined text-base">groups</span>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Active</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['active']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">check_circle</span>
-          </div>
-        </div>
-        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-amber-200 transition-colors <?= $stats['pending'] ? 'border-amber-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => 1])) ?>">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Pending</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['pending']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">hourglass_top</span>
-          </div>
-        </a>
-        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-rose-200 transition-colors <?= $stats['expired'] ? 'border-rose-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['status' => 'expired', 'expiring_within' => null, 'page' => 1])) ?>">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Expired</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['expired']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">cancel</span>
-          </div>
-        </a>
-        <a class="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:border-blue-200 transition-colors <?= $stats['expiring_soon'] ? 'border-blue-200' : 'border-gray-100' ?>" href="/admin/members?<?= e(buildQuery(['expiring_within' => '60d', 'status' => null, 'page' => 1])) ?>">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Expiring (60d)</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['expiring_soon']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">alarm</span>
-          </div>
-        </a>
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">New (30d)</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['new_last_30_days']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">person_add</span>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-gray-500">Renewals</p>
-            <p class="text-2xl font-semibold text-gray-900"><?= e((string) $stats['renewals_this_month']) ?></p>
-          </div>
-          <div class="h-10 w-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center">
-            <span class="material-icons-outlined text-base">autorenew</span>
-          </div>
-        </div>
+        <?php
+        $statCard('total', 'Total members', (string) $stats['total'], 'groups', 'bg-primary/20 text-primary-strong', 'hover:border-gray-300', []);
+        $statCard('active', 'Active', (string) $stats['active'], 'check_circle', 'bg-emerald-100 text-emerald-700', 'hover:border-emerald-200', ['status' => 'active']);
+        $statCard('pending', 'Pending', (string) $stats['pending'], 'hourglass_top', 'bg-amber-100 text-amber-700', 'hover:border-amber-200', ['status' => 'pending']);
+        $statCard('expired', 'Expired', (string) $stats['expired'], 'cancel', 'bg-rose-100 text-rose-700', 'hover:border-rose-200', ['status' => 'expired']);
+        $statCard('expiring', 'Expiring (60d)', (string) $stats['expiring_soon'], 'alarm', 'bg-blue-100 text-blue-700', 'hover:border-blue-200', ['expiring_within' => '60d']);
+        $statCard('new', 'New (30d)', (string) $stats['new_last_30_days'], 'person_add', 'bg-blue-100 text-blue-700', 'hover:border-blue-200', ['created_range' => '30d']);
+        $statCard('renewed', 'Renewals', (string) $stats['renewals_this_month'], 'autorenew', 'bg-purple-100 text-purple-700', 'hover:border-purple-200', ['renewed' => 'this_month']);
+        ?>
       </section>
 
       <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
