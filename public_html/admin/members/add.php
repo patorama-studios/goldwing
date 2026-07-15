@@ -24,6 +24,12 @@ if (!AdminMemberAccess::isFullAccess($user) || !AdminMemberAccess::canManualOrde
     exit;
 }
 
+// create_member is a sensitive action, so actions.php step-ups on submit. Gate
+// it here on page load too (the documented pattern) so the admin verifies BEFORE
+// filling the wizard — otherwise the submit redirects to /stepup.php and the
+// whole POST is discarded, so the member is never created.
+require_stepup($_SERVER['REQUEST_URI'] ?? '/admin/members/add.php');
+
 $canSendWelcome = AdminMemberAccess::canResetPassword($user);
 
 $pdo = Database::connection();
