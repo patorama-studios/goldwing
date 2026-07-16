@@ -353,6 +353,10 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined text-sm">mark_email_read</span>
               Email PDF list
             </a>
+            <a class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300" href="/admin/members/email-group.php" title="Compose a custom email and send it to a chosen audience (all active members, a chapter, or members expiring soon).">
+              <span class="material-icons-outlined text-sm">forward_to_inbox</span>
+              Email a group
+            </a>
             <details class="relative">
               <summary class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:border-gray-300 cursor-pointer">
                 <span class="material-icons-outlined text-sm">upload</span>

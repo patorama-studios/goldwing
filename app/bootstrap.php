@@ -202,7 +202,17 @@ function require_stepup(string $redirectUrl = ''): void
         exit;
     }
     if (!StepUpService::isValid((int) $user['id'])) {
-        $_SESSION['stepup_redirect'] = $redirectUrl !== '' ? $redirectUrl : ($_SERVER['REQUEST_URI'] ?? '/');
+        $target = $redirectUrl !== '' ? $redirectUrl : ($_SERVER['REQUEST_URI'] ?? '/');
+        $_SESSION['stepup_redirect'] = $target;
+        // Preserve a POST body so a submission isn't lost when the step-up token
+        // has lapsed mid-form (e.g. a long add-member wizard, or an IP/device
+        // change). stepup.php replays it after successful verification. Only
+        // same-origin paths are replayed; GET requests fall through unchanged.
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && !empty($_POST) && str_starts_with($target, '/')) {
+            $_SESSION['stepup_replay'] = ['url' => $target, 'post' => $_POST];
+        } else {
+            unset($_SESSION['stepup_replay']);
+        }
         header('Location: /stepup.php');
         exit;
     }

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
 use App\Services\NotificationService;
+use App\Services\SettingsService;
 
 require_login();
 
@@ -128,9 +129,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nomineeName = trim($formValues['nominee_first_name'] . ' ' . $formValues['nominee_last_name']);
             $safeDetails = nl2br(NotificationService::escape($formValues['nomination_details']));
 
+            // Nominations go to the recipient configured in Settings → Notifications
+            // (defaults to Mal Allen). Fall back to the shared admin list only if the
+            // field is blanked, so a nomination is never emailed to nobody.
+            $motyRecipients = SettingsService::getGlobal('notifications.member_of_year_emails', 'ausalper@gmail.com');
+            if (trim((string) $motyRecipients) === '') {
+                $motyRecipients = NotificationService::getAdminEmails();
+            }
+
             $context = [
                 'primary_email' => $formValues['nominator_email'],
-                'admin_emails' => NotificationService::getAdminEmails(),
+                'admin_emails' => $motyRecipients,
                 'nominator_name' => NotificationService::escape($nominatorName),
                 'nominator_email' => NotificationService::escape($formValues['nominator_email']),
                 'nominee_name' => NotificationService::escape($nomineeName),

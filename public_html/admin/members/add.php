@@ -314,7 +314,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </label>
               <label class="block term-field">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Term</span>
-                <select id="term" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <select id="term" name="term" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                   <option value="1">1 year</option>
                   <option value="3">3 years</option>
                 </select>

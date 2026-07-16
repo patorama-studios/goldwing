@@ -497,6 +497,10 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     $orderNotes = trim((string) ($params['reference'] ?? ''));
     $startDate = trim((string) ($params['start_date'] ?? ''));
     $renewalDate = trim((string) ($params['renewal_date'] ?? ''));
+    // Term the admin selected in the wizard (years). Was previously ignored, which
+    // silently forced every non-Life membership to 1Y — a 3-year join stored as 1Y
+    // with a 1-year expiry fallback. Defaults to 1 when a caller omits it.
+    $termYears = max(1, (int) ($params['term'] ?? 1));
     $actorUserId = $actor['id'] ?? null;
 
     $allowedStatus = ['active', 'pending', 'complimentary', 'lapsed'];
@@ -528,7 +532,7 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     $endDate = null;
     if ($memberTypeCode !== 'LIFE') {
         $endValue = $renewalDate !== '' ? DateTime::createFromFormat('Y-m-d', $renewalDate) : null;
-        $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, 1);
+        $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, $termYears);
     }
 
     $updateFields = 'member_type = :member_type, status = :status, updated_at = NOW()';
@@ -544,7 +548,7 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     $stmt = $pdo->prepare('UPDATE members SET ' . $updateFields . ' WHERE id = :id');
     $stmt->execute($updateParams);
 
-    $term = $memberTypeCode === 'LIFE' ? 'LIFE' : '1Y';
+    $term = $memberTypeCode === 'LIFE' ? 'LIFE' : ($termYears . 'Y');
     $paidAt = ($periodStatus === 'ACTIVE') ? date('Y-m-d H:i:s') : null;
     $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, paid_at, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, :paid_at, NOW())');
     $stmt->execute([
@@ -799,6 +803,7 @@ switch ($action) {
             'reference' => $_POST['order_reference'] ?? '',
             'start_date' => $_POST['start_date'] ?? '',
             'renewal_date' => $_POST['renewal_date'] ?? '',
+            'term' => $_POST['term'] ?? '',
         ], $user, $memberTypeStep);
         if (!$membershipResult['success']) {
             // Member row exists but membership failed — surface on the profile so

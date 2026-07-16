@@ -413,6 +413,7 @@ class SettingsService
                 'from_email' => 'no-reply@goldwing.org.au',
                 'reply_to' => 'webmaster@goldwing.org.au',
                 'admin_emails' => '',
+                'member_of_year_emails' => 'ausalper@gmail.com',
                 'weekly_digest_enabled' => false,
                 'event_reminders_enabled' => true,
                 'in_app_categories' => ['events', 'payments', 'store', 'community'],

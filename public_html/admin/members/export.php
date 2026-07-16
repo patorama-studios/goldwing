@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AdminMemberAccess;
 use App\Services\ActivityLogger;
+use App\Services\Database;
 use App\Services\MemberRepository;
 use App\Services\SecurityAlertService;
 
@@ -71,6 +72,43 @@ $members = $result['data'];
 
 $directoryPrefs = MemberRepository::directoryPreferences();
 
+// Full-backup enrichment: membership expiry (latest ACTIVE period end date) and
+// the member's primary bike are not in the SELECT m.* result set. Fetch both in
+// two bulk queries keyed by member_id — never per-row — to avoid N+1 lookups.
+$memberIds = [];
+foreach ($members as $member) {
+    if (isset($member['id'])) {
+        $memberIds[] = (int) $member['id'];
+    }
+}
+$expiryByMember = [];
+$bikeByMember = [];
+if ($memberIds !== []) {
+    $pdo = Database::connection();
+    $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+
+    $expiryStmt = $pdo->prepare(
+        "SELECT member_id, MAX(end_date) AS expiry FROM membership_periods "
+        . "WHERE status = 'ACTIVE' AND member_id IN ($placeholders) GROUP BY member_id"
+    );
+    $expiryStmt->execute($memberIds);
+    foreach ($expiryStmt->fetchAll() as $r) {
+        $expiryByMember[(int) $r['member_id']] = $r['expiry'];
+    }
+
+    $bikeStmt = $pdo->prepare(
+        "SELECT member_id, make, model, year, rego, colour FROM member_bikes "
+        . "WHERE member_id IN ($placeholders) ORDER BY is_primary DESC, id ASC"
+    );
+    $bikeStmt->execute($memberIds);
+    foreach ($bikeStmt->fetchAll() as $r) {
+        $mid = (int) $r['member_id'];
+        if (!isset($bikeByMember[$mid])) {
+            $bikeByMember[$mid] = $r; // first row per member = primary, else lowest id
+        }
+    }
+}
+
 ActivityLogger::log('admin', $user['id'] ?? null, null, 'member.export', [
     'count' => count($members),
     'target_type' => 'members',
@@ -91,6 +129,14 @@ if ($printedList) {
     $header[] = 'Zone';
 }
 array_push($header, 'Chapter', 'Membership Type', 'Status', 'Last Login', 'Created', 'Directory Preferences');
+// Appended full-backup columns (kept after all existing columns so current
+// exports/scripts that read by position keep working).
+array_push(
+    $header,
+    'First Name', 'Last Name', 'Date of Birth', 'Join Date', 'Membership Expiry',
+    'Member Type', 'Wings Preference', 'Do Not Renew',
+    'Bike Make', 'Bike Model', 'Bike Year', 'Bike Rego', 'Bike Colour'
+);
 fputcsv($out, $header);
 
 foreach ($members as $member) {
@@ -128,6 +174,25 @@ foreach ($members as $member) {
         $member['last_login_at'] ? date('Y-m-d H:i:s', strtotime($member['last_login_at'])) : 'Never',
         $member['created_at'] ?? '',
         implode(', ', $prefs),
+    );
+    // Appended full-backup columns (see header above).
+    $mid = isset($member['id']) ? (int) $member['id'] : 0;
+    $bike = $bikeByMember[$mid] ?? [];
+    array_push(
+        $row,
+        $member['first_name'] ?? '',
+        $member['last_name'] ?? '',
+        $member['date_of_birth'] ?? '',
+        $member['join_date'] ?? '',
+        $expiryByMember[$mid] ?? '',
+        $member['member_type'] ?? '',
+        $member['wings_preference'] ?? '',
+        !empty($member['do_not_renew']) ? 'yes' : 'no',
+        $bike['make'] ?? '',
+        $bike['model'] ?? '',
+        $bike['year'] ?? '',
+        $bike['rego'] ?? '',
+        $bike['colour'] ?? '',
     );
     fputcsv($out, $row);
 }

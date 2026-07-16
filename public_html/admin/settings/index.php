@@ -267,6 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SettingsService::setGlobal((int) $user['id'], 'notifications.reply_to', $replyTo);
                 }
                 SettingsService::setGlobal((int) $user['id'], 'notifications.admin_emails', normalize_text($_POST['notify_admin_emails'] ?? ''));
+                SettingsService::setGlobal((int) $user['id'], 'notifications.member_of_year_emails', normalize_text($_POST['notify_moty_emails'] ?? ''));
                 SettingsService::setGlobal((int) $user['id'], 'notifications.weekly_digest_enabled', isset($_POST['notify_weekly_digest']));
                 SettingsService::setGlobal((int) $user['id'], 'notifications.event_reminders_enabled', isset($_POST['notify_event_reminders']));
                 // In-app notification fields are currently hidden from the UI (the bell-inbox feature isn't wired yet).
@@ -1792,6 +1793,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             $notifyFromEmail = SettingsService::getGlobal('notifications.from_email', '');
             $notifyReplyTo = SettingsService::getGlobal('notifications.reply_to', '');
             $notifyAdminEmails = SettingsService::getGlobal('notifications.admin_emails', '');
+            $notifyMotyEmails = SettingsService::getGlobal('notifications.member_of_year_emails', 'ausalper@gmail.com');
             $notifyWeeklyDigest = SettingsService::getGlobal('notifications.weekly_digest_enabled', false);
             $notifyEventReminders = SettingsService::getGlobal('notifications.event_reminders_enabled', true);
             $senderIdentitySummary = trim(($notifyFromName !== '' ? $notifyFromName : 'Australian Goldwing Association') . ($notifyFromEmail !== '' ? ' <' . $notifyFromEmail . '>' : ''));
@@ -1852,6 +1854,20 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <input type="hidden" id="notify_from_email" name="notify_from_email" value="<?= e($notifyFromEmail) ?>">
                 <input type="hidden" id="notify_reply_to" name="notify_reply_to" value="<?= e($notifyReplyTo) ?>">
                 <input type="hidden" id="notify_admin_emails" name="notify_admin_emails" value="<?= e($notifyAdminEmails) ?>">
+              </div>
+
+              <!-- Member of the Year nomination recipient -->
+              <div class="bg-card-light rounded-2xl border border-gray-100 p-6">
+                <div class="flex items-start gap-3">
+                  <span class="material-icons-outlined text-slate-500">emoji_events</span>
+                  <div class="min-w-0 flex-1">
+                    <h2 class="font-display text-lg font-bold text-gray-900">Member of the Year nominations</h2>
+                    <p class="text-sm text-slate-500">Nomination submissions are emailed to this address. Separate multiple addresses with commas.</p>
+                    <input type="text" name="notify_moty_emails" value="<?= e($notifyMotyEmails) ?>"
+                           class="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-primary focus:border-primary"
+                           placeholder="ausalper@gmail.com">
+                  </div>
+                </div>
               </div>
 
               <!-- Notification Templates (two-pane editor) -->
