@@ -265,6 +265,10 @@ ob_start();
     <section class="event-actions">
         <a class="btn secondary" href="/calendar/ics.php?event_id=<?php echo (int) $event['id']; ?>">Add to calendar (.ics)</a>
 
+        <?php if (!empty($event['attachment_path'])) : ?>
+            <a class="btn secondary" href="<?php echo calendar_e($event['attachment_path']); ?>" download="<?php echo calendar_e($event['attachment_name'] ?: ''); ?>">Download event PDF</a>
+        <?php endif; ?>
+
         <?php if ($event['rsvp_enabled'] && !$salesClosed && !$isCancelled) : ?>
             <?php if ($user) : ?>
                 <?php

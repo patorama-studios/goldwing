@@ -3785,6 +3785,44 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 046 — calendar_events attachment (event PDF download)
+// Admins can attach a PDF (flyer / itinerary / entry form) when creating or
+// editing a calendar event; members download it from the event page. Two
+// nullable columns: file path under /uploads/ + original filename for display.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_046_calendar_event_attachment';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 046 — calendar_events attachment', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo = db();
+    $ok    = true;
+    $notes = [];
+    $ddls  = [
+        'attachment_path' => "ALTER TABLE calendar_events ADD COLUMN attachment_path VARCHAR(500) NULL AFTER media_id",
+        'attachment_name' => "ALTER TABLE calendar_events ADD COLUMN attachment_name VARCHAR(255) NULL AFTER attachment_path",
+    ];
+    foreach ($ddls as $column => $ddl) {
+        try {
+            $pdo->exec($ddl);
+            $notes[] = $column . ' added.';
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'duplicate') !== false) {
+                $notes[] = $column . ' already present.';
+            } else {
+                $ok = false;
+                $notes[] = $column . ': ' . $e->getMessage();
+            }
+        }
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 046 — calendar_events attachment', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT NOT NULL,
     media_id INT DEFAULT NULL,
+    attachment_path VARCHAR(500) DEFAULT NULL,
+    attachment_name VARCHAR(255) DEFAULT NULL,
     scope ENUM('CHAPTER','NATIONAL') NOT NULL DEFAULT 'CHAPTER',
     chapter_id INT DEFAULT NULL,
     event_type ENUM('in_person','online','hybrid') NOT NULL DEFAULT 'in_person',

@@ -144,6 +144,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        $attachmentPath = null;
+        $attachmentName = null;
+        $removeAttachment = isset($_POST['remove_attachment']);
+        if (!empty($_FILES['attachment_file']['name'])) {
+            $file = $_FILES['attachment_file'];
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                $error = 'Event PDF upload failed.';
+            } elseif ((int) $file['size'] > 10 * 1024 * 1024) {
+                $error = 'Event PDF exceeds 10MB limit.';
+            } else {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($file['tmp_name']) ?: '';
+                if ($mime !== 'application/pdf') {
+                    $error = 'Event attachment must be a PDF file.';
+                } else {
+                    $uploadDir = __DIR__ . '/../../public_html/uploads/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                    $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
+                    if (!preg_match('/\.pdf$/i', $safeName)) {
+                        $safeName .= '.pdf';
+                    }
+                    $safeName = date('Ymd_His') . '_' . $safeName;
+                    if (move_uploaded_file($file['tmp_name'], $uploadDir . $safeName)) {
+                        $attachmentPath = '/uploads/' . $safeName;
+                        $attachmentName = $file['name'];
+                        $removeAttachment = false;
+                    } else {
+                        $error = 'Event PDF upload failed.';
+                    }
+                }
+            }
+        }
+
         if ($title === '') {
             $error = 'Title is required.';
         } elseif ($description === '') {
@@ -184,6 +219,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'destination' => $destination ?: null,
                 'id' => $eventId,
             ]);
+            if ($attachmentPath !== null || $removeAttachment) {
+                $stmt = $pdo->prepare('UPDATE calendar_events SET attachment_path = :path, attachment_name = :name WHERE id = :id');
+                $stmt->execute([
+                    'path' => $removeAttachment ? null : $attachmentPath,
+                    'name' => $removeAttachment ? null : $attachmentName,
+                    'id' => $eventId,
+                ]);
+            }
             $message = 'Event updated.';
         }
     }
@@ -399,6 +442,23 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <input type="text" name="media_title" form="event-edit-form" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                 </label>
               </div>
+            </div>
+
+            <div>
+              <span class="text-sm font-medium text-gray-700">Event PDF (optional)</span>
+              <?php if (!empty($event['attachment_path'])) : ?>
+                <div class="mt-2 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                  <a href="<?php echo calendar_e($event['attachment_path']); ?>" target="_blank" rel="noopener" class="text-blue-600 font-medium truncate">
+                    <?php echo calendar_e($event['attachment_name'] ?: basename($event['attachment_path'])); ?>
+                  </a>
+                  <label class="inline-flex items-center gap-1 text-xs text-red-600 whitespace-nowrap">
+                    <input type="checkbox" name="remove_attachment" value="1" form="event-edit-form" class="rounded border-gray-200">
+                    Remove
+                  </label>
+                </div>
+              <?php endif; ?>
+              <input type="file" name="attachment_file" accept="application/pdf,.pdf" form="event-edit-form" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <p class="text-xs text-gray-500 mt-1">Flyer, itinerary or entry form — members can download it from the event page. Max 10MB.<?php if (!empty($event['attachment_path'])) : ?> Uploading a new PDF replaces the current one.<?php endif; ?></p>
             </div>
           </section>
 

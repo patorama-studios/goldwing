@@ -132,6 +132,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    $attachmentPath = null;
+    $attachmentName = null;
+    if (!empty($_FILES['attachment_file']['name'])) {
+        $file = $_FILES['attachment_file'];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $errors[] = 'Event PDF upload failed.';
+        } elseif ((int) $file['size'] > 10 * 1024 * 1024) {
+            $errors[] = 'Event PDF exceeds 10MB limit.';
+        } else {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']) ?: '';
+            if ($mime !== 'application/pdf') {
+                $errors[] = 'Event attachment must be a PDF file.';
+            } else {
+                $uploadDir = __DIR__ . '/../../public_html/uploads/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+                $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
+                if (!preg_match('/\.pdf$/i', $safeName)) {
+                    $safeName .= '.pdf';
+                }
+                $safeName = date('Ymd_His') . '_' . $safeName;
+                if (move_uploaded_file($file['tmp_name'], $uploadDir . $safeName)) {
+                    $attachmentPath = '/uploads/' . $safeName;
+                    $attachmentName = $file['name'];
+                } else {
+                    $errors[] = 'Event PDF upload failed.';
+                }
+            }
+        }
+    }
+
     if ($title === '') {
         $errors[] = 'Title is required.';
     }
@@ -166,13 +199,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $slug = $slugBase . '-' . $suffix;
             }
 
-            $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
-                VALUES (:title, :slug, :description, :media_id, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
+            $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, attachment_path, attachment_name, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
+                VALUES (:title, :slug, :description, :media_id, :attachment_path, :attachment_name, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
             $stmt->execute([
                 'title' => $title,
                 'slug' => $slug,
                 'description' => $description,
                 'media_id' => $mediaId ?: null,
+                'attachment_path' => $attachmentPath,
+                'attachment_name' => $attachmentName,
                 'scope' => $scope,
                 'chapter_id' => $scope === 'CHAPTER' ? $chapterId : null,
                 'event_type' => $eventType,
@@ -331,6 +366,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </label>
               </div>
             </div>
+
+            <label class="block text-sm font-medium text-gray-700">
+              Event PDF (optional)
+              <input type="file" name="attachment_file" accept="application/pdf,.pdf" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <span class="block mt-1 text-xs text-gray-500 font-normal">Flyer, itinerary or entry form — members can download it from the event page. Max 10MB.</span>
+            </label>
           </section>
 
           <section data-tour="create-event-location" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
