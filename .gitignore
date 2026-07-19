@@ -14,3 +14,7 @@ app/storage/logs/system.log
 
 # Spreadsheet working files (not tracked in repo)
 *.xlsx
+
+# Generated committee manual (rebuild: Admin → Help → System Documentation → Print manual, or scripts/build_manual.php)
+/Goldwing-Website-Manual.pdf
+/manual.html

@@ -13,7 +13,7 @@ It was built to be **maintainable by someone who can read English instructions b
 There are two live copies of the site:
 
 - **Live site** — `https://goldwing.org.au` — what members and the public see.
-- **Draft / staging site** — `https://goldwing.org.au` — an identical copy used to test changes before they go live. Only admins and the developer use this one.
+- **Draft / staging site** — `https://draft.goldwing.org.au` — an identical copy used to test changes before they go live. Only admins and the developer use this one.
 
 Both sites live on the association's existing cPanel hosting account. The developer has access to the cPanel control panel and to the code repository on GitHub. Admins have logins to the admin area of the website itself — they don't need (and shouldn't have) cPanel access for normal work.
 
@@ -40,7 +40,7 @@ When the developer makes a change to the website:
 3. You go into cPanel, open the **Git Version Control** screen for the live site, click **Update from Remote**, then click **Deploy HEAD Commit**.
 4. The site updates within a few seconds. Members already logged in don't get logged out. Nothing breaks for the public.
 
-Test changes on `goldwing.org.au` first whenever possible. If something looks wrong on draft, you can simply not deploy it to live until the developer has fixed it.
+Test changes on `draft.goldwing.org.au` first whenever possible. If something looks wrong on draft, you can simply not deploy it to live until the developer has fixed it.
 
 ### What admins should NEVER touch
 
@@ -51,7 +51,7 @@ Test changes on `goldwing.org.au` first whenever possible. If something looks wr
 ### Good practice
 
 - **Read the chapter that matches what you're doing first.** Each chapter starts with the plain-English "For administrators" half — five minutes there usually saves an hour of guessing.
-- **Don't experiment in live.** If you want to try something — a new page layout, a settings change, importing a member list — try it on `goldwing.org.au` first. The draft site is exactly for this.
+- **Don't experiment in live.** If you want to try something — a new page layout, a settings change, importing a member list — try it on `draft.goldwing.org.au` first. The draft site is exactly for this.
 - **Ask the developer if you're unsure.** "Will this break anything?" is always a fair question. Better a five-minute email than an outage.
 
 ### Who to ask if you're stuck

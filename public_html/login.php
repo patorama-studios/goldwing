@@ -13,6 +13,9 @@ if (isset($_GET['reset'])) {
 if (isset($_GET['session_expired'])) {
   $success = 'Your login has expired. Please sign in again to continue.';
 }
+if (isset($_GET['dev_locked'])) {
+  $error = 'Developer access is currently locked. Ask the club webmaster to grant a new access window.';
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $token = $_POST['csrf_token'] ?? '';
   if (!Csrf::verify($token)) {
@@ -61,6 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       if ($result['status'] === '2fa_email_failed') {
         $error = 'Unable to send your verification code. Contact support.';
+      } elseif ($result['status'] === 'dev_locked') {
+        $error = 'Developer access is currently locked. Ask the club webmaster to grant a new access window.';
       } else {
         $error = $result['status'] === 'locked' ? 'Too many attempts. Try again later.' : 'Login failed.';
       }

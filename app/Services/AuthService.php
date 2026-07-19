@@ -33,6 +33,10 @@ class AuthService
         if ((int) $user['is_active'] !== 1) {
             return ['status' => 'inactive'];
         }
+        if (DeveloperAccessService::isLocked((string) $user['email'])) {
+            ActivityLogger::log('system', (int) $user['id'], null, 'security.dev_access_login_denied', ['email' => $user['email']]);
+            return ['status' => 'dev_locked'];
+        }
         LoginRateLimiter::recordSuccess($identifier, (int) $user['id'], $ip);
 
         $user['roles'] = self::getUserRoles((int) $user['id']);
@@ -93,6 +97,11 @@ class AuthService
         $stmt->execute(['id' => (int) $pending['user_id']]);
         $user = $stmt->fetch();
         if (!$user) {
+            return false;
+        }
+        if (DeveloperAccessService::isLocked((string) $user['email'])) {
+            ActivityLogger::log('system', (int) $user['id'], null, 'security.dev_access_login_denied', ['email' => $user['email'], 'stage' => '2fa']);
+            unset($_SESSION['auth_pending']);
             return false;
         }
         $user['roles'] = self::getUserRoles((int) $user['id']);

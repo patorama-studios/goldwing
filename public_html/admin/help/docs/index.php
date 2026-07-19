@@ -150,7 +150,14 @@ require __DIR__ . '/../../../../app/Views/partials/backend_head.php';
           <span class="material-icons-outlined text-base">menu_book</span>
           <span>Admin documentation</span>
         </div>
-        <h1 class="font-display text-3xl text-gray-900"><?= e($toc['title'] ?? 'System Documentation') ?></h1>
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <h1 class="font-display text-3xl text-gray-900"><?= e($toc['title'] ?? 'System Documentation') ?></h1>
+          <a href="manual.php" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-emerald-700 shadow-sm transition whitespace-nowrap">
+            <span class="material-icons-outlined text-base">picture_as_pdf</span>
+            <span>Print manual / Save as PDF</span>
+          </a>
+        </div>
         <?php if (!empty($toc['intro'])): ?>
           <p class="mt-2 text-gray-600 max-w-3xl"><?= e($toc['intro']) ?></p>
         <?php endif; ?>

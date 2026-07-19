@@ -110,7 +110,9 @@
       "blurb": "Decisions, glossary, and reference material.",
       "chapters": [
         { "slug": "A-decision-log",           "title": "A — Decision log",                 "file": "chapters/A-decision-log.md",           "watched_files": [] },
-        { "slug": "B-glossary",               "title": "B — Glossary",                     "file": "chapters/B-glossary.md",               "watched_files": [] }
+        { "slug": "B-glossary",               "title": "B — Glossary",                     "file": "chapters/B-glossary.md",               "watched_files": [] },
+        { "slug": "C-technical-specifications", "title": "C — Technical specifications",   "file": "chapters/C-technical-specifications.md", "watched_files": ["config/app.php", "config/database.php", ".env.example", "cron/", ".cpanel.yml", "app/ThirdParty/"] },
+        { "slug": "D-handover-runbook",       "title": "D — Handover & emergency runbook", "file": "chapters/D-handover-runbook.md",       "watched_files": ["app/Services/DeveloperAccessService.php", "public_html/admin/settings/developer-access.php", "HANDOVER.md", "app/bootstrap.php"] }
       ]
     }
   ]

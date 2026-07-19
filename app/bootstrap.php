@@ -256,6 +256,29 @@ try {
 } catch (Throwable $e) {
 }
 
+// Developer access window (handover lockout): if the signed-in account is the
+// gated developer account and its access window has ended or been revoked,
+// end the session immediately — revoking access logs the developer out on
+// their next request, not just at their next login.
+try {
+    $devUser = current_user();
+    if ($devUser && App\Services\DeveloperAccessService::isLocked((string) ($devUser['email'] ?? ''))) {
+        App\Services\ActivityLogger::log('system', (int) $devUser['id'], null, 'security.dev_access_session_ended', ['email' => $devUser['email']]);
+        App\Services\StepUpService::clear();
+        $_SESSION = [];
+        session_destroy();
+        if (str_starts_with((string) ($_SERVER['REQUEST_URI'] ?? ''), '/api/')) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Developer access window has ended.']);
+        } else {
+            header('Location: /login.php?dev_locked=1');
+        }
+        exit;
+    }
+} catch (Throwable $e) {
+}
+
 function render_media_shortcodes(string $html): string
 {
     $html = preg_replace_callback('/\\[media:(\\d+)\\]/', function ($matches) {

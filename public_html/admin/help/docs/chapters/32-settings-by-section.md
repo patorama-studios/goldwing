@@ -170,6 +170,12 @@ The page builder's connection to AI — model, monthly spend cap, the guardrails
 
 The actual API key is stored separately (encrypted) and isn't visible in this form. Full picture: [Chapter 24 — AI page builder](view.php?slug=24-ai-page-builder).
 
+### Developer Access
+
+{{link:/admin/settings/developer-access.php|Take me to Developer Access}}
+
+The handover lockout for the outside developer's admin login. Grant a timed access window (default one week), revoke it early, or switch the whole lockout on or off. Grants email the developer automatically, and every change is logged. Full instructions in [Appendix D — Handover & emergency runbook](view.php?slug=D-handover-runbook).
+
 ### Membership Settings
 
 {{link:/admin/settings/?section=membership_pricing|Take me to Membership Settings}}

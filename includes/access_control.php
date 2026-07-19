@@ -370,6 +370,14 @@ function access_control_default_registry(): array
             'roles' => ['admin'],
         ],
         [
+            'page_key' => 'settings_developer_access',
+            'label' => 'Developer Access',
+            'path_pattern' => '/admin/settings/developer-access.php',
+            'match_type' => 'exact',
+            'nav_group' => 'Admin',
+            'roles' => ['admin'],
+        ],
+        [
             'page_key' => 'settings_access_control_save',
             'label' => 'Access Control Save',
             'path_pattern' => '/admin/settings/access-control-save.php',

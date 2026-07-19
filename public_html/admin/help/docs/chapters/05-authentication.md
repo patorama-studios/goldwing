@@ -19,6 +19,10 @@ It also tracks **who's currently logged in**, **what each person is allowed to d
 
 Only **Admins** can reset passwords on behalf of other people, or see the login history of other members. Everyone else can only manage their own account.
 
+### The developer's login (after handover)
+
+The outside developer's admin login is gated by the **handover lockout**: it only works while the webmaster has granted a timed access window in Settings → Developer Access. Outside a window, the login page refuses it and the attempt is recorded. Members and committee admins are never affected by this — full instructions live in [Appendix D — Handover & emergency runbook](view.php?slug=D-handover-runbook).
+
 ### Where to find it
 
 {{link:/admin/members/|Take me to Members}}
@@ -117,6 +121,10 @@ The site needs three things from auth and we wrote them ourselves rather than bo
 
 `completeLogin()` regenerates the session ID (defeats fixation), writes the user blob into `$_SESSION['user']` (`id`, `email`, `name`, `member_id`, `roles`), records the login in `user_logins`, fires a `security.login_success` activity entry, and records the device via `TrustedDeviceService`. A new admin device additionally pings `SecurityAlertService`. `/login.php` then redirects to `/admin/index.php` for admin/area_rep/store_manager, or `/member/index.php` for everyone else.
 
+#### Developer access window (handover lockout)
+
+After the `is_active` check, `attemptLogin()` asks `DeveloperAccessService::isLocked($email)` — when the handover lockout is enabled and the gated developer account has no open window, it returns `['status' => 'dev_locked']` and `login.php` shows a "developer access is locked" message. The same check guards `completeTwoFactorLogin()`, and `app/bootstrap.php` ends a live session whose window lapses mid-session (redirect to `/login.php?dev_locked=1`; `/api/*` requests get a JSON 401). Webmaster-facing controls and the break-glass procedure are in [Appendix D](view.php?slug=D-handover-runbook).
+
 #### Email or member ID
 
 `AuthService::findUserByIdentifier()` branches on `FILTER_VALIDATE_EMAIL` — emails hit `users.email`, anything else is parsed by `MembershipService::parseMemberNumberString` and resolved through `members` (including the associate → full-member walk-up) back to a `users` row.
@@ -207,3 +215,4 @@ An admin can "act as" a member from `/admin/members/actions.php`. It writes `$_S
 - [08 — Activity & audit log](view.php?slug=08-activity-audit) — where login successes, failures, and impersonation events land.
 - [12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout) — the throttle that runs before `password_verify`.
 - [22 — Notifications & email](view.php?slug=22-notifications-email) — how reset-password and security-alert emails go out.
+- [D — Handover & emergency runbook](view.php?slug=D-handover-runbook) — the developer-access window that gates the developer's login after handover.

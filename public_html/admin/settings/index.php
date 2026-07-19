@@ -869,6 +869,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 ],
                 'Advanced' => [
                   ['label' => 'AI Settings', 'icon' => 'smart_toy', 'desc' => 'AI keys, models, feature flags.', 'href' => '/admin/settings/ai.php', 'permission' => 'admin.settings.general.manage'],
+                  ['label' => 'Developer Access', 'icon' => 'vpn_key', 'desc' => 'Grant or revoke the developer\'s timed admin access.', 'href' => '/admin/settings/developer-access.php', 'permission' => 'admin.settings.general.manage'],
                   ['label' => 'Advanced / Developer', 'icon' => 'code', 'desc' => 'Maintenance mode, system log, raw flags.', 'href' => '/admin/settings/index.php?section=advanced', 'permission' => 'admin.settings.general.manage'],
                 ],
               ];
