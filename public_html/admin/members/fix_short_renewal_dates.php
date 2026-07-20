@@ -9,6 +9,12 @@
  *   2. New-member joins stored the raw pricing key (e.g. JOIN_P_3Y) as the
  *      term, which the old normaliser didn't understand, collapsing a 3-year
  *      join into a 1-year period.
+ *   3. Migrated members with NO period-history rows had their renewals
+ *      misclassified as brand-new pro-rata joins (fixed at runtime 3 Jul 2026),
+ *      so a 1-year renewal expired 31/07/2026 and a 3-year one 31/07/2028 —
+ *      whether paid by card or approved manually. History can't reveal these
+ *      (the member still has no prior periods), so the linked order's line
+ *      item is checked instead: "…renewal…" means renewal math applies.
  *
  * This tool replays the *fixed* expiry rules against each member's current
  * (latest) membership period and, where the stored end date is SHORT, corrects
@@ -105,6 +111,11 @@ try {
           WHERE member_id = :mid AND id <> :pid AND status <> "PENDING_PAYMENT"'
     );
     $termStmt = $pdo->prepare('UPDATE membership_periods SET term = :term WHERE id = :id');
+    $renewalOrderStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM orders o
+           JOIN order_items oi ON oi.order_id = o.id
+          WHERE o.membership_period_id = :pid AND oi.name LIKE "%renewal%"'
+    );
 
     foreach ($memberIds as $mid) {
         $mid = (int) $mid;
@@ -120,6 +131,12 @@ try {
 
         $priorCountStmt->execute(['mid' => $mid, 'pid' => (int) $period['id']]);
         $hasPrior = ((int) $priorCountStmt->fetchColumn()) > 0;
+        if (!$hasPrior) {
+            // Bug-3 cohort: no period history, but the order proves it was a
+            // renewal purchase — apply renewal math, not join math.
+            $renewalOrderStmt->execute(['pid' => (int) $period['id']]);
+            $hasPrior = ((int) $renewalOrderStmt->fetchColumn()) > 0;
+        }
 
         $expected = $expectedEnd($period, $prevEnd, $hasPrior);
         if ($expected === null) {
