@@ -68,7 +68,7 @@ The **Add Member** button (top-right of the list, full admins only) opens a step
 The steps are:
 
 1. **Type & number** — Full / Associate / Life, chapter, and the membership number (the next free number is suggested; override if you need to). For an **Associate**, you can link them to an existing **Full** member — they then share that member's base number and get the next free suffix automatically (e.g. `1234.2`). Leave the link blank to give the associate their own number.
-2. **Contact** — first name, last name, email (all required), phone.
+2. **Contact** — first name, last name, email (all required), phone. If the email is already on another member (common for households sharing one address), the wizard says who owns it and offers **"Link as associate & share email"** — accepting switches the type to Associate, pre-selects that household's Full/Life member as the link, and lets the shared email through. Decline to type a different email instead.
 3. **Address** — all optional.
 4. **Preferences** — Wings delivery, privacy level, and the A–F directory / assistance flags. The **Australia Post presort code (Zone)** field on the member view (Preferences & Assistance card) is admin-only — never shown to members — and records the postal sort zone used when mailing printed Wings copies (`members.australia_presort_code`).
 5. **Bikes** — optionally add one or more Goldwings (make / model / year / rego / colour). Empty rows are ignored.
@@ -259,7 +259,7 @@ Three reusable helpers near the top of the file back both the per-member actions
 
 `add.php` is a single page with seven client-side steps (vanilla JS, one final POST) — gated on `isFullAccess` **and** `canManualOrderFix`, and blocked for chapter-restricted accounts. It posts `action=create_member`, which:
 
-1. Validates name/email (`MemberRepository::isEmailAvailable`).
+1. Validates name/email (`MemberRepository::isEmailAvailable`). A duplicate email is allowed only when the type is `ASSOCIATE` **and** the POST carries `shared_email_ok=1` — set by the wizard's shared-household-email prompt, which calls the `check_member_email` JSON action (returns the owning member + the household's Full/Life `link_member_id`) when leaving the Contact step. `members.email` has no unique index, so shared-email households already exist via `apply.php`; a shared-email associate who later gets a welcome email is attached to the household's existing login (`sendWelcomeEmailForMember` reuses the `users` row by email).
 2. Resolves the member number — Full/Life/unlinked-associate get their own base (suggested = `MAX(member_number_base)+1` honouring `membership.member_number_start`, overridable); a linked associate reuses the parent's base + `MAX(suffix)+1`. Duplicates are rejected.
 3. Minimal `INSERT` of the required columns, then `MemberRepository::update()` for all the optional profile fields (address, suburb→city, directory prefs, etc.) so the field mapping isn't duplicated.
 4. Optional bikes via `insertMemberBike`.

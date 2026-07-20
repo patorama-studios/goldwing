@@ -198,6 +198,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <input type="text" name="phone" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
               </label>
             </div>
+
+            <!-- Shared household email prompt (shown when the email is already on a member) -->
+            <input type="hidden" name="shared_email_ok" id="shared_email_ok" value="">
+            <div id="shared-email-panel" class="mt-4 hidden rounded-xl border border-amber-300 bg-amber-50 p-4">
+              <p class="text-sm font-semibold text-amber-900">This email is already used by <span id="shared-email-owner"></span>.</p>
+              <p class="mt-1 text-xs text-amber-800">Households often share one email address. You can add this person as an associate member linked to them, sharing the same email.</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" id="shared-email-accept" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Link as associate &amp; share email</button>
+                <button type="button" id="shared-email-decline" class="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">Use a different email</button>
+              </div>
+            </div>
           </div>
 
           <!-- STEP 3: Address -->
@@ -465,10 +476,74 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
   nextBtn.addEventListener('click', function () {
     if (!validateStep(current)) { return; }
+    if (steps[current].querySelector('input[name="email"]') && !ensureEmailCleared()) { return; }
     if (current < steps.length - 1) { current++; render(); }
   });
   backBtn.addEventListener('click', function () {
     if (current > 0) { current--; render(); }
+  });
+
+  // --- Shared household email check (contact step) ---
+  var emailInput = form.querySelector('input[name="email"]');
+  var sharedOkInput = document.getElementById('shared_email_ok');
+  var sharedPanel = document.getElementById('shared-email-panel');
+  var sharedOwnerEl = document.getElementById('shared-email-owner');
+  var clearedEmail = null; // email that passed the lookup or was confirmed shared
+  var pendingOwner = null;
+
+  function advanceStep() {
+    if (current < steps.length - 1) { current++; render(); }
+  }
+
+  // Returns true if the email is already cleared; otherwise starts the lookup
+  // and advances (or shows the shared-email panel) when it resolves.
+  function ensureEmailCleared() {
+    var email = emailInput.value.trim().toLowerCase();
+    if (email === clearedEmail) { return true; }
+    nextBtn.disabled = true;
+    var body = new URLSearchParams();
+    body.set('action', 'check_member_email');
+    body.set('csrf_token', form.elements['csrf_token'].value);
+    body.set('email', emailInput.value.trim());
+    fetch('/admin/members/actions.php', { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        nextBtn.disabled = false;
+        if (data && data.success && data.available === false && data.owner) {
+          pendingOwner = data.owner;
+          sharedOwnerEl.textContent = data.owner.name + ' (#' + data.owner.member_number + ')';
+          sharedPanel.classList.remove('hidden');
+          return;
+        }
+        // Email is free (or the lookup errored — the server re-checks on submit).
+        clearedEmail = email;
+        advanceStep();
+      })
+      .catch(function () { nextBtn.disabled = false; clearedEmail = email; advanceStep(); });
+    return false;
+  }
+
+  emailInput.addEventListener('input', function () {
+    clearedEmail = null;
+    pendingOwner = null;
+    sharedOkInput.value = '';
+    sharedPanel.classList.add('hidden');
+  });
+
+  document.getElementById('shared-email-accept').addEventListener('click', function () {
+    clearedEmail = emailInput.value.trim().toLowerCase();
+    sharedOkInput.value = '1';
+    sharedPanel.classList.add('hidden');
+    memberType.value = 'ASSOCIATE';
+    onTypeChange();
+    if (pendingOwner && pendingOwner.link_member_id > 0 && fullSelect) {
+      fullSelect.value = String(pendingOwner.link_member_id);
+    }
+    advanceStep();
+  });
+  document.getElementById('shared-email-decline').addEventListener('click', function () {
+    sharedPanel.classList.add('hidden');
+    emailInput.focus();
   });
 
   form.addEventListener('submit', function (e) {

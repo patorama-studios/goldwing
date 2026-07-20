@@ -612,7 +612,7 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
 }
 
 $action = $_POST['action'] ?? '';
-$jsonActions = ['member_inline_update', 'bulk_member_action', 'associate_search', 'link_associate_member', 'unlink_associate_member'];
+$jsonActions = ['member_inline_update', 'bulk_member_action', 'associate_search', 'link_associate_member', 'unlink_associate_member', 'check_member_email'];
 if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     if (in_array($action, $jsonActions, true)) {
         respondWithJson(['success' => false, 'error' => 'Invalid CSRF token.'], 403);
@@ -624,7 +624,7 @@ if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     header('Location: /admin/members');
     exit;
 }
-$requiresMemberContext = !in_array($action, ['member_inline_update', 'bulk_member_action', 'create_member'], true);
+$requiresMemberContext = !in_array($action, ['member_inline_update', 'bulk_member_action', 'create_member', 'check_member_email'], true);
 $member = null;
 $chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
 
@@ -682,14 +682,19 @@ switch ($action) {
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $redirectAddError('A valid email address is required.');
         }
-        if (!MemberRepository::isEmailAvailable($email, null)) {
-            $redirectAddError('That email address is already linked to another member.');
-        }
 
         // --- Step 1: member type + number ---
         $memberTypeStep = strtoupper(trim((string) ($_POST['member_type'] ?? 'FULL')));
         if (!in_array($memberTypeStep, ['FULL', 'ASSOCIATE', 'LIFE'], true)) {
             $memberTypeStep = 'FULL';
+        }
+        if (!MemberRepository::isEmailAvailable($email, null)) {
+            // Households often share one email address. An associate may reuse
+            // an existing member's email, but only after the admin confirms the
+            // wizard's "link as associate" prompt (which sets shared_email_ok).
+            if ($memberTypeStep !== 'ASSOCIATE' || empty($_POST['shared_email_ok'])) {
+                $redirectAddError('That email address is already linked to another member.');
+            }
         }
         $fullMemberId = (int) ($_POST['full_member_id'] ?? 0);
         $base = 0;
@@ -2889,6 +2894,37 @@ switch ($action) {
             redirectWithFlash($memberId, $tab, 'Delete failed. Please try again or contact support.', 'error');
         }
         redirectToMembersList('Member deleted permanently.');
+        break;
+
+    case 'check_member_email':
+        // Add-member wizard: is this email already on a member? If so, return
+        // the owner so the wizard can offer "link as associate, share email".
+        if (!AdminMemberAccess::isFullAccess($user)) {
+            respondWithJson(['success' => false, 'error' => 'Permission denied.'], 403);
+        }
+        $checkEmail = trim((string) ($_POST['email'] ?? ''));
+        if ($checkEmail === '' || !filter_var($checkEmail, FILTER_VALIDATE_EMAIL)) {
+            respondWithJson(['success' => false, 'error' => 'Invalid email address.'], 400);
+        }
+        $stmt = Database::connection()->prepare('SELECT id, first_name, last_name, member_type, full_member_id, member_number_base, member_number_suffix FROM members WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+        $stmt->execute(['email' => $checkEmail]);
+        $emailOwner = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$emailOwner) {
+            respondWithJson(['success' => true, 'available' => true]);
+        }
+        // Link target for the new associate: the owner themselves if they are
+        // the household's full/life member, otherwise the full member the
+        // owner is already linked to (0 = no auto-link possible).
+        $linkMemberId = in_array($emailOwner['member_type'], ['FULL', 'LIFE'], true)
+            ? (int) $emailOwner['id']
+            : (int) ($emailOwner['full_member_id'] ?? 0);
+        respondWithJson(['success' => true, 'available' => false, 'owner' => [
+            'id' => (int) $emailOwner['id'],
+            'name' => trim(($emailOwner['first_name'] ?? '') . ' ' . ($emailOwner['last_name'] ?? '')),
+            'member_number' => MembershipService::displayMembershipNumber((int) ($emailOwner['member_number_base'] ?? 0), (int) ($emailOwner['member_number_suffix'] ?? 0)),
+            'member_type' => (string) $emailOwner['member_type'],
+            'link_member_id' => $linkMemberId,
+        ]]);
         break;
 
     case 'associate_search':
