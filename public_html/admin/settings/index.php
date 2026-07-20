@@ -424,6 +424,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'joining_enabled' => isset($_POST['joining_enabled']),
                     'joining_fee_cents' => 0,
                     'joining_prices' => [],
+                    'join_rollover_enabled' => isset($_POST['join_rollover_enabled']),
+                    'join_rollover_month' => (int) ($_POST['pricing_rollover_month'] ?? 6),
+                    'join_rollover_day' => (int) ($_POST['pricing_rollover_day'] ?? 1),
                 ];
 
                 // ---- Renewal periods ----
@@ -2969,6 +2972,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               $anchorDay = (int) $pricingConfig['anchor_day'];
               $expiryMonth = (int) $pricingConfig['expiry_month'];
               $expiryDay = (int) $pricingConfig['expiry_day'];
+              $rolloverEnabled = !empty($pricingConfig['join_rollover_enabled']);
+              $rolloverMonth = (int) ($pricingConfig['join_rollover_month'] ?? 6);
+              $rolloverDay = (int) ($pricingConfig['join_rollover_day'] ?? 1);
               $monthNames = [1=>'January','February','March','April','May','June','July','August','September','October','November','December'];
               $monthAbbr = [1=>'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
               $magazineIcons = ['PRINTED' => ['icon' => 'menu_book', 'label' => 'Printed Wings'], 'PDF' => ['icon' => 'picture_as_pdf', 'label' => 'PDF Wings']];
@@ -3064,6 +3070,27 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <?php endforeach; ?>
                       </select>
                     </div>
+                  </label>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-4">
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="join_rollover_enabled" value="1" <?= $rolloverEnabled ? 'checked' : '' ?> class="mt-1 rounded border-gray-300 text-emerald-600">
+                    <span class="text-sm text-slate-600">
+                      <span class="font-semibold text-gray-900 block">Late-year join rollover</span>
+                      New members joining on or after
+                      <select name="pricing_rollover_day" class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm">
+                        <?php for ($d = 1; $d <= 28; $d++): ?>
+                          <option value="<?= $d ?>" <?= $d === $rolloverDay ? 'selected' : '' ?>><?= $d ?></option>
+                        <?php endfor; ?>
+                      </select>
+                      <select name="pricing_rollover_month" class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm">
+                        <?php foreach ($monthNames as $num => $name): ?>
+                          <option value="<?= $num ?>" <?= $num === $rolloverMonth ? 'selected' : '' ?>><?= e($name) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      pay the <strong>start-of-year price</strong> and their membership runs to the end of the <strong>next</strong> membership year — never just the few weeks left in this one.
+                    </span>
                   </label>
                 </div>
 

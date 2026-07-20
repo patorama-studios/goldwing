@@ -1300,8 +1300,10 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         if (hintEl) {
           const joiningOption = options.find((opt) => opt.kind === 'joining');
           const proRataOption = options.find((opt) => opt.kind === 'prorata_only');
-          if (joiningOption && joiningOption.window_label) {
-            hintEl.textContent = `Joining now (${joiningOption.window_label}) — prices are pro-rated to the 31 July expiry.`;
+          if (joiningOption && joiningOption.rollover && joiningOption.expiry_label) {
+            hintEl.textContent = `Good timing — join now at the standard full-year price and your membership runs right through to ${joiningOption.expiry_label}. The rest of this year is included free.`;
+          } else if (joiningOption && joiningOption.window_label) {
+            hintEl.textContent = `Joining now (${joiningOption.window_label}) — prices are pro-rated to the ${joiningOption.expiry_label || '31 July'} expiry.`;
           } else if (proRataOption) {
             hintEl.textContent = `Pro-rata: ${proRataOption.duration_months} month${proRataOption.duration_months === 1 ? '' : 's'} until expiry. Or extend with a full renewal period.`;
           } else {

@@ -81,6 +81,14 @@ The same page also has member-ID sequencing, manual migration controls, the Asso
 
 > **Tip:** click the **Take the tour** button above (or the tour launcher on the page) for a guided walk-through of this card.
 
+### Walk-through: the late-year join rollover (June/July joiners)
+
+1. In the **Membership year** card, find the **Late-year join rollover** row.
+2. Tick the box and pick the cut-over date (committee default: **1 June**).
+3. Click **Save Settings**.
+
+From that date until the 31 July expiry, a brand-new joiner pays the **Start of year** column price (full-year figure, joining fee included) and their membership runs to the end of the **next** membership year. Example: joining 19 July 2026 costs the full $70 (PDF Full) and expires 31 July 2027 — the rest of the current year is included free, and the apply page shows the member a notice saying so. Without this, a July joiner was quoted the "After 1 Apr" pro-rata price for a membership expiring within weeks. Renewals are never affected.
+
 ### Walk-through: turning pro-rata off (charge full price all year)
 
 1. Scroll to the **Pro-rata for new joiners** card.
@@ -175,6 +183,8 @@ The config blob (one JSON value at `settings_global['membership.pricing.config']
   "prorata_enabled": true,
   "prorata_minimum_months": 1,
   "prorata_rounding": "nearest_dollar",
+  "join_rollover_enabled": true,
+  "join_rollover_month": 6, "join_rollover_day": 1,
   "renewal_periods": [
     {"id": "P_1Y", "label": "1 Year", "duration_months": 12, "sort_order": 10, "active": true},
     {"id": "P_3Y", "label": "3 Years", "duration_months": 36, "sort_order": 30, "active": true}
@@ -203,6 +213,8 @@ The config blob (one JSON value at `settings_global['membership.pricing.config']
 ```
 
 The **joining matrix** (`joining_prices`) is the current source of truth for new-member prices when `joining_enabled` is true. It's keyed `[magazine][type][period_id][window]`, where `period_id` reuses the renewal periods (`P_1Y`, `P_3Y`) and `window` is one of `FULL` / `DEC` / `APR`. `joiningWindowForDate()` maps a join date to a window by **thirds of the membership year** (anchor → before 1 Dec = `FULL`; 1 Dec → before 1 Apr = `DEC`; 1 Apr → expiry = `APR`) — explicitly *not* month-by-month, to match the committee's printed matrix cell-for-cell. The cells already bake in the one-off joining fee; `joining_fee_cents` is surfaced only as the Add Member wizard default. `JOINING_WINDOWS` is the public constant listing the three windows.
+
+**Late-year join rollover (Jul 2026):** from the configured rollover date (`join_rollover_*`, default 1 June) until expiry, `joinRolloverActive()` is true. That forces the joining window to `FULL` (start-of-year price), makes `calculateProRataCents()` charge the full annual price, and shifts the first-year end a year out via `MembershipService::newJoinYearEnd()` — used by both `createMembershipPeriod()` (provisional expiry) and `activateMembershipForOrder()`'s brand-new-join branch. `getJoinOptions()` marks each option with `rollover` + `expiry_label`, which `/apply.php` uses to show the "runs through to 31 July next year" notice. Renewal branches never call `newJoinYearEnd()`, so renewals are untouched.
 
 #### Backwards compatibility
 

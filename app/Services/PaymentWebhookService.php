@@ -262,6 +262,8 @@ class PaymentWebhookService
                 'order_number' => $order['order_number'] ?? '',
                 'payment_link' => NotificationService::escape($paymentLink),
             ]);
+            self::notifyAdminsPaymentIssue($order, $member ?: [], 'failed',
+                (string) (($intent['last_payment_error']['message'] ?? '') ?: 'Stripe reported the card payment as failed.'));
             ActivityLogger::log('system', null, (int) $order['member_id'], 'membership.payment_failed', [
                 'order_id' => $order['id'],
                 'payment_intent' => $paymentIntentId,
@@ -660,6 +662,7 @@ class PaymentWebhookService
                     'invoice_id' => $invoiceId,
                 ]);
             }
+            self::notifyAdminsPaymentIssue($order, $member ?: [], 'failed', 'Stripe invoice payment failed (card declined or authentication failed).');
         }
     }
 
@@ -725,7 +728,31 @@ class PaymentWebhookService
                         'subscription_status' => $status,
                     ]);
                 }
+                self::notifyAdminsPaymentIssue($order, $member ?: [], 'cancelled', 'Stripe subscription status: ' . $status . '. The membership has been marked inactive.');
             }
+        }
+    }
+
+    /**
+     * Admin/treasurer copy of a failed or cancelled membership payment, so
+     * nobody chases a member whose Stripe payment never went through. A mail
+     * failure must never break webhook processing.
+     */
+    private static function notifyAdminsPaymentIssue(array $order, array $member, string $statusLabel, string $reason): void
+    {
+        try {
+            NotificationService::dispatch('membership_admin_payment_issue', [
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'member_id' => (int) ($order['member_id'] ?? 0) ?: null,
+                'member_name' => trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?: 'Unknown member',
+                'member_email' => (string) (($member['email'] ?? '') ?: '—'),
+                'order_number' => (string) (($order['order_number'] ?? '') ?: ($order['id'] ?? '')),
+                'status_label' => $statusLabel,
+                'reason' => NotificationService::escape($reason),
+                'admin_link' => BaseUrlService::buildUrl('/admin/membership-orders/view.php?id=' . (int) ($order['id'] ?? 0)),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[PaymentWebhookService] admin payment-issue notification failed: ' . $e->getMessage());
         }
     }
 

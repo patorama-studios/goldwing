@@ -155,7 +155,7 @@ EmailService           ← brand-wrap, preferences/unsubscribe footer, log to em
 SmtpMailer  |  Resend API  |  PHP mail()
 ```
 
-**`NotificationService::dispatch($key, $context, $options)`** looks the key up in `getCatalogSettings()` (defaults merged with DB overrides), bails if the per-template `enabled` flag or the global kill-switch `notifications.enabled` is off (unless `options.force = true`), resolves recipients from `recipient_mode` (`primary` / `admin` / `both` / `custom`), runs `NotificationPreferenceService::shouldReceive()` for non-mandatory templates, substitutes `{{tokens}}`, and calls `EmailService::send()` once per recipient.
+**`NotificationService::dispatch($key, $context, $options)`** looks the key up in `getCatalogSettings()` (defaults merged with DB overrides), bails if the per-template `enabled` flag or the global kill-switch `notifications.enabled` is off (unless `options.force = true`), resolves recipients from `recipient_mode` (`primary` / `admin` / `both` / `custom`), runs `NotificationPreferenceService::shouldReceive()` for non-mandatory templates, substitutes `{{tokens}}`, and calls `EmailService::send()` once per recipient. `options.recipients` is an **exact-recipient override** that skips catalog recipient resolution entirely — used by Member of the Year nominations so they go *only* to the configured MotY recipient (`notifications.member_of_year_emails`, Settings → Notifications), never the shared admin list, even if the catalog row has stale custom recipients.
 
 **`EmailService::send($to, $subject, $body, $metadata)`** is the lower-level "just send this email" call — also used directly by `InvoiceService`, `SecurityAlertService`, `cron/send_renewal_reminders.php`, and admin tools. It wraps the body in the gold-branded HTML shell (`wrapHtml()`) unless it already carries `data-email-template="goldwing"`, appends a tokenised preferences/unsubscribe footer (skipped for mandatory templates), picks the transport from `integrations.email_provider` (`php_mail` default / `smtp` / `resend`), and logs the attempt to `email_log` plus an `email.sent` ActivityLogger event with the full subject + body snapshot for replay.
 
@@ -179,6 +179,8 @@ Token substitution is intentionally naive — `{{member_name}}`, `{{order_number
 | `application_member_approved` | Admin approves a membership application | no |
 | `membership_approved`, `membership_order_created`, `membership_payment_received` | Approval / order / Stripe webhook | yes |
 | `membership_treasurer_notification` | Paired with `membership_payment_received` for admins | no |
+| `membership_admin_stripe_pending` | Member reaches the Stripe payment form for a membership (admin heads-up, pre-charge; first attempt per order only) | no |
+| `membership_admin_payment_issue` | Stripe reports a membership payment failed / invoice failed / subscription cancelled (admin copy) | no |
 | `membership_order_approved/rejected`, `membership_payment_failed` | Admin action / Stripe failure | no |
 | `membership_admin_pending_approval` | Bank-transfer order needs review | no |
 | `store_order_confirmation`, `store_ticket_codes`, `store_shipping_update` | Store checkout / tracking saved | mixed |

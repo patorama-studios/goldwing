@@ -63,6 +63,12 @@ class MembershipPricingService
             'prorata_enabled' => true,
             'prorata_minimum_months' => 1,
             'prorata_rounding' => 'nearest_dollar', // or 'nearest_cent'
+            // Late-year join rollover: from this date (default 1 June) a new
+            // joiner pays the start-of-year price and their membership runs to
+            // the END of the NEXT membership year — never a few weeks.
+            'join_rollover_enabled' => true,
+            'join_rollover_month' => 6,
+            'join_rollover_day' => 1,
             'renewal_periods' => [
                 ['id' => 'P_1Y', 'label' => '1 Year', 'duration_months' => 12, 'sort_order' => 10, 'active' => true],
                 ['id' => 'P_3Y', 'label' => '3 Years', 'duration_months' => 36, 'sort_order' => 30, 'active' => true],
@@ -249,10 +255,7 @@ class MembershipPricingService
         $from = $from ?: new DateTimeImmutable('today', $tz);
         $from = $from->setTime(0, 0, 0);
 
-        $expiryThisYear = self::makeDate((int) $from->format('Y'), $config['expiry_month'], $config['expiry_day'], $tz);
-        $expiry = $from <= $expiryThisYear
-            ? $expiryThisYear
-            : self::makeDate((int) $from->format('Y') + 1, $config['expiry_month'], $config['expiry_day'], $tz);
+        $expiry = self::nextExpiryFrom($from, $config, $tz);
 
         $months = (int) $from->diff($expiry)->m
             + ((int) $from->diff($expiry)->y) * 12;
@@ -284,6 +287,9 @@ class MembershipPricingService
         }
         $config = self::getConfig();
         $months = self::monthsRemainingUntilExpiry($joinDate);
+        if (self::joinRolloverActive($joinDate)) {
+            $months = 12; // rollover join buys the whole NEXT membership year
+        }
         $raw = $annual * ($months / 12);
         $rounding = (string) ($config['prorata_rounding'] ?? 'nearest_dollar');
         if ($rounding === 'nearest_dollar') {
@@ -335,18 +341,58 @@ class MembershipPricingService
     }
 
     /**
+     * Late-year join rollover (committee, Jul 2026): a new member joining from
+     * the rollover date (default 1 June) pays the start-of-year price and their
+     * first membership year is the NEXT one — expiry lands ~14 months out, not
+     * a few weeks. Renewals are never affected.
+     */
+    public static function joinRolloverActive(?DateTimeImmutable $joinDate = null): bool
+    {
+        $config = self::getConfig();
+        if (empty($config['join_rollover_enabled'])) {
+            return false;
+        }
+        $tz = new DateTimeZone('Australia/Sydney');
+        $joinDate = ($joinDate ?: new DateTimeImmutable('today', $tz))->setTime(0, 0, 0);
+        $expiry = self::nextExpiryFrom($joinDate, $config, $tz);
+        $rollover = self::makeDate((int) $expiry->format('Y'), $config['join_rollover_month'], $config['join_rollover_day'], $tz);
+        if ($rollover > $expiry) {
+            $rollover = $rollover->modify('-1 year');
+        }
+        return $joinDate >= $rollover;
+    }
+
+    /** End of the first membership year a new joiner buys (rollover-aware). */
+    public static function joinFirstYearEnd(?DateTimeImmutable $joinDate = null): DateTimeImmutable
+    {
+        $config = self::getConfig();
+        $tz = new DateTimeZone('Australia/Sydney');
+        $joinDate = ($joinDate ?: new DateTimeImmutable('today', $tz))->setTime(0, 0, 0);
+        $end = self::nextExpiryFrom($joinDate, $config, $tz);
+        if (self::joinRolloverActive($joinDate)) {
+            $end = $end->modify('+1 year');
+        }
+        return $end;
+    }
+
+    /**
      * Which join window a date falls in, by thirds of the membership year:
      *   FULL = first third (anchor month .. before 1 Dec)
      *   DEC  = second third (1 Dec .. before 1 Apr)
      *   APR  = final third (1 Apr .. expiry)
      * Window boundaries follow the calendar month, matching the committee
      * matrix wording ("join after 1 December" / "join after 1 April").
+     * During the rollover window the joiner is buying the NEXT membership
+     * year, so the start-of-year (FULL) cell applies.
      */
     public static function joiningWindowForDate(?DateTimeImmutable $joinDate = null): string
     {
         $config = self::getConfig();
         $tz = new DateTimeZone('Australia/Sydney');
         $joinDate = $joinDate ?: new DateTimeImmutable('today', $tz);
+        if (self::joinRolloverActive($joinDate)) {
+            return 'FULL';
+        }
         $anchorMonth = (int) $config['anchor_month'];
         $joinMonth = (int) $joinDate->format('n');
         $offset = ($joinMonth - $anchorMonth + 12) % 12; // 0..11 months into the year
@@ -390,8 +436,6 @@ class MembershipPricingService
         $tz = new DateTimeZone('Australia/Sydney');
         $joinDate = $joinDate ?: new DateTimeImmutable('today', $tz);
         $monthsRemaining = self::monthsRemainingUntilExpiry($joinDate);
-        $monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
 
         $options = [];
 
@@ -401,11 +445,14 @@ class MembershipPricingService
         if (!empty($config['joining_enabled'])) {
             $window = self::joiningWindowForDate($joinDate);
             $windowLabel = self::JOINING_WINDOWS[$window] ?? '';
+            $rollover = self::joinRolloverActive($joinDate);
+            $firstYearEnd = self::joinFirstYearEnd($joinDate);
             foreach (self::getRenewalPeriods(true) as $period) {
                 $cents = self::getJoiningPriceCents($magazineType, $membershipType, $period['id'], $window, $joinDate);
                 if ($cents === null) {
                     continue;
                 }
+                $extraMonths = max(0, (int) $period['duration_months'] - 12);
                 $options[] = [
                     'key' => 'JOIN_' . $period['id'],
                     'label' => $period['label'],
@@ -416,6 +463,8 @@ class MembershipPricingService
                     'period_id' => $period['id'],
                     'window' => $window,
                     'window_label' => $windowLabel,
+                    'rollover' => $rollover,
+                    'expiry_label' => $firstYearEnd->modify("+{$extraMonths} months")->format('j F Y'),
                 ];
             }
             return $options;
@@ -426,7 +475,7 @@ class MembershipPricingService
         if (!empty($config['prorata_enabled'])) {
             $proRataCents = self::calculateProRataCents($magazineType, $membershipType, $joinDate);
             if ($proRataCents !== null) {
-                $expiryLabel = sprintf('%d %s', (int) $config['expiry_day'], $monthNames[(int) $config['expiry_month']]);
+                $expiryLabel = self::joinFirstYearEnd($joinDate)->format('j F Y');
                 $options[] = [
                     'key' => 'JOIN_ONLY',
                     'label' => sprintf('Join now until %s — %d month%s', $expiryLabel, $monthsRemaining, $monthsRemaining === 1 ? '' : 's'),
@@ -684,6 +733,11 @@ class MembershipPricingService
         $rounding = (string) ($cfg['prorata_rounding'] ?? 'nearest_dollar');
         $out['prorata_rounding'] = in_array($rounding, ['nearest_dollar', 'nearest_cent'], true)
             ? $rounding : 'nearest_dollar';
+        $out['join_rollover_enabled'] = array_key_exists('join_rollover_enabled', $cfg)
+            ? !empty($cfg['join_rollover_enabled'])
+            : $defaults['join_rollover_enabled'];
+        $out['join_rollover_month'] = self::clampInt($cfg['join_rollover_month'] ?? $defaults['join_rollover_month'], 1, 12);
+        $out['join_rollover_day'] = self::clampInt($cfg['join_rollover_day'] ?? $defaults['join_rollover_day'], 1, 28);
 
         $rawPeriods = is_array($cfg['renewal_periods'] ?? null) ? $cfg['renewal_periods'] : $defaults['renewal_periods'];
         $periods = [];
@@ -864,6 +918,15 @@ class MembershipPricingService
             }
         }
         return $config;
+    }
+
+    /** Next membership-year expiry on/after $from. */
+    private static function nextExpiryFrom(DateTimeImmutable $from, array $config, DateTimeZone $tz): DateTimeImmutable
+    {
+        $expiryThisYear = self::makeDate((int) $from->format('Y'), $config['expiry_month'], $config['expiry_day'], $tz);
+        return $from <= $expiryThisYear
+            ? $expiryThisYear
+            : self::makeDate((int) $from->format('Y') + 1, $config['expiry_month'], $config['expiry_day'], $tz);
     }
 
     private static function makeDate(int $year, int $month, int $day, DateTimeZone $tz): DateTimeImmutable

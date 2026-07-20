@@ -5,6 +5,24 @@ use DateTimeImmutable;
 
 class MembershipService
 {
+    /**
+     * End of the first membership year for a BRAND-NEW join starting $startDate:
+     * 31 Jul of the current membership year, or a year later when the join
+     * rollover window (default from 1 June) is active. Renewals never use this.
+     */
+    public static function newJoinYearEnd(string $startDate): DateTimeImmutable
+    {
+        $end = new DateTimeImmutable(self::calculateExpiry($startDate, 1));
+        try {
+            if (MembershipPricingService::joinRolloverActive(new DateTimeImmutable($startDate))) {
+                $end = $end->modify('+1 year');
+            }
+        } catch (\Throwable $e) {
+            // Pricing config unavailable (e.g. CLI without DB) — plain year end.
+        }
+        return $end;
+    }
+
     public static function calculateExpiry(string $startDate, int $termYears): string
     {
         $start = new DateTimeImmutable($startDate);
@@ -211,14 +229,13 @@ class MembershipService
         $expiry = null;
         if ($months !== null) {
             // Provisional new-joiner expiry: the rest of the current membership
-            // year plus any whole years beyond the first. Paid renewals
-            // re-derive the authoritative end date in
+            // year (rollover-aware) plus any whole years beyond the first. Paid
+            // renewals re-derive the authoritative end date in
             // MembershipOrderService::activateMembershipForOrder(); this value
             // stands for periods activated straight through markPaid()
             // (e.g. associate members approved by an admin).
-            $currentYearEnd = new DateTimeImmutable(self::calculateExpiry($startDate, 1));
             $extraMonths = max(0, $months - 12);
-            $expiry = $currentYearEnd->modify("+{$extraMonths} months")->format('Y-m-d');
+            $expiry = self::newJoinYearEnd($startDate)->modify("+{$extraMonths} months")->format('Y-m-d');
         }
         $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, NOW())');

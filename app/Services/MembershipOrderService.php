@@ -203,11 +203,12 @@ class MembershipOrderService
                 // renewal always advances the date N whole years — never short.
                 $endDate = $currentYearEnd->modify("+{$months} months")->format('Y-m-d');
             } else {
-                // Brand-new pro-rata join: rest of the current membership year
-                // plus any whole years beyond the first (the joining-window
-                // price already accounts for the partial first year).
+                // Brand-new join: rest of the current membership year plus any
+                // whole years beyond the first (the joining-window price already
+                // accounts for the partial first year). From the rollover date
+                // (default 1 June) the first year is the NEXT membership year.
                 $extraMonths = max(0, $months - 12);
-                $endDate = $currentYearEnd->modify("+{$extraMonths} months")->format('Y-m-d');
+                $endDate = MembershipService::newJoinYearEnd($startDate)->modify("+{$extraMonths} months")->format('Y-m-d');
             }
         }
 

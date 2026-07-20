@@ -1062,6 +1062,34 @@ switch ($action) {
             }
         }
 
+        // Household address sync (committee request): copy the saved address to
+        // the linked full/associate member(s) when the admin ticked the box.
+        $addressSyncKeys = ['address_line1', 'address_line2', 'suburb', 'state', 'postcode', 'country'];
+        $addressPayload = array_intersect_key($payload, array_flip($addressSyncKeys));
+        $addressSyncedNames = [];
+        if ($updated && !empty($_POST['sync_address_linked']) && $addressPayload !== []) {
+            $familyFullId = 0;
+            $targetType = strtoupper((string) ($targetMember['member_type'] ?? ''));
+            if (in_array($targetType, ['FULL', 'LIFE'], true)) {
+                $familyFullId = $targetMemberId;
+            } elseif (!empty($targetMember['full_member_id'])) {
+                $familyFullId = (int) $targetMember['full_member_id'];
+            }
+            if ($familyFullId > 0) {
+                $stmt = Database::connection()->prepare('SELECT id, first_name, last_name FROM members WHERE (id = :full_id OR full_member_id = :full_id2) AND id <> :target');
+                $stmt->execute(['full_id' => $familyFullId, 'full_id2' => $familyFullId, 'target' => $targetMemberId]);
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $linkedRow) {
+                    if (MemberRepository::update((int) $linkedRow['id'], $addressPayload)) {
+                        $addressSyncedNames[] = trim(($linkedRow['first_name'] ?? '') . ' ' . ($linkedRow['last_name'] ?? ''));
+                        ActivityLogger::log('admin', $user['id'] ?? null, (int) $linkedRow['id'], 'member.updated', [
+                            'changes' => ['address_synced_from_member_id' => $targetMemberId, 'fields' => array_keys($addressPayload)],
+                            'actor_roles' => $user['roles'] ?? [],
+                        ]);
+                    }
+                }
+            }
+        }
+
         // Sidebar / topbar / "Welcome <name>" reads from $_SESSION['user']['name']
         // which is set once at login from users.name. If the admin just edited
         // their OWN profile name (first_name or last_name), refresh the session
@@ -1119,7 +1147,11 @@ switch ($action) {
             ]);
         }
 
-        redirectWithFlash($memberId, $tab, 'Member profile updated.');
+        $profileFlash = 'Member profile updated.';
+        if ($addressSyncedNames) {
+            $profileFlash .= ' Address also applied to ' . implode(', ', $addressSyncedNames) . '.';
+        }
+        redirectWithFlash($memberId, $tab, $profileFlash);
         break;
 
     case 'member_inline_update':

@@ -85,6 +85,17 @@ class MembershipInvoiceService
         // Stamp every renewer order so the invoice.paid webhook can find and
         // activate them (primary + partner share one invoice).
         $pdo = Database::connection();
+        $primaryOrderId = (int) ($metadata['order_id'] ?? ($renewers[0]['order_id'] ?? 0));
+        $firstAttempt = true;
+        $orderNumber = '';
+        if ($primaryOrderId > 0) {
+            $stmt = $pdo->prepare('SELECT order_number, stripe_invoice_id FROM orders WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $primaryOrderId]);
+            if ($row = $stmt->fetch()) {
+                $orderNumber = (string) ($row['order_number'] ?? '');
+                $firstAttempt = trim((string) ($row['stripe_invoice_id'] ?? '')) === '';
+            }
+        }
         foreach ($renewers as $r) {
             $orderId = (int) ($r['order_id'] ?? 0);
             if ($orderId <= 0) {
@@ -96,6 +107,12 @@ class MembershipInvoiceService
                 'pi'  => $resolved['payment_intent_id'],
                 'id'  => $orderId,
             ]);
+        }
+
+        // First payment attempt for this renewal only — refreshes and retries
+        // re-stamp an already-stamped order and stay quiet.
+        if ($firstAttempt) {
+            self::notifyAdminsPaymentStarted($name, $email, $lines, $feeCents, $orderNumber, $primaryOrderId);
         }
 
         return $resolved;
@@ -143,6 +160,9 @@ class MembershipInvoiceService
             $pdo = Database::connection();
             $stmt = $pdo->prepare('UPDATE orders SET stripe_invoice_id = :inv, stripe_payment_intent_id = :pi, updated_at = NOW() WHERE id = :id');
             $stmt->execute(['inv' => $resolved['invoice_id'], 'pi' => $resolved['payment_intent_id'], 'id' => $orderId]);
+        }
+        if (trim((string) ($order['stripe_invoice_id'] ?? '')) === '') {
+            self::notifyAdminsPaymentStarted($name, $email, $lines, 0, (string) ($order['order_number'] ?? ''), $orderId);
         }
         return $resolved;
     }
@@ -321,6 +341,49 @@ class MembershipInvoiceService
             throw new \RuntimeException('Stripe invoice finalized but no PaymentIntent client_secret available.');
         }
         return $resolved;
+    }
+
+    /**
+     * Heads-up to the admin/treasurer recipients that a member has reached the
+     * Stripe payment step (first attempt for the order only). A mail failure
+     * must never block the payment flow.
+     *
+     * @param array<int,array{description?:string,cents?:int}> $lines
+     */
+    private static function notifyAdminsPaymentStarted(string $name, string $email, array $lines, int $feeCents, string $orderNumber, int $orderId): void
+    {
+        try {
+            $totalCents = 0;
+            $rows = '';
+            foreach ($lines as $line) {
+                $cents = (int) ($line['cents'] ?? 0);
+                if ($cents <= 0) {
+                    continue;
+                }
+                $totalCents += $cents;
+                $rows .= '<tr><td style="padding:4px 12px 4px 0;color:#374151;">'
+                    . NotificationService::escape((string) ($line['description'] ?? 'Membership'))
+                    . '</td><td style="padding:4px 0;text-align:right;">A$' . number_format($cents / 100, 2) . '</td></tr>';
+            }
+            if ($feeCents > 0) {
+                $totalCents += $feeCents;
+                $rows .= '<tr><td style="padding:4px 12px 4px 0;color:#374151;">Card processing fee</td><td style="padding:4px 0;text-align:right;">A$' . number_format($feeCents / 100, 2) . '</td></tr>';
+            }
+            $detailsHtml = '<table style="border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;margin:12px 0;">' . $rows
+                . '<tr><td style="padding:6px 12px 4px 0;font-weight:700;">Total</td><td style="padding:6px 0 4px;text-align:right;font-weight:700;">A$' . number_format($totalCents / 100, 2) . '</td></tr></table>';
+
+            NotificationService::dispatch('membership_admin_stripe_pending', [
+                'admin_emails' => NotificationService::getAdminEmails(),
+                'member_name' => NotificationService::escape($name !== '' ? $name : $email),
+                'member_email' => NotificationService::escape($email),
+                'order_number' => NotificationService::escape($orderNumber !== '' ? $orderNumber : (string) $orderId),
+                'amount' => 'A$' . number_format($totalCents / 100, 2),
+                'details_html' => $detailsHtml,
+                'admin_link' => BaseUrlService::buildUrl('/admin/membership-orders/view.php?id=' . $orderId),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[MembershipInvoiceService] pending-payment notification failed: ' . $e->getMessage());
+        }
     }
 
     /** Reuse the member's Stripe Customer, else find-by-email / create + persist. */

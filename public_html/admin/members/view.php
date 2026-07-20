@@ -25,8 +25,13 @@ require_permission('admin.members.view');
 
 $backUrl = '/admin/members/index.php';
 $returnToCandidate = (string) ($_GET['return_to'] ?? '');
+$savedListUrl = (string) ($_SESSION['admin_members_list_url'] ?? '');
 if ($returnToCandidate !== '' && str_starts_with($returnToCandidate, '/admin/members/index.php')) {
     $backUrl = $returnToCandidate;
+} elseif ($savedListUrl !== '' && str_starts_with($savedListUrl, '/admin/members/index.php')) {
+    // Filter set saved by the members list — restores the filtered view when
+    // return_to was dropped (after an edit save, or main ↔ associate hops).
+    $backUrl = $savedListUrl;
 }
 
 function orders_member_column(\PDO $pdo): string
@@ -1553,6 +1558,46 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                               <?= $canEditAddress ? '' : 'disabled' ?>>
                           </div>
+                          <?php
+                            // Household address sync (committee request): offer to copy
+                            // the saved address to the linked full/associate member(s).
+                            // Ticked by default when a partner already shares this
+                            // address, so couples stay in sync without extra clicks.
+                            $addressSyncPartners = [];
+                            if ($profileMemberId === $memberId) {
+                              if (in_array($member['member_type'], ['FULL', 'LIFE'], true)) {
+                                $addressSyncPartners = $associates;
+                              } elseif ($fullMember) {
+                                $addressSyncPartners = [$fullMember];
+                              }
+                            } else {
+                              $addressSyncPartners = array_merge(
+                                [$member],
+                                array_values(array_filter($associates, fn($a) => (int) ($a['id'] ?? 0) !== $profileMemberId))
+                              );
+                            }
+                            $addressSyncNames = [];
+                            $addressInSync = false;
+                            $profileAddrKey = strtolower(trim((string) ($profileMember['address_line1'] ?? ''))) . '|' . strtolower(trim((string) ($profileMember['postal_code'] ?? '')));
+                            foreach ($addressSyncPartners as $partnerRow) {
+                              $partnerName = trim(($partnerRow['first_name'] ?? '') . ' ' . ($partnerRow['last_name'] ?? ''));
+                              if ($partnerName !== '') {
+                                $addressSyncNames[] = $partnerName;
+                              }
+                              $partnerKey = strtolower(trim((string) ($partnerRow['address_line1'] ?? ''))) . '|' . strtolower(trim((string) ($partnerRow['postal_code'] ?? '')));
+                              if ($partnerKey === $profileAddrKey) {
+                                $addressInSync = true;
+                              }
+                            }
+                          ?>
+                          <?php if ($canEditAddress && $addressSyncNames): ?>
+                            <label class="md:col-span-2 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900 cursor-pointer">
+                              <input type="checkbox" name="sync_address_linked" value="1" <?= $addressInSync ? 'checked' : '' ?>
+                                class="mt-0.5 rounded border-blue-300 text-primary focus:ring-primary/40">
+                              <span>Also apply this address to linked member<?= count($addressSyncNames) === 1 ? '' : 's' ?>:
+                                <strong><?= e(implode(', ', $addressSyncNames)) ?></strong></span>
+                            </label>
+                          <?php endif; ?>
                         </div>
                       </div>
                       <?php if (!$isLinkedProfile): ?>

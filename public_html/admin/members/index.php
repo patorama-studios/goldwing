@@ -175,6 +175,9 @@ function buildQuery(array $overrides = []): string
 $currentListQuery = (string) ($_SERVER['QUERY_STRING'] ?? '');
 $currentListUrl = '/admin/members/index.php' . ($currentListQuery !== '' ? '?' . $currentListQuery : '');
 $returnToParam = '&return_to=' . rawurlencode($currentListUrl);
+// Remember the active filter set so "Back" from a member profile restores it
+// even when return_to gets dropped along the way (edit saves, associate hops).
+$_SESSION['admin_members_list_url'] = $currentListUrl;
 
 function normalizeMemberStatus(string $status): string
 {

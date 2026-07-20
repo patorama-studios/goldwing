@@ -44,7 +44,7 @@ The list view is the screen you land on first. Each row is one member. A stats p
 
 **To search**, type into the search box at the top — it matches name, email, and member number. To narrow further use the filter chips: chapter (including a **No chapter assigned** option to surface members who never got placed into one), status, membership type, role, directory preferences (the A–F flags), vehicle type, signup date range, and **Expiring** (within 30 / 60 / 90 days, before the next 31 July renewal, or already expired). Every stat card above the list is a clickable filter shortcut: **Total members** clears the filters, **Active** / **Pending** / **Expired** apply that status, **Expiring (60d)** and **New (30d)** apply those windows, and **Renewals** shows members who paid a membership order this calendar month. The card matching the current view is highlighted, and clicking one keeps any text search you've typed while resetting the other filters.
 
-When you click into a member from a filtered list, the **Member Profile** back-arrow on their detail page returns you to the exact same filtered list — so you don't have to re-apply the chapter/status/etc. each time you bounce in and out. (The filter URL is carried via a `return_to` query param on the member link.)
+When you click into a member from a filtered list, the **Member Profile** back-arrow on their detail page returns you to the exact same filtered list — so you don't have to re-apply the chapter/status/etc. each time you bounce in and out. (The filter URL is carried via a `return_to` query param on the member link, and the list also remembers your last filter set in your login session — so even after saving an edit or hopping between a member and their associate, the back-arrow still lands on the filtered view.)
 
 **Each column means:**
 
@@ -91,6 +91,8 @@ The snapshot. At a glance: contact details, chapter, current membership period, 
 #### Profile
 
 The editable identity record — name, email, phone, address, date of birth, directory preferences.
+
+When the member has a linked partner (a Full member's Associates, or an Associate's Full member), the address block shows an **"Also apply this address to linked member(s)"** checkbox naming them. Tick it (it pre-ticks itself when the household already shares an address) and saving copies the new address to every linked member in one go — no more editing the same move twice. Each synced record gets its own activity-log entry.
 
 **Editable** by anyone with profile-edit permission. The member number itself is generally **locked** (it's their permanent reference). Some fields may also be locked depending on role — area reps see the profile but typically can't change it.
 

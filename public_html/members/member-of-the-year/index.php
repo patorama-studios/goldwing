@@ -151,7 +151,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
 
             NotificationService::dispatch('member_of_year_nomination_receipt', $context, ['force' => true]);
-            NotificationService::dispatch('member_of_year_nomination_admin', $context, ['force' => true, 'visibility' => 'admin']);
+            // Nominations are confidential: exact-recipient override so ONLY the
+            // configured MotY recipient gets them — never the shared admin list,
+            // even if the notification catalog has stale custom recipients.
+            NotificationService::dispatch('member_of_year_nomination_admin', $context, [
+                'force' => true,
+                'visibility' => 'admin',
+                'recipients' => $motyRecipients,
+            ]);
 
             $success = true;
             $formValues = [

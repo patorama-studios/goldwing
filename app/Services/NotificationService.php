@@ -355,6 +355,49 @@ class NotificationService
                     'reply_to' => 'webmaster@goldwing.org.au',
                 ],
             ],
+            'membership_admin_stripe_pending' => [
+                'label' => 'Admin: Stripe membership payment started',
+                'description' => 'Sent to the admin/treasurer recipients the moment a member reaches the Stripe card payment step for a membership renewal or order — before any money moves. Pairs with the treasurer payment-received email: if no confirmation follows, the payment was abandoned, declined, or cancelled.',
+                'trigger' => 'Member opens the Stripe payment form for a membership payment.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['member_name', 'member_email', 'order_number', 'amount', 'details_html', 'admin_link'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'admin',
+                    'custom_recipients' => '',
+                    'subject' => '[Membership payment started] {{member_name}} — {{amount}} via Stripe',
+                    'body' => '<p><strong>{{member_name}}</strong> ({{member_email}}) has just started a Stripe card payment for membership order <strong>#{{order_number}}</strong>.</p>'
+                        . '{{details_html}}'
+                        . '<p>No money has moved yet. You will receive the usual <em>membership paid</em> email once Stripe confirms the charge — if it never arrives, the payment was abandoned, declined, or cancelled and the order will stay pending.</p>'
+                        . '<p style="margin-top:18px;"><a href="{{admin_link}}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">View order in admin</a></p>'
+                        . '<p style="margin-top:24px;color:#6b7280;font-size:12px;">Recipients and content are editable in Admin → Settings → Notifications.</p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
+            'membership_admin_payment_issue' => [
+                'label' => 'Admin: membership payment failed / cancelled',
+                'description' => 'Sent to the admin/treasurer recipients when Stripe reports a membership payment as failed, rejected, or cancelled, so nobody chases a member whose payment never went through.',
+                'trigger' => 'Stripe payment_intent/invoice payment fails, or a membership subscription is cancelled.',
+                'category' => 'admin',
+                'is_mandatory' => false,
+                'placeholders' => ['member_name', 'member_email', 'order_number', 'status_label', 'reason', 'admin_link'],
+                'defaults' => [
+                    'enabled' => true,
+                    'recipient_mode' => 'admin',
+                    'custom_recipients' => '',
+                    'subject' => '[Membership payment {{status_label}}] {{member_name}} — order #{{order_number}}',
+                    'body' => '<p>The Stripe payment for membership order <strong>#{{order_number}}</strong> ({{member_name}}, {{member_email}}) is <strong>{{status_label}}</strong>.</p>'
+                        . '<p>Details: {{reason}}</p>'
+                        . '<p>The membership has <strong>not</strong> been activated or extended. The member has been emailed a link to try again.</p>'
+                        . '<p style="margin-top:18px;"><a href="{{admin_link}}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">View order in admin</a></p>',
+                    'from_name' => 'Australian Goldwing Association',
+                    'from_email' => 'no-reply@goldwing.org.au',
+                    'reply_to' => 'webmaster@goldwing.org.au',
+                ],
+            ],
             'membership_migration_invite' => [
                 'label' => 'Manual migration invite',
                 'description' => 'Sent when an admin invites a member to complete a manual migration.',
@@ -744,7 +787,12 @@ class NotificationService
         $isMandatory = !empty($settings['is_mandatory']);
 
         $allowPrimary = self::shouldSendToMember($memberId, $category, $isMandatory, $options, $force);
-        $recipients = self::resolveRecipients($settings, $context, $allowPrimary);
+        // Exact recipient override: callers with a single authoritative
+        // audience (e.g. Member of the Year nominations) bypass the catalog's
+        // recipient settings so a stale custom/admin list can never widen it.
+        $recipients = !empty($options['recipients'])
+            ? self::normalizeEmails($options['recipients'])
+            : self::resolveRecipients($settings, $context, $allowPrimary);
         if (!$recipients) {
             return false;
         }
