@@ -74,6 +74,14 @@ $today = date('Y-m-d');
 // One-off joining fee default (configurable in Settings → Membership pricing).
 $joiningFeeDefault = number_format(MembershipPricingService::getJoiningFeeCents() / 100, 2, '.', '');
 
+// Late-year join-rollover config, so the expiry preview matches what the server
+// stores (MembershipService::newJoinExpiry). Without this, a 3-year add in the
+// Jun/Jul rollover window previewed a year short.
+$pricingConfig = MembershipPricingService::getConfig();
+$rolloverEnabled = !empty($pricingConfig['join_rollover_enabled']);
+$rolloverMonth = (int) ($pricingConfig['join_rollover_month'] ?? 6);
+$rolloverDay = (int) ($pricingConfig['join_rollover_day'] ?? 1);
+
 $pageTitle = 'Add Member';
 $activePage = 'members';
 require __DIR__ . '/../../../app/Views/partials/backend_head.php';
@@ -642,9 +650,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     if (parts.length !== 3) { return; }
     var year = parseInt(parts[0], 10);
     var month = parseInt(parts[1], 10);
+    var day = parseInt(parts[2], 10);
     var termYears = termInput ? parseInt(termInput.value, 10) : 1;
     if (month >= 8) { year += 1; }
     var expiryYear = year + (termYears - 1);
+    // Late-year join rollover (mirrors MembershipService::newJoinYearEnd): a
+    // join from rollover date onward, before the 1 Aug year flip, buys the
+    // NEXT membership year — one year later.
+    var rolloverEnabled = <?= $rolloverEnabled ? 'true' : 'false' ?>;
+    var rMonth = <?= $rolloverMonth ?>, rDay = <?= $rolloverDay ?>;
+    if (rolloverEnabled && month < 8 && (month > rMonth || (month === rMonth && day >= rDay))) {
+      expiryYear += 1;
+    }
     renewalInput.value = expiryYear + '-07-31';
   }
   if (startInput) { startInput.addEventListener('change', function () { renewalEdited = false; recalcExpiry(); }); }

@@ -532,7 +532,10 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     $endDate = null;
     if ($memberTypeCode !== 'LIFE') {
         $endValue = $renewalDate !== '' ? DateTime::createFromFormat('Y-m-d', $renewalDate) : null;
-        $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::calculateExpiry($startDate, $termYears);
+        // Rollover-aware, matching the paid new-join path: a 3-year add in the
+        // Jun/Jul rollover window must land 3 whole membership years out, not
+        // 2 (plain calculateExpiry anchored to the near-over current year).
+        $endDate = $endValue ? $endValue->format('Y-m-d') : MembershipService::newJoinExpiry($startDate, $termYears * 12);
     }
 
     $updateFields = 'member_type = :member_type, status = :status, updated_at = NOW()';

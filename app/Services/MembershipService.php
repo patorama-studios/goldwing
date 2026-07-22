@@ -23,6 +23,21 @@ class MembershipService
         return $end;
     }
 
+    /**
+     * Expiry for a brand-new join of $months whole months, rollover-aware.
+     * Mirrors the paid new-join path in
+     * MembershipOrderService::activateMembershipForOrder() so a manual admin
+     * add lands on the SAME date a paid join would. During the late-year
+     * join-rollover window (Jun/Jul) this is a year later than the plain
+     * calculateExpiry() anchor — which is exactly why manual 3-year adds were
+     * reading a year short (a "3 year" pick showing a 2-year span).
+     */
+    public static function newJoinExpiry(string $startDate, int $months): string
+    {
+        $extraMonths = max(0, $months - 12);
+        return self::newJoinYearEnd($startDate)->modify("+{$extraMonths} months")->format('Y-m-d');
+    }
+
     public static function calculateExpiry(string $startDate, int $termYears): string
     {
         $start = new DateTimeImmutable($startDate);
