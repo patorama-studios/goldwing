@@ -476,7 +476,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
   nextBtn.addEventListener('click', function () {
     if (!validateStep(current)) { return; }
-    if (steps[current].querySelector('input[name="email"]') && !ensureEmailCleared()) { return; }
+    // Never let the shared-email check brick the wizard: any failure falls
+    // through to a normal advance and the server re-checks on submit.
+    try {
+      if (steps[current].querySelector('input[name="email"]') && !ensureEmailCleared()) { return; }
+    } catch (err) {
+      nextBtn.disabled = false;
+      if (window.console) { console.warn('[add-member] email check failed, continuing:', err); }
+    }
     if (current < steps.length - 1) { current++; render(); }
   });
   backBtn.addEventListener('click', function () {
@@ -500,6 +507,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   function ensureEmailCleared() {
     var email = emailInput.value.trim().toLowerCase();
     if (email === clearedEmail) { return true; }
+    // Older browsers without fetch/URLSearchParams skip the live check —
+    // the server still rejects duplicate emails on submit, as before.
+    if (!window.fetch || !window.URLSearchParams || !window.Promise) {
+      if (window.console) { console.warn('[add-member] browser too old for live email check, skipping'); }
+      return true;
+    }
     nextBtn.disabled = true;
     var body = new URLSearchParams();
     body.set('action', 'check_member_email');
@@ -516,10 +529,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           return;
         }
         // Email is free (or the lookup errored — the server re-checks on submit).
+        if (!data || !data.success) {
+          if (window.console) { console.warn('[add-member] email check response not usable:', data); }
+        }
         clearedEmail = email;
         advanceStep();
       })
-      .catch(function () { nextBtn.disabled = false; clearedEmail = email; advanceStep(); });
+      .catch(function (err) {
+        nextBtn.disabled = false;
+        if (window.console) { console.warn('[add-member] email check request failed, continuing:', err); }
+        clearedEmail = email;
+        advanceStep();
+      });
     return false;
   }
 
