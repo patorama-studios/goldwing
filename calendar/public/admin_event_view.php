@@ -451,10 +451,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <a href="<?php echo calendar_e($event['attachment_path']); ?>" target="_blank" rel="noopener" class="text-blue-600 font-medium truncate">
                     <?php echo calendar_e($event['attachment_name'] ?: basename($event['attachment_path'])); ?>
                   </a>
-                  <label class="inline-flex items-center gap-1 text-xs text-red-600 whitespace-nowrap">
-                    <input type="checkbox" name="remove_attachment" value="1" form="event-edit-form" class="rounded border-gray-200">
-                    Remove
-                  </label>
+                  <span class="flex items-center gap-3 whitespace-nowrap">
+                    <a href="<?php echo calendar_e($event['attachment_path']); ?>" download="<?php echo calendar_e($event['attachment_name'] ?: ''); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600">
+                      <span class="material-icons-outlined text-sm">download</span>
+                      Download
+                    </a>
+                    <label class="inline-flex items-center gap-1 text-xs text-red-600">
+                      <input type="checkbox" name="remove_attachment" value="1" form="event-edit-form" class="rounded border-gray-200">
+                      Remove
+                    </label>
+                  </span>
                 </div>
               <?php endif; ?>
               <input type="file" name="attachment_file" accept="application/pdf,.pdf" form="event-edit-form" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
