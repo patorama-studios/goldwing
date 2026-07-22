@@ -17,9 +17,16 @@ if (!$eventId) {
 
 $mediaItems = [];
 try {
-    $mediaItems = $pdo->query('SELECT id, path, title, thumbnail_url FROM media ORDER BY id DESC LIMIT 60')->fetchAll();
+    $mediaItems = $pdo->query('SELECT id, path, title, thumbnail_url FROM media WHERE type = "image" ORDER BY id DESC LIMIT 60')->fetchAll();
 } catch (Throwable $e) {
     $mediaItems = [];
+}
+
+$pdfItems = [];
+try {
+    $pdfItems = $pdo->query('SELECT id, path, title, file_name FROM media WHERE type = "pdf" ORDER BY id DESC LIMIT 60')->fetchAll();
+} catch (Throwable $e) {
+    $pdfItems = [];
 }
 
 $products = [];
@@ -172,10 +179,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $attachmentPath = '/uploads/' . $safeName;
                         $attachmentName = $file['name'];
                         $removeAttachment = false;
+                        // Best-effort: register in the media library so it can be reused.
+                        // Guarded — a registration failure (e.g. over-long title) must not
+                        // abort the event update now that the PDF is already in place.
+                        try {
+                            calendar_register_media([
+                                'path' => $attachmentPath,
+                                'file_type' => 'application/pdf',
+                                'file_size' => (int) ($file['size'] ?? 0),
+                                'type' => 'pdf',
+                                'title' => mb_substr((string) $file['name'], 0, 150),
+                                'uploaded_by_user_id' => (int) ($user['id'] ?? 0),
+                                'source_context' => 'calendar',
+                                'source_table' => 'calendar_events',
+                                'source_record_id' => (int) $eventId,
+                            ]);
+                        } catch (Throwable $e) {
+                            error_log('[Calendar] PDF media registration failed: ' . $e->getMessage());
+                        }
                     } else {
                         $error = 'Event PDF upload failed.';
                     }
                 }
+            }
+        }
+
+        $attachmentMediaId = (int) ($_POST['attachment_media_id'] ?? 0);
+        if ($attachmentPath === null && $attachmentMediaId > 0) {
+            $stmt = $pdo->prepare('SELECT path, title, file_name FROM media WHERE id = :id AND type = "pdf"');
+            $stmt->execute(['id' => $attachmentMediaId]);
+            $libraryPdf = $stmt->fetch();
+            if ($libraryPdf) {
+                $attachmentPath = $libraryPdf['path'];
+                $attachmentName = $libraryPdf['file_name'] ?: ($libraryPdf['title'] ?: basename($libraryPdf['path']));
+                $removeAttachment = false;
+            } else {
+                $error = 'Selected library PDF not found.';
             }
         }
 
@@ -445,7 +484,22 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             </div>
 
             <div>
-              <span class="text-sm font-medium text-gray-700">Event PDF (optional)</span>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700">Event PDF (optional)</span>
+                <button type="button" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-600" onclick="openPdfModal()">
+                  <span class="material-icons-outlined text-base">folder_open</span>
+                  Choose from Media Library
+                </button>
+              </div>
+              <input type="hidden" name="attachment_media_id" id="attachment_media_id" value="" form="event-edit-form">
+              <div id="pdf_selected_wrap" class="hidden mt-2 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+                <span class="flex items-center gap-2 text-gray-700 font-medium truncate">
+                  <span class="material-icons-outlined text-base text-red-500">picture_as_pdf</span>
+                  <span id="pdf_selected_name"></span>
+                  <span class="text-xs text-gray-500 whitespace-nowrap">(will replace on save)</span>
+                </span>
+                <button type="button" class="text-xs text-red-600 whitespace-nowrap" onclick="clearPdfSelection()">Clear</button>
+              </div>
               <?php if (!empty($event['attachment_path'])) : ?>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
                   <a href="<?php echo calendar_e($event['attachment_path']); ?>" target="_blank" rel="noopener" class="text-blue-600 font-medium truncate">
@@ -463,8 +517,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </span>
                 </div>
               <?php endif; ?>
-              <input type="file" name="attachment_file" accept="application/pdf,.pdf" form="event-edit-form" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
-              <p class="text-xs text-gray-500 mt-1">Flyer, itinerary or entry form — members can download it from the event page. Max 10MB.<?php if (!empty($event['attachment_path'])) : ?> Uploading a new PDF replaces the current one.<?php endif; ?></p>
+              <input type="file" name="attachment_file" accept="application/pdf,.pdf" form="event-edit-form" onchange="clearPdfSelection(true)" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <p class="text-xs text-gray-500 mt-1">Flyer, itinerary or entry form — members can download it from the event page. Pick one from the Media Library or upload from your computer (max 10MB).<?php if (!empty($event['attachment_path'])) : ?> Choosing or uploading a new PDF replaces the current one.<?php endif; ?></p>
             </div>
           </section>
 
@@ -762,9 +816,33 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <?php foreach ($mediaItems as $media) : ?>
           <?php $thumb = $media['thumbnail_url'] ?: $media['path']; ?>
-          <button type="button" class="border border-gray-200 rounded-xl overflow-hidden bg-white text-left hover:shadow-soft" onclick="selectMedia(<?php echo (int) $media['id']; ?>, '<?php echo calendar_e($media['title']); ?>', '<?php echo calendar_e($thumb); ?>')">
+          <button type="button" class="gw-media-pick border border-gray-200 rounded-xl overflow-hidden bg-white text-left hover:shadow-soft" data-media-id="<?php echo (int) $media['id']; ?>" data-media-title="<?php echo calendar_e($media['title']); ?>" data-media-url="<?php echo calendar_e($thumb); ?>">
             <img src="<?php echo calendar_e($thumb); ?>" alt="<?php echo calendar_e($media['title']); ?>" class="h-24 w-full object-cover">
             <div class="p-2 text-xs text-gray-600 truncate"><?php echo calendar_e($media['title']); ?></div>
+          </button>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+</div>
+
+<div id="pdf_modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+  <div class="bg-white rounded-2xl p-6 shadow-card max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Select Event PDF</h2>
+      <button type="button" class="text-gray-500" onclick="closePdfModal()">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <?php if (empty($pdfItems)) : ?>
+      <p class="text-sm text-gray-500">No PDFs in the Media Library yet. Upload one from your computer instead — it will be added to the library for next time.</p>
+    <?php else : ?>
+      <div class="divide-y divide-gray-100">
+        <?php foreach ($pdfItems as $pdf) : ?>
+          <?php $pdfLabel = $pdf['file_name'] ?: ($pdf['title'] ?: basename($pdf['path'])); ?>
+          <button type="button" class="gw-pdf-pick w-full flex items-center gap-3 px-2 py-3 text-left hover:bg-gray-50 rounded-lg" data-pdf-id="<?php echo (int) $pdf['id']; ?>" data-pdf-label="<?php echo calendar_e($pdfLabel); ?>">
+            <span class="material-icons-outlined text-red-500">picture_as_pdf</span>
+            <span class="text-sm text-gray-700 truncate"><?php echo calendar_e($pdfLabel); ?></span>
           </button>
         <?php endforeach; ?>
       </div>
@@ -798,9 +876,49 @@ function selectMedia(id, name, url) {
   preview.innerHTML = '<img src="' + url + '" alt="' + name + '" class="h-full w-full object-cover rounded-xl">';
   closeMediaModal();
 }
+function openPdfModal() {
+  var modal = document.getElementById('pdf_modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closePdfModal() {
+  var modal = document.getElementById('pdf_modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+function selectPdf(id, name) {
+  document.getElementById('attachment_media_id').value = id;
+  document.getElementById('pdf_selected_name').textContent = name;
+  document.getElementById('pdf_selected_wrap').classList.remove('hidden');
+  document.getElementById('pdf_selected_wrap').classList.add('flex');
+  var fileInput = document.querySelector('input[name="attachment_file"]');
+  if (fileInput) { fileInput.value = ''; }
+  closePdfModal();
+}
+function clearPdfSelection(keepFile) {
+  document.getElementById('attachment_media_id').value = '';
+  document.getElementById('pdf_selected_wrap').classList.add('hidden');
+  document.getElementById('pdf_selected_wrap').classList.remove('flex');
+  if (!keepFile) {
+    var fileInput = document.querySelector('input[name="attachment_file"]');
+    if (fileInput) { fileInput.value = ''; }
+  }
+}
 (function initForm() {
   toggleChapter();
   togglePaid();
+  // Picker rows carry their data on data-* attributes (correctly HTML-escaped) and
+  // are wired here — avoids injecting names into inline onclick JS-string literals.
+  document.querySelectorAll('.gw-media-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      selectMedia(btn.dataset.mediaId, btn.dataset.mediaTitle, btn.dataset.mediaUrl);
+    });
+  });
+  document.querySelectorAll('.gw-pdf-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      selectPdf(btn.dataset.pdfId, btn.dataset.pdfLabel);
+    });
+  });
 })();
 </script>
 </html>

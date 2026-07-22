@@ -12,7 +12,7 @@
       + '.gw-modal-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;'
       + 'padding:20px;background:rgba(17,24,39,.55);opacity:0;transition:opacity .18s ease;overflow-y:auto}'
       + '.gw-modal-overlay.is-open{opacity:1}'
-      + '.gw-modal-dialog{position:relative;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;'
+      + '.gw-modal-dialog{position:relative;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;'
       + 'background:#fff;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,.35);transform:translateY(12px) scale(.98);'
       + 'transition:transform .18s ease;-webkit-overflow-scrolling:touch}'
       + '.gw-modal-overlay.is-open .gw-modal-dialog{transform:none}'

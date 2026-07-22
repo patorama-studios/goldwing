@@ -147,9 +147,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         #admin-calendar .fc .fc-day-today .fc-daygrid-day-number{color:#2f7d32}
         #admin-calendar .fc-daygrid-day{transition:background .12s;cursor:pointer}
         #admin-calendar .fc-daygrid-day:hover{background:#fffdf5}
-        #admin-calendar .fc-daygrid-event{border-radius:999px;padding:2px 9px;margin-top:2px;border:none}
-        #admin-calendar .gw-ev-time{font-weight:700;margin-right:4px}
-        #admin-calendar .gw-ev-title{font-weight:500}
+        #admin-calendar .fc-daygrid-event{border-radius:6px;padding:2px 8px;margin:1px 2px;border:none;box-shadow:none;cursor:pointer;transition:filter .12s,transform .12s}
+        #admin-calendar .fc-daygrid-event:hover{filter:brightness(.94);transform:translateY(-1px)}
+        #admin-calendar .gw-ev-chip{display:flex;align-items:baseline;gap:4px;min-width:0}
+        #admin-calendar .gw-ev-time{font-weight:700;font-variant-numeric:tabular-nums;opacity:.85;flex:0 0 auto}
+        #admin-calendar .gw-ev-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        #admin-calendar .fc-daygrid-more-link{font-size:11.5px;font-weight:700;color:#2f7d32;margin:1px 4px}
+        #admin-calendar .fc-popover{border:1px solid #e8e6df;border-radius:12px;box-shadow:0 18px 40px rgba(28,26,23,.18);overflow:hidden}
+        #admin-calendar .fc-popover-header{background:#fbf7e8;padding:8px 12px;font-weight:700}
       </style>
       <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
       <script>
@@ -178,6 +183,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             initialView: 'dayGridMonth',
             firstDay: 1,
             height: 760,
+            dayMaxEvents: 3,
+            moreLinkClick: 'popover',
+            eventDisplay: 'block',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
             events: 'admin_events_feed.php?chapter_id=<?php echo urlencode((string) $chapterFilter); ?>',
             eventContent: gwEventContent,

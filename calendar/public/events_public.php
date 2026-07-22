@@ -451,20 +451,64 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
         }
 
         .fc .fc-daygrid-event {
-            border-radius: 999px;
-            padding: 2px 9px;
+            border-radius: 6px;
+            padding: 2px 8px;
             font-size: 12px;
             border: none;
-            box-shadow: 0 1px 2px rgba(28, 26, 23, 0.12);
+            box-shadow: none;
+            margin: 1px 2px;
+            cursor: pointer;
+            transition: filter 0.12s ease, transform 0.12s ease;
+        }
+
+        .fc .fc-daygrid-event:hover {
+            filter: brightness(0.94);
+            transform: translateY(-1px);
+        }
+
+        .fc .fc-daygrid-event .gw-ev-chip {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            min-width: 0;
         }
 
         .fc .fc-daygrid-event .gw-ev-time {
             font-weight: 700;
-            margin-right: 4px;
+            font-variant-numeric: tabular-nums;
+            opacity: 0.85;
+            flex: 0 0 auto;
         }
 
         .fc .fc-daygrid-event .gw-ev-title {
-            font-weight: 500;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .fc .fc-daygrid-more-link {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--accent-strong);
+            margin: 1px 4px;
+        }
+
+        .fc .fc-popover {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            box-shadow: 0 18px 40px rgba(28, 26, 23, 0.18);
+            overflow: hidden;
+        }
+
+        .fc .fc-popover-header {
+            background: var(--soft);
+            padding: 8px 12px;
+            font-weight: 700;
+        }
+
+        .fc .fc-popover-body .fc-daygrid-event {
+            margin: 3px 0;
         }
 
         .fc .fc-list-event-time {
@@ -689,6 +733,9 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
                     return arg.text.charAt(0);
                 },
                 height: 700,
+                dayMaxEvents: 3,
+                moreLinkClick: 'popover',
+                eventDisplay: 'block',
                 events: '<?php echo calendar_e($feedUrl); ?>',
                 eventContent: gwEventContent,
                 datesSet: function () {
