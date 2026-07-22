@@ -29,11 +29,24 @@ if (!is_array($directoryPrefInput)) {
 // keeps members who actually have an email address (see the output loop below).
 $emailPdfList = ($_GET['list'] ?? '') === 'email_pdf';
 
+// Keep this filter set in parity with the list page (index.php) so an export
+// always returns exactly what's on screen. Any filter the list understands but
+// the export omits would silently fall back to the full list on download.
+$memberIdFilter = isset($_GET['member_id']) && (int) $_GET['member_id'] > 0 ? (int) $_GET['member_id'] : null;
 $filters = [
     'q' => trim((string) ($_GET['q'] ?? '')),
+    'member_id' => $memberIdFilter,
+    'member_number' => trim((string) ($_GET['member_number'] ?? '')),
     'membership_type_id' => isset($_GET['membership_type_id']) && $_GET['membership_type_id'] !== '' ? (int) $_GET['membership_type_id'] : null,
     'status' => $_GET['status'] ?? '',
     'role' => trim((string) ($_GET['role'] ?? '')),
+    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
+    'renewed' => ($_GET['renewed'] ?? '') === 'this_month' ? 'this_month' : '',
+    'renewed_from' => trim((string) ($_GET['renewed_from'] ?? '')),
+    'renewed_to' => trim((string) ($_GET['renewed_to'] ?? '')),
+    'created_range' => trim((string) ($_GET['created_range'] ?? '')),
+    'created_from' => trim((string) ($_GET['created_from'] ?? '')),
+    'created_to' => trim((string) ($_GET['created_to'] ?? '')),
     'directory_prefs' => $directoryPrefInput,
     'vehicle_type' => $_GET['vehicle_type'] ?? '',
     'vehicle_make' => trim((string) ($_GET['vehicle_make'] ?? '')),
@@ -63,7 +76,9 @@ if ($chapterRestriction !== null) {
 if ($filters['status'] === 'archived') {
     $filters['status'] = 'cancelled';
 }
-if ($filters['status'] === '') {
+// Match index.php: hide archived (cancelled) members by default, but keep them
+// when an explicit search term is present so a name/number lookup still finds them.
+if ($filters['status'] === '' && trim((string) ($filters['q'] ?? '')) === '') {
     $filters['exclude_statuses'] = ['cancelled'];
 }
 

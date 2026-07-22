@@ -715,6 +715,39 @@ class MemberRepository
             $parts[] = "EXISTS (SELECT 1 FROM orders o WHERE o.member_id = m.id AND o.order_type = 'membership' AND o.status = 'paid' AND o.paid_at BETWEEN :renewed_start AND :renewed_end)";
         }
 
+        // "Renewed within" custom date range: members with a paid membership
+        // payment whose paid_at falls in the window. Same definition as the
+        // "Renewals" card (any paid membership order counts as a renewal), just
+        // with admin-chosen bounds. Either bound may be supplied on its own.
+        $renewedFromInput = trim((string) ($filters['renewed_from'] ?? ''));
+        $renewedToInput = trim((string) ($filters['renewed_to'] ?? ''));
+        $renewedFrom = null;
+        $renewedTo = null;
+        if ($renewedFromInput !== '') {
+            $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $renewedFromInput);
+            if ($parsed instanceof DateTimeImmutable) {
+                $renewedFrom = $parsed->format('Y-m-d');
+            }
+        }
+        if ($renewedToInput !== '') {
+            $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $renewedToInput);
+            if ($parsed instanceof DateTimeImmutable) {
+                $renewedTo = $parsed->format('Y-m-d');
+            }
+        }
+        if (($renewedFrom || $renewedTo) && self::hasOrderColumn($pdo, 'member_id')) {
+            $renewedConds = ['o.member_id = m.id', "o.order_type = 'membership'", "o.status = 'paid'"];
+            if ($renewedFrom) {
+                $renewedConds[] = 'o.paid_at >= :renewed_from';
+                $params['renewed_from'] = $renewedFrom . ' 00:00:00';
+            }
+            if ($renewedTo) {
+                $renewedConds[] = 'o.paid_at <= :renewed_to';
+                $params['renewed_to'] = $renewedTo . ' 23:59:59';
+            }
+            $parts[] = 'EXISTS (SELECT 1 FROM orders o WHERE ' . implode(' AND ', $renewedConds) . ')';
+        }
+
         $prefList = self::normalizeDirectoryPreferences($filters['directory_prefs'] ?? []);
         if ($prefList !== []) {
             $prefConditions = [];

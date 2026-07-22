@@ -37,6 +37,8 @@ $filters = [
     'created_range' => trim((string) ($_GET['created_range'] ?? '')),
     'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
     'renewed' => ($_GET['renewed'] ?? '') === 'this_month' ? 'this_month' : '',
+    'renewed_from' => trim((string) ($_GET['renewed_from'] ?? '')),
+    'renewed_to' => trim((string) ($_GET['renewed_to'] ?? '')),
     'created_from' => trim((string) ($_GET['created_from'] ?? '')),
     'created_to' => trim((string) ($_GET['created_to'] ?? '')),
     'vehicle_type' => $_GET['vehicle_type'] ?? '',
@@ -226,6 +228,8 @@ $hasAdvancedFilters = $filters['vehicle_type'] !== ''
     || $filters['created_from'] !== ''
     || $filters['created_to'] !== ''
     || $filters['created_range'] !== ''
+    || $filters['renewed_from'] !== ''
+    || $filters['renewed_to'] !== ''
     || $filters['status'] !== ''
     || $filters['member_number'] !== ''
     || $filters['member_id'] !== null
@@ -296,7 +300,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       // Every summary card is a filter shortcut. Each link resets the other
       // filter params so a card always shows exactly its own slice, and
       // $activeStat marks which card matches the current view.
-      $statReset = ['status' => null, 'expiring_within' => null, 'created_range' => null, 'created_from' => null, 'created_to' => null, 'renewed' => null, 'page' => 1];
+      $statReset = ['status' => null, 'expiring_within' => null, 'created_range' => null, 'created_from' => null, 'created_to' => null, 'renewed' => null, 'renewed_from' => null, 'renewed_to' => null, 'page' => 1];
       $hasCreatedFilter = ($filters['created_range'] ?? '') !== '' || ($filters['created_from'] ?? '') !== '' || ($filters['created_to'] ?? '') !== '';
       $activeStat = 'total';
       if ($statusFilter === 'active') { $activeStat = 'active'; }
@@ -542,6 +546,18 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 Created to
                 <input type="date" name="created_to" value="<?= e($filters['created_to']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              </label>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Renewed from
+                <input type="date" name="renewed_from" value="<?= e($filters['renewed_from']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 text-xs font-normal text-gray-400">Members who made a membership payment on/after this date.</span>
+              </label>
+              <label class="flex flex-col text-sm font-medium text-gray-700">
+                Renewed to
+                <input type="date" name="renewed_to" value="<?= e($filters['renewed_to']) ?>" class="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 text-xs font-normal text-gray-400">…and on/before this date. Either date can be used on its own.</span>
               </label>
             </div>
             <div class="mt-4 flex flex-wrap gap-4">
