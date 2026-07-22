@@ -265,10 +265,14 @@ function require_permission(string $permissionKey): void
 function admin_role_builder_candidates(PDO $pdo): array
 {
     if (!admin_permissions_tables_ready()) {
-        $stmt = $pdo->query('SELECT r.*, 0 AS permission_count FROM roles r ORDER BY r.name');
+        $stmt = $pdo->query('SELECT r.*, 0 AS permission_count, 0 AS admin_permission_count FROM roles r ORDER BY r.name');
         return $stmt->fetchAll() ?: [];
     }
-    $stmt = $pdo->query('SELECT r.*, COUNT(rp.id) AS permission_count FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id GROUP BY r.id ORDER BY r.name');
+    // admin_permission_count counts only granted admin permissions — member.page.*
+    // view grants don't make a role an "admin" role for member-assignment purposes.
+    $stmt = $pdo->query("SELECT r.*, COUNT(rp.id) AS permission_count,
+        COALESCE(SUM(CASE WHEN rp.permission_key NOT LIKE 'member.page.%' AND rp.allowed = 1 THEN 1 ELSE 0 END), 0) AS admin_permission_count
+        FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id GROUP BY r.id ORDER BY r.name");
     return $stmt->fetchAll() ?: [];
 }
 
@@ -277,6 +281,25 @@ function admin_role_is_admin(array $role): bool
     $permissionCount = (int) ($role['permission_count'] ?? 0);
     if ($permissionCount > 0) {
         return true;
+    }
+    $defaultRoles = array_keys(admin_default_role_permissions());
+    return in_array($role['name'] ?? '', $defaultRoles, true);
+}
+
+/**
+ * Whether a role should be presented as an admin role when assigning it to a
+ * member. Unlike admin_role_is_admin(), a role that only carries member-page
+ * view grants (or has every admin permission un-ticked) counts as a system
+ * role, not an admin one.
+ */
+function admin_role_grants_admin(array $role): bool
+{
+    if (array_key_exists('admin_permission_count', $role)) {
+        if ((int) $role['admin_permission_count'] > 0) {
+            return true;
+        }
+    } elseif ((int) ($role['permission_count'] ?? 0) > 0) {
+        return true; // fallback when the split count wasn't computed
     }
     $defaultRoles = array_keys(admin_default_role_permissions());
     return in_array($role['name'] ?? '', $defaultRoles, true);

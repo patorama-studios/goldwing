@@ -121,7 +121,7 @@ try {
         $roleId = (int) $pdo->lastInsertId();
     }
 
-    $permissionKeys = admin_permission_keys();
+    $permissionKeys = array_merge(admin_permission_keys(), member_page_permission_keys());
     $allowed = array_map('strval', (array) ($_POST['permissions'] ?? []));
     $allowed = array_values(array_unique($allowed));
 

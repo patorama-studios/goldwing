@@ -175,7 +175,7 @@ try {
 }
 [$adminRoleOptions, $systemRoleOptions] = [[], []];
 foreach ($roleOptions as $roleOption) {
-  if (admin_role_is_admin($roleOption)) {
+  if (admin_role_grants_admin($roleOption)) {
     $adminRoleOptions[] = $roleOption;
   } else {
     $systemRoleOptions[] = $roleOption;

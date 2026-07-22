@@ -390,5 +390,6 @@ require_once __DIR__ . '/../includes/date_helpers.php';
 require_once __DIR__ . '/../includes/store_helpers.php';
 require_once __DIR__ . '/../includes/access_control.php';
 require_once __DIR__ . '/../includes/admin_permissions.php';
+require_once __DIR__ . '/../includes/member_pages.php';
 
 enforce_page_access();

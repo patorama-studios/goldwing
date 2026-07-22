@@ -39,6 +39,15 @@ if ($page === 'notices') {
 }
 $user = current_user();
 
+// Role-gated member page visibility: block direct-URL access to a portal page
+// this member's roles don't grant (the sidebar hides it too). Core account
+// pages (dashboard, profile, billing, …) are never gateable.
+$gwMemberPageKey = member_page_key_for_param($page);
+if ($gwMemberPageKey !== null && !member_can_view_page($user, $gwMemberPageKey)) {
+  header('Location: /member/index.php');
+  exit;
+}
+
 $userTimezone = SettingsService::getUser((int) ($user['id'] ?? 0), 'timezone', SettingsService::getGlobal('site.timezone', 'Australia/Sydney'));
 $notificationPrefs = NotificationPreferenceService::load((int) ($user['id'] ?? 0));
 $notificationCategories = NotificationPreferenceService::categories();

@@ -188,6 +188,34 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </div>
                   </section>
                 <?php endforeach; ?>
+
+                <?php $memberPages = member_page_registry(); ?>
+                <section class="rounded-2xl border border-gray-100 bg-white p-4" data-permission-group="Member Portal Pages">
+                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <h2 class="font-display text-lg font-bold text-gray-900">Member Portal Pages</h2>
+                      <p class="text-xs text-slate-500">Which logged-in-member pages this role can view. A member sees a page if any of their roles allows it — untick it on the base <strong>Member</strong> role to hide it from everyone, then allow it on a role you assign to the members who should see it.</p>
+                    </div>
+                    <?php if ($canManage): ?>
+                      <div class="flex flex-wrap gap-2">
+                        <button type="button" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600" data-group-action="allow" data-group="Member Portal Pages">Select all</button>
+                        <button type="button" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-slate-600" data-group-action="deny" data-group="Member Portal Pages">Clear all</button>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <?php foreach ($memberPages as $pageKey => $pageMeta): ?>
+                      <?php
+                        $key = member_page_permission_key($pageKey);
+                        $isChecked = (bool) ($rolePermissions[$key] ?? false);
+                      ?>
+                      <label class="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
+                        <input type="checkbox" class="permission-toggle rounded border-gray-300" name="permissions[]" value="<?= e($key) ?>" <?= $isChecked ? 'checked' : '' ?> <?= $canManage ? '' : 'disabled' ?>>
+                        <span class="font-medium text-gray-700"><?= e($pageMeta['label']) ?></span>
+                      </label>
+                    <?php endforeach; ?>
+                  </div>
+                </section>
               </div>
 
               <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">

@@ -5,6 +5,12 @@ use App\Services\AwardsService;
 
 require_login();
 
+// Role-gated member page visibility (mirrors the members' sidebar).
+if (!member_can_view_page(current_user(), 'awards')) {
+    header('Location: /member/index.php');
+    exit;
+}
+
 $user = current_user();
 $tablesReady = AwardsService::tablesReady();
 $isLive = $tablesReady && AwardsService::isLive();

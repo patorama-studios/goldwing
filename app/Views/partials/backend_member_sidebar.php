@@ -64,6 +64,19 @@ $items = [
   ['key' => 'main-site', 'group' => 'Help', 'label' => 'Main Website', 'icon' => 'public', 'href' => $mainSiteUrl],
 ];
 $user = $user ?? current_user();
+// Role-gated member page visibility: hide any section this member's roles do
+// not grant. The destination pages enforce the same rule server-side, so a
+// hidden section is also blocked by direct URL.
+if (function_exists('member_can_view_page') && function_exists('member_page_registry')) {
+  $gwMemberPages = member_page_registry();
+  $items = array_values(array_filter($items, function ($item) use ($user, $gwMemberPages) {
+    $key = $item['key'] ?? '';
+    if ($key !== '' && isset($gwMemberPages[$key])) {
+      return member_can_view_page($user, $key);
+    }
+    return true;
+  }));
+}
 // Membership-lapsed lockdown: locked categories stay visible but greyed with a
 // padlock. They remain clickable — the destination page draws a blur overlay.
 $gwLapsed = \App\Services\MembershipAccessService::isLapsed($user);

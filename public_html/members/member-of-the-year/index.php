@@ -7,6 +7,12 @@ use App\Services\SettingsService;
 
 require_login();
 
+// Role-gated member page visibility (mirrors the members' sidebar).
+if (!member_can_view_page(current_user(), 'member-of-the-year')) {
+    header('Location: /member/index.php');
+    exit;
+}
+
 $pdo = db();
 $user = current_user();
 $copy = require __DIR__ . '/../../../config/member_of_year.php';

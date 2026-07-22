@@ -60,6 +60,18 @@ If none of the built-in roles fit (e.g. you want a "Welfare Officer" who can see
 
 The built-in roles (Admin, Treasurer, etc.) can be renamed or have their permissions adjusted, but they can't be deleted — they're load-bearing.
 
+### Restricting which member pages a role can see
+
+The Admin Role Builder also has a **Member Portal Pages** section. This controls which pages inside the logged-in members' area (Wings, Calendar, Notice Board, Fallen Wings, Member of the Year, AGM Awards, Members Directory, Committee, Honda Dealers, Store) a role is allowed to view. Untick a page and it disappears from the sidebar **and** is blocked if the member types the URL directly.
+
+Because access always *combines* across a member's roles (most permissive wins), restricting works like this:
+
+1. In the Role Builder, open the base **Member** role and **untick** the page you want to hide from ordinary members. That hides it from everyone.
+2. Create a role (e.g. *Committee*) and **tick** just that page.
+3. Assign the new role, on the member's **Roles & Access** tab, to the people who *should* still see it.
+
+Everyone keeps seeing every page by default — nothing is hidden until you deliberately untick it. Store and the full public calendar live at their own public URLs, so unticking them only hides the sidebar link (it doesn't block the public page).
+
 ### What can go wrong (and what to do)
 
 - **You remove your own admin role and lock yourself out.** The system *tries* to stop you (you'll usually see a warning), but it's possible. Recovery means another admin restoring your role, or a developer fixing it in the database. **Always have at least two Admin accounts** so you never have a single point of failure.
@@ -153,6 +165,17 @@ Defined in `includes/admin_permissions.php → admin_permission_registry()`, gro
 - **Builders / Tools** — `admin.ai_page_builder.access/edit/publish`, `admin.settings.general.manage`, `admin.logs.view`, `admin.integrations.manage`
 
 The registry is the source of truth for the role builder UI — add a key here and it shows up as a new checkbox next page load.
+
+#### Member portal page visibility
+
+A second, deliberately separate permission family gates the logged-in members' area per role. It lives in `includes/member_pages.php`:
+
+- `member_page_registry()` — the gateable pages, keyed by the member sidebar item key (`wings`, `calendar`, `notices`, `fallen-wings`, `member-of-the-year`, `awards`, `directory`, `committee`, `dealers`, `store`). Single source of truth for the Role Builder section, the sidebar filter, and enforcement.
+- Grants are stored in the same `role_permissions` table under `member.page.<key>` keys — but these are **kept out of `admin_permission_keys()`** on purpose, so a member holding `member.page.*` grants is never mistaken for an admin by `admin_render_forbidden()` or the sidebar's "View as Admin" check.
+- `member_can_view_page($user, $key)` — additive union across the user's roles. `admin`-role users always bypass (never lock a webmaster out of the preview). Fail-open when no role the user holds carries any `member.page.*` row (so unmigrated/edge accounts see everything).
+- Enforcement is in three places, mirroring the "hiding a menu item is not a security control" rule: the member sidebar (`backend_member_sidebar.php`) hides the item, `public_html/member/index.php` blocks the `?page=` URL, and the own-URL pages (`members/awards/`, `members/member-of-the-year/`) guard themselves. Store and the standalone `/calendar/` are public URLs — link-hidden only.
+- `admin_role_grants_admin()` (in `admin_permissions.php`) classifies a role by whether it has any *allowed admin* permission, so a member-page-only role shows in the **System** column, not Admin, on a member's Roles tab.
+- **Seeder**: `public_html/admin/seed-member-page-roles.php` (run once, admin-gated, idempotent) grants every page to every existing role, so the deploy is behaviour-neutral and the base `member` role shows every page ticked. Roles created afterwards start blank. If it isn't run, the feature still works and stays safe (fail-open), but the base `member` role won't have explicit rows to un-tick until it's saved once. Fold this into `run-migration.php` as a normal migration once the unrelated in-flight AI-provider work there lands.
 
 #### The helpers you'll see everywhere
 
