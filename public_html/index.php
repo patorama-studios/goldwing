@@ -180,6 +180,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                 <div class="page-content">
                   <iframe title="Ride calendar" src="/calendar/events_public.php" style="width: 100%; min-height: 900px; border: 0;" loading="lazy"></iframe>
                 </div>
+                <!-- Runs on the parent so the calendar iframe can hand off its
+                     event popup to a full-page overlay that covers the nav. -->
+                <script src="/calendar/assets/event-modal.js" defer></script>
               <?php endif; ?>
             <?php elseif ($page && !$canView): ?>
               <h2>Members Only</h2>

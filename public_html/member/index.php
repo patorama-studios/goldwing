@@ -3926,6 +3926,9 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               style="border: 0; min-height: 1200px;"
               id="member-calendar-frame"></iframe>
           </div>
+          <!-- Runs on the parent so the calendar iframe can hand off its event
+               popup to a full-page overlay that covers the member nav. -->
+          <script src="/calendar/assets/event-modal.js" defer></script>
         </section>
       <?php elseif ($page === 'notices-create'): ?>
         <section class="space-y-6">
