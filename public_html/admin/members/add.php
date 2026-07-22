@@ -119,7 +119,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           </ol>
         </div>
 
-        <form id="add-member-form" method="post" action="/admin/members/actions.php" class="px-6 py-6">
+        <form id="add-member-form" method="post" action="/admin/members/actions.php" class="px-6 py-6" novalidate>
           <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
           <input type="hidden" name="action" value="create_member">
           <input type="hidden" name="tab" value="overview">
@@ -570,6 +570,23 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   form.addEventListener('submit', function (e) {
     for (var i = 0; i < steps.length - 1; i++) {
       if (!validateStep(i)) { e.preventDefault(); current = i; render(); return; }
+    }
+    // The form is novalidate: with native submit-validation on, a field the
+    // browser deems invalid (e.g. "$25" typed into a number box) sitting on a
+    // hidden step aborts the submit with no visible feedback at all. Check
+    // validity ourselves and jump to the offending step with a message.
+    var els = form.elements;
+    for (var j = 0; j < els.length; j++) {
+      var el = els[j];
+      if (el.willValidate && !el.checkValidity()) {
+        e.preventDefault();
+        for (var k = 0; k < steps.length; k++) {
+          if (steps[k].contains(el)) { current = k; render(); break; }
+        }
+        showError(el.validationMessage || 'Please check the highlighted field.');
+        try { el.focus(); } catch (err2) {}
+        return;
+      }
     }
     submitBtn.disabled = true;
     submitBtn.classList.add('opacity-60');
