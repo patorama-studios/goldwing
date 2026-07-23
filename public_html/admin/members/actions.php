@@ -682,8 +682,10 @@ switch ($action) {
         if ($firstName === '' || $lastName === '') {
             $redirectAddError('First name and last name are required.');
         }
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $redirectAddError('A valid email address is required.');
+        // Email is optional (rare, but some members have neither phone nor
+        // email); when provided it must be a valid address.
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $redirectAddError('The email address provided is not valid.');
         }
 
         // --- Step 1: member type + number ---

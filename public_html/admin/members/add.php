@@ -187,7 +187,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <!-- STEP 2: Contact -->
           <div class="wizard-step hidden" data-step="1">
             <h2 class="text-lg font-semibold text-gray-900 mb-1">Contact details</h2>
-            <p class="text-sm text-gray-500 mb-4">Name and email are required.</p>
+            <p class="text-sm text-gray-500 mb-4">Name is required. Email and phone are optional — rare, but some members have neither.</p>
             <div class="grid gap-4 sm:grid-cols-2">
               <label class="block">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">First name *</span>
@@ -198,8 +198,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <input type="text" name="last_name" data-required class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
               </label>
               <label class="block">
-                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Email *</span>
-                <input type="email" name="email" data-required data-email class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Email</span>
+                <input type="email" name="email" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 block text-xs text-gray-500">Optional. Needed later for a login or any emails.</span>
               </label>
               <label class="block">
                 <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Phone</span>
@@ -515,6 +516,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   function ensureEmailCleared() {
     var email = emailInput.value.trim().toLowerCase();
     if (email === clearedEmail) { return true; }
+    // Email is optional; nothing to look up when blank (or not yet a valid
+    // address — the submit-time validity sweep reports those).
+    if (email === '' || (emailInput.checkValidity && !emailInput.checkValidity())) { return true; }
     // Older browsers without fetch/URLSearchParams skip the live check —
     // the server still rejects duplicate emails on submit, as before.
     if (!window.fetch || !window.URLSearchParams || !window.Promise) {
