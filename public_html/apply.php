@@ -1528,8 +1528,19 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
 
       const createStripeRequestId = () => `apply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+      const fieldVal = (name) => (form.querySelector(`[name="${name}"]`)?.value || '').trim();
+
       const buildStripePaymentIntentPayload = () => {
         const fullMagazine = form.querySelector('input[name="full_magazine_type"]:checked')?.value || 'PRINTED';
+        // Compose an ISO date only when all three parts are set (server re-derives
+        // its own; this is just to carry the DOB into the invoice metadata).
+        const dobY = fieldVal('dob_year');
+        const dobM = fieldVal('dob_month');
+        const dobD = fieldVal('dob_day');
+        const dob = (dobY && dobM && dobD) ? `${dobY}-${String(dobM).padStart(2, '0')}-${String(dobD).padStart(2, '0')}` : '';
+        // Contact + associate details are sent so the invoice metadata is complete
+        // enough to rebuild the application server-side if this browser POST fails
+        // after payment (MembershipApplicationRecoveryService).
         const payload = {
           membership_full: isFullSelected() ? 1 : 0,
           membership_associate: isAssociateSelected() ? 1 : 0,
@@ -1537,9 +1548,23 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           full_magazine_type: fullMagazine,
           full_period_key: periodSelects.full ? periodSelects.full.value : '',
           associate_period_key: periodSelects.associate ? periodSelects.associate.value : '',
-          first_name: form.querySelector('input[name="first_name"]')?.value || '',
-          last_name: form.querySelector('input[name="last_name"]')?.value || '',
-          email: form.querySelector('input[name="email"]')?.value || '',
+          first_name: fieldVal('first_name'),
+          last_name: fieldVal('last_name'),
+          email: fieldVal('email'),
+          phone: fieldVal('phone'),
+          address_line1: fieldVal('address_line1'),
+          address_line2: fieldVal('address_line2'),
+          city: fieldVal('city'),
+          state: fieldVal('state'),
+          postal_code: fieldVal('postal_code'),
+          country: fieldVal('country'),
+          dob,
+          requested_chapter_id: fieldVal('requested_chapter_id'),
+          privacy_level: fieldVal('privacy_level') || 'A',
+          referral_source: fieldVal('referral_source'),
+          associate_first_name: fieldVal('associate_first_name'),
+          associate_last_name: fieldVal('associate_last_name'),
+          associate_email: fieldVal('associate_email'),
         };
         return payload;
       };
@@ -1677,8 +1702,43 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         });
       };
 
-      const submitApplicationViaAjax = async (intentId) => {
-        const ajaxForm = new FormData(form);
+      // The card path takes the payment BEFORE this POST writes the applicant to
+      // the DB. If Stripe does a full-page issuer/3DS redirect, the page reloads
+      // and the live form is empty — so we snapshot the form to sessionStorage
+      // before confirming, and the return handler replays that snapshot. Without
+      // this, a redirect-authenticated payment is captured but records nothing.
+      const APPLY_STASH_KEY = 'agaApplyFormV1';
+      const stashFormData = () => {
+        try {
+          const entries = {};
+          new FormData(form).forEach((value, key) => {
+            if (typeof value === 'string') { entries[key] = value; }
+          });
+          sessionStorage.setItem(APPLY_STASH_KEY, JSON.stringify(entries));
+        } catch (e) { /* sessionStorage unavailable — inline (non-redirect) path still works */ }
+      };
+      const loadStashFormData = () => {
+        try {
+          const raw = sessionStorage.getItem(APPLY_STASH_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+      };
+      const clearStashFormData = () => {
+        try { sessionStorage.removeItem(APPLY_STASH_KEY); } catch (e) { /* ignore */ }
+      };
+
+      const submitApplicationViaAjax = async (intentId, stashed = null) => {
+        let ajaxForm;
+        if (stashed && typeof stashed === 'object' && Object.keys(stashed).length) {
+          ajaxForm = new FormData();
+          Object.entries(stashed).forEach(([key, value]) => ajaxForm.set(key, value));
+          // The reloaded page has a fresh CSRF token — use it, not the stale
+          // snapshot one, so the replayed POST always verifies.
+          const liveCsrf = form.querySelector('input[name="csrf_token"]')?.value;
+          if (liveCsrf) { ajaxForm.set('csrf_token', liveCsrf); }
+        } else {
+          ajaxForm = new FormData(form);
+        }
         ajaxForm.set('payment_method', 'card');
         ajaxForm.set('payment_intent_id', intentId || '');
         ajaxForm.set('ajax', '1');
@@ -1691,6 +1751,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         if (!response.ok || data.error) {
           throw new Error(data.error || 'Unable to submit application.');
         }
+        clearStashFormData();
         window.location.href = `${window.location.origin}${window.location.pathname}?submitted=1`;
       };
 
@@ -1713,7 +1774,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             throw new Error('Unable to verify Stripe payment.');
           }
           if (paymentIntent.status === 'succeeded') {
-            await submitApplicationViaAjax(paymentIntent.id);
+            await submitApplicationViaAjax(paymentIntent.id, loadStashFormData());
             return;
           }
           if (paymentIntent.status === 'processing') {
@@ -1897,6 +1958,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             if (!stripe || !elements) {
               throw new Error('Stripe is not ready.');
             }
+            // Snapshot the filled form before confirming — an issuer/3DS redirect
+            // would otherwise reload the page and lose it before we can POST.
+            stashFormData();
             const returnUrl = `${window.location.origin}${window.location.pathname}`;
             const { error, paymentIntent } = await stripe.confirmPayment({
               elements,

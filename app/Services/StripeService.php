@@ -576,6 +576,39 @@ class StripeService
         return $invoice->toArray();
     }
 
+    /**
+     * List invoices, most recent first. Stripe's API can't filter by metadata,
+     * so callers filter the returned rows themselves (e.g. by metadata.context).
+     * Returns an array of invoice arrays (empty on error / no config).
+     *
+     * @param array<string,mixed> $params e.g. ['status' => 'paid', 'limit' => 100,
+     *   'created' => ['gte' => $ts]]
+     * @return array<int,array<string,mixed>>
+     */
+    public static function listInvoices(array $params = []): array
+    {
+        $secret = self::activeSecretKey();
+        if ($secret === '') {
+            return [];
+        }
+        if (!isset($params['limit'])) {
+            $params['limit'] = 100;
+        }
+        try {
+            $invoices = self::client($secret)->invoices->all($params);
+        } catch (ApiErrorException $e) {
+            StripeErrorLogger::log(__METHOD__, 'invoice.list', $e, [
+                'status' => $params['status'] ?? null,
+            ]);
+            return [];
+        }
+        $out = [];
+        foreach ($invoices->data ?? [] as $invoice) {
+            $out[] = $invoice->toArray();
+        }
+        return $out;
+    }
+
     public static function voidInvoice(string $invoiceId): ?array
     {
         $secret = self::activeSecretKey();

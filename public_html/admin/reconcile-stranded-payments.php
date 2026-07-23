@@ -38,6 +38,7 @@ use App\Services\Csrf;
 use App\Services\Database;
 use App\Services\StripeService;
 use App\Services\PaymentWebhookService;
+use App\Services\MembershipApplicationRecoveryService;
 
 require_permission('admin.settings.general.manage');
 
@@ -45,6 +46,7 @@ $pdo = Database::connection();
 $flashError = '';
 $flashSuccess = '';
 $actionResults = []; // invoiceId => ['ok'=>bool,'msg'=>string]
+$appResults = [];    // invoiceId => recovery result (orphaned new-member applications)
 
 // Non-paid membership orders that carry a Stripe invoice id. cancelled/refunded
 // are excluded so we never re-activate something deliberately reversed.
@@ -91,6 +93,19 @@ $assessInvoice = static function (string $invoiceId) use ($pdo): array {
 
 $byInvoice = $loadCandidates();
 
+// Orphaned NEW-MEMBER applications: paid membership_application invoices in
+// Stripe whose applicant never landed in the DB (the /apply.php browser POST
+// failed after payment). Unlike renewals above, these have NO order row, so the
+// candidate query can't see them — they come straight from Stripe.
+try {
+    $orphans = MembershipApplicationRecoveryService::findOrphans();
+} catch (\Throwable $e) {
+    $orphans = [];
+    if ($flashError === '') {
+        $flashError = 'Could not scan Stripe for stranded applications: ' . $e->getMessage();
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
         $flashError = 'Invalid CSRF token. Reload and try again.';
@@ -135,8 +150,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Orphaned-application recovery: create the PENDING member + application
+        // from a paid Stripe invoice the browser never recorded. Idempotent +
+        // deduped inside the service, so re-clicking or a double invoice is safe.
+        if ($action === 'recover_application' && !empty($_POST['invoice_id'])) {
+            $invoiceId = (string) $_POST['invoice_id'];
+            $appResults[$invoiceId] = MembershipApplicationRecoveryService::recoverInvoice(['id' => $invoiceId]);
+        } elseif ($action === 'recover_all_applications') {
+            foreach ($orphans as $orph) {
+                $appResults[$orph['invoice_id']] = MembershipApplicationRecoveryService::recoverInvoice($orph['invoice']);
+            }
+        }
+
         $byInvoice = $loadCandidates(); // refresh so activated ones drop off
-        $flashSuccess = 'Reconcile run complete — see the result on each row below.';
+        try {
+            $orphans = MembershipApplicationRecoveryService::findOrphans();
+        } catch (\Throwable $e) {
+            $orphans = [];
+        }
+        $flashSuccess = 'Run complete — see the result on each row below.';
     }
 }
 
@@ -283,6 +315,80 @@ $fmtName = static function (array $o): string {
                     </form>
                   <?php else: ?>
                     <span class="note">—</span>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+    </div>
+
+    <div class="card">
+      <h1>🧾 Stranded new-member applications</h1>
+      <p class="note">
+        New members who <strong>paid</strong> the join fee in Stripe but never landed in the system — the
+        <code>/apply.php</code> payment was captured, but the browser step that saves the application failed
+        (an issuer/3DS redirect that wiped the form, a closed tab, a dropped connection). Recovering creates a
+        <strong>PENDING member + application</strong> from the paid Stripe invoice so the committee can approve them
+        normally. Idempotent and deduped — safe to re-run, and a second paid invoice for the same person is flagged,
+        not duplicated.
+        <?php $graceNote = 15; ?>Only invoices paid more than <?= $graceNote ?> minutes ago are shown, so a
+        signup still in progress is never touched.
+      </p>
+
+      <?php if (!$orphans): ?>
+        <p class="note">✅ No stranded applications — every paid membership-application invoice is in the system.</p>
+      <?php else: ?>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+          <h2 style="font-size:1rem; margin:0;"><?= count($orphans) ?> paid application(s) not in the system</h2>
+          <form method="POST" onsubmit="return confirm('Create PENDING members + applications for all <?= count($orphans) ?> stranded paid application(s)?');">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="recover_all_applications">
+            <button type="submit" class="all">Recover all <?= count($orphans) ?></button>
+          </form>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant</th>
+              <th>Paid</th>
+              <th>Paid at</th>
+              <th>Stripe invoice</th>
+              <th>Action / result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($orphans as $orph): ?>
+              <?php $result = $appResults[$orph['invoice_id']] ?? null; ?>
+              <tr>
+                <td>
+                  <div><?= htmlspecialchars($orph['name'] !== '' ? $orph['name'] : '(name not captured)') ?></div>
+                  <span class="note"><?= htmlspecialchars($orph['email'] !== '' ? $orph['email'] : '—') ?></span>
+                  <?php if (!empty($orph['duplicate_payment'])): ?>
+                    <div><span class="pill no">DUPLICATE PAYMENT</span></div>
+                  <?php endif; ?>
+                </td>
+                <td>$<?= number_format(((int) $orph['amount_paid_cents']) / 100, 2) ?></td>
+                <td><span class="note"><?= $orph['paid_at'] ? htmlspecialchars(date('j M Y g:ia', (int) $orph['paid_at'])) : '—' ?></span></td>
+                <td>
+                  <code><?= htmlspecialchars((string) $orph['invoice_id']) ?></code>
+                  <?php if (!empty($orph['hosted_invoice_url'])): ?>
+                    <br><a class="back" style="margin:0;" href="<?= htmlspecialchars((string) $orph['hosted_invoice_url']) ?>" target="_blank" rel="noopener">view in Stripe ↗</a>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <?php if ($result): ?>
+                    <span class="pill <?= !empty($result['ok']) ? 'res-ok' : 'res-no' ?>"><?= !empty($result['ok']) ? 'CREATED' : 'NO-OP' ?></span>
+                    <div class="note"><?= htmlspecialchars((string) ($result['msg'] ?? '')) ?></div>
+                  <?php else: ?>
+                    <form method="POST" onsubmit="return confirm('Create a PENDING member + application from this paid Stripe invoice?');">
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                      <input type="hidden" name="action" value="recover_application">
+                      <input type="hidden" name="invoice_id" value="<?= htmlspecialchars((string) $orph['invoice_id']) ?>">
+                      <button type="submit">Recover</button>
+                    </form>
                   <?php endif; ?>
                 </td>
               </tr>

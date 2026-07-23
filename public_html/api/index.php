@@ -979,6 +979,11 @@ if ($resource === 'stripe') {
             json_response(['error' => 'Primary member name and email are required.'], 422);
         }
 
+        // Contact + selection details go into the invoice metadata so a stranded
+        // payment can be rebuilt into a full application server-side if the
+        // browser POST never lands (MembershipApplicationRecoveryService). Every
+        // value is trimmed + capped to stay under Stripe's 500-char metadata limit.
+        $metaStr = static fn($v): string => mb_substr(trim((string) $v), 0, 480);
         $invoiceMeta = [
             'membership_full' => $fullSelected ? '1' : '0',
             'membership_associate' => $associateSelected ? '1' : '0',
@@ -988,6 +993,21 @@ if ($resource === 'stripe') {
             'associate_add' => $associateAdd,
             'first_name' => $firstName,
             'last_name' => $lastName,
+            'email' => $metaStr($email),
+            'phone' => $metaStr($body['phone'] ?? ''),
+            'address_line1' => $metaStr($body['address_line1'] ?? ''),
+            'address_line2' => $metaStr($body['address_line2'] ?? ''),
+            'city' => $metaStr($body['city'] ?? ''),
+            'state' => $metaStr($body['state'] ?? ''),
+            'postal_code' => $metaStr($body['postal_code'] ?? ''),
+            'country' => $metaStr($body['country'] ?? ''),
+            'dob' => $metaStr($body['dob'] ?? ''),
+            'requested_chapter_id' => $metaStr($body['requested_chapter_id'] ?? ''),
+            'privacy_level' => $metaStr($body['privacy_level'] ?? 'A'),
+            'referral_source' => $metaStr($body['referral_source'] ?? ''),
+            'associate_first_name' => $metaStr($body['associate_first_name'] ?? ''),
+            'associate_last_name' => $metaStr($body['associate_last_name'] ?? ''),
+            'associate_email' => $metaStr($body['associate_email'] ?? ''),
             'processing_fee_cents' => (string) $processingFeeCents,
             'total_with_fee_cents' => (string) $totalWithFeeCents,
         ];
