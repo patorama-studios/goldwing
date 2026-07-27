@@ -25,6 +25,16 @@ $viewOnly = !empty($_GET['view']);
 if (!$viewOnly) {
     $update = $pdo->prepare('UPDATE wings_issues SET downloads = downloads + 1 WHERE id = :id');
     $update->execute(['id' => $id]);
+
+    // Per-member attribution for the daily summary's Wings leaderboard. The
+    // counter above is per-issue only and can't say who read what.
+    $u = current_user();
+    if ($u && !empty($u['member_id'])) {
+        \App\Services\ActivityLogger::log('member', (int) $u['id'], (int) $u['member_id'], 'wings.download', [
+            'issue_id' => $id,
+            'title' => $issue['title'] ?? '',
+        ]);
+    }
 }
 
 // Redirect to actual file

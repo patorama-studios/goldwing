@@ -227,6 +227,7 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | Script | Schedule (`DEPLOY.md`) | Job |
 |---|---|---|
 | `send_renewal_reminders.php` | `0 6 * * *` | Emails members whose membership is about to lapse. |
+| `daily_summary_admin.php` | `0 7 * * *` | Morning admin briefing — outstanding work, renewals, follow-ups, leaderboards. |
 | `expire_memberships.php` | `5 0 * * *` | Marks past-end-date periods as expired. |
 | `fim_scan.php` | Hourly (configurable) | File integrity scan; alerts on hash drift. |
 

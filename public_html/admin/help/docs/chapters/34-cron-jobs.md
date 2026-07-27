@@ -9,7 +9,7 @@ A **cron job** is a small task the website runs automatically on a schedule — 
 - Emailing members **renewal reminders** before their membership runs out.
 - Marking memberships **lapsed** two months after their expiry date (grace period), so member-only access turns off.
 - Doing a **file integrity scan** to catch tampering or unexpected file changes.
-- Optionally, sending admins a **daily summary** of activity.
+- Sending admins a **daily summary** each morning — what needs actioning, who renewed, who to chase.
 
 These run quietly in the background. Most of the time you don't need to think about them — but if reminders stop going out, or memberships aren't lapsing on time, this is where to look.
 
@@ -34,7 +34,7 @@ In **cPanel → Cron Jobs**. The page shows every scheduled command, the schedul
 - **Membership expiry** — runs daily, just after midnight. Looks for any active memberships whose end date passed more than **2 months ago** and marks them as **lapsed**. Members whose end date has just passed enter a 2-month grace window first: the badge shows Lapsed and an amber banner appears, but member features stay accessible. Access locks off only after the grace period expires.
 - **Stale pending-order cleanup** — runs daily. Closes off abandoned card-checkout orders that never got paid (Stripe's hosted checkout link expires after about a day, so we close ours too). Without this, the orders list would slowly fill with "pending" rows that no one will ever pay.
 - **File integrity scan** — runs hourly (or nightly, depending on configuration). Compares the site's files against a saved baseline and alerts the security recipient if anything has changed unexpectedly. Cross-reference with [Chapter 11 — File integrity monitoring](view.php?slug=11-file-integrity).
-- **Daily admin summary** — optional. Emails the first admin a one-paragraph digest each morning: how many active members, how many pending applications, how many memberships are due soon. A useful "is the site still alive?" heartbeat.
+- **Daily admin summary** — runs each morning. Emails the admin recipients a briefing on the club: what needs actioning (notification hub items, store orders paid but not sent, Stripe errors), who renewed and who joined this week by name, the five longest-lapsed members worth a phone call, store takings, the most active members and Wings readers, upcoming events, and birthdays or membership milestones falling this week. Sections with nothing in them are left out, so a short email genuinely means a quiet day.
 
 ### What you might need to do
 
@@ -53,7 +53,7 @@ In **cPanel → Cron Jobs**. The page shows every scheduled command, the schedul
 ### Good practice
 
 - **Don't disable a cron job without flagging the developer.** What looks like "I'll just turn off reminders for a week" can lead to members lapsing silently.
-- **Check the cPanel cron history once a month.** Confirm all four jobs are still in the list and the "Cron Email" address is still set.
+- **Check the cPanel cron history once a month.** Confirm all five jobs are still in the list and the "Cron Email" address is still set.
 - **Make sure the cron-output email goes somewhere monitored.** A shared admin inbox is fine — a personal address that no one checks during holidays is not.
 - **If a job seems to have stopped, look at the "last run" marker before assuming the script is broken.** Often cron itself has been disabled (after a hosting change, for instance) and the script is fine.
 
@@ -68,7 +68,7 @@ The **developer**. Cron jobs run outside the website's admin area and need cPane
 
 ## What this covers
 
-The four scheduled PHP scripts in `cron/` — what each one does, when it runs, what it writes to the database, who gets emailed when it works, and what to do when it doesn't. Plus the cPanel-side setup: how to add a cron entry, where its output goes, and the timezone trap that catches everyone the first time.
+The five scheduled PHP scripts in `cron/` — what each one does, when it runs, what it writes to the database, who gets emailed when it works, and what to do when it doesn't. Plus the cPanel-side setup: how to add a cron entry, where its output goes, and the timezone trap that catches everyone the first time.
 
 ## Why it exists
 
@@ -77,7 +77,7 @@ A handful of jobs simply can't wait for a human to remember them.
 - **Renewals are time-critical.** A member who lapses without warning is a member we lose. Two reminders (60 and 30 days before expiry) need to fire reliably whether or not anyone logged into the admin that day.
 - **Status has to match reality.** If `members.status` still says `ACTIVE` the day after a term ended, every member-only gate is wrong. `expire_memberships.php` keeps the database aligned with the calendar.
 - **Tampering needs to be caught quickly.** FIM ([Chapter 11](view.php?slug=11-file-integrity)) only works if it actually runs.
-- **Admins want a heartbeat.** The optional daily summary is the cheapest "is the site still alive?" signal.
+- **Admins need a worklist, not a heartbeat.** The daily summary started life as three counts, which proved nothing was wrong but never told anyone what to do. It now leads with the things waiting on a human, so the email is worth opening.
 
 Each script is deliberately tiny — one file, no framework, no daemons. cPanel runs them, MySQL holds their state, and each leaves a `last_*_run` marker so you can spot a job that stopped firing.
 
@@ -121,12 +121,29 @@ Wraps `FileIntegrityService::scan()` over the configured paths. If the baseline 
 
 **If it fails:** the most common error is `RuntimeException('Baseline not set.')` on a fresh install. Approve a baseline in admin and rerun.
 
+### `cron/daily_summary_admin.php` — daily, `0 7 * * *`
+
+Builds the morning briefing and sends it to `NotificationService::getAdminEmails()` (falling back to `site.contact_email`, then the first active `admin` user). Writes `last_daily_summary_run`.
+
+Reads, in order of appearance in the email: `members` + `membership_applications` + `membership_periods` for the stat tiles; `PendingRequestsService::all()` for the hub breakdown and the age of the oldest waiting item; `store_orders` for takings and anything paid-but-unfulfilled; `stripe_errors` for silent payment failures; `membership_periods` joined to `members` for the week's renewals and joins (a period counts as a *renewal* when the member already has one with an earlier `start_date`, otherwise it's a join); `user_logins` and `activity_log` for the two leaderboards; `calendar_events` for what's coming up; and `members.date_of_birth` / `members.join_date` for birthdays and 5-year milestones.
+
+Three things worth knowing before editing it:
+
+- **Every block goes through `q()`**, a try/catch that logs to `error_log` and returns a default. A missing table or renamed column hides one section instead of killing the whole email. The trade-off is that a broken query is *silent* — if a section vanishes, run the script by hand and read stderr before assuming there was simply no data.
+- **`members.status` is read as `UPPER(status) IN ('LAPSED','EXPIRED')`.** Prod carries the legacy uppercase values; the checked-in schema declares a lowercase enum that spells the same state `expired`. Matching both survives either.
+- **Don't alias a `COUNT()` as `reads`** — it's reserved in MySQL 8, and combined with `q()` the syntax error is invisible.
+
+Per-member Wings attribution comes from `activity_log` rows written by `public_html/member/read_wings.php` (`wings.read`) and `download_wings.php` (`wings.download`). The `wings_issues.downloads` counter is per-issue and can't say *who* read what, which is why the leaderboard needed its own signal. It only has data from the day that logging deployed — before then the row is simply absent.
+
+**If it fails:** no email arrives and `last_daily_summary_run` stops advancing. Run `php cron/daily_summary_admin.php` on the server and read stderr — `q()` logs each swallowed failure with a `[daily_summary]` prefix.
+
 ### cPanel setup
 
 In cPanel → **Cron Jobs**, add an entry per script with the schedule on the left and the command on the right:
 
 ```
 0 6 * * *    /usr/bin/php /home2/goldwing/cron/send_renewal_reminders.php
+0 7 * * *    /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
 5 0 * * *    /usr/bin/php /home2/goldwing/cron/expire_memberships.php
 15 0 * * *   /usr/bin/php /home2/goldwing/cron/expire_pending_orders.php
 0 * * * *    /usr/bin/php /home2/goldwing/cron/fim_scan.php
@@ -142,6 +159,8 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 - **Reminder windows (60 / 30 days):** hard-coded in `cron/send_renewal_reminders.php`'s `$intervals` array.
 - **FIM enable / paths / excludes:** Admin → Security & Authentication. The cron honours the DB toggle.
 - **Pricing the reminder uses:** `stripe.membership_prices` in `config/app.php`.
+- **What's in the daily summary, and in what order:** the section blocks in `cron/daily_summary_admin.php`. Each is a query plus a render block; delete one and the email loses that section cleanly.
+- **Who the daily summary goes to:** Admin → Notifications (`notifications.admin_emails`).
 
 ## Settings
 
@@ -150,6 +169,8 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 | `fim_enabled` (Security) | When false, `fim_scan.php` exits without scanning. |
 | `fim_paths`, `fim_exclude_paths` (Security) | What `fim_scan.php` hashes. |
 | `site.contact_email` | Fallback recipient when `SecurityAlertService` has no configured target. |
+| `notifications.admin_emails` | Who the daily summary goes to. Falls back to `site.contact_email`, then the first active `admin` user. |
+| `system_settings.last_daily_summary_run` | Heartbeat for the daily summary. |
 | `stripe.membership_prices.{TYPE}_1Y` (`config/app.php`) | Price IDs the renewal reminder builds checkout links from. |
 | `system_settings.last_renewal_reminder_run` / `last_expire_run` | Heartbeat markers. If these stop advancing, cron is broken. |
 
@@ -164,7 +185,7 @@ cPanel emails any stdout/stderr the script produces to the address in the **"Cro
 
 </details>
 
-<!-- SCREENSHOT: cPanel → Cron Jobs page showing the four entries and the "Cron Email" field populated. Save as 34-cpanel-cron-list.png. -->
+<!-- SCREENSHOT: cPanel → Cron Jobs page showing the five entries and the "Cron Email" field populated. Save as 34-cpanel-cron-list.png. -->
 <!-- ![cPanel cron list](../images/34-cpanel-cron-list.png) -->
 
 <!-- SCREENSHOT: A sample renewal reminder email as received by a member (Hi {first_name} … Renew now). Save as 34-renewal-email.png. -->

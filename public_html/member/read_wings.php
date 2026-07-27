@@ -20,6 +20,17 @@ if (!$issue) {
     exit;
 }
 
+// Per-member attribution for the daily summary's Wings leaderboard. Opening
+// the flipbook is the read; download_wings.php?view=1 below is just the PDF
+// fetch that feeds it, so only this page logs a read.
+$u = current_user();
+if ($u && !empty($u['member_id'])) {
+    \App\Services\ActivityLogger::log('member', (int) $u['id'], (int) $u['member_id'], 'wings.read', [
+        'issue_id' => $id,
+        'title' => $issue['title'] ?? '',
+    ]);
+}
+
 $appName    = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $faviconUrl = SettingsService::getGlobal('site.favicon_url', '');
 $pageTitle  = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8') . ' — Wings Magazine';
