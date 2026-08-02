@@ -128,6 +128,8 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | `MembershipStatusService.php` | Single funnel for admin status / renewal-date edits — keeps `members.status` and `membership_periods.status`/`end_date` in sync. |
 | `MembershipPricingService.php` | Printed vs PDF × period matrix. |
 | `MembershipMigrationService.php` | Bulk imports + chapter moves. |
+| `ApplicationDraftService.php` | Banks the full `/apply.php` form server-side before the card is charged, so a payment whose browser POST never lands can be rebuilt in full. |
+| `MembershipApplicationRecoveryService.php` | Rebuilds stranded Stripe-paid applications (paid invoice, nothing in DB) into a PENDING member + application + paid order. Runs via cron, the admin reconcile tool, and a throttled `sweepIfDue()` fired from the notification hub. |
 | `AdminMemberAccess.php` | Per-admin scope. |
 | `ChapterRepository.php` | Chapters + area-rep mapping. |
 | `CommitteeService.php` | National + chapter committee cards. |
@@ -163,7 +165,7 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | `Database.php`, `DbSessionHandler.php`, `Env.php` | DB connection, MySQL sessions, `.env` loader. |
 | `BaseUrlService.php` | Resolves `https://…` across CLI + web. |
 | `Validator.php` | Tiny input-validation helpers. |
-| `PendingRequestsService.php` | Unified "needs admin action" queue. |
+| `PendingRequestsService.php` | Unified "needs admin action" queue. Application rows carry payment context (card paid via Stripe vs bank transfer awaiting), and loading it sweeps stranded Stripe payments into the queue. |
 | `TourService.php` | UI walkthrough metadata. |
 
 #### `public_html/`

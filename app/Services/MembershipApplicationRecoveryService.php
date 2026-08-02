@@ -41,6 +41,40 @@ class MembershipApplicationRecoveryService
     /** How far back to scan Stripe for paid application invoices. */
     private const LOOKBACK_DAYS = 45;
 
+    /** Admin-traffic sweeps hit Stripe at most this often (seconds). */
+    private const SWEEP_INTERVAL = 900;
+
+    /** mtime of this file is the last sweep time. */
+    private const SWEEP_MARKER = __DIR__ . '/../cache/stranded_sweep_last_run';
+
+    /**
+     * Recover every orphaned paid invoice, at most once per SWEEP_INTERVAL.
+     *
+     * Called from the admin notification hub on page load, so stranded Stripe
+     * payments surface there without depending on the cPanel cron being
+     * scheduled. Silent and throttled: skipping (no marker writable, Stripe
+     * unconfigured, recent run) must never affect the calling page.
+     */
+    public static function sweepIfDue(): void
+    {
+        try {
+            $last = @filemtime(self::SWEEP_MARKER);
+            if ($last !== false && $last > time() - self::SWEEP_INTERVAL) {
+                return;
+            }
+            // Stamp before scanning so a failing Stripe call can't retry on
+            // every page load; if the marker isn't writable, don't sweep at all.
+            if (!@touch(self::SWEEP_MARKER)) {
+                return;
+            }
+            foreach (self::findOrphans() as $orphan) {
+                self::recoverInvoice($orphan['invoice']);
+            }
+        } catch (\Throwable $e) {
+            error_log('[MembershipApplicationRecoveryService] sweep failed: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Paid membership_application invoices in Stripe whose applicant is not in
      * the DB. Each row carries what the UI/cron needs to display and recover.

@@ -75,6 +75,17 @@ class PendingRequestsService
 
     public static function all(?string $typeFilter = null, string $statusFilter = 'pending'): array
     {
+        // A card applicant whose post-payment browser POST never landed exists
+        // only in Stripe — sweep those into PENDING members/applications
+        // (throttled, silent) so they surface here like any other pending member.
+        if ($typeFilter === null || $typeFilter === self::TYPE_MEMBERSHIP) {
+            static $swept = false;
+            if (!$swept) {
+                $swept = true;
+                MembershipApplicationRecoveryService::sweepIfDue();
+            }
+        }
+
         $items = [];
         $methods = [
             self::TYPE_FEEDBACK       => 'fetchFeedback',
@@ -327,20 +338,20 @@ class PendingRequestsService
 
                 case self::TYPE_MEMBERSHIP:
                     $stmt = $pdo->prepare(
-                        "SELECT a.id, a.member_id, a.member_type, a.status, a.created_at,
-                                m.first_name, m.last_name, m.email
+                        "SELECT a.id, a.member_id, a.member_type, a.status, a.created_at, a.notes,
+                                m.first_name, m.last_name, m.email,
+                                o.payment_method, o.payment_status, o.total, o.order_number
                          FROM membership_applications a
                          LEFT JOIN members m ON m.id = a.member_id
+                         LEFT JOIN orders o ON o.id = (SELECT o2.id FROM orders o2
+                                                       WHERE o2.member_id = a.member_id AND o2.order_type = 'membership'
+                                                       ORDER BY o2.id DESC LIMIT 1)
                          WHERE a.id = :id LIMIT 1"
                     );
                     $stmt->execute(['id' => $id]);
                     $r = $stmt->fetch();
                     if (!$r) return null;
-                    $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
-                    return self::row(self::TYPE_MEMBERSHIP, $r['id'], $submitter ?: 'Member #' . $r['member_id'],
-                        strtolower((string) $r['status']), $r['created_at'],
-                        $submitter, $r['email'] ?? null,
-                        'Type: ' . $r['member_type'], $r);
+                    return self::membershipApplicationRow($r);
 
                 case self::TYPE_MEMBERSHIP_PAYMENT:
                     $stmt = $pdo->prepare(
@@ -853,21 +864,45 @@ class PendingRequestsService
     {
         $pdo = Database::connection();
         $where = self::statusWhereUpper($statusFilter, 'a.status');
-        $sql = "SELECT a.id, a.member_id, a.member_type, a.status, a.created_at,
-                       m.first_name, m.last_name, m.email
+        $sql = "SELECT a.id, a.member_id, a.member_type, a.status, a.created_at, a.notes,
+                       m.first_name, m.last_name, m.email,
+                       o.payment_method, o.payment_status, o.total, o.order_number
                 FROM membership_applications a
                 LEFT JOIN members m ON m.id = a.member_id
+                LEFT JOIN orders o ON o.id = (SELECT o2.id FROM orders o2
+                                              WHERE o2.member_id = a.member_id AND o2.order_type = 'membership'
+                                              ORDER BY o2.id DESC LIMIT 1)
                 WHERE 1=1 $where
                 ORDER BY a.created_at DESC";
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll() ?: [];
-        return array_map(function ($r) {
-            $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
-            return self::row(self::TYPE_MEMBERSHIP, $r['id'], $submitter ?: 'Member #' . $r['member_id'],
-                strtolower((string) $r['status']), $r['created_at'],
-                $submitter, $r['email'] ?? null,
-                'Type: ' . $r['member_type'], $r);
-        }, $rows);
+        return array_map([self::class, 'membershipApplicationRow'], $rows);
+    }
+
+    /**
+     * Shared row builder for a membership application. The summary carries how
+     * the applicant is paying — a card application arrives already paid in
+     * Stripe and only needs the committee's approval, unlike a bank-transfer
+     * one that is also waiting on the money.
+     */
+    private static function membershipApplicationRow(array $r): array
+    {
+        $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+        $summary = 'Type: ' . $r['member_type'];
+        if (!empty($r['payment_method'])) {
+            $paid = ($r['payment_status'] ?? '') === 'accepted';
+            $amount = 'A$' . number_format((float) ($r['total'] ?? 0), 2);
+            $summary .= $r['payment_method'] === 'card'
+                ? ' · Card — ' . ($paid ? 'paid ' . $amount . ' via Stripe' : 'payment not confirmed')
+                : ' · Bank transfer — ' . ($paid ? 'received ' . $amount : 'awaiting payment');
+        }
+        if (str_contains((string) ($r['notes'] ?? ''), 'recovered_from_stripe')) {
+            $summary .= ' · recovered from Stripe';
+        }
+        unset($r['notes']); // raw JSON blob — not for the detail metadata grid
+        return self::row(self::TYPE_MEMBERSHIP, $r['id'], $submitter ?: 'Member #' . $r['member_id'],
+            strtolower((string) $r['status']), $r['created_at'],
+            $submitter, $r['email'] ?? null, $summary, $r);
     }
 
     /**
