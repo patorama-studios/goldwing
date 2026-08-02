@@ -14,14 +14,6 @@ $user = current_user();
 $chapterRestriction = AdminMemberAccess::getChapterRestrictionId($user);
 $canInlineEdit = AdminMemberAccess::isFullAccess($user);
 
-$allowedLimits = [25, 50, 100];
-$limit = (int) ($_GET['limit'] ?? 25);
-if (!in_array($limit, $allowedLimits, true)) {
-    $limit = 25;
-}
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$offset = ($page - 1) * $limit;
-
 $memberIdFilter = isset($_GET['member_id']) && $_GET['member_id'] !== '' ? (int) $_GET['member_id'] : null;
 if ($memberIdFilter !== null && $memberIdFilter <= 0) {
     $memberIdFilter = null;
@@ -98,7 +90,9 @@ if ($filters['status'] === '' && trim((string) ($filters['q'] ?? '')) === '') {
     $filters['exclude_statuses'] = ['cancelled'];
 }
 
-$result = MemberRepository::search($filters, $limit, $offset);
+// ponytail: no pagination — render every matching member in one list (fine at
+// club scale, ~2k rows); if it ever drags, add lazy-loading rather than pages.
+$result = MemberRepository::search($filters, 100000, 0);
 $members = $result['data'];
 $totalMembers = $result['total'];
 $stats = MemberRepository::stats($filters);
@@ -300,7 +294,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       // Every summary card is a filter shortcut. Each link resets the other
       // filter params so a card always shows exactly its own slice, and
       // $activeStat marks which card matches the current view.
-      $statReset = ['status' => null, 'expiring_within' => null, 'created_range' => null, 'created_from' => null, 'created_to' => null, 'renewed' => null, 'renewed_from' => null, 'renewed_to' => null, 'page' => 1];
+      $statReset = ['status' => null, 'expiring_within' => null, 'created_range' => null, 'created_from' => null, 'created_to' => null, 'renewed' => null, 'renewed_from' => null, 'renewed_to' => null, 'page' => null];
       $hasCreatedFilter = ($filters['created_range'] ?? '') !== '' || ($filters['created_from'] ?? '') !== '' || ($filters['created_to'] ?? '') !== '';
       $activeStat = 'total';
       if ($statusFilter === 'active') { $activeStat = 'active'; }
@@ -587,7 +581,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         <div class="flex flex-wrap gap-2">
             <button type="submit" data-tour="admin-find-member-apply" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Apply filters</button>
             <a href="/admin/members" class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">Reset</a>
-            <a href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => 1])) ?>" class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+            <a href="/admin/members?<?= e(buildQuery(['status' => 'pending', 'page' => null])) ?>" class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100">
               Pending only
             </a>
           </div>
@@ -630,7 +624,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <button type="button" data-bulk-action="send_welcome_email" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Send welcome</button>
               <button type="button" data-bulk-action="send_reset_link" class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">Reset password</button>
             </div>
-            <button type="button" data-select-all-page class="text-xs font-semibold text-primary">Select all on page</button>
+            <button type="button" data-select-all-page class="text-xs font-semibold text-primary">Select all</button>
           </div>
         </div>
         <div data-bulk-message class="hidden px-5 py-2 text-sm text-gray-600"></div>
@@ -1000,26 +994,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       </section>
 
-      <section class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm">
-        <div class="flex flex-wrap items-center gap-3 text-gray-600">
-          <span>Showing <?= e((string) ($totalMembers ? ($offset + 1) : 0)) ?> to <?= e((string) ($totalMembers ? min($page * $limit, $totalMembers) : 0)) ?> of <?= e((string) $totalMembers) ?> results</span>
-          <label class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-            Page size
-            <select name="limit" class="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" form="members-filters" onchange="this.form.submit()">
-              <?php foreach ($allowedLimits as $size): ?>
-                <option value="<?= e($size) ?>" <?= $limit === $size ? 'selected' : '' ?>><?= e($size) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </label>
-        </div>
-        <div class="flex items-center gap-2">
-          <?php if ($page > 1): ?>
-            <a class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="/admin/members?<?= e(buildQuery(['page' => $page - 1])) ?>">&larr; Previous</a>
-          <?php endif; ?>
-          <?php if ($totalMembers > $page * $limit): ?>
-            <a class="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" href="/admin/members?<?= e(buildQuery(['page' => $page + 1])) ?>">Next &rarr;</a>
-          <?php endif; ?>
-        </div>
+      <section class="rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-600">
+        <span>Showing all <?= e((string) $totalMembers) ?> results</span>
       </section>
     </div>
   </main>
