@@ -323,6 +323,12 @@ try {
   $fullMember = null;
 }
 
+// One associate per member: with the slot filled, linking another is blocked
+// (server-side too) until the current associate is unlinked.
+$associateSlotTaken = in_array($member['member_type'], ['FULL', 'LIFE'], true)
+  ? MemberRepository::activeAssociateFor($memberId)
+  : null;
+
 $profileMember = $member;
 $profileMemberId = $memberId;
 $profileContextLabel = 'Member Profile';
@@ -964,12 +970,13 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                               <div
                                 class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 border-dashed">
                                 <span class="text-sm text-gray-500 italic">No associates linked</span>
-                                <button
-                                  class="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                                  type="button">
+                                <?php // Was a bare <button> with no handler — a dead control. The
+                                      // working link-associate modal lives on the Profile tab. ?>
+                                <a href="<?= e(buildTabUrl($memberId, 'profile')) ?>"
+                                  class="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
                                   <span class="material-icons-outlined text-sm">add_link</span>
                                   Link Associate
-                                </button>
+                                </a>
                               </div>
                             <?php endif; ?>
                           <?php elseif ($member['member_type'] === 'ASSOCIATE' && $fullMember): ?>
@@ -988,13 +995,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <?php else: ?>
                             <div
                               class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 border-dashed">
-                              <span class="text-sm text-gray-500 italic">No associate linked</span>
-                              <button
-                                class="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                                type="button">
-                                <span class="material-icons-outlined text-sm">add_link</span>
-                                Link Associate
-                              </button>
+                              <?php // Linking is driven from the full member's profile, so there is
+                                    // no action to offer here. This used to be a dead button. ?>
+                              <span class="text-sm text-gray-500 italic">No associate linked — link from the full member's profile</span>
                             </div>
                           <?php endif; ?>
                         </div>
@@ -1718,7 +1721,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <h2 class="font-display text-lg font-bold text-gray-900">Membership Links</h2>
                         <p class="text-sm text-gray-500">Manage linked member profiles.</p>
                       </div>
-                      <?php if ($canEditFullProfile && in_array($member['member_type'], ['FULL', 'LIFE'], true)): ?>
+                      <?php if ($canEditFullProfile && in_array($member['member_type'], ['FULL', 'LIFE'], true) && !$associateSlotTaken): ?>
                         <button type="button" data-associate-open
                           class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm bg-white">
                           <span class="material-icons-outlined text-sm">link</span>
@@ -1744,6 +1747,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                             </li>
                           <?php endforeach; ?>
                         </ul>
+                        <?php if ($associateSlotTaken): ?>
+                          <p class="mt-3 text-xs text-gray-500">A member can only have one associate at a time. Unlink the current associate (Overview tab → Associate Member) before linking another.</p>
+                        <?php endif; ?>
                       <?php else: ?>
                         <p class="text-sm text-gray-500">No associates linked yet.</p>
                       <?php endif; ?>
@@ -1791,8 +1797,6 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <div data-associate-results class="mt-4 space-y-3 text-sm text-gray-700"></div>
                       </div>
                     </div>
-                    <div data-associate-config data-csrf-token="<?= e(Csrf::token()) ?>"
-                      data-member-id="<?= e($memberId) ?>"></div>
                   <?php endif; ?>
                   <div class="bg-card-light rounded-2xl p-6 shadow-sm border border-gray-100">
                     <div class="flex items-center gap-3 mb-4">
@@ -3575,6 +3579,14 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     });
   })();
 </script>
+<?php if ($canEditFullProfile): ?>
+  <?php // Page-level, not inside a tab panel: the Unlink button sits on Overview
+        // while the link-associate modal only renders on Profile. Scoping this to
+        // the Profile tab left Overview's Unlink with no CSRF token, so it did
+        // nothing at all when clicked. ?>
+  <div data-associate-config data-csrf-token="<?= e(Csrf::token()) ?>"
+    data-member-id="<?= e($memberId) ?>"></div>
+<?php endif; ?>
 <script defer src="/assets/js/admin-member-links.js"></script>
 
 <!-- Welcome email confirm modal -->

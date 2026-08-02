@@ -1753,6 +1753,10 @@ if ($resource === 'stripe') {
             if (!MemberRepository::isEmailAvailable($associateEmail)) {
                 json_response(['error' => 'Associate member email is already linked to another member.'], 409);
             }
+            // One associate per member.
+            if (MemberRepository::activeAssociateFor((int) $memberId)) {
+                json_response(['error' => 'This membership already has an associate member. Please contact the club to change who it is.'], 409);
+            }
             $stmt = $pdo->prepare('SELECT MAX(member_number_suffix) as max_suffix FROM members WHERE full_member_id = :full_id');
             $stmt->execute(['full_id' => $memberId]);
             $row = $stmt->fetch();

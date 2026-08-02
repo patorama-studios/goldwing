@@ -2,16 +2,13 @@
   document.addEventListener('DOMContentLoaded', () => {
     const modal = document.querySelector('[data-associate-modal]');
     const openButton = document.querySelector('[data-associate-open]');
-    if (!modal || !openButton) {
-      return;
-    }
 
-    const closeButton = modal.querySelector('[data-associate-close]');
-    const searchForm = modal.querySelector('[data-associate-search-form]');
+    const closeButton = modal?.querySelector('[data-associate-close]');
+    const searchForm = modal?.querySelector('[data-associate-search-form]');
     const searchInput = searchForm?.querySelector('input[name="associate_query"]');
     const searchButton = searchForm?.querySelector('button[type="submit"]');
-    const resultsContainer = modal.querySelector('[data-associate-results]');
-    const feedbackEl = modal.querySelector('[data-associate-feedback]');
+    const resultsContainer = modal?.querySelector('[data-associate-results]');
+    const feedbackEl = modal?.querySelector('[data-associate-feedback]');
     const configEl = document.querySelector('[data-associate-config]');
     const csrfToken = configEl?.dataset.csrfToken || '';
     const memberId = configEl?.dataset.memberId || '';
@@ -29,7 +26,13 @@
     };
 
     const showFeedback = (message, tone = 'text-gray-500') => {
+      // The feedback line lives inside the link-associate modal, which is only
+      // rendered on the Profile tab. Unlink is also offered on Overview, so fall
+      // back to an alert there rather than swallowing the message.
       if (!feedbackEl) {
+        if (tone === 'text-rose-500' && message.trim()) {
+          window.alert(message);
+        }
         return;
       }
       feedbackEl.textContent = message;
@@ -43,6 +46,7 @@
     };
 
     const closeModal = () => {
+      if (!modal) { return; }
       modal.classList.add('hidden');
       resetResults();
       searchInput?.removeAttribute('disabled');
@@ -231,14 +235,14 @@
       }
     };
 
-    openButton.addEventListener('click', () => {
-      modal.classList.remove('hidden');
+    openButton?.addEventListener('click', () => {
+      modal?.classList.remove('hidden');
       showFeedback(' ');
       searchInput?.focus();
     });
 
     closeButton?.addEventListener('click', closeModal);
-    modal.addEventListener('click', (event) => {
+    modal?.addEventListener('click', (event) => {
       if (event.target === modal) {
         closeModal();
       }

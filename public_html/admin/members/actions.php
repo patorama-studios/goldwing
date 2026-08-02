@@ -704,16 +704,23 @@ switch ($action) {
         $fullMemberId = (int) ($_POST['full_member_id'] ?? 0);
         $base = 0;
         $suffix = 0;
+        $linkedMember = null;
         if ($memberTypeStep === 'ASSOCIATE' && $fullMemberId > 0) {
+            // One associate per member: a household slot already filled has to
+            // be freed (unlink the old associate) before another is added.
+            $existingAssociate = MemberRepository::activeAssociateFor($fullMemberId);
+            if ($existingAssociate) {
+                $redirectAddError(MemberRepository::associateSlotMessage($existingAssociate));
+            }
             // Associate linked to a full member: reuse the full member's base,
             // allocate the next free suffix under that base.
-            $stmt = $pdo->prepare('SELECT member_number_base FROM members WHERE id = :id LIMIT 1');
+            $stmt = $pdo->prepare('SELECT first_name, last_name, member_number_base, member_number_suffix FROM members WHERE id = :id LIMIT 1');
             $stmt->execute(['id' => $fullMemberId]);
-            $linkedBase = $stmt->fetchColumn();
-            if ($linkedBase === false) {
+            $linkedMember = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if (!$linkedMember) {
                 $redirectAddError('The selected full member could not be found.');
             }
-            $base = (int) $linkedBase;
+            $base = (int) $linkedMember['member_number_base'];
             $stmt = $pdo->prepare('SELECT COALESCE(MAX(member_number_suffix), 0) + 1 FROM members WHERE member_number_base = :base');
             $stmt->execute(['base' => $base]);
             $suffix = (int) $stmt->fetchColumn();
@@ -873,6 +880,14 @@ switch ($action) {
         ]);
 
         $summary = 'Member ' . trim($firstName . ' ' . $lastName) . ' (#' . MembershipService::displayMembershipNumber($base, $suffix) . ') created.';
+        // Say the link out loud — an "associate created" that never names the
+        // household member reads as though the link silently didn't happen.
+        if ($linkedMember) {
+            $summary .= ' Linked as an associate of ' . trim(($linkedMember['first_name'] ?? '') . ' ' . ($linkedMember['last_name'] ?? ''))
+                . ' (#' . MembershipService::displayMembershipNumber((int) $linkedMember['member_number_base'], (int) $linkedMember['member_number_suffix']) . ').';
+        } elseif ($memberTypeStep === 'ASSOCIATE') {
+            $summary .= ' Not linked to a full member — it has its own number.';
+        }
         if ($bikesAdded > 0) {
             $summary .= ' ' . $bikesAdded . ' bike' . ($bikesAdded === 1 ? '' : 's') . ' added.';
         }
@@ -2923,12 +2938,16 @@ switch ($action) {
         $linkMemberId = in_array($emailOwner['member_type'], ['FULL', 'LIFE'], true)
             ? (int) $emailOwner['id']
             : (int) ($emailOwner['full_member_id'] ?? 0);
+        // One associate per member: if that household slot is taken the wizard
+        // warns instead of offering "link as associate".
+        $slotHolder = $linkMemberId > 0 ? MemberRepository::activeAssociateFor($linkMemberId) : null;
         respondWithJson(['success' => true, 'available' => false, 'owner' => [
             'id' => (int) $emailOwner['id'],
             'name' => trim(($emailOwner['first_name'] ?? '') . ' ' . ($emailOwner['last_name'] ?? '')),
             'member_number' => MembershipService::displayMembershipNumber((int) ($emailOwner['member_number_base'] ?? 0), (int) ($emailOwner['member_number_suffix'] ?? 0)),
             'member_type' => (string) $emailOwner['member_type'],
             'link_member_id' => $linkMemberId,
+            'associate_taken' => $slotHolder ? MemberRepository::associateSlotMessage($slotHolder) : '',
         ]]);
         break;
 
@@ -2995,6 +3014,11 @@ switch ($action) {
         }
         if ($existingLink === $memberId) {
             respondWithJson(['success' => true, 'message' => 'Associate already linked.']);
+        }
+        // One associate per member.
+        $slotHolder = MemberRepository::activeAssociateFor($memberId, $associateId);
+        if ($slotHolder) {
+            respondWithJson(['success' => false, 'error' => MemberRepository::associateSlotMessage($slotHolder)], 409);
         }
         if (!MemberRepository::update($associateId, ['full_member_id' => $memberId])) {
             respondWithJson(['success' => false, 'error' => 'Unable to link associate.']);

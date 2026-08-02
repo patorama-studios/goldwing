@@ -450,8 +450,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $existingAssociateId = (int) ($stmt->fetchColumn() ?: 0);
           }
 
+          // One associate per member: an approval never spawns a second one —
+          // the admin unlinks the current associate and re-approves.
+          $associateSlotHolder = $existingAssociateId > 0
+            ? null
+            : MemberRepository::activeAssociateFor((int) $row['member_id']);
           if ($existingAssociateId > 0) {
             $associateMemberId = $existingAssociateId;
+          } elseif ($associateSlotHolder) {
+            $alerts[] = ['type' => 'error', 'message' => 'Associate not added for ' . trim($associateFirst . ' ' . $associateLast) . '. ' . MemberRepository::associateSlotMessage($associateSlotHolder)];
           } else {
             $stmt = $pdo->prepare('SELECT MAX(member_number_suffix) as max_suffix FROM members WHERE full_member_id = :full_id');
             $stmt->execute(['full_id' => $row['member_id']]);

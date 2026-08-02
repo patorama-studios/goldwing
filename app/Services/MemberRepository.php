@@ -461,6 +461,45 @@ class MemberRepository
         return !$stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * The associate currently occupying a full/life member's household slot.
+     * A member may only carry one associate at a time; archived / cancelled
+     * associates (a former partner) release the slot so a new one can be added.
+     */
+    public static function activeAssociateFor(int $fullMemberId, ?int $excludeAssociateId = null): ?array
+    {
+        if ($fullMemberId <= 0) {
+            return null;
+        }
+        // Status is matched case-insensitively: the live column carries the
+        // legacy UPPERCASE values, other environments the lowercase enum.
+        $sql = 'SELECT id, first_name, last_name, email, status, member_number_base, member_number_suffix '
+            . 'FROM members WHERE full_member_id = :full_id '
+            . "AND LOWER(COALESCE(status, '')) NOT IN ('inactive', 'cancelled', 'archived')";
+        $params = ['full_id' => $fullMemberId];
+        if ($excludeAssociateId) {
+            $sql .= ' AND id <> :exclude_id';
+            $params['exclude_id'] = $excludeAssociateId;
+        }
+        $sql .= ' ORDER BY id ASC LIMIT 1';
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Admin-facing wording for the "slot already taken" rejection. */
+    public static function associateSlotMessage(array $associate): string
+    {
+        $name = trim(($associate['first_name'] ?? '') . ' ' . ($associate['last_name'] ?? ''));
+        $base = (int) ($associate['member_number_base'] ?? 0);
+        $who = $name !== '' ? $name : 'an associate';
+        if ($base > 0) {
+            $who .= ' (' . MembershipService::displayMembershipNumber($base, (int) ($associate['member_number_suffix'] ?? 0)) . ')';
+        }
+        return 'This member already has an associate: ' . $who
+            . '. Only one associate is allowed per member — unlink the existing one first.';
+    }
+
     public static function directoryPreferences(): array
     {
         if (self::$directoryPreferenceCache !== []) {

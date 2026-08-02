@@ -59,6 +59,21 @@ try {
     $fullMembers = [];
 }
 
+// Members whose one-associate slot is already filled — those options are shown
+// disabled so the admin sees why they can't add a second associate.
+$associateTakenBy = [];
+try {
+    $atStmt = $pdo->query("SELECT full_member_id, first_name, last_name FROM members WHERE full_member_id IS NOT NULL AND LOWER(COALESCE(status, '')) NOT IN ('inactive', 'cancelled', 'archived') ORDER BY id ASC");
+    foreach ($atStmt->fetchAll(PDO::FETCH_ASSOC) as $assocRow) {
+        $assocFullId = (int) $assocRow['full_member_id'];
+        if ($assocFullId > 0 && !isset($associateTakenBy[$assocFullId])) {
+            $associateTakenBy[$assocFullId] = trim(($assocRow['first_name'] ?? '') . ' ' . ($assocRow['last_name'] ?? '')) ?: 'an associate';
+        }
+    }
+} catch (Throwable $e) {
+    $associateTakenBy = [];
+}
+
 // Suggested next member number (same rule as MembershipUpgradeService).
 $memberNumberStart = (int) SettingsService::getGlobal('membership.member_number_start', 1000);
 $maxBase = (int) $pdo->query('SELECT MAX(member_number_base) FROM members')->fetchColumn();
@@ -170,15 +185,16 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <!-- Associate linking (shown only for associate) -->
             <div id="associate-section" class="mt-4 hidden rounded-xl border border-gray-200 bg-gray-50 p-4">
               <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Link to a full member (optional)</span>
-              <p class="mt-1 text-xs text-gray-500">Linked associates share the full member's base number and get the next free suffix automatically. Leave blank to give this associate their own number.</p>
+              <p class="mt-1 text-xs text-gray-500">Linked associates share the full member's base number and get the next free suffix automatically. Leave blank to give this associate their own number. A member can only have one associate at a time — members who already have one are greyed out.</p>
               <input type="text" id="full-member-filter" placeholder="Search by name or number…" class="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" autocomplete="off">
               <select name="full_member_id" id="full_member_id" size="6" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
                 <option value="">— No link (own number) —</option>
                 <?php foreach ($fullMembers as $fm):
                   $num = MembershipService::displayMembershipNumber((int) $fm['member_number_base'], (int) $fm['member_number_suffix']);
                   $name = trim(($fm['first_name'] ?? '') . ' ' . ($fm['last_name'] ?? ''));
+                  $takenBy = $associateTakenBy[(int) $fm['id']] ?? null;
                 ?>
-                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>"><?= e($num . ' — ' . $name) ?></option>
+                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>"<?= $takenBy ? ' disabled' : '' ?>><?= e($num . ' — ' . $name . ($takenBy ? '  ·  already has associate: ' . $takenBy : '')) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -212,7 +228,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             <input type="hidden" name="shared_email_ok" id="shared_email_ok" value="">
             <div id="shared-email-panel" class="mt-4 hidden rounded-xl border border-amber-300 bg-amber-50 p-4">
               <p class="text-sm font-semibold text-amber-900">This email is already used by <span id="shared-email-owner"></span>.</p>
-              <p class="mt-1 text-xs text-amber-800">Households often share one email address. You can add this person as an associate member linked to them, sharing the same email.</p>
+              <p id="shared-email-offer" class="mt-1 text-xs text-amber-800">Households often share one email address. You can add this person as an associate member linked to them, sharing the same email.</p>
+              <p id="shared-email-taken" class="mt-1 hidden text-xs font-semibold text-amber-900"></p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <button type="button" id="shared-email-accept" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Link as associate &amp; share email</button>
                 <button type="button" id="shared-email-decline" class="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">Use a different email</button>
@@ -504,6 +521,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   var sharedOkInput = document.getElementById('shared_email_ok');
   var sharedPanel = document.getElementById('shared-email-panel');
   var sharedOwnerEl = document.getElementById('shared-email-owner');
+  var sharedOfferEl = document.getElementById('shared-email-offer');
+  var sharedTakenEl = document.getElementById('shared-email-taken');
+  var sharedAcceptBtn = document.getElementById('shared-email-accept');
   var clearedEmail = null; // email that passed the lookup or was confirmed shared
   var pendingOwner = null;
 
@@ -537,6 +557,13 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         if (data && data.success && data.available === false && data.owner) {
           pendingOwner = data.owner;
           sharedOwnerEl.textContent = data.owner.name + ' (#' + data.owner.member_number + ')';
+          // One associate per member: when that household already has one, say
+          // so instead of offering the "link as associate" shortcut.
+          var taken = data.owner.associate_taken || '';
+          sharedTakenEl.textContent = taken;
+          sharedTakenEl.classList.toggle('hidden', taken === '');
+          sharedOfferEl.classList.toggle('hidden', taken !== '');
+          sharedAcceptBtn.classList.toggle('hidden', taken !== '');
           sharedPanel.classList.remove('hidden');
           return;
         }
@@ -612,9 +639,19 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   var renewalField = form.querySelector('.renewal-field');
   var lifeNote = document.getElementById('life-note');
 
+  // A linked associate inherits the full member's base number and gets the next
+  // free suffix from the server, so the typed member number is discarded. Hide
+  // the box in that case rather than showing a number that never gets used.
+  function syncNumberSection() {
+    if (!numberSection) { return; }
+    var linked = memberType.value === 'ASSOCIATE' && fullSelect && fullSelect.value !== '';
+    numberSection.classList.toggle('hidden', linked);
+  }
+
   function onTypeChange() {
     var t = memberType.value;
     associateSection.classList.toggle('hidden', t !== 'ASSOCIATE');
+    syncNumberSection();
     var isLife = t === 'LIFE';
     if (termField) { termField.classList.toggle('hidden', isLife); }
     if (renewalField) { renewalField.classList.toggle('hidden', isLife); }
@@ -636,6 +673,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       });
     });
   }
+  if (fullSelect) { fullSelect.addEventListener('change', syncNumberSection); }
 
   // --- Expiry auto-calc (mirrors MembershipService::calculateExpiry) ---
   var startInput = document.getElementById('start_date');
@@ -725,15 +763,26 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     var bikes = bikesContainer.querySelectorAll('input[name$="[make]"]');
     var bikeCount = 0;
     Array.prototype.slice.call(bikes).forEach(function (b) { if (b.value.trim()) { bikeCount++; } });
+    // The associate link is the whole point of an associate add, so state it
+    // here — previously the review said "Associate member" and nothing else, so
+    // there was no confirmation the link had actually taken.
+    var linkedOpt = (fullSelect && fullSelect.value) ? fullSelect.options[fullSelect.selectedIndex] : null;
+    var linkedNumber = linkedOpt ? linkedOpt.text.split(' — ')[0].trim() : '';
     var rows = [
       ['Name', (val('first_name') + ' ' + val('last_name')).trim() || '—'],
       ['Email', val('email') || '—'],
       ['Type', typeLabel],
+      ['Member number', linkedOpt
+        ? 'Next free suffix under ' + linkedNumber
+        : (val('member_number_base') || '—')],
       ['Plan', planSel ? planSel.text : '—'],
       ['Status', statusSel.options[statusSel.selectedIndex].text],
       ['Renewal', memberType.value === 'LIFE' ? 'No expiry (Life)' : (val('renewal_date') || '—')],
       ['Bikes', bikeCount ? String(bikeCount) : 'None']
     ];
+    if (memberType.value === 'ASSOCIATE') {
+      rows.splice(3, 0, ['Linked to', linkedOpt ? linkedOpt.text : 'Not linked — gets its own number']);
+    }
     el.innerHTML = '<div class="grid gap-1 sm:grid-cols-2">' + rows.map(function (r) {
       return '<div><span class="text-gray-500">' + r[0] + ':</span> <span class="font-medium text-gray-900">' + escapeHtml(r[1]) + '</span></div>';
     }).join('') + '</div>';
