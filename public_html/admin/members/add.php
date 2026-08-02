@@ -50,13 +50,21 @@ try {
     $membershipTypes = $mtStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Full / Life members available as the "parent" for a linked associate.
+// Full / Life members available as the "parent" for a linked associate. The
+// address columns ride along so the wizard can prefill the Address step for a
+// household associate; if they're ever missing, fall back to the bare list so
+// the picker itself never dies.
 $fullMembers = [];
 try {
-    $fmStmt = $pdo->query("SELECT id, first_name, last_name, member_number_base, member_number_suffix FROM members WHERE member_type IN ('FULL','LIFE') AND status <> 'INACTIVE' ORDER BY member_number_base ASC, last_name ASC");
+    $fmStmt = $pdo->query("SELECT id, first_name, last_name, member_number_base, member_number_suffix, address_line1, address_line2, city, state, postal_code, country FROM members WHERE member_type IN ('FULL','LIFE') AND status <> 'INACTIVE' ORDER BY member_number_base ASC, last_name ASC");
     $fullMembers = $fmStmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
-    $fullMembers = [];
+    try {
+        $fmStmt = $pdo->query("SELECT id, first_name, last_name, member_number_base, member_number_suffix FROM members WHERE member_type IN ('FULL','LIFE') AND status <> 'INACTIVE' ORDER BY member_number_base ASC, last_name ASC");
+        $fullMembers = $fmStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e2) {
+        $fullMembers = [];
+    }
 }
 
 // Members whose one-associate slot is already filled — those options are shown
@@ -193,8 +201,17 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   $num = MembershipService::displayMembershipNumber((int) $fm['member_number_base'], (int) $fm['member_number_suffix']);
                   $name = trim(($fm['first_name'] ?? '') . ' ' . ($fm['last_name'] ?? ''));
                   $takenBy = $associateTakenBy[(int) $fm['id']] ?? null;
+                  // Keys match the wizard's address input names (suburb → city etc.).
+                  $addr = [
+                    'address_line1' => (string) ($fm['address_line1'] ?? ''),
+                    'address_line2' => (string) ($fm['address_line2'] ?? ''),
+                    'suburb' => (string) ($fm['city'] ?? ''),
+                    'state' => (string) ($fm['state'] ?? ''),
+                    'postcode' => (string) ($fm['postal_code'] ?? ''),
+                    'country' => (string) ($fm['country'] ?? ''),
+                  ];
                 ?>
-                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>"<?= $takenBy ? ' disabled' : '' ?>><?= e($num . ' — ' . $name . ($takenBy ? '  ·  already has associate: ' . $takenBy : '')) ?></option>
+                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>" data-addr="<?= e(json_encode($addr)) ?>"<?= $takenBy ? ' disabled' : '' ?>><?= e($num . ' — ' . $name . ($takenBy ? '  ·  already has associate: ' . $takenBy : '')) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -619,6 +636,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     onTypeChange();
     if (pendingOwner && pendingOwner.link_member_id > 0 && fullSelect) {
       fullSelect.value = String(pendingOwner.link_member_id);
+      syncNumberSection();
+      prefillAddressFromLink();
     }
     advanceStep();
   });
@@ -751,7 +770,51 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       });
     });
   }
-  if (fullSelect) { fullSelect.addEventListener('change', syncNumberSection); }
+
+  // --- Household address prefill ---
+  // Linking an associate fills the Address step from the linked member (each
+  // option carries its address in data-addr). Only fields the admin hasn't
+  // typed in are touched: empty ones, ones still holding our own earlier
+  // prefill (re-linking someone else replaces them), and the untouched
+  // "Australia" country default. Unlinking clears only what we prefilled.
+  var addressFieldNames = ['address_line1', 'address_line2', 'suburb', 'state', 'postcode', 'country'];
+  addressFieldNames.forEach(function (name) {
+    var el = form.elements[name];
+    if (el) { el.addEventListener('input', function () { el.removeAttribute('data-prefilled'); }); }
+  });
+  function prefillAddressFromLink() {
+    var opt = (fullSelect && fullSelect.value) ? fullSelect.options[fullSelect.selectedIndex] : null;
+    var data = null;
+    if (opt) {
+      try { data = JSON.parse(opt.getAttribute('data-addr') || 'null'); } catch (err) { data = null; }
+    }
+    addressFieldNames.forEach(function (name) {
+      var el = form.elements[name];
+      if (!el) { return; }
+      var mine = el.getAttribute('data-prefilled') === '1';
+      var untouched = el.value.trim() === '' || mine || (name === 'country' && el.value.trim() === 'Australia');
+      if (data && untouched) {
+        var v = data[name] || '';
+        if (v !== '') {
+          el.value = v;
+          el.setAttribute('data-prefilled', '1');
+        } else if (mine) {
+          el.value = name === 'country' ? 'Australia' : '';
+          el.removeAttribute('data-prefilled');
+        }
+      } else if (!data && mine) {
+        el.value = name === 'country' ? 'Australia' : '';
+        el.removeAttribute('data-prefilled');
+      }
+    });
+  }
+
+  if (fullSelect) {
+    fullSelect.addEventListener('change', function () {
+      syncNumberSection();
+      prefillAddressFromLink();
+    });
+  }
 
   // --- Expiry auto-calc (mirrors MembershipService::calculateExpiry) ---
   var startInput = document.getElementById('start_date');
