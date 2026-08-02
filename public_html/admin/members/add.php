@@ -658,7 +658,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     // confirmation. Browsers without fetch keep the old full-page submit.
     if (!window.fetch || !window.FormData) { return; }
     e.preventDefault();
-    fetch(form.action, {
+    // getAttribute, not form.action: the hidden <input name="action"> clobbers
+    // the DOM property, so form.action is that element — fetch stringified it
+    // to a garbage URL, 404'd, and every submit silently took the full-page
+    // fallback (rejections bounced to step 1 again, confirmation never shown).
+    fetch(form.getAttribute('action'), {
       method: 'POST',
       body: new FormData(form),
       credentials: 'same-origin',
