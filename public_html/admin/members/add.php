@@ -413,8 +413,26 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
           </div>
 
+          <!-- Success confirmation (replaces the steps after a successful submit) -->
+          <div id="wizard-success" class="hidden py-10 text-center">
+            <span class="material-icons-outlined text-emerald-600" style="font-size:64px" aria-hidden="true">check_circle</span>
+            <h2 class="mt-4 text-2xl font-bold text-gray-900"><span id="success-name"></span> has been added to the system</h2>
+            <p id="success-number" class="mt-1 text-sm font-semibold text-gray-700"></p>
+            <p id="success-detail" class="mx-auto mt-4 max-w-xl text-sm text-gray-600"></p>
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a id="success-view" href="/admin/members" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                <span class="material-icons-outlined text-sm">person</span>
+                View member
+              </a>
+              <a href="/admin/members/add.php" class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:border-gray-300">
+                <span class="material-icons-outlined text-sm">person_add</span>
+                Add another member
+              </a>
+            </div>
+          </div>
+
           <!-- Nav -->
-          <div class="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
+          <div id="wizard-nav" class="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
             <button type="button" id="wizard-back" class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-gray-300 disabled:opacity-40" disabled>
               <span class="material-icons-outlined text-sm">arrow_back</span>
               Back
@@ -451,6 +469,9 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   function showError(msg) {
     errorEl.textContent = msg;
     errorEl.classList.remove('hidden');
+    if (typeof errorEl.scrollIntoView === 'function') {
+      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
   function clearError() {
     errorEl.textContent = '';
@@ -629,7 +650,60 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
     }
     submitBtn.disabled = true;
     submitBtn.classList.add('opacity-60');
+
+    // Submit over fetch: a rejection (duplicate email, number in use, associate
+    // slot taken…) used to redirect back here, restarting the wizard at step 1
+    // with everything typed lost and only a quiet flash up top. Now errors show
+    // in place with the form intact, and success shows an unmissable
+    // confirmation. Browsers without fetch keep the old full-page submit.
+    if (!window.fetch || !window.FormData) { return; }
+    e.preventDefault();
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' }
+    })
+      .then(function (r) {
+        var ct = r.headers.get('content-type') || '';
+        // Non-JSON means the request was intercepted (step-up lapsed mid-form,
+        // session expired). Re-submit as a normal form so the step-up
+        // save-and-replay flow handles it exactly as before.
+        if (ct.indexOf('application/json') === -1) { throw new Error('fallback'); }
+        return r.json();
+      })
+      .then(function (data) {
+        if (data && data.success) { showSuccess(data); return; }
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-60');
+        showError((data && data.error) || 'Something went wrong — the member was NOT added.');
+      })
+      .catch(function () {
+        form.submit();
+      });
   });
+
+  // --- Success confirmation ---
+  function showSuccess(data) {
+    steps.forEach(function (s) { s.classList.add('hidden'); });
+    var nav = document.getElementById('wizard-nav');
+    if (nav) { nav.classList.add('hidden'); }
+    progressItems.forEach(function (item) {
+      var dot = item.querySelector('.progress-dot');
+      dot.className = 'progress-dot flex h-6 w-6 items-center justify-center rounded-full border border-emerald-500 bg-emerald-500 text-white';
+    });
+    document.getElementById('success-name').textContent = data.name || 'Member';
+    var numberEl = document.getElementById('success-number');
+    numberEl.textContent = 'Member #' + (data.member_number || '—')
+      + (data.linked_to ? ' — linked as an associate of ' + data.linked_to : '');
+    var detailEl = document.getElementById('success-detail');
+    detailEl.textContent = data.summary || '';
+    if (data.warning) { detailEl.className = detailEl.className.replace('text-gray-600', 'text-amber-700 font-semibold'); }
+    document.getElementById('success-view').href = '/admin/members/view.php?id=' + encodeURIComponent(data.member_id) + '&tab=overview';
+    document.getElementById('wizard-success').classList.remove('hidden');
+    clearError();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   // --- Member type behaviour ---
   var memberType = document.getElementById('member_type');

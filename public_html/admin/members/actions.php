@@ -669,7 +669,16 @@ switch ($action) {
         }
 
         $pdo = Database::connection();
-        $redirectAddError = static function (string $message): void {
+        // The wizard submits via fetch (X-Requested-With) so a rejection keeps
+        // the admin's half-filled form instead of dumping them back to step 1
+        // with a flash they never see. The header is deliberately the trigger:
+        // a step-up replay re-posts the same body as a plain form, so it takes
+        // the redirect+flash path and never renders raw JSON to the browser.
+        $wantsJson = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
+        $redirectAddError = static function (string $message) use ($wantsJson): void {
+            if ($wantsJson) {
+                respondWithJson(['success' => false, 'error' => $message], 422);
+            }
             $_SESSION['members_flash'] = ['type' => 'error', 'message' => $message];
             header('Location: /admin/members/add.php');
             exit;
@@ -825,7 +834,18 @@ switch ($action) {
         if (!$membershipResult['success']) {
             // Member row exists but membership failed — surface on the profile so
             // the admin can finish setting up the membership manually.
-            redirectWithFlash($newMemberId, 'overview', 'Member created, but the membership could not be set up: ' . ($membershipResult['error'] ?? 'unknown error') . ' Please add it from the Orders tab.', 'error');
+            $membershipWarning = 'Member created, but the membership could not be set up: ' . ($membershipResult['error'] ?? 'unknown error') . ' Please add it from the Orders tab.';
+            if ($wantsJson) {
+                respondWithJson([
+                    'success' => true,
+                    'member_id' => $newMemberId,
+                    'member_number' => MembershipService::displayMembershipNumber($base, $suffix),
+                    'name' => trim($firstName . ' ' . $lastName),
+                    'summary' => $membershipWarning,
+                    'warning' => true,
+                ]);
+            }
+            redirectWithFlash($newMemberId, 'overview', $membershipWarning, 'error');
         }
 
         // Reload the full member record for email dispatch (name/email/user_id).
@@ -893,6 +913,19 @@ switch ($action) {
         }
         if ($emailNotes !== []) {
             $summary .= ' ' . ucfirst(implode('; ', $emailNotes)) . '.';
+        }
+        if ($wantsJson) {
+            respondWithJson([
+                'success' => true,
+                'member_id' => $newMemberId,
+                'member_number' => MembershipService::displayMembershipNumber($base, $suffix),
+                'name' => trim($firstName . ' ' . $lastName),
+                'linked_to' => $linkedMember
+                    ? trim(($linkedMember['first_name'] ?? '') . ' ' . ($linkedMember['last_name'] ?? ''))
+                        . ' (#' . MembershipService::displayMembershipNumber((int) $linkedMember['member_number_base'], (int) $linkedMember['member_number_suffix']) . ')'
+                    : null,
+                'summary' => $summary,
+            ]);
         }
         redirectWithFlash($newMemberId, 'overview', $summary);
         break;
