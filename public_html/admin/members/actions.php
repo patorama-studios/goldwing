@@ -733,6 +733,13 @@ switch ($action) {
             $stmt = $pdo->prepare('SELECT COALESCE(MAX(member_number_suffix), 0) + 1 FROM members WHERE member_number_base = :base');
             $stmt->execute(['base' => $base]);
             $suffix = (int) $stmt->fetchColumn();
+            // Admin-chosen point number (the wizard prefills the next free one);
+            // blank/invalid falls back to the allocator above, and a collision
+            // is rejected by the duplicate check below.
+            $inputSuffix = trim((string) ($_POST['member_number_suffix'] ?? ''));
+            if ($inputSuffix !== '' && ctype_digit($inputSuffix) && (int) $inputSuffix >= 1) {
+                $suffix = (int) $inputSuffix;
+            }
         } else {
             // Full / Life / unlinked associate: own base number, suffix 0.
             $fullMemberId = 0;

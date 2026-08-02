@@ -67,6 +67,18 @@ try {
     }
 }
 
+// Next free point-suffix per base number, to prefill the associate-number
+// field (mirrors the allocator in actions.php: MAX(suffix)+1 under the base).
+$nextSuffixByBase = [];
+try {
+    $nsStmt = $pdo->query('SELECT member_number_base, COALESCE(MAX(member_number_suffix), 0) + 1 AS next_suffix FROM members GROUP BY member_number_base');
+    foreach ($nsStmt->fetchAll(PDO::FETCH_ASSOC) as $nsRow) {
+        $nextSuffixByBase[(int) $nsRow['member_number_base']] = (int) $nsRow['next_suffix'];
+    }
+} catch (Throwable $e) {
+    $nextSuffixByBase = [];
+}
+
 // Members whose one-associate slot is already filled — those options are shown
 // disabled so the admin sees why they can't add a second associate.
 $associateTakenBy = [];
@@ -181,19 +193,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               </label>
             </div>
 
-            <!-- Member number (full / life / unlinked associate) -->
-            <div id="number-section" class="mt-4">
-              <label class="block max-w-xs">
-                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Member number</span>
-                <input type="text" name="member_number_base" value="<?= e((string) $suggestedBase) ?>" inputmode="numeric" pattern="\d*" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                <span class="mt-1 block text-xs text-gray-500">Next available number is suggested. Override if needed.</span>
-              </label>
-            </div>
-
-            <!-- Associate linking (shown only for associate) -->
+            <!-- Associate linking (shown only for associate, ABOVE the number:
+                 the link decides the number, so it's the first question) -->
             <div id="associate-section" class="mt-4 hidden rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Link to a full member (optional)</span>
-              <p class="mt-1 text-xs text-gray-500">Linked associates share the full member's base number and get the next free suffix automatically. Leave blank to give this associate their own number. A member can only have one associate at a time — members who already have one are greyed out.</p>
+              <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Who is this associate linked to?</span>
+              <p class="mt-1 text-xs text-gray-500">Pick the full member first — the associate shares their number with a point suffix (e.g. 1494.1). Choose "No link" to give this associate their own stand-alone number instead. A member can only have one associate at a time — members who already have one are greyed out.</p>
               <input type="text" id="full-member-filter" placeholder="Search by name or number…" class="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" autocomplete="off">
               <select name="full_member_id" id="full_member_id" size="6" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
                 <option value="">— No link (own number) —</option>
@@ -211,9 +215,31 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     'country' => (string) ($fm['country'] ?? ''),
                   ];
                 ?>
-                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>" data-addr="<?= e(json_encode($addr)) ?>"<?= $takenBy ? ' disabled' : '' ?>><?= e($num . ' — ' . $name . ($takenBy ? '  ·  already has associate: ' . $takenBy : '')) ?></option>
+                  <option value="<?= e((string) $fm['id']) ?>" data-search="<?= e(strtolower($num . ' ' . $name)) ?>" data-addr="<?= e(json_encode($addr)) ?>" data-base="<?= e((string) (int) $fm['member_number_base']) ?>" data-next-suffix="<?= e((string) ($nextSuffixByBase[(int) $fm['member_number_base']] ?? 1)) ?>"<?= $takenBy ? ' disabled' : '' ?>><?= e($num . ' — ' . $name . ($takenBy ? '  ·  already has associate: ' . $takenBy : '')) ?></option>
                 <?php endforeach; ?>
               </select>
+
+              <!-- Point suffix (shown once a full member is picked) -->
+              <div id="suffix-section" class="mt-4 hidden">
+                <label class="block max-w-xs">
+                  <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Associate number</span>
+                  <div class="mt-2 flex items-center gap-1">
+                    <span id="suffix-base-label" class="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700"></span>
+                    <span class="text-sm font-semibold text-gray-700">.</span>
+                    <input type="text" name="member_number_suffix" id="member_number_suffix" inputmode="numeric" pattern="\d*" class="w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  </div>
+                  <span class="mt-1 block text-xs text-gray-500">The point number after the member's number. The next free one is suggested — override if needed.</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Member number (full / life / unlinked associate) -->
+            <div id="number-section" class="mt-4">
+              <label class="block max-w-xs">
+                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Member number</span>
+                <input type="text" name="member_number_base" value="<?= e((string) $suggestedBase) ?>" inputmode="numeric" pattern="\d*" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <span class="mt-1 block text-xs text-gray-500">Next available number is suggested. Override if needed.</span>
+              </label>
             </div>
           </div>
 
@@ -540,6 +566,15 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
 
   nextBtn.addEventListener('click', function () {
     if (!validateStep(current)) { return; }
+    // An associate's link is the first decision — don't let the wizard move on
+    // until the admin has picked a member or explicitly chosen "No link".
+    if (current === 0 && form.elements['member_type'].value === 'ASSOCIATE') {
+      var fs0 = document.getElementById('full_member_id');
+      if (fs0 && fs0.selectedIndex === -1) {
+        showError('Choose who this associate is linked to — or select "— No link (own number) —".');
+        return;
+      }
+    }
     // Never let the shared-email check brick the wizard: any failure falls
     // through to a normal advance and the server re-checks on submit.
     try {
@@ -736,18 +771,39 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
   var renewalField = form.querySelector('.renewal-field');
   var lifeNote = document.getElementById('life-note');
 
-  // A linked associate inherits the full member's base number and gets the next
-  // free suffix from the server, so the typed member number is discarded. Hide
-  // the box in that case rather than showing a number that never gets used.
+  var suffixSection = document.getElementById('suffix-section');
+  var suffixInput = document.getElementById('member_number_suffix');
+  var suffixBaseLabel = document.getElementById('suffix-base-label');
+  if (suffixInput) { suffixInput.addEventListener('input', function () { suffixInput.removeAttribute('data-prefilled'); }); }
+
+  // For an associate the link is the first question, so the picker starts with
+  // nothing selected and the number fields follow the choice:
+  //   nothing picked yet  → no number field at all
+  //   full member picked  → point-suffix field (base shown, next free suggested)
+  //   "No link" picked    → the stand-alone member-number box
+  // Full / Life members always get the plain number box.
   function syncNumberSection() {
     if (!numberSection) { return; }
-    var linked = memberType.value === 'ASSOCIATE' && fullSelect && fullSelect.value !== '';
-    numberSection.classList.toggle('hidden', linked);
+    var isAssoc = memberType.value === 'ASSOCIATE';
+    var opt = (fullSelect && fullSelect.selectedIndex >= 0) ? fullSelect.options[fullSelect.selectedIndex] : null;
+    var linked = isAssoc && opt && opt.value !== '';
+    numberSection.classList.toggle('hidden', isAssoc && !(opt && opt.value === ''));
+    if (suffixSection) {
+      suffixSection.classList.toggle('hidden', !linked);
+      if (linked) {
+        if (suffixBaseLabel) { suffixBaseLabel.textContent = opt.getAttribute('data-base') || ''; }
+        if (suffixInput && (suffixInput.value.trim() === '' || suffixInput.getAttribute('data-prefilled') === '1')) {
+          suffixInput.value = opt.getAttribute('data-next-suffix') || '1';
+          suffixInput.setAttribute('data-prefilled', '1');
+        }
+      }
+    }
   }
 
   function onTypeChange() {
     var t = memberType.value;
     associateSection.classList.toggle('hidden', t !== 'ASSOCIATE');
+    if (t === 'ASSOCIATE' && fullSelect && fullSelect.value === '') { fullSelect.selectedIndex = -1; }
     syncNumberSection();
     var isLife = t === 'LIFE';
     if (termField) { termField.classList.toggle('hidden', isLife); }
@@ -914,7 +970,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       ['Email', val('email') || '—'],
       ['Type', typeLabel],
       ['Member number', linkedOpt
-        ? 'Next free suffix under ' + linkedNumber
+        ? (linkedOpt.getAttribute('data-base') || linkedNumber) + '.' + ((suffixInput && suffixInput.value.trim()) || '?')
         : (val('member_number_base') || '—')],
       ['Plan', planSel ? planSel.text : '—'],
       ['Status', statusSel.options[statusSel.selectedIndex].text],
