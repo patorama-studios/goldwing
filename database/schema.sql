@@ -18,7 +18,7 @@ CREATE TABLE members (
   user_id INT NULL,
   member_type ENUM('FULL','ASSOCIATE','LIFE') NOT NULL,
   status ENUM('PENDING','ACTIVE','LAPSED','INACTIVE') NOT NULL DEFAULT 'PENDING',
-  member_number_base INT NOT NULL,
+  member_number_base INT NULL,
   member_number_suffix INT NOT NULL DEFAULT 0,
   full_member_id INT NULL,
   chapter_id INT NULL,

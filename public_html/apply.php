@@ -12,6 +12,7 @@ use App\Services\NotificationService;
 use App\Services\BaseUrlService;
 use App\Services\StripeService;
 use App\Services\MembershipOrderService;
+use App\Services\ApplicationDraftService;
 
 if (!function_exists('json_response')) {
   function json_response(array $data, int $status = 200): void
@@ -59,6 +60,19 @@ $requestedChapterId = 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
     $error = 'Invalid CSRF token.';
+  } elseif (($_POST['stage'] ?? '') === 'draft') {
+    // Card path only: the applicant's whole form, banked server-side in the same
+    // click that confirms the card — BEFORE the money moves. If the follow-up
+    // POST below never lands (3DS redirect, closed tab, dropped connection),
+    // the payment is no longer stranded on its own: recovery rebuilds the full
+    // application from this draft. See ApplicationDraftService.
+    ApplicationDraftService::save(
+      (string) ($_POST['stripe_invoice_id'] ?? ''),
+      (string) ($_POST['payment_intent_id'] ?? ''),
+      trim((string) ($_POST['email'] ?? '')),
+      $_POST
+    );
+    json_response(['ok' => true]);
   } else {
     $fullSelected = isset($_POST['membership_full']);
     $associateSelected = isset($_POST['membership_associate']);
@@ -153,8 +167,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!$error) {
       // Member numbers are NOT auto-assigned on signup. An admin types the
-      // member number manually when approving the application.
-      $memberNumberBase = 0;
+      // member number manually when approving the application. NULL, not 0:
+      // members has UNIQUE (base, suffix), so a 0-0 placeholder allowed only ONE
+      // unnumbered pending member at a time — every further application died on
+      // "Duplicate entry '0-0'" AFTER the card was charged (the Jul 2026
+      // stranded-application bug). Unique indexes ignore NULL rows.
+      $memberNumberBase = null;
       $memberNumberSuffix = 0;
       $fullMemberId = null;
 
@@ -388,7 +406,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           $orderPaymentStatus = 'pending';
           $stripePaymentIntentId = trim((string) ($_POST['payment_intent_id'] ?? ''));
-          $stripeInvoiceId = '';
+          // Stamped even when the intent isn't confirmed paid, so an order left
+          // pending still carries its invoice and the reconcile tool can find it.
+          $stripeInvoiceId = trim((string) ($_POST['stripe_invoice_id'] ?? ''));
           if ($paymentMethod === 'card' && $stripePaymentIntentId !== '') {
             $intent = StripeService::retrievePaymentIntent($stripePaymentIntentId);
             $intentPaid = is_array($intent)
@@ -396,7 +416,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               && (int) ($intent['amount_received'] ?? 0) >= $totalCents;
             if ($intentPaid) {
               $orderPaymentStatus = 'accepted';
-              $stripeInvoiceId = (string) ($intent['invoice'] ?? '');
+              $stripeInvoiceId = (string) ($intent['invoice'] ?? '') ?: $stripeInvoiceId;
             } else {
               error_log('[apply.php] card payment intent not confirmed paid at signup: ' . $stripePaymentIntentId);
             }
@@ -416,6 +436,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (\Throwable $e) {
           error_log('[apply.php] membership order creation failed: ' . $e->getMessage());
         }
+
+        // The applicant is in the DB — the pre-payment draft has done its job.
+        ApplicationDraftService::clearForEmail($email);
 
         AuditService::log(null, 'application_submitted', 'New membership application submitted.');
         $message = 'Application submitted. We will confirm your membership and payment details shortly.';
@@ -1521,6 +1544,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       let paymentElement = null;
       let clientSecret = null;
       let paymentIntentId = null;
+      let stripeInvoiceId = null;
       let stripeConfig = null;
       let needsPaymentIntentRefresh = true;
       let stripeInitializing = false;
@@ -1680,6 +1704,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         }
         clientSecret = data.client_secret;
         paymentIntentId = data.payment_intent_id || null;
+        stripeInvoiceId = data.invoice_id || null;
         await initStripeElements(clientSecret);
         needsPaymentIntentRefresh = false;
         if (paymentElementContainer) {
@@ -1714,6 +1739,9 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
           new FormData(form).forEach((value, key) => {
             if (typeof value === 'string') { entries[key] = value; }
           });
+          // Carried through the redirect too — a reloaded page has no live
+          // invoice id, and the order needs it stamped on.
+          if (stripeInvoiceId) { entries.stripe_invoice_id = stripeInvoiceId; }
           sessionStorage.setItem(APPLY_STASH_KEY, JSON.stringify(entries));
         } catch (e) { /* sessionStorage unavailable — inline (non-redirect) path still works */ }
       };
@@ -1725,6 +1753,26 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
       };
       const clearStashFormData = () => {
         try { sessionStorage.removeItem(APPLY_STASH_KEY); } catch (e) { /* ignore */ }
+      };
+
+      // The real safety net: bank the whole form on the SERVER before the card is
+      // confirmed, so the applicant exists to us the moment their money moves.
+      // sessionStorage above only survives a redirect on the same device; this
+      // survives anything. Best-effort — if it fails we still charge, because the
+      // invoice metadata carries a recoverable (if thinner) copy.
+      const saveApplicationDraft = async () => {
+        try {
+          const draftForm = new FormData(form);
+          draftForm.set('stage', 'draft');
+          draftForm.set('stripe_invoice_id', stripeInvoiceId || '');
+          draftForm.set('payment_intent_id', paymentIntentId || '');
+          draftForm.set('ajax', '1');
+          await fetch(window.location.pathname, {
+            method: 'POST',
+            credentials: 'include',
+            body: draftForm,
+          });
+        } catch (e) { /* never block the payment on this */ }
       };
 
       const submitApplicationViaAjax = async (intentId, stashed = null) => {
@@ -1741,6 +1789,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
         }
         ajaxForm.set('payment_method', 'card');
         ajaxForm.set('payment_intent_id', intentId || '');
+        if (stripeInvoiceId) { ajaxForm.set('stripe_invoice_id', stripeInvoiceId); }
         ajaxForm.set('ajax', '1');
         const response = await fetch(window.location.pathname, {
           method: 'POST',
@@ -1961,6 +2010,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
             // Snapshot the filled form before confirming — an issuer/3DS redirect
             // would otherwise reload the page and lose it before we can POST.
             stashFormData();
+            await saveApplicationDraft();
             const returnUrl = `${window.location.origin}${window.location.pathname}`;
             const { error, paymentIntent } = await stripe.confirmPayment({
               elements,

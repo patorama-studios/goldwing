@@ -17,10 +17,14 @@ use PDO;
  * so without this there is no server-side recovery and the applicant is lost.
  *
  * This service finds those orphaned paid invoices and reconstructs the PENDING
- * member + application + paid order from the invoice metadata (enriched at
- * creation with the applicant's contact details) + the Stripe Customer, then
- * notifies the committee — exactly what a successful apply.php POST would have
- * done, minus bike/associate-address extras the committee completes at approval.
+ * member + application + paid order, then notifies the committee — exactly what
+ * a successful apply.php POST would have done.
+ *
+ * It rebuilds from the ApplicationDraft where there is one: apply.php banks the
+ * applicant's whole form server-side in the same click that confirms the card,
+ * so a recovered application is complete — bikes, associate details, assist
+ * offers and all. Older stranded payments predate drafts and fall back to the
+ * invoice metadata, which carries contact details but not those extras.
  *
  * Used by the admin rescue tool (reconcile-stranded-payments.php, immediate) and
  * by cron (recover_stranded_applications.php, delayed). It is idempotent and
@@ -162,6 +166,8 @@ class MembershipApplicationRecoveryService
             return ['ok' => false, 'msg' => 'Recovery error: ' . $e->getMessage(), 'member_id' => null, 'order_id' => null, 'duplicate' => false];
         }
 
+        ApplicationDraftService::clearForEmail($email);
+
         // Notifications + audit run outside the DB transaction — a mail failure
         // must never undo a recovered application.
         self::notify($result['member_id'], $result['member_name'], $email, $result['member_type'], $result['order_number']);
@@ -247,6 +253,29 @@ class MembershipApplicationRecoveryService
             : (string) ($invoice['payment_intent'] ?? '');
         $invoiceId = (string) ($invoice['id'] ?? '');
 
+        // The applicant's own form, banked server-side before the card was
+        // charged. Used for the identity/contact/extras fields — the membership
+        // selections below stay on the invoice metadata, because that is what
+        // was actually billed.
+        $draft = ApplicationDraftService::find($invoiceId, $email) ?? [];
+        $draftVal = static function (string $key) use ($draft): string {
+            return trim((string) ($draft[$key] ?? ''));
+        };
+        // Draft first, invoice metadata second — either may be blank.
+        $pick = static function (string $draftKey, string $metaKey) use ($draftVal, $meta): ?string {
+            $v = $draftVal($draftKey);
+            if ($v === '') {
+                $v = trim((string) ($meta[$metaKey] ?? ''));
+            }
+            return $v !== '' ? $v : null;
+        };
+        if ($draftVal('first_name') !== '') {
+            $firstName = $draftVal('first_name');
+        }
+        if ($draftVal('last_name') !== '') {
+            $lastName = $draftVal('last_name');
+        }
+
         $fullMagazineType = strtoupper(trim((string) ($meta['full_magazine_type'] ?? 'PRINTED')));
         $fullPeriodKey = strtoupper(trim((string) ($meta['full_period_key'] ?? '')));
         $associatePeriodKey = strtoupper(trim((string) ($meta['associate_period_key'] ?? '')));
@@ -274,24 +303,35 @@ class MembershipApplicationRecoveryService
         $hasDob = MemberRepository::hasMemberColumn($pdo, 'date_of_birth');
         $dobColumnSql = $hasDob ? ', date_of_birth' : '';
         $dobValueSql = $hasDob ? ', :date_of_birth' : '';
-        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone' . $dobColumnSql . ', address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES (:member_type, :status, 0, 0, NULL, NULL, :first_name, :last_name, :email, :phone' . $dobValueSql . ', :address1, :address2, :city, :state, :postal, :country, :privacy, 0, 0, 0, 0, 0, 0, NOW())');
+        // Assist offers + magazine exclusions are checkboxes: only present in the
+        // draft when the applicant ticked them, and absent from invoice metadata
+        // entirely (a metadata-only rebuild leaves them all 0, as before).
+        $flag = static fn(string $key): int => $draftVal($key) !== '' ? 1 : 0;
+        $stmt = $pdo->prepare('INSERT INTO members (member_type, status, member_number_base, member_number_suffix, full_member_id, chapter_id, first_name, last_name, email, phone' . $dobColumnSql . ', address_line1, address_line2, city, state, postal_code, country, privacy_level, assist_ute, assist_phone, assist_bed, assist_tools, exclude_printed, exclude_electronic, created_at) VALUES (:member_type, :status, NULL, 0, NULL, NULL, :first_name, :last_name, :email, :phone' . $dobValueSql . ', :address1, :address2, :city, :state, :postal, :country, :privacy, :assist_ute, :assist_phone, :assist_bed, :assist_tools, :exclude_printed, :exclude_electronic, NOW())');
         $params = [
             'member_type' => $memberType,
             'status' => 'PENDING',
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $email !== '' ? $email : null,
-            'phone' => self::metaVal($meta, 'phone'),
-            'address1' => self::metaVal($meta, 'address_line1'),
-            'address2' => self::metaVal($meta, 'address_line2'),
-            'city' => self::metaVal($meta, 'city'),
-            'state' => self::metaVal($meta, 'state'),
-            'postal' => self::metaVal($meta, 'postal_code'),
-            'country' => self::metaVal($meta, 'country'),
-            'privacy' => (string) ($meta['privacy_level'] ?? 'A'),
+            'phone' => $pick('phone', 'phone'),
+            'address1' => $pick('address_line1', 'address_line1'),
+            'address2' => $pick('address_line2', 'address_line2'),
+            'city' => $pick('city', 'city'),
+            'state' => $pick('state', 'state'),
+            'postal' => $pick('postal_code', 'postal_code'),
+            'country' => $pick('country', 'country'),
+            'privacy' => $pick('privacy_level', 'privacy_level') ?? 'A',
+            'assist_ute' => $flag('assist_ute'),
+            'assist_phone' => $flag('assist_phone'),
+            'assist_bed' => $flag('assist_bed'),
+            'assist_tools' => $flag('assist_tools'),
+            'exclude_printed' => $flag('exclude_printed'),
+            'exclude_electronic' => $flag('exclude_electronic'),
         ];
         if ($hasDob) {
-            $params['date_of_birth'] = self::metaVal($meta, 'dob');
+            $draftDob = MemberRepository::composeDateOfBirth($draftVal('dob_year'), $draftVal('dob_month'), $draftVal('dob_day'));
+            $params['date_of_birth'] = $draftDob ?: self::metaVal($meta, 'dob');
         }
         $stmt->execute($params);
         $memberId = (int) $pdo->lastInsertId();
@@ -299,13 +339,34 @@ class MembershipApplicationRecoveryService
             throw new \RuntimeException('member insert returned no id');
         }
 
+        // --- the applicant's bikes (draft only — never fits in metadata) ---
+        $decodeVehicles = static function (string $json): array {
+            $rows = json_decode($json, true);
+            return is_array($rows) ? $rows : [];
+        };
+        $fullVehicles = $decodeVehicles($draftVal('full_vehicle_payload'));
+        $associateVehicles = $decodeVehicles($draftVal('associate_vehicle_payload'));
+        self::insertBikes($pdo, $memberId, $fullVehicles);
+
         // --- membership_applications row (PENDING) ---
         $applicationNotes = [
-            'referral_source' => (string) ($meta['referral_source'] ?? ''),
+            'referral_source' => $pick('referral_source', 'referral_source') ?? '',
             'associate' => [
-                'first_name' => (string) ($meta['associate_first_name'] ?? ''),
-                'last_name' => (string) ($meta['associate_last_name'] ?? ''),
-                'email' => (string) ($meta['associate_email'] ?? ''),
+                'first_name' => $pick('associate_first_name', 'associate_first_name') ?? '',
+                'last_name' => $pick('associate_last_name', 'associate_last_name') ?? '',
+                'email' => $pick('associate_email', 'associate_email') ?? '',
+                'phone' => $draftVal('associate_phone'),
+                'date_of_birth' => MemberRepository::composeDateOfBirth($draftVal('associate_dob_year'), $draftVal('associate_dob_month'), $draftVal('associate_dob_day')),
+                'address_line1' => $draftVal('associate_address_line1'),
+                'city' => $draftVal('associate_city'),
+                'state' => $draftVal('associate_state'),
+                'postal_code' => $draftVal('associate_postal_code'),
+                'country' => $draftVal('associate_country'),
+                'address_diff' => $draftVal('associate_address_diff'),
+            ],
+            'vehicles' => [
+                'full' => $fullVehicles,
+                'associate' => $associateVehicles,
             ],
             'membership' => [
                 'full_selected' => $fullSelected,
@@ -317,11 +378,14 @@ class MembershipApplicationRecoveryService
                 'processing_fee_cents' => $processingFeeCents,
                 'total_with_fee_cents' => $totalWithFeeCents,
             ],
-            'requested_chapter_id' => ($meta['requested_chapter_id'] ?? '') !== '' ? (int) $meta['requested_chapter_id'] : null,
+            'requested_chapter_id' => $pick('requested_chapter_id', 'requested_chapter_id') !== null
+                ? (int) $pick('requested_chapter_id', 'requested_chapter_id')
+                : null,
             'payment_method' => 'card',
             // Flags so the committee (and any audit) can see this application was
             // rebuilt from a stranded Stripe payment, not a normal submission.
             'recovered_from_stripe' => true,
+            'recovered_from_draft' => $draft !== [],
             'source_invoice_id' => $invoiceId,
             'source_payment_intent_id' => $paymentIntentId,
         ];
@@ -370,6 +434,76 @@ class MembershipApplicationRecoveryService
             'order_number' => $order ? (string) ($order['order_number'] ?? '') : '',
             'payment_intent_id' => $paymentIntentId,
         ];
+    }
+
+    /**
+     * Write the applicant's bikes, mirroring apply.php's column probing so this
+     * works on any schema vintage. Best-effort: a bike that won't insert must
+     * never cost us the recovered application.
+     *
+     * @param array<int,mixed> $vehicles
+     */
+    private static function insertBikes(PDO $pdo, int $memberId, array $vehicles): void
+    {
+        if (!$vehicles) {
+            return;
+        }
+        try {
+            $columns = $pdo->query('SHOW COLUMNS FROM member_bikes')->fetchAll(PDO::FETCH_COLUMN, 0);
+        } catch (\Throwable $e) {
+            return;
+        }
+        $hasRego = in_array('rego', $columns, true);
+        $hasColour = in_array('colour', $columns, true);
+        $hasColor = in_array('color', $columns, true);
+        $hasPrimary = in_array('is_primary', $columns, true);
+        $primarySet = false;
+
+        foreach ($vehicles as $vehicle) {
+            if (!is_array($vehicle)) {
+                continue;
+            }
+            $make = trim((string) ($vehicle['make'] ?? ''));
+            $model = trim((string) ($vehicle['model'] ?? ''));
+            if ($make === '' || $model === '') {
+                continue;
+            }
+            $yearValue = trim((string) ($vehicle['year'] ?? ''));
+            $colour = trim((string) ($vehicle['colour'] ?? ($vehicle['color'] ?? '')));
+            $rego = substr(trim((string) ($vehicle['rego'] ?? '')), 0, 20);
+
+            $cols = ['member_id', 'make', 'model', 'year', 'created_at'];
+            $vals = [':member_id', ':make', ':model', ':year', 'NOW()'];
+            $params = [
+                'member_id' => $memberId,
+                'make' => $make,
+                'model' => $model,
+                'year' => ($yearValue !== '' && is_numeric($yearValue)) ? (int) $yearValue : null,
+            ];
+            if ($hasRego) {
+                $cols[] = 'rego';
+                $vals[] = ':rego';
+                $params['rego'] = $rego !== '' ? $rego : null;
+            }
+            if ($colour !== '' && ($hasColour || $hasColor)) {
+                $col = $hasColour ? 'colour' : 'color';
+                $cols[] = $col;
+                $vals[] = ':' . $col;
+                $params[$col] = $colour;
+            }
+            if ($hasPrimary && !$primarySet) {
+                $cols[] = 'is_primary';
+                $vals[] = ':is_primary';
+                $params['is_primary'] = 1;
+            }
+            try {
+                $stmt = $pdo->prepare('INSERT INTO member_bikes (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')');
+                $stmt->execute($params);
+                $primarySet = true;
+            } catch (\Throwable $e) {
+                error_log('[MembershipApplicationRecoveryService] bike insert failed for member #' . $memberId . ': ' . $e->getMessage());
+            }
+        }
     }
 
     /** Trim + null-coalesce a metadata string (metadata values are always strings). */

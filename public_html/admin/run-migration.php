@@ -3823,6 +3823,47 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 048 — unnumbered members hold NULL, not 0-0
+// members has UNIQUE (member_number_base, member_number_suffix), and every
+// unapproved applicant was inserted at 0-0 — so only ONE unnumbered pending
+// member could exist at a time. The second concurrent application (or its
+// Stripe recovery) died with "Duplicate entry '0-0'" AFTER the card was
+// charged — this is how Barry Tierney's and Adil Oommen's applications
+// vanished (Jul 2026). Make base nullable, park unnumbered members at NULL
+// (unique indexes ignore NULL rows), and free the 0-0 slot. apply.php and
+// MembershipApplicationRecoveryService now insert NULL; admin approval still
+// assigns the real number.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_048_member_number_nullable';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 048 — unnumbered members NULL not 0-0', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $pdo->exec('ALTER TABLE members MODIFY member_number_base INT NULL');
+        $notes[] = 'member_number_base now nullable.';
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'ALTER: ' . $e->getMessage();
+    }
+    if ($ok) {
+        try {
+            $freed = $pdo->exec('UPDATE members SET member_number_base = NULL WHERE member_number_base = 0');
+            $notes[] = $freed . ' unnumbered member(s) moved from 0 to NULL.';
+            SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        } catch (\Throwable $e) {
+            $ok = false;
+            $notes[] = 'UPDATE: ' . $e->getMessage();
+        }
+    }
+    $results[] = ['label' => 'Migration 048 — unnumbered members NULL not 0-0', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
