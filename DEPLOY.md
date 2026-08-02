@@ -39,7 +39,7 @@
 ## 7) Cron jobs
 Add the following cPanel cron jobs:
 - `0 6 * * * /usr/bin/php /path/to/cron/send_renewal_reminders.php`
-- `0 7 * * * /usr/bin/php /path/to/cron/daily_summary_admin.php`
+- `0 7 * * 0 /usr/bin/php /path/to/cron/daily_summary_admin.php`  (Sunday only)
 - `5 0 * * * /usr/bin/php /path/to/cron/expire_memberships.php`
 
 ## 8) Admin login

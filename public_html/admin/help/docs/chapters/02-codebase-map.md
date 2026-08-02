@@ -30,7 +30,7 @@ You'll see these folder names come up in conversations with developers. You don'
 - **`public_html/member/`** — the logged-in member area: the dashboard, the read-Wings page, 2FA enrolment, the notifications page.
 - **`public_html/store/`** — the public-facing shop pages: catalogue, product pages, cart, checkout.
 - **`app/storage/logs/`** — runtime log files. If a developer says "send me the log," they usually mean a file in here.
-- **`cron/`** — the scheduled jobs that run automatically every day (renewal reminders, expiring lapsed memberships, the file-integrity scan). You don't run these yourself — the server runs them on a timer.
+- **`cron/`** — the scheduled jobs that run on their own (renewal reminders, expiring lapsed memberships and the file-integrity scan run daily; the admin summary goes out Sunday mornings). You don't run these yourself — the server runs them on a timer.
 - **`config/`** — settings files. The database connection details and the AI provider key live here. **Never edit these from the admin panel side** — they're maintained by developers only.
 - **`database/`** — `.sql` files that set up or update the database. Developers apply these when they roll out new features.
 
@@ -227,7 +227,7 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | Script | Schedule (`DEPLOY.md`) | Job |
 |---|---|---|
 | `send_renewal_reminders.php` | `0 6 * * *` | Emails members whose membership is about to lapse. |
-| `daily_summary_admin.php` | `0 7 * * *` | Morning admin briefing — outstanding work, renewals, follow-ups, leaderboards. |
+| `daily_summary_admin.php` | `0 7 * * 0` | Sunday admin briefing — outstanding work, renewals, follow-ups, leaderboards. Filename says daily for cPanel-path reasons; cadence lives in the cron schedule. |
 | `expire_memberships.php` | `5 0 * * *` | Marks past-end-date periods as expired. |
 | `fim_scan.php` | Hourly (configurable) | File integrity scan; alerts on hash drift. |
 

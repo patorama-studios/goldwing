@@ -1,20 +1,28 @@
 <?php
 /**
- * Daily admin summary — the club's morning briefing.
+ * Weekly admin summary — the club's Sunday-morning briefing.
  *
  * Replaces the original three-bullet version (active / pending / due soon),
  * which was true but told nobody anything they could act on.
  *
- * Design rules, so this stays readable at 6am:
+ * The filename still says "daily" because the cPanel cron entry points at this
+ * path, and Pat has no SSH — renaming it means retyping the command by hand,
+ * which fails silently if it's wrong. The cadence lives in the cron schedule,
+ * not the filename. Same reason the `last_daily_summary_run` heartbeat keeps
+ * its key.
+ *
+ * Design rules, so this stays readable on a Sunday morning:
  *   - Every block is wrapped in q(). A missing table or column on prod hides
  *     one section instead of killing the whole email.
- *   - Sections that come back empty are omitted entirely, so a quiet Tuesday
- *     is a short email and a busy Monday is a long one. The length itself is
- *     the signal.
+ *   - Sections that come back empty are omitted entirely, so a quiet week is
+ *     a short email and a busy one is long. The length itself is the signal.
  *   - Action items sit at the top; the fun sits underneath; health sits in
  *     the footer where you only read it when something looks off.
+ *   - Every "recent" window is 7 days, matching the send cadence. If the
+ *     schedule ever changes, those windows have to change with it or the
+ *     briefing goes blind between sends.
  *
- * Schedule: 0 7 * * *  /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
+ * Schedule: 0 7 * * 0  /usr/bin/php /home2/goldwing/cron/daily_summary_admin.php
  */
 
 require_once __DIR__ . '/../app/bootstrap.php';
@@ -245,10 +253,13 @@ foreach ($anniversaryRows as $row) {
 }
 
 // ── Health ────────────────────────────────────────────────────────────────
-$emailsSent   = $scalar("SELECT COUNT(*) FROM email_log WHERE sent = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)");
-$emailsFailed = $scalar("SELECT COUNT(*) FROM email_log WHERE sent = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)");
-$failedLogins = $scalar("SELECT COUNT(*) FROM activity_log WHERE action = 'security.login_failed' AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)");
-$stripeErrors = $scalar("SELECT COUNT(*) FROM stripe_errors WHERE occurred_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)");
+// These windows must match the send cadence. They were 24 hours when this ran
+// daily; on a weekly send that would have hidden six days of failed payments
+// and bounced email between briefings.
+$emailsSent   = $scalar("SELECT COUNT(*) FROM email_log WHERE sent = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+$emailsFailed = $scalar("SELECT COUNT(*) FROM email_log WHERE sent = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+$failedLogins = $scalar("SELECT COUNT(*) FROM activity_log WHERE action = 'security.login_failed' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+$stripeErrors = $scalar("SELECT COUNT(*) FROM stripe_errors WHERE occurred_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
 
 // ── Rendering helpers ─────────────────────────────────────────────────────
 $GOLD  = '#9e9140';
@@ -301,14 +312,15 @@ $li = fn(string $html) => '<li style="margin-bottom:5px;">' . $html . '</li>';
 $today  = date('l j F Y');
 $body   = [];
 
-$body[] = '<p style="margin:0 0 4px;font-size:19px;font-weight:600;color:#111827;">Morning briefing</p>';
-$body[] = '<p style="margin:0 0 20px;color:#6b7280;font-size:14px;">' . e($today) . '</p>';
+$body[] = '<p style="margin:0 0 4px;font-size:19px;font-weight:600;color:#111827;">The week at the club</p>';
+$body[] = '<p style="margin:0 0 20px;color:#6b7280;font-size:14px;">' . e($today)
+    . ' &middot; covering the past 7 days</p>';
 
 // Stat tiles
 $body[] = '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:4px;"><tr>'
     . $tile('Active members', $active)
-    . $tile('Renewed (7d)', count($renewed), count($renewed) ? '#15803d' : '#374151')
-    . $tile('New members (7d)', count($joined), count($joined) ? '#15803d' : '#374151')
+    . $tile('Renewed this week', count($renewed), count($renewed) ? '#15803d' : '#374151')
+    . $tile('Joined this week', count($joined), count($joined) ? '#15803d' : '#374151')
     . '</tr><tr>'
     . $tile('Awaiting action', count($hubItems), count($hubItems) ? '#b45309' : '#374151')
     . $tile('Due in 60 days', $dueSoon)
@@ -351,7 +363,7 @@ if ($awaitingDespatch) {
 
 if ($stripeErrors > 0) {
     $actions[] = $li('<strong style="color:#b91c1c;">' . $plural($stripeErrors, 'Stripe error')
-        . ' in the last 24 hours</strong>'
+        . ' this week</strong>'
         . ' <span style="color:#6b7280;">— a payment may have failed silently</span>');
 }
 
@@ -500,7 +512,7 @@ $health = $plural($emailsSent, 'email') . ' sent'
     . ' &middot; ' . $plural($pendingApp, 'pending application');
 
 $body[] = '<p style="margin:28px 0 0;padding-top:14px;border-top:1px solid ' . $LINE
-    . ';font-size:12px;color:#9ca3af;">Last 24 hours: ' . $health . '</p>';
+    . ';font-size:12px;color:#9ca3af;">Past 7 days: ' . $health . '</p>';
 
 // ── Send ──────────────────────────────────────────────────────────────────
 // Subject stays ASCII on purpose: SmtpMailer writes the Subject header raw,
@@ -511,7 +523,7 @@ if (count($renewed))  $subjectBits[] = count($renewed) . ' renewed';
 if (count($joined))   $subjectBits[] = count($joined) . ' joined';
 if (!$subjectBits)    $subjectBits[] = 'all quiet';
 
-$subject = 'Goldwing Daily - ' . date('D j M') . ' - ' . implode(', ', $subjectBits);
+$subject = 'Goldwing Weekly - ' . date('j M') . ' - ' . implode(', ', $subjectBits);
 $html    = implode('', $body);
 
 foreach ($recipients as $to) {
