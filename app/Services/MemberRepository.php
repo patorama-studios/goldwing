@@ -175,6 +175,7 @@ class MemberRepository
             'new_last_30_days' => 0,
             'renewals_this_month' => 0,
             'expiring_soon' => 0,
+            'overdue' => 0,
         ];
 
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -211,6 +212,19 @@ class MemberRepository
         self::bindParams($stmt, $expiringSoonParams);
         $stmt->execute();
         $result['expiring_soon'] = (int) $stmt->fetchColumn();
+
+        // Past expiry but still ACTIVE — the grace-period cohort the expire
+        // cron hasn't flipped to LAPSED yet. These members appear in neither
+        // the "expired" status counts nor the future-only expiring window.
+        $overdueSql = 'SELECT COUNT(*) FROM members m WHERE (SELECT MAX(mp.end_date) FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\') < CURDATE() AND LOWER(m.status) = \'active\' AND UPPER(COALESCE(m.member_type, \'\')) <> \'LIFE\'';
+        $overdueParams = $params;
+        if ($whereClause !== '') {
+            $overdueSql .= ' AND ' . $whereClause;
+        }
+        $stmt = $pdo->prepare($overdueSql);
+        self::bindParams($stmt, $overdueParams);
+        $stmt->execute();
+        $result['overdue'] = (int) $stmt->fetchColumn();
 
         if (self::hasOrderColumn($pdo, 'member_id')) {
             $monthStart = (new DateTimeImmutable('first day of this month'))->setTime(0, 0, 0)->format('Y-m-d H:i:s');
@@ -650,6 +664,14 @@ class MemberRepository
                 $cutoffYear = (int) $today->format('m') >= 8 ? (int) $today->format('Y') + 1 : (int) $today->format('Y');
                 $params['expiring_cutoff'] = $cutoffYear . '-07-31';
                 $parts[] = $latestActiveEnd . ' BETWEEN CURDATE() AND :expiring_cutoff';
+            } elseif ($expiringKey === 'overdue') {
+                // Grace-period cohort: period has ended but the expire cron
+                // hasn't flipped them to LAPSED yet (end_date + GRACE_MONTHS).
+                // LIFE members never expire, so a stale ACTIVE period row on
+                // one must not list them here.
+                $parts[] = $latestActiveEnd . ' < CURDATE()';
+                $parts[] = "LOWER(m.status) = 'active'";
+                $parts[] = "UPPER(COALESCE(m.member_type, '')) <> 'LIFE'";
             } elseif ($expiringKey === 'expired') {
                 $statusValues = self::expandStatusFilter('expired');
                 $placeholders = [];

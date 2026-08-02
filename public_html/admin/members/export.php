@@ -40,7 +40,7 @@ $filters = [
     'membership_type_id' => isset($_GET['membership_type_id']) && $_GET['membership_type_id'] !== '' ? (int) $_GET['membership_type_id'] : null,
     'status' => $_GET['status'] ?? '',
     'role' => trim((string) ($_GET['role'] ?? '')),
-    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
+    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'overdue', 'expired'], true) ? $_GET['expiring_within'] : '',
     'renewed' => ($_GET['renewed'] ?? '') === 'this_month' ? 'this_month' : '',
     'renewed_from' => trim((string) ($_GET['renewed_from'] ?? '')),
     'renewed_to' => trim((string) ($_GET['renewed_to'] ?? '')),

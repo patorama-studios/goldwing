@@ -33,6 +33,7 @@ $audiences = [
     'all_active' => 'All active members',
     'chapter' => 'A specific chapter',
     'expiring_30' => 'Members expiring within 30 days',
+    'overdue' => 'Members past expiry (in grace period)',
 ];
 
 $chapters = ChapterRepository::listForSelection($pdo, true);
@@ -63,6 +64,10 @@ $resolveFilters = static function (string $audience, ?int $chapterId) use ($chap
         case 'expiring_30':
             // MemberRepository honours '30d' — latest ACTIVE period ending within 30 days.
             $filters['expiring_within'] = '30d';
+            break;
+        case 'overdue':
+            // Past end_date, still ACTIVE (grace period) — hasn't renewed yet.
+            $filters['expiring_within'] = 'overdue';
             break;
         case 'all_active':
         default:

@@ -35,7 +35,7 @@ $filters = [
     'role' => trim((string) ($_GET['role'] ?? '')),
     'directory_prefs' => $_GET['directory_pref'] ?? [],
     'created_range' => trim((string) ($_GET['created_range'] ?? '')),
-    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'expired'], true) ? $_GET['expiring_within'] : '',
+    'expiring_within' => in_array($_GET['expiring_within'] ?? '', ['30d', '60d', '90d', 'eoy', 'overdue', 'expired'], true) ? $_GET['expiring_within'] : '',
     'renewed' => ($_GET['renewed'] ?? '') === 'this_month' ? 'this_month' : '',
     'renewed_from' => trim((string) ($_GET['renewed_from'] ?? '')),
     'renewed_to' => trim((string) ($_GET['renewed_to'] ?? '')),
@@ -306,6 +306,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
       if ($statusFilter === 'active') { $activeStat = 'active'; }
       elseif ($statusFilter === 'pending') { $activeStat = 'pending'; }
       elseif ($statusFilter === 'expired') { $activeStat = 'expired'; }
+      elseif (($filters['expiring_within'] ?? '') === 'overdue') { $activeStat = 'overdue'; }
       elseif (($filters['expiring_within'] ?? '') === '60d') { $activeStat = 'expiring'; }
       elseif (($filters['renewed'] ?? '') === 'this_month') { $activeStat = 'renewed'; }
       elseif (($filters['created_range'] ?? '') === '30d') { $activeStat = 'new'; }
@@ -320,11 +321,12 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
              . '<span class="material-icons-outlined text-base">' . e($icon) . '</span></div></a>';
       };
       ?>
-      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <?php
         $statCard('total', 'Total members', (string) $stats['total'], 'groups', 'bg-primary/20 text-primary-strong', 'hover:border-gray-300', []);
         $statCard('active', 'Active', (string) $stats['active'], 'check_circle', 'bg-emerald-100 text-emerald-700', 'hover:border-emerald-200', ['status' => 'active']);
         $statCard('pending', 'Pending', (string) $stats['pending'], 'hourglass_top', 'bg-amber-100 text-amber-700', 'hover:border-amber-200', ['status' => 'pending']);
+        $statCard('overdue', 'Past expiry (grace)', (string) $stats['overdue'], 'event_busy', 'bg-orange-100 text-orange-700', 'hover:border-orange-200', ['expiring_within' => 'overdue']);
         $statCard('expired', 'Expired', (string) $stats['expired'], 'cancel', 'bg-rose-100 text-rose-700', 'hover:border-rose-200', ['status' => 'expired']);
         $statCard('expiring', 'Expiring (60d)', (string) $stats['expiring_soon'], 'alarm', 'bg-blue-100 text-blue-700', 'hover:border-blue-200', ['expiring_within' => '60d']);
         $statCard('new', 'New (30d)', (string) $stats['new_last_30_days'], 'person_add', 'bg-blue-100 text-blue-700', 'hover:border-blue-200', ['created_range' => '30d']);
@@ -422,6 +424,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                 <option value="60d" <?= $expiringWithin === '60d' ? 'selected' : '' ?>>Within 60 days</option>
                 <option value="90d" <?= $expiringWithin === '90d' ? 'selected' : '' ?>>Within 90 days</option>
                 <option value="eoy" <?= $expiringWithin === 'eoy' ? 'selected' : '' ?>>Before next 31 July</option>
+                <option value="overdue" <?= $expiringWithin === 'overdue' ? 'selected' : '' ?>>Past expiry (in grace period)</option>
                 <option value="expired" <?= $expiringWithin === 'expired' ? 'selected' : '' ?>>Already expired</option>
               </select>
             </label>

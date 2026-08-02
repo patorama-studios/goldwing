@@ -31,7 +31,7 @@ You'll wear your "membership secretary" hat for most of this. Day-to-day it's ch
 - **Application stage** — approve, reject (with a reason), or just view the details (vehicles, chapter request, magazine preference, associate sub-application).
 - **Active stage** — view the member's profile, change their chapter, send them a manual payment link if they need one, edit details.
 - **Renewal stage** — issue a Stripe checkout link manually if the automatic reminder didn't work for them.
-- **Grace period stage** — the amber banner tells you when access will lock. Encourage them to renew while features are still accessible.
+- **Grace period stage** — the amber banner tells you when access will lock. Encourage them to renew while features are still accessible. To see everyone in this stage at once, use the **Past expiry (grace)** card on Admin → Members (or the **Past expiry (in grace period)** option in the Expiring filter) — it lists members whose end date has passed but who haven't been flipped to lapsed yet, i.e. exactly the people to chase for a renewal.
 - **Locked-out stage** — encourage them to rejoin; once they pay they're active again.
 - **Life members** — same as active, but no renewal admin needed.
 
