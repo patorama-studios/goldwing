@@ -59,7 +59,7 @@ class PendingRequestsService
             self::TYPE_PROFILE_UPDATE      => ['label' => 'Details Updated',        'icon' => 'manage_accounts'],
             self::TYPE_STORE_ORDER         => ['label' => 'Store Order',            'icon' => 'storefront'],
             self::TYPE_MEMBERSHIP          => ['label' => 'Membership Application', 'icon' => 'how_to_reg'],
-            self::TYPE_MEMBERSHIP_PAYMENT  => ['label' => 'Renewal — Bank Transfer', 'icon' => 'account_balance'],
+            self::TYPE_MEMBERSHIP_PAYMENT  => ['label' => 'Membership Renewal', 'icon' => 'payments'],
         ];
     }
 
@@ -356,14 +356,14 @@ class PendingRequestsService
                 case self::TYPE_MEMBERSHIP_PAYMENT:
                     $stmt = $pdo->prepare(
                         "SELECT o.id, o.order_number, o.member_id, o.membership_period_id,
-                                o.total, o.currency, o.payment_status, o.status, o.created_at,
+                                o.total, o.currency, o.payment_method, o.payment_status, o.status, o.created_at,
                                 m.first_name, m.last_name, m.email,
                                 p.term, p.end_date
                          FROM orders o
                          LEFT JOIN members m ON m.id = o.member_id
                          LEFT JOIN membership_periods p ON p.id = o.membership_period_id
                          WHERE o.id = :id AND o.order_type = 'membership'
-                               AND o.payment_method = 'bank_transfer' LIMIT 1"
+                               AND o.membership_period_id IS NOT NULL LIMIT 1"
                     );
                     $stmt->execute(['id' => $id]);
                     $r = $stmt->fetch();
@@ -511,18 +511,18 @@ class PendingRequestsService
             }
         } catch (Throwable $e) {}
 
-        // bank-transfer membership renewals — linked by member_id
+        // membership renewals (bank transfer or Stripe) — linked by member_id
         try {
             $stmt = $pdo->prepare(
                 "SELECT o.id, o.order_number, o.member_id, o.membership_period_id,
-                        o.total, o.currency, o.payment_status, o.status, o.created_at,
+                        o.total, o.currency, o.payment_method, o.payment_status, o.status, o.created_at,
                         m.first_name, m.last_name, m.email,
                         p.term, p.end_date
                  FROM orders o
                  LEFT JOIN members m ON m.id = o.member_id
                  LEFT JOIN membership_periods p ON p.id = o.membership_period_id
                  WHERE o.member_id = :mid AND o.order_type = 'membership'
-                       AND o.payment_method = 'bank_transfer'
+                       AND o.membership_period_id IS NOT NULL
                  ORDER BY o.created_at DESC LIMIT 20"
             );
             $stmt->execute(['mid' => $memberId]);
@@ -906,31 +906,33 @@ class PendingRequestsService
     }
 
     /**
-     * Bank-transfer membership renewals awaiting an admin's manual payment
-     * check. These are `orders` rows (order_type='membership') that were
-     * created with payment_method='bank_transfer' and never paid through
-     * Stripe. Approving one activates the membership; denying it expires the
-     * member. Always scoped to bank-transfer membership orders; the status
-     * filter narrows within that.
+     * Membership renewals awaiting payment or an admin's manual check —
+     * `orders` rows (order_type='membership') linked to a membership period,
+     * whatever the payment method. A bank-transfer row waits on the admin
+     * confirming the money arrived; a Stripe row waits on the member paying
+     * their checkout link (or on an admin approving it manually if the money
+     * is in Stripe but the webhook never landed). The period link also keeps
+     * new-member application orders out — those already appear as Membership
+     * Application items.
      */
     private static function fetchMembershipPayments(string $statusFilter): array
     {
         $pdo = Database::connection();
         $statusWhere = match ($statusFilter) {
-            'pending'  => "AND o.payment_status = 'pending'",
+            'pending'  => "AND o.payment_status = 'pending' AND o.status <> 'cancelled'",
             'approved' => "AND o.payment_status = 'accepted'",
             'rejected' => "AND o.payment_status IN ('rejected', 'failed')",
             'archived' => "AND o.status = 'cancelled'",
             default    => '',
         };
         $sql = "SELECT o.id, o.order_number, o.member_id, o.membership_period_id,
-                       o.total, o.currency, o.payment_status, o.status, o.created_at,
+                       o.total, o.currency, o.payment_method, o.payment_status, o.status, o.created_at,
                        m.first_name, m.last_name, m.email,
                        p.term, p.end_date
                 FROM orders o
                 LEFT JOIN members m ON m.id = o.member_id
                 LEFT JOIN membership_periods p ON p.id = o.membership_period_id
-                WHERE o.order_type = 'membership' AND o.payment_method = 'bank_transfer'
+                WHERE o.order_type = 'membership' AND o.membership_period_id IS NOT NULL
                       $statusWhere
                 ORDER BY o.created_at DESC
                 LIMIT 100";
@@ -939,7 +941,7 @@ class PendingRequestsService
         return array_map([self::class, 'membershipPaymentRow'], $rows);
     }
 
-    /** Shared row builder for a bank-transfer renewal order. */
+    /** Shared row builder for a renewal order (bank transfer or Stripe). */
     private static function membershipPaymentRow(array $r): array
     {
         $submitter = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
@@ -948,12 +950,17 @@ class PendingRequestsService
             'rejected', 'failed' => 'rejected',
             default             => 'pending',
         };
+        $isBank = ($r['payment_method'] ?? 'bank_transfer') === 'bank_transfer';
         $termLabel = self::termLabel((string) ($r['term'] ?? ''));
         $amount = 'A$' . number_format((float) ($r['total'] ?? 0), 2);
         $title = ($submitter ?: 'Member #' . $r['member_id']) . ' — ' . $termLabel . ' renewal';
-        $summary = 'Bank transfer · ' . $amount . ' · ' . $termLabel
-            . ' · Order ' . ($r['order_number'] ?? ('#' . $r['id']))
-            . ' · awaiting payment confirmation';
+        $tail = match ($displayStatus) {
+            'approved' => 'paid',
+            'rejected' => 'declined',
+            default    => $isBank ? 'awaiting payment confirmation' : 'awaiting member payment',
+        };
+        $summary = ($isBank ? 'Bank transfer' : 'Stripe') . ' · ' . $amount . ' · ' . $termLabel
+            . ' · Order ' . ($r['order_number'] ?? ('#' . $r['id'])) . ' · ' . $tail;
         return self::row(self::TYPE_MEMBERSHIP_PAYMENT, $r['id'], $title,
             $displayStatus, $r['created_at'], $submitter, $r['email'] ?? null, $summary, $r);
     }
@@ -1198,7 +1205,7 @@ class PendingRequestsService
             if ($newStatus !== 'approved' && $newStatus !== 'rejected') {
                 return;
             }
-            // Bank-transfer renewal awaiting a manual payment check.
+            // Renewal order awaiting payment (bank transfer or Stripe).
             $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :id AND order_type = 'membership' LIMIT 1");
             $stmt->execute(['id' => $id]);
             $order = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1207,27 +1214,32 @@ class PendingRequestsService
             }
             $memberId = (int) ($order['member_id'] ?? 0);
             $periodId = (int) ($order['membership_period_id'] ?? 0);
+            $isBank = ($order['payment_method'] ?? 'bank_transfer') === 'bank_transfer';
 
             if ($newStatus === 'approved') {
                 // Reuse the same activation path as the Stripe webhook — sets
                 // the period ACTIVE, the member ACTIVE, and the renewal/expiry
                 // date from the chosen term.
                 MembershipOrderService::activateMembershipForOrder($order, [
-                    'payment_reference' => 'Bank transfer confirmed by admin',
+                    'payment_reference' => $isBank
+                        ? 'Bank transfer confirmed by admin'
+                        : 'Stripe payment confirmed by admin',
                 ]);
                 return;
             }
 
-            // Denied: cancel the order and expire the member immediately
-            // (admin's choice — a denied renewal ends membership at that point,
-            // regardless of any remaining cover). markOrderRejected +
-            // applyAdminUpdate keep members.status and the period in sync.
-            MembershipOrderService::markOrderRejected($id, $message !== '' ? $message : 'Bank transfer not received');
+            // Denied: cancel the order and lapse its (unpaid) period.
+            MembershipOrderService::markOrderRejected($id, $message !== '' ? $message : 'Payment not received');
             if ($periodId > 0) {
                 $pdo->prepare('UPDATE membership_periods SET status = "LAPSED" WHERE id = :id')
                     ->execute(['id' => $periodId]);
             }
-            if ($memberId > 0) {
+            // Bank transfer only: the member claimed a payment that never
+            // arrived, so declining also expires them immediately (admin's
+            // choice — regardless of remaining cover). A Stripe order was
+            // simply never paid; the member keeps their current status and
+            // expires naturally if they don't renew.
+            if ($isBank && $memberId > 0) {
                 MembershipStatusService::applyAdminUpdate($memberId, ['status' => 'expired']);
             }
             return;

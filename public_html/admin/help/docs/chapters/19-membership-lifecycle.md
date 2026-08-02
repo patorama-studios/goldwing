@@ -113,15 +113,18 @@ In addition to the 60/30-day reminder emails, members can renew on demand from i
 <!-- SCREENSHOT: The cancel-membership confirmation step (click "Cancel my membership instead" from the lightbox), showing the reason textarea. Save as 19-cancel-request.png. -->
 <!-- ![Cancel-membership request modal](../images/19-cancel-request.png) -->
 
-### Bank-transfer renewals — approve or deny in the Notification Hub
+### Pending renewals — approve or deny in the Notification Hub
 
-Card renewals are automatic: the Stripe webhook confirms the payment and activates the membership with no admin action. **Bank-transfer renewals need a human to confirm the money landed**, so they run through the Notification Hub:
+Card renewals that get paid are automatic: the Stripe webhook confirms the payment and activates the membership with no admin action. But every renewal order still waiting on money shows in the Notification Hub under **Membership Renewal**, whatever the payment method:
+
+- **Bank transfer** rows ("awaiting payment confirmation") **need a human to confirm the money landed** — that's the classic flow below.
+- **Stripe** rows ("awaiting member payment") are renewals or admin-sent checkout links the member hasn't paid yet. Normally you just wait (or re-send the link from the member's page); they disappear by themselves when the member pays. If Stripe's dashboard shows the money but the order is stuck on pending (a missed webhook), **Approve** activates the membership manually.
 
 1. **Member picks bank transfer** in the renewal lightbox. We create the renewal order (unpaid), show them the bank details, and email them a "your membership is pending confirmation" notice. **If their current membership has already ended**, their member-only features (calendar, Wings, directory, store) stay blurred behind the lockdown until you approve — with a blue "your renewal is pending" banner (not the red "expired" one), since they have already paid. A member who renews **early** (current period still running) keeps full access while the transfer awaits approval — submitting a renewal never downgrades someone who is still covered.
-2. **You get a to-do in the Notification Hub** (`/admin/requests/`) under **Renewal — Bank Transfer**. It shows the member, the term they chose, the amount, and the order number.
+2. **You get a to-do in the Notification Hub** (`/admin/requests/`) under **Membership Renewal**. It shows the member, the payment method, the term they chose, the amount, and the order number.
 3. **Check the bank.** Once the transfer has cleared, open the request and hit **Approve** or **Deny**:
    - **Approve** → activates the membership exactly like a card payment would: sets them active and sets the new renewal date from the term they chose (a 3-year renewal advances three whole years, etc.). The member is emailed that their membership is active.
-   - **Deny** → **expires the membership immediately** (regardless of any remaining cover) and emails the member the reason you typed. A reason is required to deny. Use this if the payment never arrives.
+   - **Deny** → for a **bank transfer**, **expires the membership immediately** (regardless of any remaining cover) and emails the member the reason you typed — use this if the claimed payment never arrives. For a **Stripe** order it just cancels the unpaid order and its period; the member keeps their current status and lapses naturally if they never renew. A reason is required to deny either way.
 
 The member sees the same request — pending, then approved/denied — in their own notifications area (`/member/notifications.php`).
 

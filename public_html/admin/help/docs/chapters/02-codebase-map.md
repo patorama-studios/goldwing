@@ -165,7 +165,7 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | `Database.php`, `DbSessionHandler.php`, `Env.php` | DB connection, MySQL sessions, `.env` loader. |
 | `BaseUrlService.php` | Resolves `https://…` across CLI + web. |
 | `Validator.php` | Tiny input-validation helpers. |
-| `PendingRequestsService.php` | Unified "needs admin action" queue. Application rows carry payment context (card paid via Stripe vs bank transfer awaiting), and loading it sweeps stranded Stripe payments into the queue. |
+| `PendingRequestsService.php` | Unified "needs admin action" queue. Application + renewal rows carry payment context (Stripe vs bank transfer, paid vs awaiting), and loading it sweeps stranded Stripe payments into the queue. |
 | `TourService.php` | UI walkthrough metadata. |
 
 #### `public_html/`
