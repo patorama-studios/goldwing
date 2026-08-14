@@ -221,7 +221,7 @@ function orders_payment_status_column(\PDO $pdo): string
 if ($user && $user['member_id']) {
   $stmt = $pdo->prepare('SELECT m.*, ' . \App\Services\ChapterRepository::displayNameSql($pdo) . ' as chapter_name FROM members m LEFT JOIN chapters c ON c.id = m.chapter_id WHERE m.id = :id');
   $stmt->execute(['id' => $user['member_id']]);
-  $member = $stmt->fetch();
+  $member = $stmt->fetch() ?: null;
 
   if ($member) {
     $ordersMemberColumn = orders_member_column($pdo);
@@ -1324,7 +1324,10 @@ if ($user && $user['member_id']) {
     // member's expiry (it reads "about to expire" or over-promises the term).
     $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY (status <> "PENDING_PAYMENT") DESC, end_date DESC LIMIT 1');
     $stmt->execute(['member_id' => $member['id']]);
-    $membershipPeriod = $stmt->fetch();
+    // fetch() returns false when a member has no period row at all (stranded
+    // application, never-activated join). Normalise to null - the dashboard
+    // passes this straight into ?array params that reject false.
+    $membershipPeriod = $stmt->fetch() ?: null;
 
     // In the 2-month grace window the membership has expired but still has
     // access. Every status badge/dot reads "Lapsed" to match the amber expiry
@@ -1339,7 +1342,7 @@ if ($user && $user['member_id']) {
     } elseif ($member['member_type'] === 'ASSOCIATE' && $member['full_member_id']) {
       $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id');
       $stmt->execute(['id' => $member['full_member_id']]);
-      $fullMember = $stmt->fetch();
+      $fullMember = $stmt->fetch() ?: null;
     }
 
     $profileMember = $member;
