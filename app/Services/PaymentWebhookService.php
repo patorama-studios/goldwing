@@ -938,11 +938,23 @@ class PaymentWebhookService
         if ($periodId <= 0) {
             $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
         }
-        if ($memberId > 0 && $periodId > 0) {
+        // Only $memberId is required: activateMembershipForOrder() mints a
+        // missing period itself, so a card payment against an order with no
+        // period (an admin "Request payment" top-up) still sets the renewal
+        // date instead of silently passing through and leaving the member
+        // paid-but-undated.
+        if ($memberId > 0) {
             $activated = MembershipOrderService::activateMembershipForOrder($order, [
                 'payment_reference' => $order['stripe_payment_intent_id'] ?? ($metadata['payment_intent'] ?? ''),
                 'period_id' => $periodId,
             ]);
+            if (!$activated) {
+                StripeErrorLogger::logWebhookSkip(__METHOD__, 'membership paid but not activated: no membership period could be resolved or created', [
+                    'related_order_id' => $order['id'] ?? null,
+                    'member_id' => $memberId,
+                    'period_id' => $periodId ?: null,
+                ]);
+            }
             if ($activated) {
                 // Associate → Full upgrade: if the order's internal_notes
                 // declared this was an upgrade purchase, flip the member

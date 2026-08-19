@@ -32,6 +32,27 @@ require_once __DIR__ . '/../../calendar/lib/calendar_occurrences.php';
 
 require_login();
 
+/**
+ * Membership type display label. Associate + is_life_member renders as
+ * "Associate Life" — the member stays a linked ASSOCIATE structurally, the
+ * flag carries the life status (never lapses, no renewals).
+ */
+function gw_member_type_label(?array $m, bool $withMemberSuffix = true): string
+{
+  $m = $m ?? [];
+  $code = strtoupper((string) ($m['member_type'] ?? ''));
+  $suffix = $withMemberSuffix ? ' Member' : '';
+  if ($code === 'ASSOCIATE' && !empty($m['is_life_member'])) {
+    return 'Associate Life' . $suffix;
+  }
+  return match ($code) {
+    'FULL' => 'Full Member',
+    'LIFE' => 'Life Member',
+    'ASSOCIATE' => 'Associate' . $suffix,
+    default => 'Member',
+  };
+}
+
 $page = $_GET['page'] ?? 'dashboard';
 $page = preg_replace('/[^a-z0-9-]/', '', strtolower($page));
 if ($page === 'notices') {
@@ -775,7 +796,7 @@ if ($user && $user['member_id']) {
       } elseif ($_POST['action'] === 'membership_renew') {
         if (!$member) {
           $billingError = 'Unable to start renewal.';
-        } elseif (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
+        } elseif (MemberRepository::isLifeMember($member)) {
           $billingError = 'Life members do not need to renew.';
         } elseif (empty($_POST['acknowledged'])) {
           $billingError = 'Please confirm your membership details are correct before renewing.';
@@ -814,7 +835,7 @@ if ($user && $user['member_id']) {
             }
 
             $renewers = [['member' => $member, 'role' => 'self']];
-            if ($renewPartnerForHandler && strtoupper((string) ($renewPartnerForHandler['member_type'] ?? '')) !== 'LIFE') {
+            if ($renewPartnerForHandler && !MemberRepository::isLifeMember($renewPartnerForHandler)) {
               $renewers[] = ['member' => $renewPartnerForHandler, 'role' => 'partner'];
             }
 
@@ -995,6 +1016,8 @@ if ($user && $user['member_id']) {
           $profileError = 'Unable to start the upgrade.';
         } elseif (strtoupper((string) ($member['member_type'] ?? '')) !== 'ASSOCIATE') {
           $profileError = 'Only Associate members can upgrade to Full membership.';
+        } elseif (MemberRepository::isLifeMember($member)) {
+          $profileError = 'Life members do not need to upgrade.';
         } else {
           $result = MembershipUpgradeService::startCheckout($member);
           if (!empty($result['ok']) && !empty($result['redirect_url'])) {
@@ -1325,7 +1348,7 @@ if ($user && $user['member_id']) {
     $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE member_id = :member_id ORDER BY (status <> "PENDING_PAYMENT") DESC, end_date DESC LIMIT 1');
     $stmt->execute(['member_id' => $member['id']]);
     // fetch() returns false when a member has no period row at all (stranded
-    // application, never-activated join). Normalise to null - the dashboard
+    // application, never-activated join). Normalise to null — the dashboard
     // passes this straight into ?array params that reject false.
     $membershipPeriod = $stmt->fetch() ?: null;
 
@@ -1577,7 +1600,7 @@ if ($user && $user['member_id']) {
       $orderPeriodId = (int) ($order['membership_period_id'] ?? 0);
       if ($orderPeriodId > 0 && array_key_exists($orderPeriodId, $orderPeriodTermMonths)) {
         $daysRemainingLabel = $termToLabel($orderPeriodTermMonths[$orderPeriodId]);
-      } elseif (!empty($member['member_type']) && $member['member_type'] === 'LIFE') {
+      } elseif ($member && MemberRepository::isLifeMember($member)) {
         $daysRemainingLabel = 'No expiry';
       }
       $paymentMethod = trim((string) ($order['payment_method'] ?? ''));
@@ -1777,7 +1800,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         }
         // Committee/leadership role pills sourced from member_committee_assignments.
         $memberRolePills = $member ? CommitteeService::rolesForMember((int) $member['id']) : [];
-        $isLifeMember = ($member['member_type'] ?? '') === 'LIFE';
+        $isLifeMember = MemberRepository::isLifeMember($member ?? []);
         // Lapsed members can stay on the dashboard, but its widgets that preview
         // locked features (Wings / calendar / awards / notices / directory) get
         // an individual lock overlay so they can't be clicked through.
@@ -1843,11 +1866,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             $dashboardPartnerAvatar = (string) ($dashboardPartner['avatar_url'] ?? '');
           }
         }
-        $dashboardPartnerTypeLabel = [
-          'FULL' => 'Full Member',
-          'ASSOCIATE' => 'Associate',
-          'LIFE' => 'Life Member',
-        ][strtoupper((string) ($dashboardPartner['member_type'] ?? ''))] ?? 'Member';
+        $dashboardPartnerTypeLabel = gw_member_type_label($dashboardPartner, false);
         $dashboardPartnerNumber = $dashboardPartner && !empty($dashboardPartner['member_number_base'])
           ? MembershipService::displayMembershipNumber((int) $dashboardPartner['member_number_base'], (int) ($dashboardPartner['member_number_suffix'] ?? 0))
           : '';
@@ -2683,12 +2702,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         } elseif (!empty($profileMember['member_number'])) {
           $profileMemberNumber = $profileMember['member_number'];
         }
-        $membershipTypeMap = [
-          'FULL' => 'Full Member',
-          'ASSOCIATE' => 'Associate Member',
-          'LIFE' => 'Life Member',
-        ];
-        $profileMembershipTypeLabel = $membershipTypeMap[strtoupper((string) ($profileMember['member_type'] ?? ''))] ?? 'Member';
+        $profileMembershipTypeLabel = gw_member_type_label($profileMember);
         $profileMembershipStatusKey = strtolower((string) ($profileMember['status'] ?? 'pending'));
         // Own profile in the grace window: expired but access retained — show Lapsed.
         if ($gwInGrace && (int) $profileMemberId === (int) $member['id']) {
@@ -2753,7 +2767,6 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           }
           return (string) ($m['member_number'] ?? '—');
         };
-        $typeLabelsPanel = ['FULL' => 'Full Member', 'ASSOCIATE' => 'Associate', 'LIFE' => 'Life Member'];
         // Resolve avatar for any household member from THEIR own user settings,
         // not the logged-in user's. Falls back to legacy members.avatar_url and,
         // for associates, to the linked full member's associate_avatar_url.
@@ -2795,12 +2808,12 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <?php foreach ([$householdMain, $householdAssoc] as $panelMember):
                   $panelIsActive = (int) $panelMember['id'] === $profileMemberId;
                   $panelType = strtoupper((string) ($panelMember['member_type'] ?? 'FULL'));
-                  $panelIsLife = $panelType === 'LIFE';
+                  $panelIsLife = MemberRepository::isLifeMember($panelMember);
                   $panelIsAssoc = $panelType === 'ASSOCIATE';
                   $panelAvatar = $panelAvatarFor($panelMember, $panelIsAssoc ? $householdMain : null);
                   $panelName = trim(($panelMember['first_name'] ?? '') . ' ' . ($panelMember['last_name'] ?? ''));
                   $panelNumber = $memberNumberForPanel($panelMember);
-                  $panelTypeLabel = $typeLabelsPanel[$panelType] ?? ucfirst(strtolower($panelType));
+                  $panelTypeLabel = gw_member_type_label($panelMember, false);
                   $panelPhone = $panelMember['phone'] ?? '';
                   $panelHistoric = !empty($panelMember['is_historic']);
                   $panelEditUrl = '/member/index.php?page=profile&member_id=' . urlencode((string) $panelMember['id']);
@@ -3149,7 +3162,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   </div>
                   <?php
                     $isOwnProfile = (int) $profileMemberId === (int) $member['id'];
-                    $isAssociate = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'ASSOCIATE';
+                    $isAssociate = strtoupper((string) ($profileMember['member_type'] ?? '')) === 'ASSOCIATE'
+                      && !MemberRepository::isLifeMember($profileMember);
                     $upgradePriceCents = ($isOwnProfile && $isAssociate)
                       ? MembershipUpgradeService::getUpgradePriceCents($profileMember) : null;
                     $showUpgradeButton = $isOwnProfile && $isAssociate;
@@ -4530,10 +4544,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             }
           }
           $renewEligible = false;
-          if ($member && strtoupper((string) ($member['member_type'] ?? '')) !== 'LIFE' && !empty($membershipPeriod['end_date'])) {
+          if ($member && !MemberRepository::isLifeMember($member) && !empty($membershipPeriod['end_date'])) {
             $renewEligible = strtotime((string) $membershipPeriod['end_date']) <= strtotime('+60 days');
           }
-          if (!empty($membershipPeriod['status']) && strtoupper((string) $membershipPeriod['status']) === 'LAPSED') {
+          if (!empty($membershipPeriod['status']) && strtoupper((string) $membershipPeriod['status']) === 'LAPSED'
+              && !($member && MemberRepository::isLifeMember($member))) {
             $renewEligible = true;
           }
           ?>
@@ -4555,19 +4570,10 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </div>
               <?php endif; ?>
               <?php
-              $billingMembershipTypeLabel = 'Member';
-              if ($member) {
-                $memberTypeKey = strtoupper((string) ($member['member_type'] ?? ''));
-                $billingMembershipTypeLabel = match ($memberTypeKey) {
-                  'FULL' => 'Full Member',
-                  'ASSOCIATE' => 'Associate Member',
-                  'LIFE' => 'Life Member',
-                  default => 'Member',
-                };
-              }
+              $billingMembershipTypeLabel = gw_member_type_label($member);
               // Grace window: membership has expired (access retained) — show Lapsed.
               $billingStatusLabel = $gwInGrace ? 'Lapsed' : ($member ? ucfirst(strtolower((string) ($member['status'] ?? 'pending'))) : '—');
-              $billingExpiryLabel = ($member && strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
+              $billingExpiryLabel = ($member && MemberRepository::isLifeMember($member)) ? 'N/A' : format_date($membershipPeriod['end_date'] ?? null);
               ?>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-600">
                 <div>
@@ -5763,7 +5769,7 @@ if ($renewModalEligible) {
   } elseif ($fullMember) {
     $renewPartnerMember = $fullMember;
   }
-  if ($renewPartnerMember && strtoupper((string) ($renewPartnerMember['member_type'] ?? '')) === 'LIFE') {
+  if ($renewPartnerMember && MemberRepository::isLifeMember($renewPartnerMember)) {
     $renewPartnerMember = null;
   }
 

@@ -141,11 +141,24 @@ class MembershipOrderService
             $periodId = isset($metadata['period_id']) ? (int) $metadata['period_id'] : 0;
         }
 
-        if ($memberId <= 0 || $periodId <= 0) {
+        if ($memberId <= 0) {
             return false;
         }
 
         $pdo = Database::connection();
+
+        // No period on the order — an admin "Request payment" top-up, or an
+        // order whose period link never landed. This used to return false, so a
+        // member whose card HAD been charged was left with no renewal date at
+        // all. Mint the period from the term on the order instead and let the
+        // expiry maths below fill the date in.
+        if ($periodId <= 0) {
+            $periodId = self::createPeriodForOrphanOrder($pdo, $memberId, $order);
+        }
+        if ($periodId <= 0) {
+            return false;
+        }
+
         $stmt = $pdo->prepare('SELECT * FROM membership_periods WHERE id = :id AND member_id = :member_id LIMIT 1');
         $stmt->execute(['id' => $periodId, 'member_id' => $memberId]);
         $period = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -190,18 +203,17 @@ class MembershipOrderService
                 $isRenewal = $memberStatus !== '' && $memberStatus !== 'PENDING';
             }
 
-            // 31 Jul that ends the membership year containing the payment date.
-            $currentYearEnd = new DateTimeImmutable(MembershipService::calculateExpiry($startDate, 1));
-
             if ($activeEndDate && $activeEndDate >= $today) {
                 // Active renewal: stack the full term on top of existing cover.
                 $startDate = $activeEndDate->modify('+1 day')->format('Y-m-d');
                 $endDate = $activeEndDate->modify("+{$months} months")->format('Y-m-d');
             } elseif ($isRenewal) {
-                // Lapsed / expired renewal: give the full term from the current
-                // membership-year end, active immediately. A full-price N-year
-                // renewal always advances the date N whole years — never short.
-                $endDate = $currentYearEnd->modify("+{$months} months")->format('Y-m-d');
+                // Lapsed / expired renewal: full term from the renewal anchor,
+                // active immediately. Inside the post-year-end grace window the
+                // anchor is the 31 Jul that just passed (an August payer is
+                // renewing the year that just started, not buying a year
+                // ahead); past it, the coming year end (never short).
+                $endDate = MembershipService::lapsedRenewalAnchor($startDate)->modify("+{$months} months")->format('Y-m-d');
             } else {
                 // Brand-new join: rest of the current membership year plus any
                 // whole years beyond the first (the joining-window price already
@@ -245,6 +257,86 @@ class MembershipOrderService
         ]);
 
         return true;
+    }
+
+    /**
+     * Mint a membership period for a paid membership order that has none, so
+     * activation can calculate and store the renewal date. Returns 0 where a
+     * period must NOT be created here: a not-yet-approved applicant (the
+     * application-approval flow owns their period, and the committee's decision
+     * comes first), a life member (no expiry to set), or an order that doesn't
+     * read as a membership purchase.
+     */
+    private static function createPeriodForOrphanOrder(PDO $pdo, int $memberId, array $order): int
+    {
+        $orderId = (int) ($order['id'] ?? 0);
+
+        $stmt = $pdo->prepare('SELECT * FROM members WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $memberId]);
+        $member = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$member || MemberRepository::isLifeMember($member)) {
+            return 0;
+        }
+        if (strtoupper(trim((string) ($member['status'] ?? ''))) === 'PENDING') {
+            return 0;
+        }
+
+        $term = self::termFromOrderItems($pdo, $orderId);
+        if ($term === null) {
+            return 0;
+        }
+
+        $periodId = MembershipService::createMembershipPeriod($memberId, $term, date('Y-m-d'));
+        if ($periodId > 0 && $orderId > 0) {
+            $pdo->prepare('UPDATE orders SET membership_period_id = :period_id, updated_at = NOW() WHERE id = :id')
+                ->execute(['period_id' => $periodId, 'id' => $orderId]);
+        }
+        return $periodId;
+    }
+
+    /**
+     * Best-effort term for an order that carries no period, read off its line
+     * items. Defaults to 1Y — the shortest term, so a wrong guess never
+     * over-credits someone.
+     *
+     * Returns null when the order doesn't read as a membership purchase at all.
+     * The admin "Request payment" box is free text, so a one-off charge (say a
+     * postage top-up) can land on a membership-typed order; minting a period
+     * for that would silently extend the member's cover by a year.
+     */
+    private static function termFromOrderItems(PDO $pdo, int $orderId): ?string
+    {
+        if ($orderId <= 0) {
+            return null;
+        }
+        $stmt = $pdo->prepare('SELECT name FROM order_items WHERE order_id = :id');
+        $stmt->execute(['id' => $orderId]);
+        $names = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (!preg_match('/MEMBERSHIP|RENEW|JOIN/', strtoupper(implode(' ', $names)))) {
+            return null;
+        }
+
+        // A period key sitting in the item name ("Full membership 3Y",
+        // "Associate membership JOIN_P_3Y") is authoritative — termToMonths
+        // resolves those, pricing-config period ids included.
+        foreach ($names as $name) {
+            foreach (preg_split('/\s+/', strtoupper(trim((string) $name))) as $token) {
+                if (preg_match('/^(\d+[YM]|JOIN[A-Z0-9_]*|(?:ONE|TWO|THREE)_[A-Z_]+)$/', $token)) {
+                    return MembershipService::canonicalTerm($token);
+                }
+            }
+        }
+
+        // Otherwise read the duration out of the prose, e.g. the free-text
+        // description on an admin payment request ("3-year membership renewal").
+        $text = strtoupper(implode(' ', $names));
+        if (preg_match('/(\d+)\s*-?\s*MONTH/', $text, $m)) {
+            return max(1, (int) $m[1]) . 'M';
+        }
+        if (preg_match('/(\d+)\s*-?\s*YEAR/', $text, $m)) {
+            return max(1, (int) $m[1]) . 'Y';
+        }
+        return '1Y';
     }
 
     public static function markOrderRejected(int $orderId, ?string $reason = null): void

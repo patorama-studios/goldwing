@@ -17,7 +17,7 @@ If `APP_KEY` is lost or changed, every scrambled value becomes unreadable garbag
 - The **Stripe secret key** and the **Stripe webhook signing secret**
 - The **SMTP password** (the password used to send our outbound emails)
 - Every admin's **2FA TOTP secret** (the seed behind the 6-digit codes in their authenticator app)
-- All **AI provider keys** (OpenAI, kie.ai, etc.)
+- All **AI provider keys** (OpenRouter)
 
 ### What's NOT encrypted
 
@@ -109,7 +109,7 @@ Everything hinges on `APP_KEY`, set in `.env` (or `.env.local`) on each environm
 | SMTP password (`integrations.smtp_password`) | `settings_global` row, `{"encrypted": true, "value": "…"}` wrapper | CryptoService (via `SettingsService::setGlobal(..., ['encrypt' => true])`) |
 | Email-preferences unsubscribe tokens | URL payload (never stored — round-tripped through the URL) | CryptoService |
 | 2FA TOTP seeds | `users_2fa.totp_secret_encrypted` | EncryptionService preferred, CryptoService fallback |
-| AI provider keys (OpenAI, kie.ai, etc.) | `ai_provider_keys.api_key_encrypted` | EncryptionService (refuses to save if not ready) |
+| AI provider keys (OpenRouter) | `ai_provider_keys.api_key_encrypted` | EncryptionService (refuses to save if not ready) |
 
 The TwoFactorService dual path is in `app/Services/TwoFactorService.php`:
 

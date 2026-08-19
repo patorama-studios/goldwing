@@ -22,9 +22,9 @@
   - `stripe.secret_key` and `stripe.webhook_secret`
   - `stripe.membership_prices` with your Stripe price IDs
   - `ai.default_model` to pick the default model (default: `claude-sonnet-4-6`)
-- The AI page builder is hard-locked to kie.ai. Configure the API key either via:
-  - Admin → AI Settings → kie.ai API Key (stored encrypted in DB), OR
-  - `KIE_API_KEY` environment variable (fallback)
+- The AI page builder is hard-locked to OpenRouter (openrouter.ai). Configure the API key either via:
+  - Admin → AI Settings → OpenRouter API Key (stored encrypted in DB), OR
+  - `OPENROUTER_API_KEY` environment variable (fallback)
   - `AI_DEFAULT_MODEL` env var (optional model override)
 
 ## 5) Stripe webhook

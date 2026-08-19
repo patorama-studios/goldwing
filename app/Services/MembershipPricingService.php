@@ -69,6 +69,11 @@ class MembershipPricingService
             'join_rollover_enabled' => true,
             'join_rollover_month' => 6,
             'join_rollover_day' => 1,
+            // Renewal grace: a lapsed member renewing within this many months
+            // AFTER the 31 Jul year end is renewing the year that just started
+            // (1Y paid 3 Aug 2026 ends 31 Jul 2027), not buying a year ahead.
+            // 0 disables the window.
+            'renewal_grace_months' => 3,
             'renewal_periods' => [
                 ['id' => 'P_1Y', 'label' => '1 Year', 'duration_months' => 12, 'sort_order' => 10, 'active' => true],
                 ['id' => 'P_3Y', 'label' => '3 Years', 'duration_months' => 36, 'sort_order' => 30, 'active' => true],
@@ -360,6 +365,13 @@ class MembershipPricingService
             $rollover = $rollover->modify('-1 year');
         }
         return $joinDate >= $rollover;
+    }
+
+    /** Months after the year end during which a lapsed renewal still buys the
+     *  just-started membership year. 0 = window disabled. */
+    public static function renewalGraceMonths(): int
+    {
+        return (int) (self::getConfig()['renewal_grace_months'] ?? 0);
     }
 
     /** End of the first membership year a new joiner buys (rollover-aware). */
@@ -738,6 +750,7 @@ class MembershipPricingService
             : $defaults['join_rollover_enabled'];
         $out['join_rollover_month'] = self::clampInt($cfg['join_rollover_month'] ?? $defaults['join_rollover_month'], 1, 12);
         $out['join_rollover_day'] = self::clampInt($cfg['join_rollover_day'] ?? $defaults['join_rollover_day'], 1, 28);
+        $out['renewal_grace_months'] = self::clampInt($cfg['renewal_grace_months'] ?? $defaults['renewal_grace_months'], 0, 12);
 
         $rawPeriods = is_array($cfg['renewal_periods'] ?? null) ? $cfg['renewal_periods'] : $defaults['renewal_periods'];
         $periods = [];

@@ -25,7 +25,7 @@ A factual reference for "what is the website actually made of": the technology, 
 | **Stripe** | Card payments, invoices, refunds, payouts to the bank | dashboard.stripe.com (association account) |
 | **Email (SMTP)** | Sends all site email — receipts, reminders, alerts | Settings → Integrations + the mailbox provider |
 | **Google Maps** | Address autocomplete on signup and profile forms | Google Cloud Console (API key) |
-| **kie.ai** | Powers the AI page builder (optional) | kie.ai account (API key in Settings → AI) |
+| **OpenRouter** | Powers the AI page builder (optional) | openrouter.ai account (API key in Settings → AI) |
 | **GitHub** | Stores the website's code | github.com (private repository) |
 | **Domain & DNS** | The goldwing.org.au name and its DNS records | The domain registrar account |
 
@@ -52,7 +52,7 @@ Everything else — members, pages, store, calendar, documents — is the site's
 | `APP_KEY` | Master encryption key — decrypts Stripe/SMTP secrets stored in the database. **Losing it means re-entering every stored secret.** |
 | `APP_BASE_URL` | Canonical site URL |
 | `GOOGLE_MAPS_API_KEY` | Address autocomplete |
-| `KIE_API_KEY` / `AI_DEFAULT_MODEL` | AI page builder |
+| `OPENROUTER_API_KEY` / `AI_DEFAULT_MODEL` | AI page builder |
 | `GOOGLE_OAUTH_*` / `APPLE_OAUTH_*` | Social login (configured but optional) |
 
 Most live secrets (Stripe keys, SMTP password) are stored **encrypted in the database** (`settings_global`, via `CryptoService`) and edited through the Settings hub — not in `.env`. `.env` holds the DB connection plus the `APP_KEY` that unlocks the rest. See [Chapter 10 — Encryption & secrets](view.php?slug=10-encryption-secrets).

@@ -660,7 +660,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     $statusLabelText = statusLabel($member['status']);
                     $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
                     $memberType = strtoupper((string) ($member['member_type'] ?? 'FULL'));
-                    $isLifeMember = $memberType === 'LIFE';
+                    $isLifeMember = $memberType === 'LIFE' || !empty($member['is_life_member']);
                     $isAssociate = $memberType === 'ASSOCIATE';
                     $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
                     $userId = (int) ($member['user_id'] ?? 0);
@@ -744,8 +744,11 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     <td class="px-3 py-2.5">
                       <?php if ($isLifeMember): ?>
                         <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800">
-                          <span class="material-icons-outlined text-[10px]">star</span>Life
+                          <span class="material-icons-outlined text-[10px]">star</span><?= $isAssociate ? 'Assoc. Life' : 'Life' ?>
                         </span>
+                        <?php if ($isAssociate && $primaryMemberName !== ''): ?>
+                          <p class="text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px]" title="Associate of <?= e($primaryMemberName) ?>">of <?= e($primaryMemberName) ?></p>
+                        <?php endif; ?>
                       <?php elseif ($isAssociate): ?>
                         <span class="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700">Assoc.</span>
                         <?php if ($primaryMemberName !== ''): ?>
@@ -848,7 +851,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           $statusKey = normalizeMemberStatus((string) ($member['status'] ?? ''));
                           $statusLabelText = statusLabel($member['status']);
                           $memberType = strtoupper((string) ($member['member_type'] ?? 'FULL'));
-                          $isLifeMember = $memberType === 'LIFE';
+                          $isLifeMember = $memberType === 'LIFE' || !empty($member['is_life_member']);
                           $isAssociate = $memberType === 'ASSOCIATE';
                           $primaryMemberName = trim((string) ($member['primary_member_name'] ?? ''));
                           $userId = (int) ($member['user_id'] ?? 0);
@@ -888,7 +891,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                           <td class="px-3 py-2.5">
                             <?php if ($isLifeMember): ?>
                               <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-yellow-800">
-                                <span class="material-icons-outlined text-[10px]">star</span>Life
+                                <span class="material-icons-outlined text-[10px]">star</span><?= $isAssociate ? 'Assoc. Life' : 'Life' ?>
                               </span>
                             <?php elseif ($isAssociate): ?>
                               <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-purple-700">Assoc.</span>
@@ -977,7 +980,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <div class="mt-2 flex flex-wrap justify-center gap-1">
                     <?php if ($isLifeMember): ?>
                       <span class="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-yellow-800">
-                        <span class="material-icons-outlined text-[9px]">star</span>Life
+                        <span class="material-icons-outlined text-[9px]">star</span><?= $isAssociate ? 'Assoc. Life' : 'Life' ?>
                       </span>
                     <?php elseif ($isAssociate): ?>
                       <span class="inline-flex rounded-full bg-purple-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-purple-700">Assoc.</span>

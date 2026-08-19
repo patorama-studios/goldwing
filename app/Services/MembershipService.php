@@ -38,6 +38,30 @@ class MembershipService
         return self::newJoinYearEnd($startDate)->modify("+{$extraMonths} months")->format('Y-m-d');
     }
 
+    /**
+     * The 31 Jul a lapsed/expired renewal's term runs from, given the payment
+     * date. Within the renewal grace window after year end (default 3 months,
+     * so through 31 Oct) the member is renewing the year that JUST started —
+     * anchor on the 31 Jul that just passed, so a 1Y renewal paid 3 Aug 2026
+     * ends 31 Jul 2027, not 2028. Past the window, the full term runs from
+     * the coming year end instead (never short).
+     */
+    public static function lapsedRenewalAnchor(string $paidDate): DateTimeImmutable
+    {
+        $paid = new DateTimeImmutable($paidDate);
+        $comingYearEnd = new DateTimeImmutable(self::calculateExpiry($paidDate, 1));
+        $prevYearEnd = $comingYearEnd->modify('-1 year');
+        try {
+            $graceMonths = MembershipPricingService::renewalGraceMonths();
+        } catch (\Throwable $e) {
+            $graceMonths = 0; // Pricing config unavailable (e.g. CLI without DB).
+        }
+        if ($graceMonths > 0 && $paid <= $prevYearEnd->modify("+{$graceMonths} months")) {
+            return $prevYearEnd;
+        }
+        return $comingYearEnd;
+    }
+
     public static function calculateExpiry(string $startDate, int $termYears): string
     {
         $start = new DateTimeImmutable($startDate);

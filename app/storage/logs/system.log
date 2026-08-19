@@ -103,3 +103,116 @@ Stack trace:
 #0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php(24): PDO->prepare('UPDATE wings_is...')
 #1 {main}
   thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/download_wings.php on line 24
+[26-Jun-2026 09:23:54 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 37
+[26-Jun-2026 09:23:54 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 45
+[26-Jun-2026 09:23:54 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 52
+[26-Jun-2026 09:23:54 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 54
+[15-Jul-2026 13:00:38 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'name' in 'field list' in Command line code:7
+Stack trace:
+#0 Command line code(7): PDO->query('SELECT id, code...')
+#1 {main}
+  thrown in Command line code on line 7
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 46
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 48
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 50
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 58
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 65
+[17-Jul-2026 02:56:19 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 67
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 46
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 48
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 50
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 58
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 65
+[17-Jul-2026 02:57:00 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 67
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 46
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 48
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 50
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 58
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 65
+[22-Jul-2026 01:09:47 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 67
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 46
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 48
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 50
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 58
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 65
+[22-Jul-2026 01:09:59 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 67
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'payment_status' in 'where clause'
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'so.payment_status' in 'where clause'
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'reads
+     FROM activity_log al
+     JOIN members m ON m.id = al.member_id
+     ' at line 2
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'date_of_birth' in 'field list'
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'join_date' in 'field list'
+[27-Jul-2026 14:45:12 Australia/Sydney] [daily_summary] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'goldwing.stripe_errors' doesn't exist
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 46
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 48
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 50
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 58
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  session_set_save_handler(): Session save handler cannot be changed after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 65
+[27-Jul-2026 04:47:02 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/bootstrap.php on line 67
+[27-Jul-2026 14:47:02 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 2014 Cannot execute queries while other unbuffered queries are active.  Consider using PDOStatement::fetchAll().  Alternatively, if your code is only ever going to run against mysql, you may enable query buffering by setting the PDO::MYSQL_ATTR_USE_BUFFERED_QUERY attribute. in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:23
+Stack trace:
+#0 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(23): PDO->beginTransaction()
+#1 {main}
+  thrown in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php on line 23
+[27-Jul-2026 14:47:22 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[01000]: Warning: 1265 Data truncated for column 'status' at row 1 in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:25
+Stack trace:
+#0 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(25): PDOStatement->execute(Array)
+#1 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(44): {closure:/private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:23}('INSERT INTO mem...', Array)
+#2 {main}
+  thrown in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php on line 25
+[27-Jul-2026 14:48:02 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:25
+Stack trace:
+#0 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(25): PDOStatement->execute(Array)
+#1 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(104): {closure:/private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:23}('INSERT INTO sto...', Array)
+#2 {main}
+  thrown in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php on line 25
+[27-Jul-2026 14:48:16 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '18-1' for key 'calendar_event_rsvps.uniq_event_user' in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:25
+Stack trace:
+#0 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(25): PDOStatement->execute(Array)
+#1 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(120): {closure:/private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:23}('INSERT INTO cal...', Array)
+#2 {main}
+  thrown in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php on line 25
+[27-Jul-2026 14:48:24 Australia/Sydney] [daily_summary] SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'reads
+     FROM activity_log al
+     JOIN members m ON m.id = al.member_id
+     ' at line 2
+[27-Jul-2026 14:54:14 Australia/Sydney] [daily_summary] SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'reads
+     FROM activity_log al
+     JOIN members m ON m.id = al.member_id
+     ' at line 2
+[27-Jul-2026 14:55:00 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'reads
+     FROM activity_log al JOIN members m ON m.id = al.member_id
+     WHERE' at line 1 in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php:132
+Stack trace:
+#0 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php(132): PDO->query('SELECT COALESCE...')
+#1 {main}
+  thrown in /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/74ec5367-7174-4858-a6c6-0e81a42d47f2/scratchpad/seed_and_render.php on line 132
+[02-Aug-2026 13:45:25 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'member_number_base' doesn't have a default value in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php:7
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php(7): PDO->exec('INSERT INTO mem...')
+#1 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php on line 7
+[02-Aug-2026 13:45:36 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'term' doesn't have a default value in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php:8
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php(8): PDO->exec('INSERT INTO mem...')
+#1 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php on line 8
+[02-Aug-2026 13:45:46 Australia/Sydney] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1364 Field 'created_at' doesn't have a default value in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php:8
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php(8): PDO->exec('INSERT INTO mem...')
+#1 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/overdue_smoke_tmp.php on line 8
+[14-Aug-2026 16:53:53 Australia/Sydney] PHP Fatal error:  Uncaught TypeError: App\Services\MembershipAccessService::effectiveStatusFrom(): Argument #2 ($period) must be of type ?array, false given, called in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/index.php on line 1819 and defined in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/MembershipAccessService.php:89
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/index.php(1819): App\Services\MembershipAccessService::effectiveStatusFrom(Array, false)
+#1 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/2bdc8d5f-4b23-4e66-b4aa-6c713abff579/scratchpad/render_member.php(61): require('/Users/patorama...')
+#2 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/MembershipAccessService.php on line 89
+[14-Aug-2026 16:55:29 Australia/Sydney] PHP Fatal error:  Uncaught TypeError: App\Services\MembershipAccessService::effectiveStatusFrom(): Argument #2 ($period) must be of type ?array, false given, called in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/index.php on line 1822 and defined in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/MembershipAccessService.php:89
+Stack trace:
+#0 /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/public_html/member/index.php(1822): App\Services\MembershipAccessService::effectiveStatusFrom(Array, false)
+#1 /private/tmp/claude-501/-Users-patorama-Documents-Vibe-Coding-Projects-Goldwing-Website/2bdc8d5f-4b23-4e66-b4aa-6c713abff579/scratchpad/render_member.php(61): require('/Users/patorama...')
+#2 {main}
+  thrown in /Users/patorama/Documents/Vibe Coding Projects/Goldwing Website/app/Services/MembershipAccessService.php on line 89

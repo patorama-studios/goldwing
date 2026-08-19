@@ -104,7 +104,7 @@ That last line matters: services like `StripeSettingsService` and `EmailService`
 | `APP_KEY` | `CryptoService` (Ch 10) | **Yes** | 32-byte base64 secret. Rotating it breaks every value already encrypted — see Gotchas. |
 | `APP_BASE_URL` | `config('base_url')`, email links | Yes | e.g. `https://goldwing.org.au`. Trailing slash stripped. |
 | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASS` `DB_CHARSET` | `config/database.php` | Effectively yes | Hard-coded production fallbacks exist — always set these in `.env.local`. |
-| `KIE_API_KEY` | AI page builder (Ch 24) | For AI features | Feeds `config('ai.api_key')` and `config('ai.providers.kie.api_key')`. |
+| `OPENROUTER_API_KEY` | AI page builder (Ch 24) | For AI features | Feeds `config('ai.api_key')` and `config('ai.providers.openrouter.api_key')`. |
 | `AI_DEFAULT_MODEL` | AI page builder | No | Defaults to `claude-sonnet-4-6`. |
 | `GOOGLE_OAUTH_CLIENT_ID` `GOOGLE_OAUTH_CLIENT_SECRET` `GOOGLE_OAUTH_REDIRECT_URI` | `config('auth.google')` | No | Placeholders until Google SSO ships. |
 | `APPLE_OAUTH_CLIENT_ID` `APPLE_OAUTH_TEAM_ID` `APPLE_OAUTH_KEY_ID` `APPLE_OAUTH_PRIVATE_KEY_PATH` `APPLE_OAUTH_REDIRECT_URI` | `config('auth.apple')` | No | Same. |
@@ -122,7 +122,7 @@ Static return array. Keys in current use:
 - `session.{name,secure,httponly,samesite,gc_maxlifetime}` — session cookie params plus the DB-session idle timeout. Bootstrap reads `samesite` from here (currently `Lax`, so the session cookie survives the Stripe return redirect) and applies `gc_maxlifetime` (default 7200s / 2h) as a **sliding** idle timeout — see Gotchas.
 - `email.{from,from_name}` — default `From:` headers. Most code reads SMTP from `settings_global` instead.
 - `stripe.{secret_key,webhook_secret,membership_prices.*}` — empty defaults; `StripeSettingsService` reads `settings_global` first.
-- `ai.{default_provider,default_model,provider,api_key,model,providers.kie.*}` — wired to `KIE_API_KEY` / `AI_DEFAULT_MODEL`.
+- `ai.{default_provider,default_model,provider,api_key,model,providers.openrouter.*}` — wired to `OPENROUTER_API_KEY` / `AI_DEFAULT_MODEL`.
 - `auth.{google,apple}.*` — OAuth credentials, all env-driven.
 
 Reads use `config('a.b.c', $default)`, which dot-walks the array. `config()` `require`s the file on every call (Ch 01).
@@ -178,5 +178,5 @@ This chapter doesn't own user-facing settings. The full catalogue of `settings_g
 - [03 — Database & migrations](view.php?slug=03-database-migrations) — what `DB_*` points at.
 - [10 — Encryption & secrets at rest](view.php?slug=10-encryption-secrets) — what `APP_KEY` does and how to rotate it.
 - [13 — Stripe integration overview](view.php?slug=13-stripe-overview) — how `STRIPE_*` interacts with `settings_global`.
-- [24 — AI page builder](view.php?slug=24-ai-page-builder) — what `KIE_API_KEY` and `AI_DEFAULT_MODEL` drive.
+- [24 — AI page builder](view.php?slug=24-ai-page-builder) — what `OPENROUTER_API_KEY` and `AI_DEFAULT_MODEL` drive.
 - [31 — Settings architecture](view.php?slug=31-settings-architecture) — the full Settings Hub model and key catalogue.

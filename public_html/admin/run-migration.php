@@ -3823,6 +3823,37 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MIGRATION 047 — AI page builder: kie.ai → OpenRouter
+// Deletes the stored kie.ai API key (provider removed from the codebase) and
+// resets provider/model settings. The old model ID 'claude-sonnet-4-6' is not
+// a valid OpenRouter ID, so the model must be reset or every AI call would 400.
+// A new OpenRouter key is pasted in via Admin → Settings → AI.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_047_ai_openrouter';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 047 — AI provider → OpenRouter', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $ok    = true;
+    $notes = [];
+    try {
+        $deleted = db()->exec("DELETE FROM ai_provider_keys WHERE provider = 'kie'");
+        $notes[] = $deleted ? 'kie.ai key deleted.' : 'No kie.ai key stored.';
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'ai_provider_keys: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'ai.provider', 'openrouter');
+        SettingsService::setGlobal((int) $user['id'], 'ai.model', 'deepseek/deepseek-chat');
+        $notes[] = 'Provider/model reset to openrouter / deepseek/deepseek-chat.';
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 047 — AI provider → OpenRouter', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MIGRATION 048 — unnumbered members hold NULL, not 0-0
 // members has UNIQUE (member_number_base, member_number_suffix), and every
 // unapproved applicant was inserted at 0-0 — so only ONE unnumbered pending
@@ -3861,6 +3892,48 @@ if ($alreadyRun) {
         }
     }
     $results[] = ['label' => 'Migration 048 — unnumbered members NULL not 0-0', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration 049 — associate life members (Aug 2026, member 950.1).
+// A linked associate can also be a life member. member_type stays ASSOCIATE
+// (keeps the household link + .1 number working); the new is_life_member flag
+// carries the life status: never lapses, no renewal reminders, no renewal
+// prompts. Also adds the "Associate Life" membership type so the admin
+// member-view dropdown can record it.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_049_associate_life_members';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 049 — associate life members', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $hasColumn = (bool) $pdo->query("SHOW COLUMNS FROM members LIKE 'is_life_member'")->fetchColumn();
+        if ($hasColumn) {
+            $notes[] = 'is_life_member column already present.';
+        } else {
+            $pdo->exec('ALTER TABLE members ADD COLUMN is_life_member TINYINT(1) NOT NULL DEFAULT 0 AFTER member_type');
+            $notes[] = 'members.is_life_member column added.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'ALTER: ' . $e->getMessage();
+    }
+    if ($ok) {
+        try {
+            $inserted = $pdo->exec("INSERT IGNORE INTO membership_types (name, billing_period, price_cents, is_active, created_at) VALUES ('Associate Life', 'one_off', 0, 1, NOW())");
+            $notes[] = $inserted ? '"Associate Life" membership type added.' : '"Associate Life" membership type already present.';
+            SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        } catch (\Throwable $e) {
+            $ok = false;
+            $notes[] = 'INSERT: ' . $e->getMessage();
+        }
+    }
+    $results[] = ['label' => 'Migration 049 — associate life members', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

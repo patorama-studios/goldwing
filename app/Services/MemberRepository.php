@@ -61,6 +61,32 @@ class MemberRepository
     }
 
     /**
+     * Life status lives in TWO places: member_type = 'LIFE' (a full life
+     * member) OR is_life_member = 1 (an associate granted life membership —
+     * member_type stays ASSOCIATE so the household link and .1 numbering keep
+     * working). Every "never lapses / no renewal" check must use this.
+     */
+    public static function isLifeMember(array $member): bool
+    {
+        return strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE'
+            || !empty($member['is_life_member']);
+    }
+
+    /**
+     * SQL fragment (members aliased `m`) excluding life members — both
+     * member_type LIFE and flagged associate-life. The flag clause is only
+     * added once the is_life_member column exists (pre-migration safe).
+     */
+    public static function notLifeSql(PDO $pdo): string
+    {
+        $sql = "UPPER(COALESCE(m.member_type, '')) <> 'LIFE'";
+        if (self::hasMemberColumn($pdo, 'is_life_member')) {
+            $sql .= ' AND COALESCE(m.is_life_member, 0) = 0';
+        }
+        return $sql;
+    }
+
+    /**
      * Build a YYYY-MM-DD date string from separate day/month/year parts
      * (as posted by the apply form's DOB dropdowns). Returns null if any part
      * is missing or the combination isn't a real calendar date.
@@ -216,7 +242,7 @@ class MemberRepository
         // Past expiry but still ACTIVE — the grace-period cohort the expire
         // cron hasn't flipped to LAPSED yet. These members appear in neither
         // the "expired" status counts nor the future-only expiring window.
-        $overdueSql = 'SELECT COUNT(*) FROM members m WHERE (SELECT MAX(mp.end_date) FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\') < CURDATE() AND LOWER(m.status) = \'active\' AND UPPER(COALESCE(m.member_type, \'\')) <> \'LIFE\'';
+        $overdueSql = 'SELECT COUNT(*) FROM members m WHERE (SELECT MAX(mp.end_date) FROM membership_periods mp WHERE mp.member_id = m.id AND mp.status = \'ACTIVE\') < CURDATE() AND LOWER(m.status) = \'active\' AND ' . self::notLifeSql($pdo);
         $overdueParams = $params;
         if ($whereClause !== '') {
             $overdueSql .= ' AND ' . $whereClause;
@@ -307,6 +333,8 @@ class MemberRepository
             'country' => 'country',
             'chapter_id' => 'chapter_id',
             'membership_type_id' => 'membership_type_id',
+            'member_type' => 'member_type',
+            'is_life_member' => 'is_life_member',
             'full_member_id' => 'full_member_id',
             'status' => 'status',
             'wings_preference' => 'wings_preference',
@@ -333,6 +361,15 @@ class MemberRepository
                     continue;
                 }
                 $value = $mapped;
+            }
+            if ($column === 'member_type') {
+                $value = strtoupper(trim((string) $value));
+                if (!in_array($value, ['FULL', 'ASSOCIATE', 'LIFE'], true)) {
+                    continue;
+                }
+            }
+            if ($column === 'is_life_member') {
+                $value = (int) (bool) $value;
             }
             $columnValues[$column] = $value === '' ? null : $value;
         }
@@ -463,6 +500,17 @@ class MemberRepository
             return true;
         }
         $pdo = Database::connection();
+        // Households share one inbox (the add-member wizard allows an associate
+        // to reuse the full member's address), so a member who already holds
+        // this address keeps it — otherwise their record can never be saved
+        // again. Only a *change* onto someone else's address is a conflict.
+        if ($excludeMemberId) {
+            $stmt = $pdo->prepare('SELECT id FROM members WHERE id = :id AND LOWER(email) = LOWER(:email) LIMIT 1');
+            $stmt->execute(['id' => $excludeMemberId, 'email' => $email]);
+            if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+                return true;
+            }
+        }
         $sql = 'SELECT id FROM members WHERE LOWER(email) = LOWER(:email)';
         $params = ['email' => $email];
         if ($excludeMemberId) {
@@ -671,7 +719,7 @@ class MemberRepository
                 // one must not list them here.
                 $parts[] = $latestActiveEnd . ' < CURDATE()';
                 $parts[] = "LOWER(m.status) = 'active'";
-                $parts[] = "UPPER(COALESCE(m.member_type, '')) <> 'LIFE'";
+                $parts[] = self::notLifeSql($pdo);
             } elseif ($expiringKey === 'expired') {
                 $statusValues = self::expandStatusFilter('expired');
                 $placeholders = [];

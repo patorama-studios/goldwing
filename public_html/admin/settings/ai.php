@@ -13,7 +13,7 @@ $user = current_user();
 $message = '';
 $error = '';
 
-$provider = 'kie';
+$provider = 'openrouter';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? '')) {
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $model = trim((string) ($_POST['model'] ?? ''));
         if ($model === '') {
-            $model = 'claude-sonnet-4-6';
+            $model = 'deepseek/deepseek-chat';
         }
         $apiKey = trim((string) ($_POST['api_key'] ?? ''));
         $imageEnabled = isset($_POST['image_generation_enabled']);
@@ -52,11 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-SettingsService::setGlobal((int) $user['id'], 'ai.provider', 'kie');
-$model = SettingsService::getGlobal('ai.model', 'claude-sonnet-4-6');
+SettingsService::setGlobal((int) $user['id'], 'ai.provider', 'openrouter');
+$model = SettingsService::getGlobal('ai.model', 'deepseek/deepseek-chat');
 if (!is_string($model) || trim((string) $model) === '') {
-    $model = 'claude-sonnet-4-6';
+    $model = 'deepseek/deepseek-chat';
 }
+$suggestedModels = config('ai.providers.openrouter.models', []);
 $imageEnabled = SettingsService::getGlobal('ai.image_generation_enabled', false);
 $monthlyCap = (float) SettingsService::getGlobal('ai.monthly_cap_usd', 50);
 $tokenRate = (float) SettingsService::getGlobal('ai.token_cost_usd', 0.01);
@@ -98,7 +99,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
             <div class="inline-flex items-center gap-2 rounded-full <?= $meta['configured'] ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700' ?> px-3 py-1.5 text-xs font-semibold whitespace-nowrap">
               <span class="h-2 w-2 rounded-full <?= $meta['configured'] ? 'bg-green-500' : 'bg-amber-500' ?>"></span>
-              <span>kie.ai &middot; <?= $meta['configured'] ? 'Connected' : 'Not connected' ?></span>
+              <span>OpenRouter &middot; <?= $meta['configured'] ? 'Connected' : 'Not connected' ?></span>
             </div>
           </div>
         </div>
@@ -115,24 +116,29 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
               <span class="material-icons-outlined text-slate-500">auto_awesome</span>
               <div>
                 <h2 class="font-display text-lg font-bold text-gray-900">Provider &amp; Model</h2>
-                <p class="text-sm text-slate-500">The AI page builder uses <strong>kie.ai</strong> with Claude Sonnet 4.6. It is restricted to creating and editing pages only and cannot modify site code or any other admin area.</p>
+                <p class="text-sm text-slate-500">The AI page builder uses <strong>OpenRouter</strong>, which gives access to every major model (DeepSeek, GPT, Gemini, Claude) through one API key. It is restricted to creating and editing pages only and cannot modify site code or any other admin area.</p>
               </div>
             </div>
             <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Provider</label>
-                <input type="text" value="kie.ai" readonly class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
-                <p class="mt-1 text-xs text-slate-400">Provider is fixed to kie.ai.</p>
+                <input type="text" value="OpenRouter" readonly class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                <p class="mt-1 text-xs text-slate-400">Provider is fixed to OpenRouter (openrouter.ai).</p>
               </div>
               <div>
                 <label for="ai_model" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Model</label>
-                <input id="ai_model" type="text" name="model" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" value="<?= e((string) $model) ?>" placeholder="claude-sonnet-4-6">
-                <p class="mt-1 text-xs text-slate-400">Default is <code>claude-sonnet-4-6</code> (Claude Sonnet 4.6 via kie.ai).</p>
+                <input id="ai_model" type="text" name="model" list="ai_model_options" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" value="<?= e((string) $model) ?>" placeholder="deepseek/deepseek-chat">
+                <datalist id="ai_model_options">
+                  <?php foreach ($suggestedModels as $suggested): ?>
+                    <option value="<?= e((string) $suggested) ?>"></option>
+                  <?php endforeach; ?>
+                </datalist>
+                <p class="mt-1 text-xs text-slate-400">Pick a suggestion or paste any model ID from <a href="https://openrouter.ai/models" target="_blank" rel="noopener" class="underline">openrouter.ai/models</a>. Default <code>deepseek/deepseek-chat</code> is cheap and strong; use a GPT/Gemini/Claude model if you attach design reference images (DeepSeek has no vision).</p>
               </div>
             </div>
             <div>
-              <label for="ai_api_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">kie.ai API Key</label>
-              <input id="ai_api_key" type="password" name="api_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" placeholder="<?= $meta['configured'] ? 'Key configured (last 4: ' . e((string) $meta['last4']) . ')' : 'Paste your kie.ai API key' ?>">
+              <label for="ai_api_key" class="text-xs font-semibold uppercase tracking-wider text-slate-500">OpenRouter API Key</label>
+              <input id="ai_api_key" type="password" name="api_key" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono" placeholder="<?= $meta['configured'] ? 'Key configured (last 4: ' . e((string) $meta['last4']) . ')' : 'Paste your OpenRouter API key (sk-or-...)' ?>">
               <p class="mt-1 text-xs text-slate-400">Stored encrypted. Leave blank to keep the existing key.</p>
             </div>
           </div>
@@ -161,8 +167,8 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
             </div>
             <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
               <div>
-                <div class="text-sm font-medium text-gray-900">Enable image generation via kie.ai</div>
-                <div class="text-xs text-slate-500">Allow the AI builder to request rendered images</div>
+                <div class="text-sm font-medium text-gray-900">Enable image generation</div>
+                <div class="text-xs text-slate-500">Not wired up yet — leave off. Use the media library for images.</div>
               </div>
               <input type="checkbox" name="image_generation_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= $imageEnabled ? 'checked' : '' ?>>
             </label>
@@ -192,7 +198,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
           <div class="sticky bottom-4 z-10 bg-card-light rounded-2xl border border-gray-100 shadow-soft p-4 flex flex-wrap items-center justify-between gap-3">
             <div class="text-xs text-slate-500 flex items-center gap-2">
               <span class="material-icons-outlined text-base text-slate-400">info</span>
-              kie.ai key is stored encrypted at rest.
+              OpenRouter key is stored encrypted at rest.
             </div>
             <div class="flex items-center gap-3">
               <a href="/admin/settings/ai.php" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2">Cancel</a>

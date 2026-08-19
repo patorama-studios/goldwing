@@ -160,6 +160,16 @@ function mapMembershipTypeName(string $name): string
     return 'FULL';
 }
 
+/**
+ * "Associate Life" maps to member_type ASSOCIATE (the link and .1 number keep
+ * working) with is_life_member = 1 carrying the life status. This detects the
+ * life half of any membership type name.
+ */
+function membershipTypeNameIsLife(string $name): bool
+{
+    return str_contains(strtoupper(trim($name)), 'LIFE');
+}
+
 function isSafeIdentifier(string $value): bool
 {
     return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $value);
@@ -516,6 +526,9 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     }
 
     $memberTypeCode = $forceMemberTypeCode ?: mapMembershipTypeName((string) $membershipType['name']);
+    // "Associate Life" keeps code ASSOCIATE but is a life membership: LIFE
+    // term, no end date, is_life_member flag set on the member row.
+    $isLifeMembership = $memberTypeCode === 'LIFE' || membershipTypeNameIsLife((string) $membershipType['name']);
     $memberStatus = match ($membershipStatus) {
         'pending' => 'PENDING',
         'lapsed' => 'LAPSED',
@@ -530,7 +543,7 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
     $startValue = DateTime::createFromFormat('Y-m-d', $startDate);
     $startDate = $startValue ? $startValue->format('Y-m-d') : date('Y-m-d');
     $endDate = null;
-    if ($memberTypeCode !== 'LIFE') {
+    if (!$isLifeMembership) {
         $endValue = $renewalDate !== '' ? DateTime::createFromFormat('Y-m-d', $renewalDate) : null;
         // Rollover-aware, matching the paid new-join path: a 3-year add in the
         // Jun/Jul rollover window must land 3 whole membership years out, not
@@ -548,10 +561,14 @@ function createMembershipForMember(\PDO $pdo, int $memberId, array $params, ?arr
         $updateFields = 'membership_type_id = :membership_type_id, ' . $updateFields;
         $updateParams['membership_type_id'] = $membershipTypeId;
     }
+    if (MemberRepository::hasMemberColumn($pdo, 'is_life_member')) {
+        $updateFields = 'is_life_member = :is_life_member, ' . $updateFields;
+        $updateParams['is_life_member'] = ($isLifeMembership && $memberTypeCode !== 'LIFE') ? 1 : 0;
+    }
     $stmt = $pdo->prepare('UPDATE members SET ' . $updateFields . ' WHERE id = :id');
     $stmt->execute($updateParams);
 
-    $term = $memberTypeCode === 'LIFE' ? 'LIFE' : ($termYears . 'Y');
+    $term = $isLifeMembership ? 'LIFE' : ($termYears . 'Y');
     $paidAt = ($periodStatus === 'ACTIVE') ? date('Y-m-d H:i:s') : null;
     $stmt = $pdo->prepare('INSERT INTO membership_periods (member_id, term, start_date, end_date, status, paid_at, created_at) VALUES (:member_id, :term, :start_date, :end_date, :status, :paid_at, NOW())');
     $stmt->execute([
@@ -1040,6 +1057,33 @@ switch ($action) {
             }
             if (array_key_exists('membership_type_id', $_POST)) {
                 $payload['membership_type_id'] = $_POST['membership_type_id'] !== '' ? (int) $_POST['membership_type_id'] : null;
+                // The live members table has no membership_type_id column, so
+                // persisting ONLY that id silently reverted every type change
+                // (Aug 2026: associate life member 950.1). Derive the real
+                // member_type + is_life_member columns from the selected type
+                // name and save those. "Associate Life" = ASSOCIATE + flag.
+                if ($payload['membership_type_id'] !== null) {
+                    $typeStmt = Database::connection()->prepare('SELECT name FROM membership_types WHERE id = :id LIMIT 1');
+                    $typeStmt->execute(['id' => $payload['membership_type_id']]);
+                    $selectedTypeName = (string) ($typeStmt->fetchColumn() ?: '');
+                    if ($selectedTypeName !== '') {
+                        $newTypeCode = mapMembershipTypeName($selectedTypeName);
+                        $currentTypeCode = strtoupper((string) ($targetMember['member_type'] ?? ''));
+                        $isLinkedAssociate = $currentTypeCode === 'ASSOCIATE' && !empty($targetMember['full_member_id']);
+                        // Guard structural moves: an associate's link + .1 number
+                        // and a full member's base number can't be rewritten from
+                        // a dropdown. Life-ness may change freely; associate-ness
+                        // may not (use the upgrade/link flows for that).
+                        if ($isLinkedAssociate && $newTypeCode !== 'ASSOCIATE') {
+                            redirectWithFlash($memberId, $tab, 'This member is a linked associate. To make them a life member keep the Associate Life type; to convert them to a Full/Life member in their own right, unlink or upgrade them first.', 'error', $redirectExtras);
+                        }
+                        if (in_array($currentTypeCode, ['FULL', 'LIFE'], true) && $newTypeCode === 'ASSOCIATE') {
+                            redirectWithFlash($memberId, $tab, 'This member holds their own membership number. Converting them to an associate needs the associate linking flow, not the type dropdown.', 'error', $redirectExtras);
+                        }
+                        $payload['member_type'] = $newTypeCode;
+                        $payload['is_life_member'] = ($newTypeCode !== 'LIFE' && membershipTypeNameIsLife($selectedTypeName)) ? 1 : 0;
+                    }
+                }
             }
             if (array_key_exists('status', $_POST)) {
                 $status = $_POST['status'];
@@ -1824,12 +1868,24 @@ switch ($action) {
                 $normalizedRenewal = $parsed->format('Y-m-d');
             }
         }
-        if (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') {
+        if (MemberRepository::isLifeMember($member)) {
             $normalizedRenewal = null;
         }
         $stmt = $pdo->prepare('SELECT id, end_date FROM membership_periods WHERE member_id = :member_id ORDER BY start_date DESC, id DESC LIMIT 1');
         $stmt->execute(['member_id' => $memberId]);
         $period = $stmt->fetch();
+        if (!$period && $normalizedRenewal !== null) {
+            // A member can reach here with no period at all (a paid order that
+            // never had one attached). Refusing the edit left the only manual
+            // way to set their renewal date closed, so create the period the
+            // date belongs to instead.
+            $newPeriodId = MembershipService::createMembershipPeriod($memberId, '1Y', date('Y-m-d'));
+            $stmt->execute(['member_id' => $memberId]);
+            $period = $stmt->fetch();
+            ActivityLogger::log('admin', $user['id'] ?? null, $memberId, 'membership.period_created_for_renewal_edit', [
+                'period_id' => $newPeriodId,
+            ]);
+        }
         if (!$period) {
             redirectWithFlash($memberId, $tab, 'No membership period found.', 'error');
         }

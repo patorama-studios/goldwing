@@ -174,7 +174,7 @@ Each of these owns a part of the site and gets its own chapter. This is the inde
 | Memberships & renewals | `app/Services/MembershipService.php`, `cron/expire_memberships.php` | [19](view.php?slug=19-membership-lifecycle) |
 | Members admin console | `public_html/admin/members/`, `AdminMemberAccess` | [20](view.php?slug=20-members-admin) |
 | Notifications & email | `app/Services/EmailService.php`, `SmtpMailer.php` | [22](view.php?slug=22-notifications-email) |
-| Pages, navigation, AI page builder | `PageService`, `PageBuilderService`, `AiService` (kie.ai) | [23](view.php?slug=23-pages-navigation)–[24](view.php?slug=24-ai-page-builder) |
+| Pages, navigation, AI page builder | `PageService`, `PageBuilderService`, `OpenRouterProvider` (OpenRouter) | [23](view.php?slug=23-pages-navigation)–[24](view.php?slug=24-ai-page-builder) |
 | Store | `public_html/admin/store/`, `OrderService` | [27](view.php?slug=27-store-architecture)–[30](view.php?slug=30-catalogue-import) |
 | Settings Hub | `SettingsService`, `settings_global` / `settings_user` tables | [31](view.php?slug=31-settings-architecture)–[32](view.php?slug=32-settings-by-section) |
 | Tours (UI walkthroughs) | `TourService`, `config/tour-manifest.json` | [36](view.php?slug=36-tours-system) |
@@ -184,7 +184,7 @@ Each of these owns a part of the site and gets its own chapter. This is the inde
 Most of these are admin pages — you change behaviour through the UI, and the underlying code reads the change out of the `settings_global` table. The exceptions are:
 
 - **`config/app.php`** — for things that *can't* live in a database (the Stripe secret-key fallback, Google/Apple OAuth credentials, default AI model). Edit on disk and redeploy.
-- **`.env` / `.env.local`** — `APP_KEY` (used for encrypting Stripe keys at rest), `KIE_API_KEY`, `AI_DEFAULT_MODEL`, OAuth env overrides. **Never commit `.env*` to git.**
+- **`.env` / `.env.local`** — `APP_KEY` (used for encrypting Stripe keys at rest), `OPENROUTER_API_KEY`, `AI_DEFAULT_MODEL`, OAuth env overrides. **Never commit `.env*` to git.**
 - **`config/database.php`** — DB host, name, user, password. Edited per environment on the server.
 
 ### Settings
@@ -218,4 +218,4 @@ Reads go through `App\Services\SettingsService::getGlobal('site.timezone', 'Aust
 - [03 — Database & migrations](view.php?slug=03-database-migrations) — schema, migration approach, the SQL files.
 - [04 — Configuration & environment](view.php?slug=04-configuration) — `.env`, `config/app.php`, what overrides what.
 - [33 — Deployment](view.php?slug=33-deployment) — the "push live" flow end-to-end.
-- [A — Decision log](view.php?slug=A-decision-log) — why no framework, why kie.ai, why custom 2FA.
+- [A — Decision log](view.php?slug=A-decision-log) — why no framework, why OpenRouter, why custom 2FA.

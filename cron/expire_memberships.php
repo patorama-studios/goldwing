@@ -8,7 +8,10 @@ $pdo = db();
 // GRACE_MONTHS, then this flips them to LAPSED. Reading the constant keeps the
 // cron's flip aligned with the "still active" window in MembershipAccessService.
 $graceMonths = (int) \App\Services\MembershipAccessService::GRACE_MONTHS;
-$stmt = $pdo->prepare("SELECT id, member_id FROM membership_periods WHERE status = 'ACTIVE' AND end_date < (CURDATE() - INTERVAL $graceMonths MONTH)");
+// Life members (member_type LIFE, or an associate with is_life_member set)
+// never lapse — a stale dated period on one must not flip them to LAPSED.
+$notLife = \App\Services\MemberRepository::notLifeSql($pdo);
+$stmt = $pdo->prepare("SELECT mp.id, mp.member_id FROM membership_periods mp JOIN members m ON m.id = mp.member_id WHERE mp.status = 'ACTIVE' AND mp.end_date < (CURDATE() - INTERVAL $graceMonths MONTH) AND $notLife");
 $stmt->execute();
 $periods = $stmt->fetchAll();
 

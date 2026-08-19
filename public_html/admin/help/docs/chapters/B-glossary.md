@@ -12,7 +12,7 @@ If you find a term in another chapter that isn't defined here, add it. Keep entr
 - **Activity log** — The `activity_log` table — records member-targeted admin actions (refunds, profile changes, password resets, etc.). Distinct from audit_log. See [08 — Activity & audit log](view.php?slug=08-activity-audit).
 - **Admin** — The top-tier built-in role with site-wide powers. See [07 — Roles & permissions](view.php?slug=07-roles-permissions).
 - **Admin Role Builder** — UI at `/admin/settings/roles.php` for defining custom admin roles and their permission sets.
-- **AI page builder** — Visual/chat-driven page editor under `/admin/page-builder/`, locked to kie.ai. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
+- **AI page builder** — Visual/chat-driven page editor under `/admin/page-builder/`, backed by OpenRouter. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
 - **APP_KEY** — Required env var; encryption key for every secret stored at rest. Lose it, lose access to all encrypted Stripe keys, SMTP passwords, and TOTP secrets. See [10 — Encryption & secrets](view.php?slug=10-encryption-secrets).
 - **Area rep** — Built-in role: an admin scoped to a single chapter. Sees only their chapter's members and events. See [21 — Chapters & area reps](view.php?slug=21-chapters-area-reps).
 - **AUD** — Australian dollars. The site's only currency. Stored in cents internally.
@@ -38,7 +38,7 @@ If you find a term in another chapter that isn't defined here, add it. Keep entr
 - **Idempotency (webhook)** — Property that lets Stripe re-deliver a webhook without producing duplicate side effects. Enforced via the `webhook_events.stripe_event_id` UNIQUE constraint. See [16 — Webhooks & idempotency](view.php?slug=16-webhooks-idempotency).
 - **Impersonation** — Admin feature that lets staff act as a specific member (debugging support cases). Logged to `activity_log`; member-portal shows a banner. See [20 — Members admin console](view.php?slug=20-members-admin).
 - **Integrations** — Settings Hub section for SMTP, Resend, and similar external service credentials. See [32 — Settings by section](view.php?slug=32-settings-by-section).
-- **kie.ai** — The AI provider the page builder is hard-locked to. Key stored encrypted via `AiProviderKeyService`. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
+- **OpenRouter** — The AI gateway the page builder is hard-locked to (one API key, any major model — DeepSeek, GPT, Gemini, Claude). Key stored encrypted via `AiProviderKeyService`. Replaced kie.ai in Jul 2026. See [24 — AI page builder](view.php?slug=24-ai-page-builder).
 - **Lapsed** — Membership state after the expiry date passes without renewal. Set by `cron/expire_memberships.php`. See [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
 - **Life member** — Permanent membership with no expiry. See [19 — Membership lifecycle](view.php?slug=19-membership-lifecycle).
 - **Login rate limiter** — Tracks failed login attempts per IP and per account; locks out after configured thresholds. See [12 — Login rate limiting & lockout](view.php?slug=12-rate-limit-lockout).

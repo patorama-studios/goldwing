@@ -140,18 +140,16 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | File | Job |
 |---|---|
 | `PageService.php` | Public CMS-page CRUD. |
-| `PageSchemaService.php` | Block schema (hero, columns, gallery…). |
-| `PageBuilderService.php` | Drag-and-drop orchestration. |
-| `AiPageBuilderService.php`, `PageAiRevisionService.php` | AI prompt → diff + history. |
+| `PageBuilderService.php` | Draft HTML element tagging + swaps for the AI builder. |
 | `NavigationService.php` | Menu locations + nested items. |
 | `MediaService.php` | Uploads, thumbnails, library. |
-| `DomSnapshotService.php`, `UnifiedDiffService.php` | Snapshot + diff for AI editor. |
+| `DomSnapshotService.php` | DOM sanitiser used by admin/member dashboards. |
 | `EventService.php`, `EventRsvpRepository.php` | Public events + RSVPs. |
 | `DownloadLogRepository.php` | Wings PDF download tracking. |
 
 **Notifications & Comms** — `NotificationService.php` (what gets sent, to whom), `NotificationPreferenceService.php` (opt-outs), `EmailService.php` (templated render + send), `SmtpMailer.php` (raw transport), `EmailPreferencesTokenService.php` (one-click unsubscribe), `SmsService.php` (placeholder), `NoticeService.php` (on-site banners).
 
-**AI** — `AiService.php` (frontline calls), `AiProviderKeyService.php` (encrypted keys), and `AiProviders/` holding `AiProviderInterface.php`, `AiProviderFactory.php`, and `KieAiProvider.php` (the only real provider today).
+**AI** — `AiProviderKeyService.php` (encrypted keys) and `AiProviders/` holding `AiProviderInterface.php`, `AiProviderFactory.php`, and `OpenRouterProvider.php` (the only provider; prompt-building lives in `public_html/admin/page-builder/api.php`).
 
 **Settings, Activity, Infra**
 

@@ -73,7 +73,7 @@ For the narrative version — "here's the runtime, here's where the code lives" 
 
 **Consequences.** Switching vendors is a code change plus a new adapter, not a settings toggle. One vendor to negotiate with, one set of model names to track. Documented in [Chapter 24](view.php?slug=24-ai-page-builder) and called out in [DEPLOY.md](../../../../DEPLOY.md).
 
-**Status.** Active.
+**Status.** Superseded by [decision 15](#15-ai-page-builder-moved-to-openrouter-kieai-removed) (Jul 2026).
 
 ### 7. Stripe as the sole payments provider
 
@@ -152,6 +152,16 @@ For the narrative version — "here's the runtime, here's where the code lives" 
 **Decision.** Deploys go exclusively through cPanel's git pull from `origin/main`. FTP scripts (`scripts/ftp_upload.py`, `ftp_upload2.py`, etc.) are kept on disk for true emergencies only — they are never the normal path. Destructive git commands on the server are forbidden.
 
 **Consequences.** Developers must remember the discipline. The reward is a clean, reproducible deploy history and a working tree that always matches a commit hash. See [Chapter 33](view.php?slug=33-deployment).
+
+**Status.** Active.
+
+### 15. AI page builder moved to OpenRouter; kie.ai removed
+
+**Context.** kie.ai is a third-party reseller with no accountability if it flakes, and its Claude-only lock-in made model cost a vendor decision instead of ours. The committee will own the AI account/key going forward, so the provider needed to be a mainstream gateway where one key reaches every major model and cheap models (DeepSeek) can carry the routine page-editing load.
+
+**Decision.** One adapter, `OpenRouterProvider`, speaking the OpenAI chat format against `openrouter.ai/api/v1/chat/completions`. Model is free-choice: any OpenRouter model ID, entered in Settings → AI (default `deepseek/deepseek-chat`). The legacy block-schema flow (`/api/pages.php`, `AiService`, `AiPageBuilderService`, `PageAiRevisionService`, `PageSchemaService`, `UnifiedDiffService`) and `KieAiProvider` were deleted outright — it had no UI caller and bypassed the monthly usage cap. Migration 047 wipes the stored kie key and resets provider/model settings.
+
+**Consequences.** One key, any model, cost reported per-call by OpenRouter (`usage.cost`) so the monthly cap meters real spend instead of estimates. Vision (design-reference images) now depends on the chosen model — DeepSeek is text-only. The `ai_conversations` / `ai_messages` tables are orphaned by the deletion (kept, inert). See [Chapter 24](view.php?slug=24-ai-page-builder).
 
 **Status.** Active.
 

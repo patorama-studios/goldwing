@@ -142,7 +142,9 @@ class MembershipAccessService
 
         try {
             $pdo = db();
-            $stmt = $pdo->prepare('SELECT status, member_type FROM members WHERE id = :id LIMIT 1');
+            $lifeFlagSelect = MemberRepository::hasMemberColumn($pdo, 'is_life_member')
+                ? ', is_life_member' : '';
+            $stmt = $pdo->prepare('SELECT status, member_type' . $lifeFlagSelect . ' FROM members WHERE id = :id LIMIT 1');
             $stmt->execute([':id' => $memberId]);
             $member = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$member) {
@@ -152,8 +154,9 @@ class MembershipAccessService
             $memberType = strtoupper((string) ($member['member_type'] ?? ''));
             $result['member_type'] = $memberType;
 
-            // LIFE members never lapse — no renewal, no lockdown.
-            if ($memberType === 'LIFE') {
+            // Life members never lapse — no renewal, no lockdown. Covers both
+            // member_type LIFE and associate-life (is_life_member flag).
+            if (MemberRepository::isLifeMember($member)) {
                 $result['reason'] = 'life';
                 return self::$stateCache[$cacheKey] = $result;
             }

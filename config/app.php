@@ -32,16 +32,25 @@ return [
         ],
     ],
     'ai' => [
-        'default_provider' => 'kie',
-        'default_model' => getenv('AI_DEFAULT_MODEL') ?: 'claude-sonnet-4-6',
-        'provider' => 'kie',
-        'api_key' => getenv('KIE_API_KEY') ?: '',
-        'model' => getenv('AI_DEFAULT_MODEL') ?: 'claude-sonnet-4-6',
+        'default_provider' => 'openrouter',
+        'default_model' => getenv('AI_DEFAULT_MODEL') ?: 'deepseek/deepseek-chat',
+        'provider' => 'openrouter',
+        'api_key' => getenv('OPENROUTER_API_KEY') ?: '',
+        'model' => getenv('AI_DEFAULT_MODEL') ?: 'deepseek/deepseek-chat',
         'providers' => [
-            'kie' => [
-                'label' => 'kie.ai',
-                'api_key' => getenv('KIE_API_KEY') ?: '',
-                'models' => ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5'],
+            'openrouter' => [
+                'label' => 'OpenRouter',
+                'api_key' => getenv('OPENROUTER_API_KEY') ?: '',
+                // Suggestions only — any model ID from openrouter.ai/models works.
+                'models' => [
+                    'deepseek/deepseek-chat',
+                    'deepseek/deepseek-r1',
+                    'openai/gpt-4.1-mini',
+                    'openai/gpt-5-mini',
+                    'google/gemini-2.5-flash',
+                    'anthropic/claude-haiku-4.5',
+                    'anthropic/claude-sonnet-4.5',
+                ],
             ],
         ],
     ],

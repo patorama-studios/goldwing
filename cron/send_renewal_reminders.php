@@ -9,12 +9,14 @@ $pdo = db();
 $intervals = [60, 30];
 
 foreach ($intervals as $days) {
-    $stmt = $pdo->prepare('SELECT mp.*, m.email, m.phone, m.first_name, m.member_type FROM membership_periods mp JOIN members m ON m.id = mp.member_id WHERE mp.status = "ACTIVE" AND mp.end_date = DATE_ADD(CURDATE(), INTERVAL :days DAY) AND NOT EXISTS (SELECT 1 FROM membership_periods mp2 WHERE mp2.member_id = mp.member_id AND mp2.status = "ACTIVE" AND mp2.end_date > mp.end_date)');
+    $lifeFlagSelect = \App\Services\MemberRepository::hasMemberColumn($pdo, 'is_life_member')
+        ? ', m.is_life_member' : '';
+    $stmt = $pdo->prepare('SELECT mp.*, m.email, m.phone, m.first_name, m.member_type' . $lifeFlagSelect . ' FROM membership_periods mp JOIN members m ON m.id = mp.member_id WHERE mp.status = "ACTIVE" AND mp.end_date = DATE_ADD(CURDATE(), INTERVAL :days DAY) AND NOT EXISTS (SELECT 1 FROM membership_periods mp2 WHERE mp2.member_id = mp.member_id AND mp2.status = "ACTIVE" AND mp2.end_date > mp.end_date)');
     $stmt->execute(['days' => $days]);
     $periods = $stmt->fetchAll();
 
     foreach ($periods as $period) {
-        if ($period['member_type'] === 'LIFE') {
+        if (\App\Services\MemberRepository::isLifeMember($period)) {
             continue;
         }
         $check = $pdo->prepare('SELECT id FROM renewal_reminders WHERE period_id = :period_id AND reminder_type = :type');

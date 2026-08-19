@@ -3,7 +3,6 @@ require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\AiProviderKeyService;
 use App\Services\AiProviders\AiProviderFactory;
-use App\Services\AiProviders\KieAiProvider;
 use App\Services\AuditService;
 use App\Services\Csrf;
 use App\Services\PageBuilderService;
@@ -11,8 +10,8 @@ use App\Services\PageService;
 use App\Services\SettingsService;
 use App\Services\MediaService;
 
-const AI_PROVIDER = 'kie';
-const AI_DEFAULT_MODEL = 'claude-sonnet-4-6';
+const AI_PROVIDER = 'openrouter';
+const AI_DEFAULT_MODEL = 'deepseek/deepseek-chat';
 
 function ai_scope_lock_prompt(): string
 {
@@ -150,14 +149,11 @@ function default_template_html(string $scope): string
     return '';
 }
 
-function generate_image_kie(string $prompt): array
+function generate_image_ai(string $prompt): array
 {
-    $apiKey = AiProviderKeyService::getKey('kie') ?? config('ai.providers.kie.api_key', '');
-    if ($apiKey === '' || $apiKey === null) {
-        return ['ok' => false, 'error' => 'kie.ai API key not configured.'];
-    }
-    $provider = new KieAiProvider($apiKey);
-    return $provider->generateImage($prompt);
+    // ponytail: image generation was never wired up; to add it, call an
+    // image-capable OpenRouter model here and upload the result to media.
+    return ['ok' => false, 'error' => 'Image generation is not available. Use the media library instead.'];
 }
 
 function normalize_reference_image_url(string $url): ?string
@@ -239,8 +235,9 @@ function usage_cost_from_raw(string $provider, array $raw, float $ratePer1k): ar
         ?? (($usage['input_tokens'] ?? 0) + ($usage['output_tokens'] ?? 0)
             ?: ($usage['prompt_tokens'] ?? 0) + ($usage['completion_tokens'] ?? 0)));
     $usd = 0.0;
-    if (isset($raw['credits_consumed'])) {
-        $usd = (float) $raw['credits_consumed'];
+    if (isset($usage['cost'])) {
+        // OpenRouter reports the actual USD cost when usage.include is requested.
+        $usd = (float) $usage['cost'];
     } elseif ($tokens > 0) {
         $usd = ($tokens / 1000.0) * $ratePer1k;
     }
@@ -627,7 +624,7 @@ if ($method === 'POST') {
         }
         $client = AiProviderFactory::make($provider);
         if (!$client) {
-            json_response(['error' => 'kie.ai is not configured. Add an API key in AI Settings.'], 400);
+            json_response(['error' => 'OpenRouter is not configured. Add an API key in AI Settings.'], 400);
         }
 
         $guardrails = (string) SettingsService::getGlobal('ai.guardrails', '');
@@ -823,7 +820,7 @@ if ($method === 'POST') {
         }
         $client = AiProviderFactory::make($provider);
         if (!$client) {
-            json_response(['error' => 'kie.ai is not configured. Add an API key in AI Settings.'], 400);
+            json_response(['error' => 'OpenRouter is not configured. Add an API key in AI Settings.'], 400);
         }
         if ($referenceImageUrl !== null && !$client->supportsVision()) {
             json_response(['error' => 'Vision input is not available for the selected model.'], 400);
@@ -966,7 +963,7 @@ if ($method === 'POST') {
         if (!$enabled) {
             json_response(['error' => 'Image generation is disabled.'], 400);
         }
-        $result = generate_image_kie($prompt);
+        $result = generate_image_ai($prompt);
         if (!$result['ok']) {
             json_response(['error' => $result['error']], 500);
         }

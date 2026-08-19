@@ -200,7 +200,8 @@ foreach ($members as $member) {
         $member['date_of_birth'] ?? '',
         $member['join_date'] ?? '',
         $expiryByMember[$mid] ?? '',
-        $member['member_type'] ?? '',
+        (strtoupper((string) ($member['member_type'] ?? '')) === 'ASSOCIATE' && !empty($member['is_life_member']))
+            ? 'ASSOCIATE LIFE' : ($member['member_type'] ?? ''),
         $member['wings_preference'] ?? '',
         !empty($member['do_not_renew']) ? 'yes' : 'no',
         $bike['make'] ?? '',

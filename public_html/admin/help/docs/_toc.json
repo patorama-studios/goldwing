@@ -66,8 +66,8 @@
       "title": "Part 6 — Content",
       "blurb": "Public pages, navigation, the AI page builder, media, and events.",
       "chapters": [
-        { "slug": "23-pages-navigation",      "title": "Pages, navigation & menus",        "file": "chapters/23-pages-navigation.md",      "watched_files": ["app/Services/PageService.php", "app/Services/NavigationService.php", "app/Services/PageSchemaService.php", "public_html/admin/pages/", "public_html/admin/navigation.php"] },
-        { "slug": "24-ai-page-builder",       "title": "AI page builder",                  "file": "chapters/24-ai-page-builder.md",       "watched_files": ["app/Services/PageBuilderService.php", "app/Services/AiPageBuilderService.php", "app/Services/AiService.php", "app/Services/AiProviderKeyService.php", "app/Services/AiProviders/", "app/Services/DomSnapshotService.php", "app/Services/UnifiedDiffService.php", "public_html/admin/page-builder/", "public_html/admin/ai_editor.php"] },
+        { "slug": "23-pages-navigation",      "title": "Pages, navigation & menus",        "file": "chapters/23-pages-navigation.md",      "watched_files": ["app/Services/PageService.php", "app/Services/NavigationService.php", "public_html/admin/pages/", "public_html/admin/navigation.php"] },
+        { "slug": "24-ai-page-builder",       "title": "AI page builder",                  "file": "chapters/24-ai-page-builder.md",       "watched_files": ["app/Services/PageBuilderService.php", "app/Services/AiProviderKeyService.php", "app/Services/AiProviders/", "public_html/admin/page-builder/", "public_html/admin/ai_editor.php", "public_html/admin/settings/ai.php"] },
         { "slug": "25-media-library",         "title": "Media library",                    "file": "chapters/25-media-library.md",         "watched_files": ["app/Services/MediaService.php", "public_html/uploads/"] },
         { "slug": "26-events-rsvps",          "title": "Events & RSVPs",                   "file": "chapters/26-events-rsvps.md",          "watched_files": ["app/Services/EventService.php", "app/Services/EventRsvpRepository.php", "calendar/", "public_html/calendar/"] }
       ]

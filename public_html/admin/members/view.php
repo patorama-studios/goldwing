@@ -182,21 +182,30 @@ foreach ($roleOptions as $roleOption) {
   }
 }
 
-$allowedMembershipNames = ['Life', 'Full', 'Associate'];
+$allowedMembershipNames = ['Life', 'Full', 'Associate', 'Associate Life'];
 $membershipTypes = array_values(array_filter($membershipTypes, fn($type) => in_array($type['name'] ?? '', $allowedMembershipNames, true)));
 usort($membershipTypes, fn($a, $b) => array_search($a['name'] ?? '', $allowedMembershipNames, true) <=> array_search($b['name'] ?? '', $allowedMembershipNames, true));
 
-$selectedMembershipTypeId = null;
-if (array_key_exists('membership_type_id', $member)) {
-  $selectedMembershipTypeId = $member['membership_type_id'] !== null ? (int) $member['membership_type_id'] : null;
-} elseif (!empty($member['member_type'])) {
-  $memberTypeKey = strtoupper($member['member_type'] ?? '');
-  foreach ($membershipTypes as $type) {
-    if (strtoupper($type['name'] ?? '') === $memberTypeKey) {
-      $selectedMembershipTypeId = (int) $type['id'];
-      break;
-    }
+// The saved member_type (+ is_life_member for associate life) is the source
+// of truth — the membership_type_id column doesn't exist on the live DB, so
+// deriving the selection from it showed stale "Associate" after type changes.
+$memberTypeLabelFor = static function (array $m): string {
+  $code = strtoupper((string) ($m['member_type'] ?? ''));
+  if ($code === 'ASSOCIATE' && !empty($m['is_life_member'])) {
+    return 'Associate Life';
   }
+  return $code !== '' ? ucfirst(strtolower($code)) : 'Member';
+};
+$selectedMembershipTypeId = null;
+$memberTypeNameKey = $memberTypeLabelFor($member);
+foreach ($membershipTypes as $type) {
+  if (strcasecmp($type['name'] ?? '', $memberTypeNameKey) === 0) {
+    $selectedMembershipTypeId = (int) $type['id'];
+    break;
+  }
+}
+if ($selectedMembershipTypeId === null && array_key_exists('membership_type_id', $member) && $member['membership_type_id'] !== null) {
+  $selectedMembershipTypeId = (int) $member['membership_type_id'];
 }
 
 $directoryPrefs = MemberRepository::directoryPreferences();
@@ -361,7 +370,7 @@ $profileMemberNumber = $profileMember['member_number_display'] ?? ($profileMembe
 if ($profileMemberNumber === '') {
   $profileMemberNumber = '—';
 }
-$profileMembershipTypeLabel = $profileMember['membership_type_name'] ?? ucfirst(strtolower((string) ($profileMember['member_type'] ?? 'Member')));
+$profileMembershipTypeLabel = $memberTypeLabelFor($profileMember);
 $profileStatusLabel = ucfirst(strtolower((string) ($profileMember['status'] ?? 'pending')));
 $profileChapterLabel = $profileMember['chapter_name'] ?? 'Unassigned';
 $profileJoinedLabel = formatDate($profileMember['join_date'] ?? $profileMember['created_at'] ?? null);
@@ -423,7 +432,7 @@ if ($migrationEnabled && !empty($member['manual_migration_disabled'])) {
     }
   }
 }
-$membershipTypeLabel = $member['membership_type_name'] ?? ucfirst(strtolower((string) ($member['member_type'] ?? 'Member')));
+$membershipTypeLabel = $memberTypeLabelFor($member);
 $membershipStatusKey = strtolower((string) ($member['status'] ?? 'pending'));
 $membershipStatusLabel = ucfirst($membershipStatusKey);
 $memberStatusForSelect = match ($membershipStatusKey) {
@@ -432,7 +441,7 @@ $memberStatusForSelect = match ($membershipStatusKey) {
   default => $membershipStatusKey,
 };
 $lastPaymentDateLabel = $latestPayment ? formatDateTime($latestPayment['paid_at'] ?? $latestPayment['created_at'] ?? null) : '—';
-$renewalDateLabel = (strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE') ? 'N/A' : formatDate($membershipPeriod['end_date'] ?? null);
+$renewalDateLabel = MemberRepository::isLifeMember($member) ? 'N/A' : formatDate($membershipPeriod['end_date'] ?? null);
 $paymentMethodLabel = $latestPayment ? ($latestPayment['payment_method'] ?? '') : '';
 $paymentMethodLabel = $paymentMethodLabel !== '' ? ucwords(str_replace('_', ' ', $paymentMethodLabel)) : '—';
 $paymentStatusLabel = $latestPayment ? ($latestPayment['payment_status'] ?? '') : '';
@@ -723,7 +732,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
         </div>
       <?php endif; ?>
 
-      <?php $isAdminViewLifeMember = strtoupper((string) ($member['member_type'] ?? '')) === 'LIFE'; ?>
+      <?php $isAdminViewLifeMember = MemberRepository::isLifeMember($member); ?>
       <section class="rounded-2xl border <?= $isAdminViewLifeMember ? 'border-yellow-300' : 'border-gray-200' ?> bg-white shadow-sm">
         <div class="border-b <?= $isAdminViewLifeMember ? 'border-yellow-200 bg-yellow-50' : 'border-gray-100' ?> px-8 py-6">
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
@@ -754,7 +763,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                     </h1>
                     <?php if ($isAdminViewLifeMember): ?>
                       <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-200 text-yellow-800 text-xs font-bold uppercase tracking-wide">
-                        <span class="material-icons-outlined text-[12px]">star</span>Life Member
+                        <span class="material-icons-outlined text-[12px]">star</span><?= e($membershipTypeLabel === 'Life' ? 'Life Member' : $membershipTypeLabel) ?>
                       </span>
                     <?php endif; ?>
                   </div>

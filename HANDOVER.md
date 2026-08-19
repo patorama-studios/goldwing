@@ -17,7 +17,7 @@ The goal: after handover day the **committee owns every account and credential**
 | 4 | Stripe account | Card payments, refunds, payouts to the club bank account | *(fill in — confirm owner email)* | Committee (treasurer + webmaster as admins) | ☐ |
 | 5 | Site mailbox / SMTP login | The mailbox the site sends from | *(fill in)* | Webmaster | ☐ |
 | 6 | Google Cloud project | Google Maps API key (address autocomplete) | *(fill in)* | Webmaster | ☐ |
-| 7 | kie.ai account | AI page-builder credits (optional service) | *(fill in)* | Webmaster (or close it) | ☐ |
+| 7 | OpenRouter account (openrouter.ai) | AI page-builder credits (optional service) | *(fill in)* | Webmaster (or close it) | ☐ |
 | 8 | Server `.env` values + `APP_KEY` | DB credentials + master encryption key | Developer | Committee password manager | ☐ |
 | 9 | Webmaster admin login on the site | Day-to-day admin access | — | Webmaster (their own account, own 2FA) | ☐ |
 | 10 | Committee Manual PDF | The full documentation snapshot | — | Committee drive | ☐ |

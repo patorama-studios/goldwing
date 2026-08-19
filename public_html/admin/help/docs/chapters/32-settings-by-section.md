@@ -161,7 +161,7 @@ Full picture: [Chapter 26 — Events & RSVPs](view.php?slug=26-events-rsvps).
 
 The page builder's connection to AI — model, monthly spend cap, the guardrails prompt.
 
-- **Provider / model** — currently fixed to kie.ai with a Claude model.
+- **Provider / model** — fixed to OpenRouter; any OpenRouter model ID can be entered (default DeepSeek).
 - **Image generation enabled** — whether the builder can ask the AI for images (off by default — image generation costs more).
 - **Monthly cap (USD)** — a soft spend cap; once hit, the system blocks new AI calls until next month.
 - **Per-token / per-image cost basis** — used to estimate the running monthly spend.
@@ -451,12 +451,12 @@ What it controls: defaults applied to new events. Deep dive: [Ch 26 — Events &
 
 #### AI Settings (standalone)
 
-What it controls: the kie.ai-backed page builder model, monthly spend cap, per-token / per-image cost basis, system guardrails, master prompt. Saved by `public_html/admin/settings/ai.php`. Deep dive: [Ch 24 — AI page builder](view.php?slug=24-ai-page-builder).
+What it controls: the OpenRouter-backed page builder model, monthly spend cap, per-token / per-image cost basis, system guardrails, master prompt. Saved by `public_html/admin/settings/ai.php`. Deep dive: [Ch 24 — AI page builder](view.php?slug=24-ai-page-builder).
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `ai.provider` | string | "kie" | Provider key — currently fixed to `kie`. |
-| `ai.model` | string | "claude-sonnet-4-6" | Model identifier passed to kie.ai. |
+| `ai.provider` | string | "openrouter" | Provider key — currently fixed to `openrouter`. |
+| `ai.model` | string | "deepseek/deepseek-chat" | OpenRouter model ID passed with every request. |
 | `ai.image_generation_enabled` | bool | false | Allow image generation calls. |
 | `ai.monthly_cap_usd` | float | 50 | Soft cap; blocks calls when exceeded. |
 | `ai.token_cost_usd` | float | 0.01 | Per-1k-token cost basis for spend tracking. |
@@ -476,7 +476,7 @@ What it controls: the membership year anchor + expiry, admin-defined renewal per
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `membership.pricing.config` | object | (seeded config) | Single JSON blob with `anchor_month`/`anchor_day`/`expiry_month`/`expiry_day`, `prorata_enabled`, `prorata_rounding`, `renewal_periods` list (`{id,label,duration_months,sort_order,active}`), `renewal_prices` matrix (`{magazine→type→period_id→cents}`), `prorata_annual_prices` (`{magazine→type→cents}`), plus `joining_enabled` (bool), `joining_fee_cents` (int), the `joining_prices` matrix (`{magazine→type→period_id→window→cents}`, window ∈ `FULL`/`DEC`/`APR`), and the late-year join rollover: `join_rollover_enabled` (bool), `join_rollover_month`/`join_rollover_day` (default 1 June — joins from this date pay the start-of-year price and expire at the end of the *next* membership year). |
+| `membership.pricing.config` | object | (seeded config) | Single JSON blob with `anchor_month`/`anchor_day`/`expiry_month`/`expiry_day`, `prorata_enabled`, `prorata_rounding`, `renewal_periods` list (`{id,label,duration_months,sort_order,active}`), `renewal_prices` matrix (`{magazine→type→period_id→cents}`), `prorata_annual_prices` (`{magazine→type→cents}`), plus `joining_enabled` (bool), `joining_fee_cents` (int), the `joining_prices` matrix (`{magazine→type→period_id→window→cents}`, window ∈ `FULL`/`DEC`/`APR`), the late-year join rollover: `join_rollover_enabled` (bool), `join_rollover_month`/`join_rollover_day` (default 1 June — joins from this date pay the start-of-year price and expire at the end of the *next* membership year), and `renewal_grace_months` (int, default 3, 0 = off — a lapsed renewal paid within this many months after the year end is renewing the year that just started, so an early-August 1Y renewal ends at the next 31 July, not a year beyond). |
 | `membership.pricing_matrix` | object | (legacy seed) | Legacy 24-row matrix `{magazine_type → membership_type → period → cents}`. Read once on first migration and then inert — `getConfig()` migrates it into `membership.pricing.config`. Kept for safety so older installs don't lose data on the first load. |
 | `membership.member_number_start` | int | 1000 | First member number issued. |
 | `membership.associate_suffix_start` | int | 1 | First associate suffix. |

@@ -70,10 +70,10 @@ $expectedEnd = function (array $period, ?string $prevEnd, bool $hasPrior) use ($
         // Renewal stacked on still-active coverage: term whole months on top.
         $end = $prevEndD->modify("+{$months} months");
     } elseif ($hasPrior) {
-        // Lapsed / expired renewal: full term from the membership-year end that
-        // contained the payment date. (This is the bug-1 path.)
-        $cye = new DateTimeImmutable(MembershipService::calculateExpiry($start, 1));
-        $end = $cye->modify("+{$months} months");
+        // Lapsed / expired renewal: full term from the renewal anchor — inside
+        // the post-year-end grace window that's the 31 Jul that just passed,
+        // matching activateMembershipForOrder(). (This is the bug-1 path.)
+        $end = MembershipService::lapsedRenewalAnchor($start)->modify("+{$months} months");
     } else {
         // Brand-new pro-rata join: rest of current year + whole years beyond
         // the first. (Correct joins already match; bug-2 joins are short here.)
