@@ -3767,7 +3767,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             <?php if ($latestIssue): ?>
               <div class="relative z-10 grid grid-cols-1 lg:grid-cols-[360px,1fr] gap-8 items-center">
                 <div class="w-full max-w-[360px] xl:max-w-[420px]">
-                  <div class="aspect-[3/4] rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden">
+                  <a class="block aspect-[3/4] rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden"
+                    href="/member/read_wings.php?id=<?= $latestIssue['id'] ?>" aria-label="Read <?= e($latestIssue['title']) ?>">
                     <?php if (!empty($latestIssue['cover_image_url'])): ?>
                       <img alt="<?= e($latestIssue['title']) ?>" class="w-full h-full object-cover"
                         src="<?= e($latestIssue['cover_image_url']) ?>">
@@ -3776,7 +3777,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                         <span class="material-icons-outlined text-6xl text-gray-300">import_contacts</span>
                       </div>
                     <?php endif; ?>
-                  </div>
+                  </a>
                 </div>
                 <div class="space-y-4">
                   <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
@@ -3828,7 +3829,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     <span
                       class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
                     <input id="wings-search" class="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                      placeholder="Search issues..." type="search">
+                      placeholder="Search issues..." type="search" autocomplete="off">
                   </div>
                   <select id="wings-year" class="py-2 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white">
                     <option value="all">All years</option>
@@ -3854,7 +3855,8 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   <article
                     class="wings-issue-card group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                     data-title="<?= e($issueTitle) ?>" data-year="<?= e($publishedYear) ?>">
-                    <div class="aspect-[3/4] bg-gray-50 overflow-hidden">
+                    <a class="block aspect-[3/4] bg-gray-50 overflow-hidden"
+                      href="/member/read_wings.php?id=<?= $issue['id'] ?>" aria-label="Read <?= e($issue['title']) ?>">
                       <?php if (!empty($issue['cover_image_url'])): ?>
                         <img alt="<?= e($issue['title']) ?>"
                           class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -3864,7 +3866,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                           <span class="material-icons-outlined text-4xl text-gray-300">menu_book</span>
                         </div>
                       <?php endif; ?>
-                    </div>
+                    </a>
                     <div class="p-4 space-y-2">
                       <h4 class="text-base font-semibold text-gray-900"><?= e($issue['title']) ?></h4>
                       <?php if ($publishedLabel): ?>
@@ -3918,8 +3920,16 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     }
                   };
 
-                  searchInput.addEventListener('input', applyFilters);
+                  // Chrome autofills the saved login email into this box (the page's
+                  // only free-text field), hiding every issue and swallowing the click
+                  // that committed the autofill. Typing needs focus — an unfocused
+                  // value change is autofill, so wipe it.
+                  const dropAutofill = () => {
+                    if (searchInput.value && document.activeElement !== searchInput) searchInput.value = '';
+                  };
+                  searchInput.addEventListener('input', () => { dropAutofill(); applyFilters(); });
                   yearSelect.addEventListener('change', applyFilters);
+                  dropAutofill();
                   applyFilters();
                 })();
               </script>
@@ -4206,7 +4216,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <span class="material-icons-outlined text-base text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
                 <input id="fallen-search"
                   class="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
-                  placeholder="Search by name..." type="search">
+                  placeholder="Search by name..." type="search" autocomplete="off">
               </div>
               <select id="fallen-year" class="py-2.5 pl-3 pr-8 text-sm border border-gray-200 rounded-lg bg-white md:w-56">
                 <option value="all">Filter by year</option>
@@ -4306,8 +4316,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     });
                     if (emptyState) emptyState.classList.toggle('hidden', visibleCount !== 0);
                   };
-                  searchInput.addEventListener('input', applyFilters);
+                  // Same browser-autofill guard as the Wings archive search box.
+                  const dropAutofill = () => {
+                    if (searchInput.value && document.activeElement !== searchInput) searchInput.value = '';
+                  };
+                  searchInput.addEventListener('input', () => { dropAutofill(); applyFilters(); });
                   yearSelect.addEventListener('change', applyFilters);
+                  dropAutofill();
                 })();
               </script>
             <?php else: ?>
@@ -5220,7 +5235,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
               <span class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                 <span class="material-icons-outlined text-gray-400 text-lg">search</span>
               </span>
-              <input type="text" id="dir-search" placeholder="Search by name or member number…"
+              <input type="text" id="dir-search" placeholder="Search by name or member number…" autocomplete="off"
                 class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
             </div>
             <select data-tour="find-member-chapter" id="dir-chapter" class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-[180px]">
@@ -5448,9 +5463,14 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
             if (countEl) countEl.textContent = visible;
           }
 
-          search.addEventListener('input', applyFilters);
+          // Same browser-autofill guard as the Wings archive search box.
+          function dropAutofill() {
+            if (search.value && document.activeElement !== search) search.value = '';
+          }
+          search.addEventListener('input', function () { dropAutofill(); applyFilters(); });
           chapterSel.addEventListener('change', applyFilters);
           typeSel.addEventListener('change', applyFilters);
+          dropAutofill();
         })();
         </script>
       <?php elseif ($page === 'committee'): ?>
