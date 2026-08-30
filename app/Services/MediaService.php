@@ -25,8 +25,13 @@ class MediaService
         if ($title === '') {
             $title = $fileName;
         }
+        // media.title is VARCHAR(150); an over-long upload filename must not
+        // abort the INSERT.
+        $title = mb_substr($title, 0, 150);
         $visibility = $data['visibility'] ?? 'member';
-        $uploadedBy = isset($data['uploaded_by_user_id']) ? (int) $data['uploaded_by_user_id'] : null;
+        // media.uploaded_by has an FK to users.id — a caller passing 0 (no
+        // logged-in user resolved) must become NULL, not an FK violation.
+        $uploadedBy = (int) ($data['uploaded_by_user_id'] ?? 0) > 0 ? (int) $data['uploaded_by_user_id'] : null;
 
         $pdo = Database::connection();
         $existing = null;
