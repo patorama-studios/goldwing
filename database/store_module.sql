@@ -63,6 +63,7 @@ CREATE TABLE store_products (
   slug VARCHAR(200) UNIQUE NOT NULL,
   description MEDIUMTEXT NULL,
   type ENUM('physical','ticket') NOT NULL DEFAULT 'physical',
+  free_shipping TINYINT(1) NOT NULL DEFAULT 0,
   base_price DECIMAL(10,2) NOT NULL,
   sku VARCHAR(100) NULL,
   has_variants TINYINT(1) NOT NULL DEFAULT 0,

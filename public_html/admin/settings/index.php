@@ -1126,7 +1126,7 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                   <label class="flex items-start justify-between gap-3 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
                     <div>
                       <div class="text-sm font-medium text-gray-900">Enable flat-rate shipping</div>
-                      <div class="text-xs text-slate-500">One amount applied to every shippable order</div>
+                      <div class="text-xs text-slate-500">Charged once per order, and only when the cart holds something that has to be posted. Products ticked &ldquo;Posts free&rdquo; (stickers, badges) are skipped.</div>
                     </div>
                     <input type="checkbox" name="store_shipping_flat_enabled" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" <?= SettingsService::getGlobal('store.shipping_flat_enabled', false) ? 'checked' : '' ?>>
                   </label>

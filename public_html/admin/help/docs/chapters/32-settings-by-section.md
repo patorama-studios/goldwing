@@ -46,7 +46,7 @@ How the storefront behaves at checkout. Pricing of individual items lives on eac
 - **Shipping region** — `AU` or `INTL`. Drives which shipping options show.
 - **GST enabled** — adds a GST line to orders.
 - **Pass Stripe fees** — if on, the buyer pays the card processing fee on top of the item price. If off, the association absorbs it.
-- **Flat shipping rate** — a single shipping price for every order. Leave off if you're using per-product shipping instead.
+- **Flat shipping rate** — one postage price, charged once per order, and only when the cart holds something that has to be posted. Products ticked **Posts free** (stickers, badges) don't trigger it.
 - **Free shipping threshold** — order total above which shipping is free. Off by default.
 - **Pickup option** — let buyers choose pickup at checkout, with custom instructions.
 - **Notification emails** — comma-separated list of staff to email when a new order comes in.
@@ -314,7 +314,7 @@ What it controls: storefront identity, fee passthrough, shipping, pickup, order-
 | `store.pass_stripe_fees` | bool | true | Adds the Stripe processing fee to the buyer's total. |
 | `store.stripe_fee_percent` | float | 0 | Percent component of the passed fee. |
 | `store.stripe_fee_fixed` | float | 0 | Fixed-cents component of the passed fee. |
-| `store.shipping_flat_enabled` | bool | false | Charge a flat shipping rate. |
+| `store.shipping_flat_enabled` | bool | false | Charge a flat shipping rate, once per order, on carts holding something postable. |
 | `store.shipping_flat_rate` | float\|null | null | Flat-rate amount (dollars). |
 | `store.shipping_free_enabled` | bool | false | Free shipping above threshold. |
 | `store.shipping_free_threshold` | float\|null | null | Order subtotal for free shipping. |

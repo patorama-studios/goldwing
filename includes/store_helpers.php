@@ -301,23 +301,69 @@ function store_calculate_processing_fee(float $baseAmount, float $percent, float
     return round($fee, 2);
 }
 
-function store_calculate_shipping(float $subtotalAfterDiscount, array $settings, string $fulfillment): float
+/**
+ * True when at least one thing in the cart actually has to be posted.
+ * Tickets are never posted, and products flagged "posts free" (the
+ * quartermaster's stickers and badges) carry no postage -- so a cart holding
+ * only those ships at $0 even with flat-rate postage switched on.
+ */
+function store_cart_needs_postage(array $items): bool
+{
+    $productIds = [];
+    foreach ($items as $item) {
+        $id = (int) ($item['product_id'] ?? 0);
+        if ($id > 0) {
+            $productIds[$id] = $id;
+        }
+    }
+    if (!$productIds) {
+        return false;
+    }
+    $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+    $stmt = db()->prepare(
+        "SELECT COUNT(*) FROM store_products WHERE id IN ($placeholders) AND type = 'physical' AND free_shipping = 0"
+    );
+    $stmt->execute(array_values($productIds));
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+/**
+ * Postage for this cart, or NULL when no rate can be quoted -- which is the
+ * "shipping isn't available" signal. Callers must not let a postable order
+ * through on a NULL: that is how an order ships at $0.00 with no postage
+ * collected. Every caller resolves the rate here so the amount charged and the
+ * availability check can never disagree.
+ */
+function store_resolve_shipping(array $items, float $subtotalAfterDiscount, array $settings, string $fulfillment): ?float
 {
     if ($fulfillment === 'pickup') {
         return 0.0;
     }
-    $freeEnabled = (int) ($settings['shipping_free_enabled'] ?? 0) === 1;
-    $flatEnabled = (int) ($settings['shipping_flat_enabled'] ?? 0) === 1;
+    // Postage is charged once per order, not per item, and only when the cart
+    // holds something that has to be posted.
+    if (!store_cart_needs_postage($items)) {
+        return 0.0;
+    }
     $threshold = (float) ($settings['shipping_free_threshold'] ?? 0);
     $flatRate = (float) ($settings['shipping_flat_rate'] ?? 0);
 
-    if ($freeEnabled && $threshold >= 0 && $subtotalAfterDiscount >= $threshold) {
+    if (!empty($settings['shipping_free_enabled']) && $threshold > 0 && $subtotalAfterDiscount >= $threshold) {
         return 0.0;
     }
-    if ($flatEnabled && $flatRate >= 0) {
+    if (!empty($settings['shipping_flat_enabled']) && $flatRate > 0) {
         return round($flatRate, 2);
     }
-    return 0.0;
+    return null;
+}
+
+function store_calculate_shipping(array $items, float $subtotalAfterDiscount, array $settings, string $fulfillment): float
+{
+    return store_resolve_shipping($items, $subtotalAfterDiscount, $settings, $fulfillment) ?? 0.0;
+}
+
+function store_shipping_available(array $items, float $subtotalAfterDiscount, array $settings, string $fulfillment): bool
+{
+    return store_resolve_shipping($items, $subtotalAfterDiscount, $settings, $fulfillment) !== null;
 }
 
 function store_get_open_cart(int $userId): array
@@ -485,7 +531,7 @@ function store_calculate_cart_totals(array $items, ?array $discount, array $sett
     }
     $discountTotal = $discount ? store_calculate_discount($discount, $subtotal) : 0.0;
     $subtotalAfterDiscount = max(0.0, $subtotal - $discountTotal);
-    $shippingTotal = store_calculate_shipping($subtotalAfterDiscount, $settings, $fulfillment);
+    $shippingTotal = store_calculate_shipping($items, $subtotalAfterDiscount, $settings, $fulfillment);
     $gstEnabled = (int) ($settings['gst_enabled'] ?? 0) === 1;
     $taxTotal = $gstEnabled ? round($subtotalAfterDiscount * 0.1, 2) : 0.0;
     $processingBase = $subtotalAfterDiscount + $shippingTotal + $taxTotal;

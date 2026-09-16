@@ -191,7 +191,7 @@ Permission keys: `store_orders_view`, `store_orders_manage`, `store_refunds_mana
 
 ### Settings
 
-Order-time pricing pulls from store settings: flat vs free-over-threshold shipping, pickup on/off, processing-fee percentage, shipping region (`AU` by default — blocks non-AU postcodes). All live on the Store settings page; full reference in [Ch 29](view.php?slug=29-discounts-shipping). The membership order-number prefix is `membership.order_prefix` (default `M`), with the running counter in `membership.order_counter` / `_year`.
+Order-time pricing pulls from store settings: flat vs free-over-threshold shipping (skipped entirely when nothing in the cart has to be posted, and *refused* when something does but no rate is set), pickup on/off, processing-fee percentage, shipping region (`AU` by default — blocks non-AU postcodes). All live on the Store settings page; full reference in [Ch 29](view.php?slug=29-discounts-shipping). The membership order-number prefix is `membership.order_prefix` (default `M`), with the running counter in `membership.order_counter` / `_year`.
 
 ### Gotchas
 

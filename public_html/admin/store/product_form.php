@@ -164,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lowStockThreshold = trim($_POST['low_stock_threshold'] ?? '') !== '' ? (int) $_POST['low_stock_threshold'] : null;
             $stockQuantity = trim($_POST['stock_quantity'] ?? '') !== '' ? (int) $_POST['stock_quantity'] : null;
             $isActive = isset($_POST['is_active']) ? 1 : 0;
+            $freeShipping = isset($_POST['free_shipping']) ? 1 : 0;
             $eventName = trim($_POST['event_name'] ?? '');
 
             if ($action === 'save_product' && $title === '') {
@@ -183,14 +184,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'low_stock_threshold' => $lowStockThreshold,
                     'event_name' => $type === 'ticket' ? $eventName : null,
                     'is_active' => $isActive,
+                    'free_shipping' => $freeShipping,
                 ];
 
                 if ($product) {
                     $payload['id'] = $productId;
-                    $stmt = $pdo->prepare('UPDATE store_products SET title = :title, slug = :slug, description = :description, type = :type, base_price = :base_price, sku = :sku, track_inventory = :track_inventory, stock_quantity = :stock_quantity, low_stock_threshold = :low_stock_threshold, event_name = :event_name, is_active = :is_active, updated_at = NOW() WHERE id = :id');
+                    $stmt = $pdo->prepare('UPDATE store_products SET title = :title, slug = :slug, description = :description, type = :type, base_price = :base_price, sku = :sku, track_inventory = :track_inventory, stock_quantity = :stock_quantity, low_stock_threshold = :low_stock_threshold, event_name = :event_name, is_active = :is_active, free_shipping = :free_shipping, updated_at = NOW() WHERE id = :id');
                     $stmt->execute($payload);
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO store_products (title, slug, description, type, base_price, sku, track_inventory, stock_quantity, low_stock_threshold, event_name, is_active, created_at) VALUES (:title, :slug, :description, :type, :base_price, :sku, :track_inventory, :stock_quantity, :low_stock_threshold, :event_name, :is_active, NOW())');
+                    $stmt = $pdo->prepare('INSERT INTO store_products (title, slug, description, type, base_price, sku, track_inventory, stock_quantity, low_stock_threshold, event_name, is_active, free_shipping, created_at) VALUES (:title, :slug, :description, :type, :base_price, :sku, :track_inventory, :stock_quantity, :low_stock_threshold, :event_name, :is_active, :free_shipping, NOW())');
                     $stmt->execute($payload);
                     $productId = (int) $pdo->lastInsertId();
                     $product = array_merge(['id' => $productId], $payload);
@@ -444,6 +446,10 @@ $pageSubtitle = $product ? 'Edit product details and variants.' : 'Create a new 
           <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
             <input type="checkbox" name="track_inventory" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= !empty($product['track_inventory']) ? 'checked' : '' ?>>
             Track Inventory
+          </label>
+          <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <input type="checkbox" name="free_shipping" class="h-4 w-4 rounded border-slate-300 text-secondary focus:ring-secondary" <?= !empty($product['free_shipping']) ? 'checked' : '' ?>>
+            Posts free (no postage charge)
           </label>
         </div>
       </div>

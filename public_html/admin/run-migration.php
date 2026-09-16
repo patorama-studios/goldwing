@@ -3937,6 +3937,42 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 050 — per-product "posts free" flag (Sep 2026, Rob Watson).
+// The committee's rule is a flat $15 postage per order on clothing, hats and
+// anything over $20, while stickers and badges post free. Flat-rate shipping
+// alone can't express that: switching it on charged every order. This flag
+// marks the items that carry no postage, so postage is only quoted when the
+// cart holds something that actually has to be posted.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_050_store_products_free_shipping';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 050 — product "posts free" flag', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $hasColumn = (bool) $pdo->query("SHOW COLUMNS FROM store_products LIKE 'free_shipping'")->fetchColumn();
+        if ($hasColumn) {
+            $notes[] = 'free_shipping column already present.';
+        } else {
+            $pdo->exec('ALTER TABLE store_products ADD COLUMN free_shipping TINYINT(1) NOT NULL DEFAULT 0 AFTER type');
+            $notes[] = 'store_products.free_shipping column added.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'ALTER: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $notes[] = 'Tick "Posts free" on stickers and badges in the product editor, then set flat-rate postage to $15.00 in Store settings.';
+    }
+    $results[] = ['label' => 'Migration 050 — product "posts free" flag', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

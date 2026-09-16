@@ -176,16 +176,7 @@ if (!empty($cart['discount_code'])) {
 
 $totals = store_calculate_cart_totals($cartItems, $discount, $settings, $fulfillment);
 $subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
-$shippingAvailable = false;
-if ($fulfillment === 'shipping') {
-    $threshold = (float) ($settings['shipping_free_threshold'] ?? 0);
-    $flatRate = (float) ($settings['shipping_flat_rate'] ?? 0);
-    if (!empty($settings['shipping_free_enabled']) && $threshold > 0 && $subtotalAfterDiscount >= $threshold) {
-        $shippingAvailable = true;
-    } elseif (!empty($settings['shipping_flat_enabled']) && $flatRate > 0) {
-        $shippingAvailable = true;
-    }
-}
+$shippingAvailable = store_shipping_available($cartItems, $subtotalAfterDiscount, $settings, $fulfillment);
 
 $pageTitle = 'Checkout';
 $activePage = 'store';
@@ -262,6 +253,16 @@ if ($cartItems) {
           <a href="/store" class="inline-flex items-center gap-2 mt-5 px-5 py-3 rounded-lg bg-primary hover:bg-primary/90 text-gray-900 font-semibold text-sm transition-colors">
             <span class="material-icons-outlined">storefront</span>
             Browse products
+          </a>
+        </div>
+      <?php elseif (!$shippingAvailable): ?>
+        <div class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+          <span class="material-icons-outlined text-5xl text-amber-500">local_shipping</span>
+          <h2 class="mt-3 text-xl font-semibold text-gray-900">Postage isn't set up yet.</h2>
+          <p class="mt-1 text-gray-500">We can't work out the postage on this order, so we've stopped it here rather than send it without a postage charge. Please contact the quartermaster.</p>
+          <a href="/store/cart" class="inline-flex items-center gap-2 mt-5 px-5 py-3 rounded-lg bg-primary hover:bg-primary/90 text-gray-900 font-semibold text-sm transition-colors">
+            <span class="material-icons-outlined">arrow_back</span>
+            Back to cart
           </a>
         </div>
       <?php else: ?>

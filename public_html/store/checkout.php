@@ -98,16 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       $totals = store_calculate_cart_totals($items, $discount, $settings, $fulfillment);
       $subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
-      $shippingAvailable = false;
-      if ($requiresShipping) {
-        $threshold = (float) ($settings['shipping_free_threshold'] ?? 0);
-        $flatRate = (float) ($settings['shipping_flat_rate'] ?? 0);
-        if (!empty($settings['shipping_free_enabled']) && $threshold >= 0 && $subtotalAfterDiscount >= $threshold) {
-          $shippingAvailable = true;
-        } elseif (!empty($settings['shipping_flat_enabled']) && $flatRate >= 0) {
-          $shippingAvailable = true;
-        }
-      }
+      $shippingAvailable = store_shipping_available($items, $subtotalAfterDiscount, $settings, $fulfillment);
 
       if (!$checkoutEnabled) {
         echo '<div class="alert error">Checkout is currently unavailable.</div>';
@@ -314,18 +305,6 @@ if (!empty($cart['discount_code'])) {
 }
 
 $totals = store_calculate_cart_totals($items, $discount, $settings, $fulfillment);
-$subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
-
-$shippingAvailable = false;
-if ($fulfillment === 'shipping') {
-  $threshold = (float) ($settings['shipping_free_threshold'] ?? 0);
-  $flatRate = (float) ($settings['shipping_flat_rate'] ?? 0);
-  if (!empty($settings['shipping_free_enabled']) && $threshold >= 0 && $subtotalAfterDiscount >= $threshold) {
-    $shippingAvailable = true;
-  } elseif (!empty($settings['shipping_flat_enabled']) && $flatRate >= 0) {
-    $shippingAvailable = true;
-  }
-}
 
 $pageTitle = 'Checkout';
 ?>

@@ -1197,15 +1197,11 @@ if ($resource === 'stripe') {
 
         $totals = store_calculate_cart_totals($items, $discount, $settingsStore, $fulfillment);
         $subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
-        if ($requiresShipping && $fulfillment === 'shipping') {
-            $threshold = (float) ($settingsStore['shipping_free_threshold'] ?? 0);
-            $flatRate = (float) ($settingsStore['shipping_flat_rate'] ?? 0);
-            $shippingAvailable = false;
-            if (!empty($settingsStore['shipping_free_enabled']) && $threshold > 0 && $subtotalAfterDiscount >= $threshold) {
-                $shippingAvailable = true;
-            } elseif (!empty($settingsStore['shipping_flat_enabled']) && $flatRate > 0) {
-                $shippingAvailable = true;
-            }
+        // Refuse rather than charge the card and post the gear for free: this
+        // is the path David Goodchild's order took out at $0.00 postage.
+        if ($requiresShipping && $fulfillment === 'shipping'
+            && !store_shipping_available($items, $subtotalAfterDiscount, $settingsStore, $fulfillment)) {
+            json_response(['error' => 'Shipping is not available for this order.'], 422);
         }
 
         $pdo = db();
@@ -2191,17 +2187,8 @@ if ($resource === 'checkout' && count($segments) >= 2 && $segments[1] === 'creat
 
         $totals = store_calculate_cart_totals($items, $discount, $settingsStore, $fulfillment);
         $subtotalAfterDiscount = max(0.0, $totals['subtotal'] - $totals['discount_total']);
-        $shippingAvailable = false;
-        if ($requiresShipping) {
-            $threshold = (float) ($settingsStore['shipping_free_threshold'] ?? 0);
-            $flatRate = (float) ($settingsStore['shipping_flat_rate'] ?? 0);
-            if (!empty($settingsStore['shipping_free_enabled']) && $threshold > 0 && $subtotalAfterDiscount >= $threshold) {
-                $shippingAvailable = true;
-            } elseif (!empty($settingsStore['shipping_flat_enabled']) && $flatRate > 0) {
-                $shippingAvailable = true;
-            }
-        }
-        if ($requiresShipping && $fulfillment === 'shipping' && !$shippingAvailable) {
+        if ($requiresShipping && $fulfillment === 'shipping'
+            && !store_shipping_available($items, $subtotalAfterDiscount, $settingsStore, $fulfillment)) {
             json_response(['error' => 'Shipping is not available for this order.'], 422);
         }
 

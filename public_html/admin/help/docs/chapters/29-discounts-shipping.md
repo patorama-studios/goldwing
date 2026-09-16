@@ -66,10 +66,13 @@ To stop a code working immediately (even mid-date-window), edit it and untick **
 1. Go to **Admin → Settings → Store Settings**.
 2. Find the **Shipping & fees** card.
 3. Turn on **Flat-rate shipping**.
-4. Enter the dollar amount (e.g. `12.50`).
+4. Enter the dollar amount (e.g. `15.00`).
 5. *(Optional)* Turn on **Free shipping over** and enter a threshold (e.g. `100`) — orders above that subtotal get free shipping automatically.
 6. *(Optional)* Turn on **Pickup** if you want to offer pickup-instead-of-post as a checkout option. When a member picks pickup, shipping is zero.
 7. Save.
+8. Then tick **Posts free (no postage charge)** on the products that don't attract postage — stickers and badges — in **Admin → Store → Products → (product)**.
+
+Step 8 is what stops the flat rate hitting everything. The postage charge is applied **once per order**, and only when the cart holds at least one product that actually has to be posted. A cart of stickers alone posts at $0; a sticker in with a jacket pays the one flat rate, not two.
 
 Shipping is one flat line on the order — it's not split across products, and it's not per-region. International freight at a different rate isn't supported today.
 
@@ -91,6 +94,8 @@ The formula grosses up — meaning the fee covers itself. Don't enter Stripe's r
 - **"My discount code isn't working."** — Three common reasons. (1) Typo — codes are case-insensitive but a missing letter still fails. (2) Outside the date window. (3) Hit the max-uses cap. (4) Order subtotal is below the minimum spend. The discount page shows the use count and date window for each code — check there first.
 - **"The code worked an hour ago and now it doesn't."** — Probably hit the use cap, or someone toggled it inactive. Check the **Active** flag and the `used_count` on the discounts list.
 - **"Shipping wasn't charged on a ticket order."** — Intentional. Event tickets and digital products don't post anywhere, so shipping is skipped. Only mail-order physical products attract the freight charge.
+- **"Shipping wasn't charged on a sticker order."** — Also intentional, if that product has **Posts free** ticked. Check the product in Admin → Store → Products. If a product that *should* attract postage is going out free, that tick is the first thing to look at.
+- **"A member says checkout told them postage isn't set up."** — That's the guard doing its job: the cart holds something postable but no flat rate is configured, so checkout refuses rather than taking the money and posting the gear for free. Fix it by turning on flat-rate shipping and entering the amount.
 - **"A member's complaining the total at checkout is higher than the price tag."** — Almost always the processing fee passthrough. They paid the listed price + GST + shipping + ~2.5% fee. Two fixes: (1) explain it on the product page so it's not a surprise, or (2) turn the passthrough off if the association would rather absorb the fee.
 - **"Two discounts seemed to combine."** — The system only allows one code per checkout, but if a member typed one code then refreshed and typed another, the cart can briefly show stacked behaviour. The order itself only records the final code. If you see a real double-discount on a placed order, screenshot it and send to the developer — that's a bug.
 - **"Discount expired between the cart and checkout."** — A member can sit on a cart for hours. The code is re-validated at the final payment step, so an expired one silently drops off. There's no "your discount expired" warning. If a member complains, refund the difference or extend the code.
@@ -109,7 +114,7 @@ The formula grosses up — meaning the fee covers itself. Don't enter Stripe's r
 - **Discount not applying and you can't figure out why** — Treasurer or developer. Send the code and the order number.
 - **Total at checkout looks wrong** — developer. Send a screenshot of the checkout summary and the order ID.
 - **Stripe rate changed and the passthrough is now wrong** — admin or developer; update the percent and fixed fields under Settings → Store Settings.
-- **Shipping needs to be different for a one-off (e.g. heavy item)** — there's no per-product shipping today. Either absorb it or create a fixed-amount discount equal to the regular shipping rate.
+- **Shipping needs to be different for a one-off (e.g. heavy item)** — there's only one rate plus a per-product "posts free" exemption; there are no per-product *rates*. Either absorb it or create a fixed-amount discount equal to the regular shipping rate.
 
 ---
 
@@ -155,11 +160,17 @@ Math (`store_calculate_discount()`):
 
 #### Shipping
 
-Shipping is configured in **Settings → Store Settings** (the legacy `/admin/store/settings.php` redirects there) and pulled at checkout via `store_get_settings()`. Rules (`store_calculate_shipping()` at `includes/store_helpers.php:304`):
+Shipping is configured in **Settings → Store Settings** (the legacy `/admin/store/settings.php` redirects there) and pulled at checkout via `store_get_settings()`. Every caller resolves the rate through one function, `store_resolve_shipping()` in `includes/store_helpers.php`, which returns the dollar amount **or `null`** meaning "no rate can be quoted". Rules, in order:
 
 1. If buyer chose **pickup** (`store.pickup_enabled` + `fulfillment === 'pickup'`), shipping = `0`.
-2. Else if `store.shipping_free_enabled` and post-discount subtotal meets `store.shipping_free_threshold`, shipping = `0`.
-3. Else if `store.shipping_flat_enabled`, shipping = `store.shipping_flat_rate`.
+2. Else if nothing in the cart has to be posted — `store_cart_needs_postage()` is false because every line is a `ticket` or has `store_products.free_shipping = 1` — shipping = `0`.
+3. Else if `store.shipping_free_enabled`, `store.shipping_free_threshold > 0` and the post-discount subtotal meets it, shipping = `0`.
+4. Else if `store.shipping_flat_enabled` and `store.shipping_flat_rate > 0`, shipping = `store.shipping_flat_rate`.
+5. Else `null` — **no rate configured for a postable cart**.
+
+`store_calculate_shipping()` coerces `null` to `0.0` for display; `store_shipping_available()` reports whether it was `null`. Both `/checkout` and `/api/stripe/create-payment-intent` refuse a postable order when it's `null`, so a missing rate can no longer ship gear at $0.00 (it did, once — see the gotchas). Because the amount and the availability check come from the same call, they can't disagree.
+
+The `free_shipping` flag is a per-product **exemption**, not a per-product rate: the flat rate is still charged once per order. It's edited as **Posts free (no postage charge)** on the product form and added by Migration 050.
 4. Else `0`.
 
 It's a single dollar amount stored on the order as `store_orders.shipping_total` and shown as one line on the cart, checkout summary, and invoice — **not distributed per item**. The order has one shipment address and one freight cost; splitting it would invent precision that isn't there.
@@ -206,7 +217,7 @@ All keys live under `store.*` in `settings_global`. Full reference in [Ch 32 —
 | `store.pass_stripe_fees` | bool | `true` | Master switch for fee passthrough. |
 | `store.stripe_fee_percent` | float | `0.00` | Percent component (e.g. `1.7`). |
 | `store.stripe_fee_fixed` | float | `0.00` | Fixed dollar component (e.g. `0.30`). |
-| `store.shipping_flat_enabled` | bool | `false` | Charge a flat shipping rate. |
+| `store.shipping_flat_enabled` | bool | `false` | Charge a flat shipping rate, once per order, on carts holding something postable. |
 | `store.shipping_flat_rate` | float\|null | `null` | Flat-rate amount in dollars. |
 | `store.shipping_free_enabled` | bool | `false` | Enable free-over-threshold. |
 | `store.shipping_free_threshold` | float\|null | `null` | Subtotal at which shipping becomes free. |
@@ -223,7 +234,9 @@ The `store_discounts` table is its own thing — discounts are rows, not setting
 - **`is_active` overrides the date window.** Setting `is_active = 0` blocks the code immediately even if it's still inside its date range. Use that as the kill switch.
 - **Discounts apply to subtotal only.** They don't reduce shipping, GST or the processing fee. For "free shipping" as a promo, use a `fixed` discount equal to your shipping rate.
 - **Processing-fee passthrough is unusual in retail.** Buyers used to Amazon/eBay expect the seller to absorb gateway fees. Checkout labels it "Payment processing fee" on its own line, but **communicate it in the product copy** — it's a common refund/complaint trigger. Turn it off via `store.pass_stripe_fees` if you'd rather absorb.
-- **Per-region shipping is not implemented.** `store.shipping_region` is recorded but rates are the same for everyone. International freight = code change at `includes/store_helpers.php:304`.
+- **Per-region shipping is not implemented.** `store.shipping_region` is recorded but rates are the same for everyone. International freight = code change in `store_resolve_shipping()`.
+- **A postable cart with no rate configured is refused, not zero-rated.** Before Sep 2026 `/checkout` and `create-payment-intent` computed `$shippingAvailable` and then never read it, so with shipping settings unconfigured an order went through at $0.00 postage — that's how David Goodchild's merch shipped free. Both paths now call `store_shipping_available()` and return 422 / render a blocking panel.
+- **`store_cart_needs_postage()` reads `store_products.free_shipping`.** Deploying the code without running Migration 050 will fatal on any cart totals call. Run the migration immediately after deploy.
 - **The fee formula grosses up.** Don't enter Stripe's headline rate plus a margin "to be safe" — `1 / (1 - rate)` already does that. Entering 5% when Stripe charges 1.7% will overcharge noticeably.
 - **Shipping is a single line, not per-item.** When refunding partial orders, shipping is refunded separately via [Ch 17 — Refunds](view.php?slug=17-refunds), not pro-rated.
 

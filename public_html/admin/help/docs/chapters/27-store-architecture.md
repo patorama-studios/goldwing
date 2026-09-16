@@ -52,7 +52,7 @@ There's also a **Low stock** page that lists anything running low, and a **Setti
 
 When you create a product, you pick its **type**. There are two:
 
-- **Physical** — sweets, patches, caps, manuals, merch. The kinds of things that live in a box and need to be posted to the buyer. Physical products usually have **stock** (a count of how many you have) and need a **shipping address** at checkout.
+- **Physical** — sweets, patches, caps, manuals, merch. The kinds of things that live in a box and need to be posted to the buyer. Physical products usually have **stock** (a count of how many you have) and need a **shipping address** at checkout. Tick **Posts free (no postage charge)** on the small flat items the quartermaster posts in an envelope (stickers, badges) so they don't drag the postage fee onto the order.
 - **Ticket** — entry to an event (a rally, a dinner, an AGM). When the member pays, the system automatically emails them a unique code — that's their ticket. They show the code at the door. No box, no postage. See [Chapter 28](view.php?slug=28-tickets) for how tickets work end-to-end.
 
 Both types live in the same products list and use the same cart and checkout. The difference is what happens *after* the member pays.
@@ -181,7 +181,7 @@ Inventory tracking is **opt-in per product**: set `track_inventory = 1` and a `s
 
 `store_settings` holds three knobs (mirrored in the Settings Hub as `store.*`):
 
-- **Shipping** — flat-rate (`shipping_flat_rate`), with optional free-over-threshold. Pickup is a separate option with custom instructions.
+- **Shipping** — flat-rate (`shipping_flat_rate`), charged once per order and only when the cart holds a physical product without `store_products.free_shipping`. Optional free-over-threshold. Pickup is a separate option with custom instructions. A postable cart with no rate configured is refused at checkout rather than shipped at $0 — see [Ch 29](view.php?slug=29-discounts-shipping).
 - **Processing fee passthrough** — `stripe_fee_enabled` plus percent/fixed components add the Stripe surcharge to the buyer's total instead of absorbing it.
 - **Stripe Invoice + Payment Element** — `/api/stripe/create-payment-intent` delegates to `StoreInvoiceService::ensureInvoiceForOrder()`. That service (1) finds or lazily creates a Stripe Customer for the buyer (and writes the id back to `members.stripe_customer_id`), (2) for each line lazily mirrors the `store_products` row into Stripe as a Product (id cached on `store_products.stripe_product_id`), (3) creates a draft Stripe Invoice with itemized `invoiceItems` per product plus separate lines for shipping, discount, and the processing fee, (4) finalizes the invoice — Stripe auto-creates a linked PaymentIntent with `collection_method = 'charge_automatically'`. The browser mounts a Stripe Payment Element with that PI's `client_secret`; `stripe.confirmPayment()` confirms with `return_url = /order/success?order=<order_number>` (a member-shell thank-you page; the full order detail remains one click away at `/store/orders/<order_number>`). Card entry stays on-site; 3DS, Apple Pay, and Google Pay render inside the Element. The Stripe dashboard shows full itemized line items, downloadable PDF invoices, and per-Customer billing history.
 

@@ -79,7 +79,8 @@
       "chapters": [
         { "slug": "27-store-architecture",    "title": "Store architecture",               "file": "chapters/27-store-architecture.md",    "watched_files": ["database/store_module.sql", "public_html/admin/store/", "public_html/store/"] },
         { "slug": "28-tickets",               "title": "Tickets (ticket products)",        "file": "chapters/28-tickets.md",               "watched_files": ["app/Services/OrderService.php", "app/Services/PaymentWebhookService.php", "public_html/admin/store/product_form.php"] },
-        { "slug": "29-discounts-shipping",    "title": "Discounts, shipping & fees",       "file": "chapters/29-discounts-shipping.md",    "watched_files": ["public_html/admin/store/discounts.php", "public_html/admin/store/settings.php", "app/Services/OrderService.php"] },
+        { "slug": "29-discounts-shipping",    "title": "Discounts, shipping & fees",       "file": "chapters/29-discounts-shipping.md",    "watched_files": [
+                "includes\/store_helpers.php","public_html/admin/store/discounts.php", "public_html/admin/store/settings.php", "app/Services/OrderService.php"] },
         { "slug": "30-catalogue-import",      "title": "Bulk catalogue import",            "file": "chapters/30-catalogue-import.md",      "watched_files": ["scripts/import_store_catalogue.php", "scripts/data/"] }
       ]
     },
