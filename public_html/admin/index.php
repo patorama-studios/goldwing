@@ -132,8 +132,12 @@ if ($page === 'ai-editor') {
   header('Location: /admin/page-builder');
   exit;
 }
-if ($page === 'audit' || $page === 'reports') {
-  // Both folded into the unified Audit Hub at /admin/audit/.
+if ($page === 'reports') {
+  header('Location: /admin/reports/');
+  exit;
+}
+if ($page === 'audit') {
+  // Folded into the unified Audit Hub at /admin/audit/.
   header('Location: /admin/audit/');
   exit;
 }
@@ -1641,7 +1645,7 @@ $pageTitles = [
   'wings' => 'Wings Magazine',
   'ai-editor' => 'AI Page Builder',
   'audit' => 'Audit Log',
-  'reports' => 'Reports & Exports',
+  'reports' => 'Reports',
 ];
 $pageTitle = $pageTitles[$page] ?? 'Admin CRM';
 $activePage = $page;

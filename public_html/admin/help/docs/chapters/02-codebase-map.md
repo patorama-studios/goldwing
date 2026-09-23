@@ -159,6 +159,8 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | `AuditService.php` | Stamps changes into `audit_logs` (admin actions). |
 | `ActivityLogger.php`, `ActivityRepository.php` | Security & member-touching events → `activity_log`. |
 | `AuditHubService.php` | Read-only UNION of `audit_log` / `audit_logs` / `activity_log` for the unified Audit Hub. |
+| `PageViewLogger.php` | One `page_views` row per HTML page load by a logged-in user (from `bootstrap.php`) — feeds the Reports page. |
+| `EngagementReportService.php` | On-demand queries behind Admin → Reports (logins, areas, visits, leaderboards, newcomers, dormant, since-launch). |
 | `LogViewerService.php` | Tails the PHP system log for the Advanced settings panel. |
 | `Database.php`, `DbSessionHandler.php`, `Env.php` | DB connection, MySQL sessions, `.env` loader. |
 | `BaseUrlService.php` | Resolves `https://…` across CLI + web. |

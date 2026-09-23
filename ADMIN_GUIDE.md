@@ -82,4 +82,6 @@
 - Review approvals, rejections, content edits, and AI applies.
 
 ## Reports
-- View basic member status counts. Extend for exports as needed.
+- Admin → Reports (`/admin/reports/`): member engagement — who logs in, which portal areas they use, visit length, leaderboards, newcomers who haven't logged in, dormant members with a renewal due, and since-launch totals.
+- Page-view tracking needs Migration 051 run once from `/admin/run-migration.php`; every other panel works from existing data.
+- CSV export for the newcomer and dormant lists (logged in the Audit Hub as `report.export`).

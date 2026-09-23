@@ -393,3 +393,7 @@ require_once __DIR__ . '/../includes/admin_permissions.php';
 require_once __DIR__ . '/../includes/member_pages.php';
 
 enforce_page_access();
+
+// Member engagement report (/admin/reports/): one page_views row per HTML
+// page load by a logged-in user. See PageViewLogger for what is left out.
+App\Services\PageViewLogger::record();

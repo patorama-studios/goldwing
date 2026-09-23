@@ -34,6 +34,7 @@ $items = [
     // OVERVIEW
     ['key' => 'dashboard', 'group' => 'Overview', 'label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/admin/index.php', 'permission' => 'admin.dashboard.view'],
     ['key' => 'requests', 'group' => 'Overview', 'label' => 'Notification Hub', 'icon' => 'notifications_active', 'href' => '/admin/requests/', 'permission' => 'admin.requests.view', 'badge' => $pendingRequestsCount],
+    ['key' => 'reports', 'group' => 'Overview', 'label' => 'Reports', 'icon' => 'insights', 'href' => '/admin/reports/', 'permission' => 'admin.logs.view'],
 
     // MEMBERSHIP
     ['key' => 'members', 'group' => 'Membership', 'label' => 'Members', 'icon' => 'group', 'href' => '/admin/members/', 'permission' => 'admin.members.view'],

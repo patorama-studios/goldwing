@@ -3973,6 +3973,53 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 051 — page_views table for the admin Member Engagement report
+// (Sep 2026). One row per HTML page load by a logged-in user: which portal
+// area, when. No IP address, no query string. PageViewLogger stays silent
+// until this table exists, so the report's "Where members go" and visit
+// panels are blank until it runs. Same DDL as
+// database/migrations/2026_09_23_page_views.sql — keep the two in sync.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_051_page_views';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 051 — page views (engagement report)', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $exists = (bool) $pdo->query("SHOW TABLES LIKE 'page_views'")->fetchColumn();
+        if ($exists) {
+            $notes[] = 'page_views table already present.';
+        } else {
+            $pdo->exec('CREATE TABLE page_views (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  member_id INT NULL,
+  is_admin TINYINT(1) NOT NULL DEFAULT 0,
+  area VARCHAR(40) NOT NULL,
+  path VARCHAR(191) NOT NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_page_views_created (created_at),
+  INDEX idx_page_views_user_created (user_id, created_at),
+  INDEX idx_page_views_area_created (area, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+            $notes[] = 'page_views table created.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'CREATE: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $notes[] = 'Tracking starts with the next page load. Open Admin → Reports.';
+    }
+    $results[] = ['label' => 'Migration 051 — page views (engagement report)', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

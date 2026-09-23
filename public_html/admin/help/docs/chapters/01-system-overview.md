@@ -113,6 +113,8 @@ require __DIR__ . '/../app/Views/partials/backend_footer.php';
 8. Sets the timezone from `site.timezone` setting (default `Australia/Sydney`).
 9. Force-HTTPS redirect if `security.force_https` is enabled.
 10. Maintenance-mode shortcut: if `advanced.maintenance_mode` is on, non-admin requests get a 503 page.
+11. Enforces the page-access registry (`enforce_page_access()` from `includes/access_control.php`).
+12. Records the page view for the Member Engagement report (`App\Services\PageViewLogger::record()`) — one thin `page_views` row per HTML page load by a logged-in user; see [Chapter 39 — Member engagement report](view.php?slug=39-engagement-reports).
 
 The two functions that gate access on almost every page are `require_login()` and `require_role(['admin'])`. Sensitive actions additionally call `require_stepup()` — see [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
 
