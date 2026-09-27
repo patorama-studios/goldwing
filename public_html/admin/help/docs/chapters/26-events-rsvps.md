@@ -51,9 +51,9 @@ The public calendar (what members see) lives at `/calendar/` on the site — mem
 3. **Scope** — choose **Chapter** (one chapter only) or **National** (everyone sees it).
 4. **RSVP** — leave the **RSVP enabled** toggle on unless there's a reason members shouldn't RSVP (e.g. a fully open meet-and-greet with no headcount needed).
 5. **Paid event?** — only tick **This is a paid event** if you've already set up the ticket product in the store. Most events should be left free.
-6. Click **Publish**.
+6. Click **Publish** once — the button changes to **Publishing…** while a flyer PDF uploads.
 
-The event appears on the public calendar straight away.
+You land on the saved event's page with an **Event published** banner, so you can check the PDF is attached, and **View event page** opens what members see. The event appears on the public calendar straight away. If something was missing (e.g. no chapter picked), the form comes back with a red message at the top and any PDF you'd attached is still selected — fix it and Publish again.
 
 ### How to see who's RSVP'd
 

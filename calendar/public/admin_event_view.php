@@ -53,7 +53,8 @@ if (!$event) {
     exit;
 }
 
-$message = '';
+// admin_event_create.php redirects here after publishing.
+$message = isset($_GET['created']) && $_SERVER['REQUEST_METHOD'] !== 'POST' ? 'Event published — it is now on the calendar.' : '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -418,6 +419,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700" href="events.php">Back to list</a>
+          <a class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700" href="event_view.php?slug=<?php echo calendar_e(urlencode($event['slug'])); ?>" target="_blank" rel="noopener">View event page</a>
           <button form="event-edit-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
             <span class="material-icons-outlined text-base">save</span>
             Save Changes

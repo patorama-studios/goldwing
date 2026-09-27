@@ -17,20 +17,6 @@ try {
     $chapters = [];
 }
 
-$mediaItems = [];
-try {
-    $mediaItems = $pdo->query('SELECT id, path, title, thumbnail_url FROM media WHERE type = "image" ORDER BY id DESC LIMIT 60')->fetchAll();
-} catch (Throwable $e) {
-    $mediaItems = [];
-}
-
-$pdfItems = [];
-try {
-    $pdfItems = $pdo->query('SELECT id, path, title, file_name FROM media WHERE type = "pdf" ORDER BY id DESC LIMIT 60')->fetchAll();
-} catch (Throwable $e) {
-    $pdfItems = [];
-}
-
 $products = [];
 try {
     $products = $pdo->query('SELECT id, name, price_cents, currency FROM products ORDER BY name')->fetchAll();
@@ -39,8 +25,10 @@ try {
 }
 
 $errors = [];
-$success = '';
 $uploadedMediaId = null;
+$mediaId = 0;
+$attachmentMediaId = 0;
+$attachmentName = null;
 
 $old = function (string $key, $default = '') {
     return $_POST[$key] ?? $default;
@@ -140,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $attachmentPath = null;
-    $attachmentName = null;
+    $attachmentMediaId = (int) ($_POST['attachment_media_id'] ?? 0);
     if (!empty($_FILES['attachment_file']['name'])) {
         $file = $_FILES['attachment_file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
@@ -165,11 +153,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (move_uploaded_file($file['tmp_name'], $uploadDir . $safeName)) {
                     $attachmentPath = '/uploads/' . $safeName;
                     $attachmentName = $file['name'];
-                    // Best-effort: register in the media library so it can be reused.
+                    // Best-effort: register in the media library so it can be reused, and
+                    // so a submit rejected below re-offers this PDF instead of dropping it.
                     // Guarded — a registration failure (e.g. over-long title) must not
                     // abort the event save now that the PDF is already in place.
                     try {
-                        calendar_register_media([
+                        $attachmentMediaId = (int) calendar_register_media([
                             'path' => $attachmentPath,
                             'file_type' => 'application/pdf',
                             'file_size' => (int) ($file['size'] ?? 0),
@@ -180,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'source_table' => 'calendar_events',
                         ]);
                     } catch (Throwable $e) {
+                        $attachmentMediaId = 0;
                         error_log('[Calendar] PDF media registration failed: ' . $e->getMessage());
                     }
                 } else {
@@ -189,7 +179,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $attachmentMediaId = (int) ($_POST['attachment_media_id'] ?? 0);
     if ($attachmentPath === null && $attachmentMediaId > 0) {
         $stmt = $pdo->prepare('SELECT path, title, file_name FROM media WHERE id = :id AND type = "pdf"');
         $stmt->execute(['id' => $attachmentMediaId]);
@@ -198,6 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $attachmentPath = $libraryPdf['path'];
             $attachmentName = $libraryPdf['file_name'] ?: ($libraryPdf['title'] ?: basename($libraryPdf['path']));
         } else {
+            $attachmentMediaId = 0;
             $errors[] = 'Selected library PDF not found.';
         }
     }
@@ -295,16 +285,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
 
-            $success = 'Event created successfully.';
         } catch (Throwable $e) {
             error_log('[Calendar] Event creation failed: ' . $e->getMessage());
             if ($eventId === 0) {
                 $errors[] = 'Unable to create event. Please try again later.';
-            } else {
-                $success = 'Event created successfully.';
             }
         }
+        if ($eventId > 0) {
+            // Land on the saved event. Re-showing the filled-in form let a refresh
+            // or a second "Publish" create the same event twice.
+            calendar_redirect('admin_event_view.php?id=' . $eventId . '&created=1');
+        }
     }
+}
+
+// Loaded after the POST so a cover image / PDF uploaded by a rejected submit
+// is in the pickers and can be re-offered below.
+$mediaItems = [];
+try {
+    $mediaItems = $pdo->query('SELECT id, path, title, thumbnail_url FROM media WHERE type = "image" ORDER BY id DESC LIMIT 60')->fetchAll();
+} catch (Throwable $e) {
+    $mediaItems = [];
+}
+
+$pdfItems = [];
+try {
+    $pdfItems = $pdo->query('SELECT id, path, title, file_name FROM media WHERE type = "pdf" ORDER BY id DESC LIMIT 60')->fetchAll();
+} catch (Throwable $e) {
+    $pdfItems = [];
 }
 
 $timezoneOptions = [
@@ -334,18 +342,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         </div>
         <div class="flex items-center gap-3">
           <a href="admin_events.php" class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700">Discard</a>
-          <button data-tour="create-event-publish" form="calendar-event-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors">
+          <button data-tour="create-event-publish" form="calendar-event-form" type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ink text-white text-sm font-semibold shadow-soft hover:bg-primary-strong transition-colors disabled:opacity-60">
             <span class="material-icons-outlined text-base">publish</span>
             Publish Event
           </button>
         </div>
       </div>
 
-      <?php if ($success) : ?>
-        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          <?php echo calendar_e($success); ?>
-        </div>
-      <?php endif; ?>
       <?php if (!empty($errors)) : ?>
         <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 space-y-1">
           <?php foreach ($errors as $err) : ?>
@@ -380,7 +383,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   Choose from Media Library
                 </button>
               </div>
-              <input type="hidden" name="media_id" id="media_id" value="<?php echo calendar_e($old('media_id')); ?>">
+              <input type="hidden" name="media_id" id="media_id" value="<?php echo $mediaId ?: ''; ?>">
               <div class="mt-3 border-2 border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50">
                 <div class="flex items-center gap-4">
                   <div id="media_preview" class="h-24 w-40 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-400 text-sm">
@@ -412,11 +415,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                   Choose from Media Library
                 </button>
               </div>
-              <input type="hidden" name="attachment_media_id" id="attachment_media_id" value="">
-              <div id="pdf_selected_wrap" class="hidden mt-2 items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <input type="hidden" name="attachment_media_id" id="attachment_media_id" value="<?php echo $attachmentMediaId ?: ''; ?>">
+              <div id="pdf_selected_wrap" class="<?php echo $attachmentMediaId ? 'flex' : 'hidden'; ?> mt-2 items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
                 <span class="flex items-center gap-2 text-gray-700 font-medium truncate">
                   <span class="material-icons-outlined text-base text-red-500">picture_as_pdf</span>
-                  <span id="pdf_selected_name"></span>
+                  <span id="pdf_selected_name"><?php echo calendar_e((string) $attachmentName); ?></span>
                 </span>
                 <button type="button" class="text-xs text-red-600 whitespace-nowrap" onclick="clearPdfSelection()">Clear</button>
               </div>
@@ -689,6 +692,19 @@ function clearPdfSelection(keepFile) {
 (function initForm() {
   toggleChapter();
   togglePaid();
+  // A flyer PDF can take a while to upload with no sign of progress — lock
+  // Publish once clicked so a second click can't create the event twice.
+  var publishBtn = document.querySelector('button[form="calendar-event-form"]');
+  var publishLabel = publishBtn.lastChild.textContent;
+  document.getElementById('calendar-event-form').addEventListener('submit', function () {
+    publishBtn.disabled = true;
+    publishBtn.lastChild.textContent = ' Publishing…';
+  });
+  // Re-arm if the browser's Back button restores this page mid-publish.
+  window.addEventListener('pageshow', function () {
+    publishBtn.disabled = false;
+    publishBtn.lastChild.textContent = publishLabel;
+  });
   // Picker rows carry their data on data-* attributes (correctly HTML-escaped) and
   // are wired here — avoids injecting names into inline onclick JS-string literals.
   document.querySelectorAll('.gw-media-pick').forEach(function (btn) {

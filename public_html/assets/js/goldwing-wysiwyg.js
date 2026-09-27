@@ -74,8 +74,15 @@
     const editor = document.createElement('div');
     wrapper.appendChild(editor);
 
-    textarea.style.display = 'none';
     textarea.parentNode.insertBefore(wrapper, textarea);
+    // Invisible but still rendered (not display:none), so the browser's
+    // `required` check can reach it — hidden outright, an empty required
+    // editor made the Save/Publish button silently do nothing.
+    textarea.tabIndex = -1;
+    textarea.setAttribute('aria-hidden', 'true');
+    textarea.style.cssText = 'position:absolute;left:0;bottom:0;width:100%;height:1px;min-height:0;padding:0;border:0;opacity:0;pointer-events:none;resize:none';
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(textarea);
 
     const placeholder = textarea.getAttribute('placeholder') || '';
 
@@ -107,8 +114,14 @@
       // server-side "required" checks still work.
       const html = quill.getText().trim() === '' ? '' : quill.root.innerHTML;
       textarea.value = html;
+      quill.container.style.borderColor = '';
     };
     quill.on('text-change', sync);
+
+    // Empty + required: the browser focuses the hidden textarea — hand that to
+    // the editor (so typing lands there) and outline it red.
+    textarea.addEventListener('focus', () => quill.focus());
+    textarea.addEventListener('invalid', () => { quill.container.style.borderColor = '#dc2626'; });
 
     // Belt-and-braces: sync once more right before the form submits.
     const form = textarea.closest('form');
