@@ -676,7 +676,7 @@ $outlookCalendarUrl = 'https://outlook.live.com/calendar/0/addcalendar?url=' . u
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <script src="assets/event-modal.js"></script>
+    <script src="assets/event-modal.js?v=20260930"></script>
     <script>
         function gwFormatTime(d) {
             return new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).format(d).toUpperCase();

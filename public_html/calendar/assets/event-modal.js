@@ -83,7 +83,11 @@
         e.preventDefault();
         var action = withEmbed(form.getAttribute('action') || '');
         if (!action) { return; }
-        fetch(action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' })
+        // FormData(form) alone drops the clicked button's name/value (rsvp_status),
+        // so append the submitter explicitly.
+        var data = new FormData(form);
+        if (e.submitter && e.submitter.name) { data.append(e.submitter.name, e.submitter.value); }
+        fetch(action, { method: 'POST', body: data, credentials: 'same-origin' })
           .then(function (r) { return r.text(); })
           .then(function (html) { content.innerHTML = html; bindContent(); })
           .catch(function () {

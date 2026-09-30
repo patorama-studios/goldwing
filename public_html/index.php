@@ -182,7 +182,7 @@ require __DIR__ . '/../app/Views/partials/nav_public.php';
                 </div>
                 <!-- Runs on the parent so the calendar iframe can hand off its
                      event popup to a full-page overlay that covers the nav. -->
-                <script src="/calendar/assets/event-modal.js" defer></script>
+                <script src="/calendar/assets/event-modal.js?v=20260930" defer></script>
               <?php endif; ?>
             <?php elseif ($page && !$canView): ?>
               <h2>Members Only</h2>

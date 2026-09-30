@@ -2162,7 +2162,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </a>
               </div>
             <?php endif; ?>
-            <script src="/calendar/assets/event-modal.js" defer></script>
+            <script src="/calendar/assets/event-modal.js?v=20260930" defer></script>
             <script>
               (function () {
                 if (window.__gwEventModalBound) { return; }
@@ -3955,7 +3955,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           </div>
           <!-- Runs on the parent so the calendar iframe can hand off its event
                popup to a full-page overlay that covers the member nav. -->
-          <script src="/calendar/assets/event-modal.js" defer></script>
+          <script src="/calendar/assets/event-modal.js?v=20260930" defer></script>
         </section>
       <?php elseif ($page === 'notices-create'): ?>
         <section class="space-y-6">
