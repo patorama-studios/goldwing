@@ -266,7 +266,7 @@ When `end_date` passes the member's status badge and all in-app labels immediate
 
 `SELECT … FROM membership_periods WHERE status = 'ACTIVE' AND end_date < (CURDATE() - INTERVAL 2 MONTH)`
 
-After that interval each match: period → `LAPSED`, member → `LAPSED`. Writes `last_expire_run` into `system_settings`. The grace period constant lives in `MembershipAccessService::GRACE_MONTHS` — the cron reads it so both stay in sync.
+After that interval each match: period → `LAPSED`, and member → `LAPSED` **only if no other `ACTIVE` period still covers them** — a renewal adds a new period and leaves the old one `ACTIVE`, so an already-renewed member just has the stale row closed. Writes `last_expire_run` into `system_settings`. The grace period constant lives in `MembershipAccessService::GRACE_MONTHS` — the cron reads it so both stay in sync.
 
 The `in_grace` flag is computed in `MembershipAccessService::state()` (`!lapsed && end_date < today`). The member-area pages check `$gwInGrace` to show the Lapsed badge/dot while keeping feature gates open.
 

@@ -22,7 +22,10 @@ foreach ($periods as $period) {
     // "LAPSED" matches the legacy members.status convention written by
     // MemberRepository::normalizeStatus (EXPIRED -> LAPSED); the lockdown
     // reader lowercases and treats "lapsed" as locked.
-    $updateMember = $pdo->prepare('UPDATE members SET status = "LAPSED" WHERE id = :member_id');
+    // Only when nothing else still covers them: a renewal adds a NEW period
+    // and leaves the old one ACTIVE, so lapsing on the stale row alone locked
+    // out every already-renewed member on 1 Oct 2026.
+    $updateMember = $pdo->prepare("UPDATE members SET status = 'LAPSED' WHERE id = :member_id AND NOT EXISTS (SELECT 1 FROM membership_periods mp2 WHERE mp2.member_id = members.id AND mp2.status = 'ACTIVE' AND (mp2.end_date IS NULL OR mp2.end_date >= (CURDATE() - INTERVAL $graceMonths MONTH)))");
     $updateMember->execute(['member_id' => $period['member_id']]);
 }
 
