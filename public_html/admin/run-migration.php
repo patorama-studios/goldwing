@@ -4177,7 +4177,8 @@ if ($alreadyRun) {
 // (unnumbered, Sydney Chapter) become INACTIVE life member records so they sit
 // in the members system, and their Life Members roll rows get linked to them.
 // "Deceased" has no members column: INACTIVE keeps them out of the directory,
-// renewals and mailings, `notes` says why, and the roll carries (Deceased).
+// renewals and mailings, and the roll carries (Deceased). (Live members has no
+// `notes` column — don't write to it.)
 // Idempotent and cautious: an existing record (by number, or by exact name) is
 // updated rather than duplicated; a number held by someone with a different
 // surname, an ambiguous name, a missing household head or a NOT NULL
@@ -4193,7 +4194,6 @@ if ($alreadyRun) {
     $pdo    = db();
     $ok     = true;
     $notes  = [];
-    $noteTx = 'Deceased life member (Wings roll). Kept Inactive: not billed, mailed or listed in the directory.';
     try {
         $baseNullable = (($pdo->query("SHOW COLUMNS FROM members LIKE 'member_number_base'")->fetch(PDO::FETCH_ASSOC)['Null'] ?? '') === 'YES');
         $hasRollLink  = (bool) $pdo->query("SHOW COLUMNS FROM life_members LIKE 'member_id'")->fetchColumn();
@@ -4211,12 +4211,11 @@ if ($alreadyRun) {
         $update  = $pdo->prepare("UPDATE members SET status = 'INACTIVE',
                 member_type = IF(member_type = 'ASSOCIATE', member_type, 'LIFE'),
                 is_life_member = IF(member_type = 'ASSOCIATE', 1, is_life_member),
-                full_member_id = COALESCE(full_member_id, ?),
-                notes = IF(notes IS NULL OR notes = '', ?, notes), updated_at = NOW() WHERE id = ?");
+                full_member_id = COALESCE(full_member_id, ?), updated_at = NOW() WHERE id = ?");
         $insert  = $pdo->prepare("INSERT INTO members
                 (member_type, is_life_member, status, member_number_base, member_number_suffix, full_member_id,
-                 chapter_id, first_name, last_name, email, notes, country, created_at)
-             VALUES (?, ?, 'INACTIVE', ?, ?, ?, (SELECT id FROM chapters WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1), ?, ?, ?, ?, 'Australia', NOW())");
+                 chapter_id, first_name, last_name, email, country, created_at)
+             VALUES (?, ?, 'INACTIVE', ?, ?, ?, (SELECT id FROM chapters WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1), ?, ?, ?, 'Australia', NOW())");
         $roll    = $hasRollLink ? $pdo->prepare('UPDATE life_members SET member_id = ?, is_deceased = 1 WHERE full_name = ? AND member_id IS NULL') : null;
         $added = 0;
         $updated = 0;
@@ -4258,7 +4257,7 @@ if ($alreadyRun) {
                 }
             }
             if ($row) {
-                $update->execute([$headId, $noteTx, (int) $row['id']]);
+                $update->execute([$headId, (int) $row['id']]);
                 $memberId = (int) $row['id'];
                 $updated++;
             } else {
@@ -4271,7 +4270,7 @@ if ($alreadyRun) {
                 // blank, so fall back to an address that can never receive mail.
                 foreach (['', 'deceased-' . ($base ?? 'x') . '-' . $suffix . '@goldwing.invalid'] as $email) {
                     try {
-                        $insert->execute([$type, $lifeFlag, $base, $suffix, $headId, $chapter, $first, $last, $email, $noteTx]);
+                        $insert->execute([$type, $lifeFlag, $base, $suffix, $headId, $chapter, $first, $last, $email]);
                         break;
                     } catch (\PDOException $e) {
                         if ($email !== '' || $e->getCode() !== '23000') {
