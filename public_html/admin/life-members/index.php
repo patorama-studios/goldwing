@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
 use App\Services\Csrf;
+use App\Services\MemberRepository;
 
 require_permission('admin.pages.view');
 
@@ -18,15 +19,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tableReady) {
     if (Csrf::verify($_POST['csrf_token'] ?? '')) {
         $action = $_POST['action'] ?? '';
         $id = (int) ($_POST['id'] ?? 0);
-        if ($action === 'add') {
-            $name = trim((string) ($_POST['full_name'] ?? ''));
-            $year = (int) ($_POST['year_awarded'] ?? 0);
-            if ($name === '' || mb_strlen($name) > 150 || $year < 1900 || $year > (int) date('Y') + 1) {
-                $flash = ['type' => 'error', 'message' => 'Enter a name and a valid year.'];
-            } else {
-                $pdo->prepare('INSERT INTO life_members (full_name, year_awarded, is_deceased, is_honorary, created_at) VALUES (?, ?, ?, ?, NOW())')
-                    ->execute([$name, $year, empty($_POST['is_deceased']) ? 0 : 1, empty($_POST['is_honorary']) ? 0 : 1]);
+        $name = trim((string) ($_POST['full_name'] ?? ''));
+        $year = (int) ($_POST['year_awarded'] ?? 0);
+        $validEntry = $name !== '' && mb_strlen($name) <= 150 && $year >= 1900 && $year <= (int) date('Y') + 1;
+        if (($action === 'add' || $action === 'add_member') && !$validEntry) {
+            $flash = ['type' => 'error', 'message' => 'Enter a name and a valid year.'];
+        } elseif ($action === 'add') {
+            $pdo->prepare('INSERT INTO life_members (full_name, year_awarded, is_deceased, is_honorary, created_at) VALUES (?, ?, ?, ?, NOW())')
+                ->execute([$name, $year, empty($_POST['is_deceased']) ? 0 : 1, empty($_POST['is_honorary']) ? 0 : 1]);
+            $flash = ['type' => 'success', 'message' => $name . ' added.'];
+        } elseif ($action === 'add_member') {
+            // A member already flagged life: record their year and link the roll entry to them.
+            $check = $pdo->prepare('SELECT COUNT(*) FROM members WHERE id = ? AND id NOT IN (SELECT member_id FROM life_members WHERE member_id IS NOT NULL)');
+            $check->execute([(int) ($_POST['member_id'] ?? 0)]);
+            if ($check->fetchColumn()) {
+                $pdo->prepare('INSERT INTO life_members (full_name, member_id, year_awarded, is_deceased, is_honorary, created_at) VALUES (?, ?, ?, 0, 0, NOW())')
+                    ->execute([$name, (int) $_POST['member_id'], $year]);
                 $flash = ['type' => 'success', 'message' => $name . ' added.'];
+            } else {
+                $flash = ['type' => 'error', 'message' => 'That member is already on the roll.'];
             }
         } elseif ($action === 'toggle_deceased' && $id > 0) {
             $pdo->prepare('UPDATE life_members SET is_deceased = 1 - is_deceased WHERE id = ?')->execute([$id]);
@@ -46,6 +57,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tableReady) {
 $flash = $_SESSION['life_members_flash'] ?? null;
 unset($_SESSION['life_members_flash']);
 $rows = $tableReady ? $pdo->query('SELECT * FROM life_members ORDER BY is_honorary, year_awarded, id')->fetchAll() : [];
+// ACTIVE members flagged life who aren't on the roll yet (they already show on the
+// member page by name; this is where their year gets recorded). Needs Migration 054.
+$unlisted = [];
+if ($tableReady) {
+    try {
+        $unlisted = $pdo->query("SELECT m.id, m.first_name, m.last_name FROM members m
+            WHERE LOWER(m.status) = 'active' AND NOT (" . MemberRepository::notLifeSql($pdo) . ")
+              AND m.id NOT IN (SELECT member_id FROM life_members WHERE member_id IS NOT NULL)
+            ORDER BY m.last_name, m.first_name")->fetchAll();
+    } catch (Throwable $e) {
+        $unlisted = [];
+    }
+}
 $canEdit = current_admin_can('admin.pages.edit', current_user());
 
 $pageTitle = 'Life Members';
@@ -91,6 +115,28 @@ require __DIR__ . '/../../../app/Views/partials/backend_head.php';
                         <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Add to roll</button>
                     </div>
                 </form>
+            <?php endif; ?>
+
+            <?php if ($unlisted): ?>
+                <section class="rounded-2xl border border-amber-100 bg-amber-50 p-6 space-y-3">
+                    <div>
+                        <h2 class="text-sm font-semibold text-amber-900">Flagged as life members, no year recorded yet</h2>
+                        <p class="text-xs text-amber-800 mt-1">These members already appear on the member page by name. Add the year they were awarded to place them in the roll.</p>
+                    </div>
+                    <?php foreach ($unlisted as $u): ?>
+                        <?php $uName = trim($u['first_name'] . ' ' . $u['last_name']); ?>
+                        <form method="post" class="flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="csrf_token" value="<?= e(Csrf::token()) ?>">
+                            <input type="hidden" name="action" value="add_member">
+                            <input type="hidden" name="member_id" value="<?= (int) $u['id'] ?>">
+                            <input type="text" name="full_name" value="<?= e($uName) ?>" maxlength="150" required aria-label="Name as shown on the roll" class="w-56 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900">
+                            <input type="number" name="year_awarded" min="1900" max="<?= (int) date('Y') + 1 ?>" placeholder="Year" required aria-label="Year awarded" class="w-24 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900">
+                            <?php if ($canEdit): ?>
+                                <button type="submit" class="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-gray-900 transition hover:bg-primary/80">Add to roll</button>
+                            <?php endif; ?>
+                        </form>
+                    <?php endforeach; ?>
+                </section>
             <?php endif; ?>
 
             <section class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-x-auto">

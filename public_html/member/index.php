@@ -5482,9 +5482,13 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         <?php
         // Life Members honour roll — the `life_members` table (Migration 053),
         // maintained in Admin → Life Members. Grouped by year awarded, as in the
-        // Wings roll; honorary members are listed separately underneath.
+        // Wings roll; honorary members are listed separately underneath. Any
+        // ACTIVE member flagged life who isn't on the roll yet (Migration 054
+        // links roll rows to members) is listed by name after the year groups,
+        // so flagging someone is enough to make them appear.
         $lifeByYear = [];
         $lifeHonorary = [];
+        $lifeOthers = [];
         try {
             foreach ($pdo->query('SELECT full_name, year_awarded, is_deceased, is_honorary FROM life_members ORDER BY year_awarded, id') as $lm) {
                 if ($lm['is_honorary']) {
@@ -5496,15 +5500,37 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         } catch (\Throwable $e) {
             // table not migrated yet — falls through to the empty state
         }
+        try {
+            $lifeStmt = $pdo->query("
+                SELECT m.first_name, m.last_name, COALESCE(m.full_member_id, m.id) AS household
+                FROM members m
+                LEFT JOIN members fm ON fm.id = m.full_member_id
+                WHERE LOWER(m.status) = 'active' AND NOT (" . MemberRepository::notLifeSql($pdo) . ")
+                  AND m.id NOT IN (SELECT member_id FROM life_members WHERE member_id IS NOT NULL)
+                ORDER BY COALESCE(fm.last_name, m.last_name), COALESCE(fm.first_name, m.first_name), household, m.full_member_id IS NOT NULL, m.first_name
+            ");
+            foreach ($lifeStmt->fetchAll() as $lm) {
+                $lifeOthers[$lm['household']][] = trim($lm['first_name'] . ' ' . $lm['last_name']);
+            }
+        } catch (\Throwable $e) {
+            // Migration 054 not run yet — roll entries only
+        }
         $lifeLine = static fn(array $lm): string => '<p class="text-lg font-semibold text-gray-900">' . e($lm['full_name']) . ' &ndash; ' . (int) $lm['year_awarded']
             . ($lm['is_deceased'] ? ' <span class="font-normal italic text-amber-700">(Deceased)</span>' : '') . '</p>';
         ?>
         <section class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
           <h2 class="font-display text-3xl font-bold text-amber-700 leading-snug max-w-xl mx-auto">Our gratitude will always be shown towards our Life Members&hellip;</h2>
-          <?php if ($lifeByYear || $lifeHonorary): ?>
+          <?php if ($lifeByYear || $lifeHonorary || $lifeOthers): ?>
             <div class="mt-8 space-y-5">
               <?php foreach ($lifeByYear as $lifeGroup): ?>
                 <div><?php foreach ($lifeGroup as $lm) { echo $lifeLine($lm); } ?></div>
+              <?php endforeach; ?>
+              <?php foreach ($lifeOthers as $lifeNames): ?>
+                <div>
+                  <?php foreach ($lifeNames as $lifeName): ?>
+                    <p class="text-lg font-semibold text-gray-900"><?= e($lifeName) ?></p>
+                  <?php endforeach; ?>
+                </div>
               <?php endforeach; ?>
             </div>
             <?php if ($lifeHonorary): ?>

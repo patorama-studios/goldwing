@@ -4077,6 +4077,68 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 054 — life_members.member_id (Oct 2026). Lets the Life Members page
+// list every ACTIVE member flagged life that is not already on the roll, with
+// no duplicates. Adds the column, then links existing roll rows to their member
+// record on surname + first-name prefix — only when exactly one member matches
+// (so "Mal Pryor" finds "Malcolm Pryor", "Dot Brannan" finds "Dorothy (Dot)
+// Brannan", and an ambiguous or missing match stays NULL). Same DDL as
+// database/migrations/2026_10_03_life_members_member_link.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_054_life_members_member_link';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 054 — life members member link', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        if ((bool) $pdo->query("SHOW COLUMNS FROM life_members LIKE 'member_id'")->fetchColumn()) {
+            $notes[] = 'member_id column already present.';
+        } else {
+            $pdo->exec('ALTER TABLE life_members ADD COLUMN member_id INT NULL AFTER full_name, ADD INDEX idx_life_members_member (member_id)');
+            $notes[] = 'life_members.member_id column added.';
+        }
+        $find = $pdo->prepare('SELECT id FROM members WHERE LOWER(last_name) = ? AND (LOWER(first_name) LIKE ? OR LOWER(first_name) LIKE ?)');
+        $link = $pdo->prepare('UPDATE life_members SET member_id = ? WHERE id = ?');
+        $linked = 0;
+        $unmatched = [];
+        foreach ($pdo->query('SELECT id, full_name FROM life_members WHERE member_id IS NULL')->fetchAll() as $row) {
+            [$first, $last] = array_pad(explode(' ', trim($row['full_name']), 2), 2, '');
+            $first = strtolower($first);
+            $ids = [];
+            // exact first name first (a bare LIKE is equality), then prefix / "(nickname)"
+            foreach ([[$first, $first], [$first . '%', '%(' . $first . ')%']] as $patterns) {
+                $find->execute([strtolower($last), $patterns[0], $patterns[1]]);
+                $ids = $find->fetchAll(PDO::FETCH_COLUMN);
+                if (count($ids) === 1) {
+                    break;
+                }
+            }
+            if ($last !== '' && count($ids) === 1) {
+                $link->execute([(int) $ids[0], (int) $row['id']]);
+                $linked++;
+            } else {
+                $unmatched[] = $row['full_name'];
+            }
+        }
+        $notes[] = $linked . ' roll entries linked to a member record.';
+        if ($unmatched) {
+            $notes[] = 'No single match (left unlinked): ' . implode(', ', $unmatched) . '.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'life_members: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 054 — life members member link', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
