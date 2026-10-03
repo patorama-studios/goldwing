@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $endAt = $_POST['end_at'] ?? '';
     $allDay = isset($_POST['all_day']) ? 1 : 0;
     $rsvpEnabled = isset($_POST['rsvp_enabled']) ? 1 : 0;
+    $notifyEmail = trim($_POST['notify_email'] ?? '');
     $isPaid = isset($_POST['is_paid']) ? 1 : 0;
     $ticketProductId = $isPaid ? (int) ($_POST['ticket_product_id'] ?? 0) : null;
     $capacity = $_POST['capacity'] !== '' ? (int) $_POST['capacity'] : null;
@@ -209,6 +210,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isPaid && !$ticketProductId) {
         $errors[] = 'Ticket product is required for paid events.';
     }
+    if ($notifyEmail !== '' && !filter_var($notifyEmail, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'RSVP notification email is not a valid email address.';
+    }
 
     if (empty($errors)) {
         $eventId = 0;
@@ -226,8 +230,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $slug = $slugBase . '-' . $suffix;
             }
 
-            $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, attachment_path, attachment_name, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
-                VALUES (:title, :slug, :description, :media_id, :attachment_path, :attachment_name, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
+            $stmt = $pdo->prepare('INSERT INTO calendar_events (title, slug, description, media_id, attachment_path, attachment_name, scope, chapter_id, event_type, timezone, start_at, end_at, all_day, recurrence_rule, rsvp_enabled, notify_email, is_paid, ticket_product_id, capacity, sales_close_at, map_url, map_zoom, online_url, meeting_point, destination, status, created_by, created_at)
+                VALUES (:title, :slug, :description, :media_id, :attachment_path, :attachment_name, :scope, :chapter_id, :event_type, :timezone, :start_at, :end_at, :all_day, :recurrence_rule, :rsvp_enabled, :notify_email, :is_paid, :ticket_product_id, :capacity, :sales_close_at, :map_url, :map_zoom, :online_url, :meeting_point, :destination, "published", :created_by, NOW())');
             $stmt->execute([
                 'title' => $title,
                 'slug' => $slug,
@@ -244,6 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'all_day' => $allDay,
                 'recurrence_rule' => $recurrenceRule,
                 'rsvp_enabled' => $rsvpEnabled,
+                'notify_email' => $notifyEmail ?: null,
                 'is_paid' => $isPaid,
                 'ticket_product_id' => $ticketProductId,
                 'capacity' => $capacity,
@@ -548,6 +553,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <span class="block text-xs text-gray-500">Allow members to register</span>
               </span>
               <input type="checkbox" name="rsvp_enabled" value="1" class="rounded border-gray-200" <?php echo $old('rsvp_enabled') ? 'checked' : ''; ?>>
+            </label>
+            <label class="block text-sm font-medium text-gray-700">
+              RSVP notification email
+              <span class="block text-xs font-normal text-gray-500">Emailed each time a member RSVPs. Leave blank for none.</span>
+              <input type="email" name="notify_email" value="<?php echo calendar_e($old('notify_email')); ?>" placeholder="organiser@example.com" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
             </label>
             <label class="flex items-start justify-between gap-3 text-sm">
               <span>

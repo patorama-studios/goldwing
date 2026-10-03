@@ -80,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endAt = $_POST['end_at'] ?? '';
         $allDay = isset($_POST['all_day']) ? 1 : 0;
         $rsvpEnabled = isset($_POST['rsvp_enabled']) ? 1 : 0;
+        $notifyEmail = trim($_POST['notify_email'] ?? '');
         $isPaid = isset($_POST['is_paid']) ? 1 : 0;
         $ticketProductId = $isPaid ? (int) ($_POST['ticket_product_id'] ?? 0) : null;
         $capacity = $_POST['capacity'] !== '' ? (int) $_POST['capacity'] : null;
@@ -239,10 +240,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'End time must be after start time.';
         } elseif ($isPaid && !$ticketProductId) {
             $error = 'Ticket product is required for paid events.';
+        } elseif ($notifyEmail !== '' && !filter_var($notifyEmail, FILTER_VALIDATE_EMAIL)) {
+            $error = 'RSVP notification email is not a valid email address.';
         }
 
         if ($error === '') {
-            $stmt = $pdo->prepare('UPDATE calendar_events SET title = :title, description = :description, media_id = :media_id, scope = :scope, chapter_id = :chapter_id, event_type = :event_type, timezone = :timezone, start_at = :start_at, end_at = :end_at, all_day = :all_day, recurrence_rule = :recurrence_rule, rsvp_enabled = :rsvp_enabled, is_paid = :is_paid, ticket_product_id = :ticket_product_id, capacity = :capacity, sales_close_at = :sales_close_at, map_url = :map_url, map_zoom = :map_zoom, online_url = :online_url, meeting_point = :meeting_point, destination = :destination WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE calendar_events SET title = :title, description = :description, media_id = :media_id, scope = :scope, chapter_id = :chapter_id, event_type = :event_type, timezone = :timezone, start_at = :start_at, end_at = :end_at, all_day = :all_day, recurrence_rule = :recurrence_rule, rsvp_enabled = :rsvp_enabled, notify_email = :notify_email, is_paid = :is_paid, ticket_product_id = :ticket_product_id, capacity = :capacity, sales_close_at = :sales_close_at, map_url = :map_url, map_zoom = :map_zoom, online_url = :online_url, meeting_point = :meeting_point, destination = :destination WHERE id = :id');
             $stmt->execute([
                 'title' => $title,
                 'description' => $description,
@@ -256,6 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'all_day' => $allDay,
                 'recurrence_rule' => $recurrenceRule,
                 'rsvp_enabled' => $rsvpEnabled,
+                'notify_email' => $notifyEmail ?: null,
                 'is_paid' => $isPaid,
                 'ticket_product_id' => $ticketProductId,
                 'capacity' => $capacity,
@@ -696,6 +700,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <span class="block text-xs text-gray-500">Allow members to register</span>
               </span>
               <input type="checkbox" name="rsvp_enabled" form="event-edit-form" value="1" class="rounded border-gray-200" <?php echo (int) $event['rsvp_enabled'] === 1 ? 'checked' : ''; ?>>
+            </label>
+            <label class="block text-sm font-medium text-gray-700">
+              RSVP notification email
+              <span class="block text-xs font-normal text-gray-500">Emailed each time a member RSVPs. Leave blank for none.</span>
+              <input type="email" name="notify_email" form="event-edit-form" value="<?php echo calendar_e($event['notify_email'] ?? ''); ?>" placeholder="organiser@example.com" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
             </label>
             <label class="flex items-start justify-between gap-3 text-sm">
               <span>

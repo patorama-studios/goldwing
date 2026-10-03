@@ -4020,6 +4020,38 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 052 — per-event RSVP notification email (Sep 2026, Rob Watson).
+// Whoever enters the event can name an address (organiser, chapter rep) that
+// gets an email each time a member RSVPs. Blank = no email, as before.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_052_calendar_event_notify_email';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 052 — event RSVP notification email', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $hasColumn = (bool) $pdo->query("SHOW COLUMNS FROM calendar_events LIKE 'notify_email'")->fetchColumn();
+        if ($hasColumn) {
+            $notes[] = 'notify_email column already present.';
+        } else {
+            $pdo->exec('ALTER TABLE calendar_events ADD COLUMN notify_email VARCHAR(255) NULL AFTER rsvp_enabled');
+            $notes[] = 'calendar_events.notify_email column added.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'ALTER: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 052 — event RSVP notification email', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Migration 053 — life_members honour roll for the member portal "Life
 // Members" page (Oct 2026). Name, year awarded, deceased, honorary. Seeded once
 // from the 2024-25 Wings roll, only when the table is empty. Same DDL + seed as

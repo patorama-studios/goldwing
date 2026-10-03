@@ -36,6 +36,33 @@ $user = calendar_current_user();
 $message = '';
 $error = '';
 
+// Email the event's RSVP contact (if one is set) whenever a member responds.
+// Uses the site's EmailService (goldwing.org.au sender), never the calendar
+// mailer's example.com placeholder. Failures are swallowed so a mail problem
+// can't undo or hide the member's saved RSVP.
+$notifyRsvp = function (string $response) use ($pdo, $event, $user): void {
+    $to = trim((string) ($event['notify_email'] ?? ''));
+    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(qty),0) FROM calendar_event_rsvps WHERE event_id = :event_id AND status = "going"');
+        $stmt->execute(['event_id' => $event['id']]);
+        $going = (int) $stmt->fetchColumn();
+        $name = trim((string) ($user['name'] ?? '')) ?: (string) ($user['email'] ?? 'A member');
+        $when = (new DateTime($event['start_at'], new DateTimeZone($event['timezone'])))->format('l j F Y, g:i A');
+        $notes = trim((string) ($_POST['notes'] ?? ''));
+        $body = '<p><strong>' . calendar_e($name) . '</strong> responded to <strong>' . calendar_e($event['title']) . '</strong> (' . calendar_e($when) . ').</p>'
+            . '<p>Response: <strong>' . calendar_e($response) . '</strong>'
+            . ($notes !== '' ? '<br>Notes: ' . calendar_e($notes) : '')
+            . (!empty($user['email']) ? '<br>Email: ' . calendar_e($user['email']) : '') . '</p>'
+            . '<p>Total now attending: <strong>' . $going . '</strong></p>';
+        \App\Services\EmailService::send($to, 'RSVP: ' . $name . ' — ' . $event['title'], $body, ['is_mandatory' => true]);
+    } catch (\Throwable $e) {
+        error_log('RSVP notify failed for event ' . $event['id'] . ': ' . $e->getMessage());
+    }
+};
+
 $now = new DateTime('now', new DateTimeZone($event['timezone']));
 $salesCloseAt = $event['sales_close_at'] ? new DateTime($event['sales_close_at'], new DateTimeZone($event['timezone'])) : null;
 $salesClosed = $salesCloseAt ? ($now >= $salesCloseAt) : false;
@@ -58,6 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('DELETE FROM calendar_event_rsvps WHERE event_id = :event_id AND user_id = :user_id');
             $stmt->execute(['event_id' => $event['id'], 'user_id' => $user['id']]);
             $message = 'Your response has been cleared.';
+            $notifyRsvp('Cleared their response');
         } elseif (!in_array($rsvpStatus, $validStatuses, true)) {
             $error = 'Please choose a response.';
         } else {
@@ -90,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 $statusMessages = ['going' => 'Attending', 'maybe' => 'Maybe', 'not_going' => 'Not attending'];
                 $message = 'Your response has been saved: ' . $statusMessages[$rsvpStatus] . '.';
+                $notifyRsvp($statusMessages[$rsvpStatus] . ($rsvpStatus === 'not_going' ? '' : ' (' . $qty . ' coming)'));
             }
         }
     }

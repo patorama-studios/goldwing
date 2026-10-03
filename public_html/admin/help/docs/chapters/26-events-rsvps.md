@@ -49,7 +49,7 @@ The public calendar (what members see) lives at `/calendar/` on the site — mem
     - **Location** — meeting point, destination, and (optionally) a map link.
     - **Description** — what to bring, ride leader, what time to arrive vs depart, dress code, anything members need to know.
 3. **Scope** — choose **Chapter** (one chapter only) or **National** (everyone sees it).
-4. **RSVP** — leave the **RSVP enabled** toggle on unless there's a reason members shouldn't RSVP (e.g. a fully open meet-and-greet with no headcount needed).
+4. **RSVP** — leave the **RSVP enabled** toggle on unless there's a reason members shouldn't RSVP (e.g. a fully open meet-and-greet with no headcount needed). If someone (the organiser, the chapter rep) should hear about each RSVP as it comes in, put their address in **RSVP notification email**. They get an email every time a member responds, changes or clears their response, showing the running Attending total. Leave it blank and nobody is emailed; the list is still on the event page.
 5. **Paid event?** — only tick **This is a paid event** if you've already set up the ticket product in the store. Most events should be left free.
 6. Click **Publish** once — the button changes to **Publishing…** while a flyer PDF uploads.
 
@@ -186,6 +186,7 @@ The legacy `?page=events` route still exists by direct URL but isn't linked anyw
 #### Notifications
 
 - **New event created** — not currently broadcast on save. Members find out via the next weekly digest or by visiting `/calendar/`.
+- **RSVP notification** — if `calendar_events.notify_email` is set (Migration 052), `event_view.php` emails that address on every RSVP save or clear via `EmailService::send` (the site's goldwing.org.au sender, not the calendar mailer's placeholder), with the member, response, qty, notes and running `going` total. Sent inline, not queued; a send failure is logged and never blocks the RSVP.
 - **Reminders** — `calendar/cron/reminders.php` hourly, 7-day + 24-hour emails to **Attending and Maybe** RSVPs plus ticket holders, deduped via the queue table.
 - **Weekly digest** — gated by `notifications.weekly_digest_enabled` plus per-user `notification_preferences.weekly_digest`. Filters to `NATIONAL` + the user's `chapter_id`.
 
