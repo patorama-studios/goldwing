@@ -4020,6 +4020,63 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 053 — life_members honour roll for the member portal "Life
+// Members" page (Oct 2026). Name, year awarded, deceased, honorary. Seeded once
+// from the 2024-25 Wings roll, only when the table is empty. Same DDL + seed as
+// database/migrations/2026_10_03_life_members.sql — keep the two in sync.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_053_life_members';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 053 — life members roll', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS life_members (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  year_awarded SMALLINT UNSIGNED NOT NULL,
+  is_deceased TINYINT(1) NOT NULL DEFAULT 0,
+  is_honorary TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL,
+  INDEX idx_life_members_year (year_awarded, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        if ((int) $pdo->query('SELECT COUNT(*) FROM life_members')->fetchColumn() > 0) {
+            $notes[] = 'life_members already has rows — seed skipped.';
+        } else {
+            // [name, year, deceased, honorary]
+            $seed = [
+                ['Harry Ward', 1993, 1, 0], ['Shirley Ward', 1993, 1, 0],
+                ['Mal Pryor', 1997, 0, 0], ['Helen Pryor', 1997, 0, 0],
+                ['Kevin Woodward', 2000, 1, 0], ['Wendy Woodward', 2000, 0, 0],
+                ['Mal Allen', 2002, 0, 0], ['Bonnie Allen', 2002, 0, 0],
+                ['Peter Brannan', 2010, 0, 0], ['Dot Brannan', 2010, 0, 0],
+                ['Frank Milligan', 2012, 0, 0],
+                ['Mark Johannesen', 2015, 0, 0], ['Cecily Johannesen', 2015, 0, 0],
+                ['Greg Snart', 2019, 0, 1],
+                ["Greg O'Loughlin", 2021, 1, 0],
+                ['Graham Merrick', 2022, 0, 0], ['Christine Merrick', 2022, 0, 0],
+            ];
+            $ins = $pdo->prepare('INSERT INTO life_members (full_name, year_awarded, is_deceased, is_honorary, created_at) VALUES (?, ?, ?, ?, NOW())');
+            foreach ($seed as $row) {
+                $ins->execute($row);
+            }
+            $notes[] = count($seed) . ' roll entries seeded from the Wings roll.';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'life_members: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 053 — life members roll', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

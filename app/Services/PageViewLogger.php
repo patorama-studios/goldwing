@@ -23,6 +23,7 @@ class PageViewLogger
         'committee'          => 'Committee',
         'dealers'            => 'Honda Dealers',
         'fallen-wings'       => 'Fallen Wings',
+        'life-members'       => 'Life Members',
         'member-of-the-year' => 'Member of the Year',
         'awards'             => 'AGM Awards',
         'store'              => 'Store',

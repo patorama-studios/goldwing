@@ -1752,6 +1752,7 @@ $pageTitles = [
   'notices-view' => 'Notice Board',
   'notices-create' => 'Create Notice',
   'fallen-wings' => 'Fallen Wings',
+  'life-members' => 'Life Members',
   'billing' => 'Billing & Payments',
   'history' => 'Membership History',
   'store' => 'Store',
@@ -5477,6 +5478,43 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
           dropAutofill();
         })();
         </script>
+      <?php elseif ($page === 'life-members'): ?>
+        <?php
+        // Life Members honour roll — the `life_members` table (Migration 053),
+        // maintained in Admin → Life Members. Grouped by year awarded, as in the
+        // Wings roll; honorary members are listed separately underneath.
+        $lifeByYear = [];
+        $lifeHonorary = [];
+        try {
+            foreach ($pdo->query('SELECT full_name, year_awarded, is_deceased, is_honorary FROM life_members ORDER BY year_awarded, id') as $lm) {
+                if ($lm['is_honorary']) {
+                    $lifeHonorary[] = $lm;
+                } else {
+                    $lifeByYear[$lm['year_awarded']][] = $lm;
+                }
+            }
+        } catch (\Throwable $e) {
+            // table not migrated yet — falls through to the empty state
+        }
+        $lifeLine = static fn(array $lm): string => '<p class="text-lg font-semibold text-gray-900">' . e($lm['full_name']) . ' &ndash; ' . (int) $lm['year_awarded']
+            . ($lm['is_deceased'] ? ' <span class="font-normal italic text-amber-700">(Deceased)</span>' : '') . '</p>';
+        ?>
+        <section class="bg-card-light rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+          <h2 class="font-display text-3xl font-bold text-amber-700 leading-snug max-w-xl mx-auto">Our gratitude will always be shown towards our Life Members&hellip;</h2>
+          <?php if ($lifeByYear || $lifeHonorary): ?>
+            <div class="mt-8 space-y-5">
+              <?php foreach ($lifeByYear as $lifeGroup): ?>
+                <div><?php foreach ($lifeGroup as $lm) { echo $lifeLine($lm); } ?></div>
+              <?php endforeach; ?>
+            </div>
+            <?php if ($lifeHonorary): ?>
+              <h3 class="font-display text-2xl font-bold text-amber-700 mt-10 mb-2"><?= count($lifeHonorary) > 1 ? 'Honourary Members' : 'Honourary Member' ?></h3>
+              <div><?php foreach ($lifeHonorary as $lm) { echo $lifeLine($lm); } ?></div>
+            <?php endif; ?>
+          <?php else: ?>
+            <p class="mt-8 text-sm text-gray-500">No life members to show yet.</p>
+          <?php endif; ?>
+        </section>
       <?php elseif ($page === 'committee'): ?>
         <?php
         // Committee & Leadership page — pulled from committee_roles +

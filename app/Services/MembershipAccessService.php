@@ -33,7 +33,7 @@ class MembershipAccessService
     public const LOCKED_PAGES = [
         'calendar',
         'notices', 'notices-view', 'notices-create',
-        'wings', 'fallen-wings',
+        'wings', 'fallen-wings', 'life-members',
         'member-of-the-year', 'awards',
         'directory', 'committee', 'dealers', 'store',
         'notifications',

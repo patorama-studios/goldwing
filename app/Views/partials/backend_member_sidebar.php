@@ -44,6 +44,7 @@ $items = [
   ],
   ['key' => 'wings', 'group' => 'Community', 'label' => 'Wings', 'icon' => 'menu_book', 'href' => '/member/index.php?page=wings'],
   ['key' => 'fallen-wings', 'group' => 'Community', 'label' => 'Fallen Wings', 'icon' => 'military_tech', 'href' => '/member/index.php?page=fallen-wings'],
+  ['key' => 'life-members', 'group' => 'Community', 'label' => 'Life Members', 'icon' => 'stars', 'href' => '/member/index.php?page=life-members'],
   ['key' => 'member-of-the-year', 'group' => 'Community', 'label' => 'Member of the Year', 'icon' => 'emoji_events', 'href' => '/members/member-of-the-year'],
   ['key' => 'awards', 'group' => 'Community', 'label' => 'AGM Awards', 'icon' => 'workspace_premium', 'href' => '/members/awards/'],
 
