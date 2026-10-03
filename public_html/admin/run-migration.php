@@ -4171,6 +4171,134 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 055 — the four deceased life members as member records (Oct 2026).
+// Harry & Shirley Ward (#9 / #9.1, Northwest Chapter B), Kevin Woodward
+// (#295.1, shares Wendy's household, Sydney Chapter) and Greg O'Loughlin
+// (unnumbered, Sydney Chapter) become INACTIVE life member records so they sit
+// in the members system, and their Life Members roll rows get linked to them.
+// "Deceased" has no members column: INACTIVE keeps them out of the directory,
+// renewals and mailings, `notes` says why, and the roll carries (Deceased).
+// Idempotent and cautious: an existing record (by number, or by exact name) is
+// updated rather than duplicated; a number held by someone with a different
+// surname, an ambiguous name, a missing household head or a NOT NULL
+// member_number_base is reported and skipped (status "error", re-run after).
+// Needs Migrations 048 (nullable base), 053 and 054 — all earlier in this file.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_055_deceased_life_members';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 055 — deceased life members', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo    = db();
+    $ok     = true;
+    $notes  = [];
+    $noteTx = 'Deceased life member (Wings roll). Kept Inactive: not billed, mailed or listed in the directory.';
+    try {
+        $baseNullable = (($pdo->query("SHOW COLUMNS FROM members LIKE 'member_number_base'")->fetch(PDO::FETCH_ASSOC)['Null'] ?? '') === 'YES');
+        $hasRollLink  = (bool) $pdo->query("SHOW COLUMNS FROM life_members LIKE 'member_id'")->fetchColumn();
+        // [first, last, base, suffix, type, life flag, chapter, household head: a base number, or the
+        //  name of a person above (resolved to whichever record that person ended up as)]
+        $people = [
+            ['Harry',   'Ward',       9,    0, 'LIFE',      0, 'Northwest Chapter B', null],
+            ['Shirley', 'Ward',       9,    1, 'ASSOCIATE', 1, 'Northwest Chapter B', 'Harry Ward'],
+            ['Kevin',   'Woodward',   295,  1, 'ASSOCIATE', 1, 'Sydney Chapter',      295],
+            ['Greg',    "O'Loughlin", null, 0, 'LIFE',      0, 'Sydney Chapter',      null],
+        ];
+        $bySlot  = $pdo->prepare('SELECT id, first_name, last_name FROM members WHERE member_number_base = ? AND member_number_suffix = ? LIMIT 1');
+        $byName  = $pdo->prepare('SELECT id FROM members WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)');
+        $head    = $pdo->prepare('SELECT id FROM members WHERE member_number_base = ? AND member_number_suffix = 0 AND LOWER(last_name) = LOWER(?) LIMIT 1');
+        $update  = $pdo->prepare("UPDATE members SET status = 'INACTIVE',
+                member_type = IF(member_type = 'ASSOCIATE', member_type, 'LIFE'),
+                is_life_member = IF(member_type = 'ASSOCIATE', 1, is_life_member),
+                full_member_id = COALESCE(full_member_id, ?),
+                notes = IF(notes IS NULL OR notes = '', ?, notes), updated_at = NOW() WHERE id = ?");
+        $insert  = $pdo->prepare("INSERT INTO members
+                (member_type, is_life_member, status, member_number_base, member_number_suffix, full_member_id,
+                 chapter_id, first_name, last_name, email, notes, country, created_at)
+             VALUES (?, ?, 'INACTIVE', ?, ?, ?, (SELECT id FROM chapters WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1), ?, ?, ?, ?, 'Australia', NOW())");
+        $roll    = $hasRollLink ? $pdo->prepare('UPDATE life_members SET member_id = ?, is_deceased = 1 WHERE full_name = ? AND member_id IS NULL') : null;
+        $added = 0;
+        $updated = 0;
+        $resolved = [];
+        foreach ($people as [$first, $last, $base, $suffix, $type, $lifeFlag, $chapter, $headBase]) {
+            $who = $first . ' ' . $last;
+            $row = null;
+            if ($base !== null) {
+                $bySlot->execute([$base, $suffix]);
+                $row = $bySlot->fetch(PDO::FETCH_ASSOC) ?: null;
+                if ($row && strcasecmp($row['last_name'], $last) !== 0) {
+                    $ok = false;
+                    $notes[] = $who . ': #' . $base . ($suffix ? '.' . $suffix : '') . ' belongs to ' . $row['first_name'] . ' ' . $row['last_name'] . ' — skipped.';
+                    continue;
+                }
+            }
+            if (!$row) {
+                $byName->execute([$first, $last]);
+                $ids = $byName->fetchAll(PDO::FETCH_COLUMN);
+                if (count($ids) > 1) {
+                    $ok = false;
+                    $notes[] = $who . ': more than one member with that name — skipped.';
+                    continue;
+                }
+                $row = $ids ? ['id' => $ids[0]] : null;
+            }
+            $headId = null;
+            if ($headBase !== null) {
+                if (is_string($headBase)) {
+                    $headId = $resolved[$headBase] ?? null;
+                } else {
+                    $head->execute([$headBase, $last]);
+                    $headId = $head->fetchColumn() ?: null;
+                }
+                if (!$headId) {
+                    $ok = false;
+                    $notes[] = $who . ': no household head found (' . (is_string($headBase) ? $headBase : $last . ' at #' . $headBase) . ') — skipped.';
+                    continue;
+                }
+            }
+            if ($row) {
+                $update->execute([$headId, $noteTx, (int) $row['id']]);
+                $memberId = (int) $row['id'];
+                $updated++;
+            } else {
+                if ($base === null && !$baseNullable) {
+                    $ok = false;
+                    $notes[] = $who . ': members.member_number_base is NOT NULL (Migration 048 not applied) — skipped.';
+                    continue;
+                }
+                // Email-less like Migration 042 (''); a UNIQUE email index would reject a second
+                // blank, so fall back to an address that can never receive mail.
+                foreach (['', 'deceased-' . ($base ?? 'x') . '-' . $suffix . '@goldwing.invalid'] as $email) {
+                    try {
+                        $insert->execute([$type, $lifeFlag, $base, $suffix, $headId, $chapter, $first, $last, $email, $noteTx]);
+                        break;
+                    } catch (\PDOException $e) {
+                        if ($email !== '' || $e->getCode() !== '23000') {
+                            throw $e;
+                        }
+                    }
+                }
+                $memberId = (int) $pdo->lastInsertId();
+                $added++;
+            }
+            $resolved[$who] = $memberId;
+            if ($roll) {
+                $roll->execute([$memberId, $who]);
+            }
+        }
+        $notes[] = $added . ' member record(s) created, ' . $updated . ' existing updated to Inactive life.';
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'Error: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+    }
+    $results[] = ['label' => 'Migration 055 — deceased life members', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 
