@@ -17,6 +17,7 @@ That means there's one place to change the wording, one place to change who emai
 - **Send test emails** to make sure things work before a real member is on the receiving end.
 - **See what got sent** — there's an email log so you can prove "yes, we sent it on Tuesday at 3pm".
 - **See in-app admin alerts** in the Notification Hub for things needing a webmaster decision.
+- **Email each new Wings issue to members** from Admin → Wings, after checking the list and the email first, then see who got it and who opened it.
 
 ### Who's allowed
 
@@ -56,6 +57,7 @@ Three places, depending on what you're trying to do:
 | **Notification Hub: new request** | Member submits something needing review | Webmaster |
 | **New store order (admin copy)** | A paid store order comes in | Admin |
 | **Admin security alerts** | FIM change, webhook failure, repeated failed login, refund created, member import/export, new admin device | Security alert recipient |
+| **New Wings issue** | An admin presses Send on Admin → Wings → Email to members | Every current member with an email address, minus anyone unticked or opted out |
 
 ### Two channels: transactional vs notification
 
@@ -70,10 +72,31 @@ If a member complains they're getting "too much email", point them at notificati
 
 Two routes for the member:
 
-1. **Member profile → Notification preferences** — granular per-category toggles (calendar, noticeboard, orders, payments, admin, security), plus a master switch and a one-click "unsubscribe from all non-essential emails".
+1. **Member profile → Notification preferences** — granular per-category toggles (calendar, noticeboard, orders, payments, admin, Wings magazine, security), plus a master switch and a one-click "unsubscribe from all non-essential emails".
 2. **The footer of any non-essential email** — every notification email carries an "Update email preferences" and "Unsubscribe from all non-essential emails" link. These work without logging in (the link contains a token that's good for 7 days).
 
 Members **cannot** opt out of transactional emails. That's intentional.
+
+### Emailing a new Wings issue
+
+{{link:/admin/index.php?page=wings|Take me to Wings}}
+
+Once this month's issue is uploaded (with its cover image, which the email is built around), press **Email to members** on it. The Wings page shows whether each issue has been emailed yet, and how many members opened it.
+
+1. **Check the email.** The left side shows the email exactly as members will see it. The subject is filled in for you; change it if you like. Add a **personal message** if there's something to say about this issue — it appears in a gold box above the cover. Press **Send me a test** to get a copy in your own inbox first.
+2. **Check who gets it.** The right side lists every current (Active) member with an email address, all ticked. Print and digital members are both on it, because everyone gets the emailed copy. A couple sharing one inbox shows as one line and gets one email ("G'day John & Mary"). **Untick anyone who shouldn't get this issue.** The search box finds people by name, email, member number or chapter.
+3. **Press Send.** You'll be asked to confirm, and possibly to re-enter your password. The next screen sends the emails in small batches with a progress bar. **Keep that page open until it says "All done."** If you close it early, open the report again (from the Wings page) and press **Resume sending**. Nobody gets a second copy.
+4. **Read the report.** It lists every member with Sent / Failed / Removed / Opted out, and when they opened it. If some failed, press **Retry failed**.
+
+Good to know:
+
+- **Each member's buttons open the magazine straight away.** Their email carries a personal link, so there's no login or password needed. That matters because plenty of members have never set up their portal login. The link only opens that one issue.
+- **Members who switched off Wings emails** (or all non-essential email) in their preferences are listed separately and left off. They can switch it back on themselves.
+- **Members with no email address** can't be emailed. The page tells you how many there are; they're on the printed mailing list.
+- **Sending the same issue again emails everyone ticked a second time.** The page warns you if the issue has already gone out.
+- **Who can send it:** admins, and anyone given the **Wings Distributor** role. That role sees only the Wings page and this screen. To give it to someone, open their member profile → **Roles & Access**, tick **Wings distributor** and save; they need to log out and back in once. Chapter-restricted (area rep) accounts see a notice instead, because the email goes to the whole club.
+- **There's a daily sending limit**, 80 a day to start with. Resend's free plan allows only 100 emails a day for the whole site, and receipts, password resets and login codes count towards that too. When a send reaches the limit it pauses and tells you when the next lot can go; come back then and press **Resume**. On a paid Resend plan (no daily cap), set the limit to 0 with **Change** at the top of the screen. It also sends no faster than 2 emails a second, well inside Resend's per-second limit.
+- **If every email in a batch fails**, the send stops itself instead of working through the whole list. That usually means the email service is refusing (daily quota used up, a login problem or an outage). Fix that, then press **Resume**, and **Retry failed** at the end.
 
 ### SMTP setup walkthrough
 
@@ -100,6 +123,7 @@ Out of the box the site uses PHP's built-in `mail()` function, which on a shared
 - **OTP codes / 2FA codes aren't arriving** — these are mandatory transactional emails and bypass opt-outs, so if they're missing it's a transport problem. Send a test from the Notifications page. If the test doesn't arrive either, SMTP is broken. Until you fix it, members and admins can't log in via email OTP.
 - **The "From" address won't change** — the site only allows sender addresses on the `goldwing.org.au` domain. This is deliberate — it stops a hijacked admin account from sending mail as a third party. If you really need a different domain, your developer has to change the validation rule.
 - **Encrypted SMTP password "stopped working"** — if the site's encryption key (`APP_KEY`) was rotated or lost, every encrypted secret becomes unreadable, including the SMTP password. Re-enter the password on the Integrations page.
+- **Part of a Wings send failed** — usually the email service's quota. Resend's free plan allows 100 emails a day for the whole site, so if other mail used it up, the send stops itself after a batch of failures. Once the quota resets (midnight UTC, which is 10–11am in Sydney), open the report, press **Resume**, then **Retry failed**. Only the failed ones are re-sent. Lowering the daily limit on the Email Wings screen stops it happening again.
 
 ### What gets recorded
 
@@ -197,7 +221,18 @@ Security alerts (FIM changes, repeated failed logins, new admin device, refund c
 
 - **`EmailOtpService::issueCode()`** generates a 6-digit code, stores its `password_hash`, and dispatches `security_email_otp` with `force = true` (so opt-outs and the master switch can't block it). 10-minute expiry, max 5 attempts, 60-second resend cooldown, 5 resends/hour. See [Chapter 06 — 2FA, step-up & trusted devices](view.php?slug=06-2fa-stepup).
 - **`EmailPreferencesTokenService::createToken($memberId, 'preferences' | 'unsubscribe')`** mints a `CryptoService::encrypt()`-wrapped token (member ID, purpose, 7-day expiry). Every non-mandatory email gets a footer with tokenised "Update email preferences" and "Unsubscribe from all non-essential emails" links, so members can opt out without logging in. Landing page is `/email_preferences.php`.
-- **`NotificationPreferenceService`** stores per-user opt-outs in `settings_user.notification_preferences`: a `master_enabled` switch, an `unsubscribe_all_non_essential` flag, and per-category booleans (`calendar`, `noticeboard`, `orders`, `payments`, `admin`, `security`). Mandatory templates short-circuit the check — you can't opt out of password reset.
+- **`NotificationPreferenceService`** stores per-user opt-outs in `settings_user.notification_preferences`: a `master_enabled` switch, an `unsubscribe_all_non_essential` flag, and per-category booleans (`calendar`, `noticeboard`, `orders`, `payments`, `admin`, `wings`, `security`). Mandatory templates short-circuit the check — you can't opt out of password reset. A category missing from a member's saved prefs falls back to `notifications.default_categories` (default on), so adding `wings` left everyone opted in.
+
+#### Wings issue email (`WingsSendService`)
+
+Admin → Wings → **Email to members** opens `/admin/wings-send.php?issue=<id>` (permission `admin.wings_magazine.manage`, held by `admin` and the `wings_distributor` role from Migration 057; chapter-restricted admins are refused). The page and `?page=wings` are listed in `access_control_self_gated_permission()` so a Role Builder role holding that permission gets past the role registry ([Chapter 07](view.php?slug=07-roles-permissions)). It is not a catalogue template: the layout is fixed in `WingsSendService::renderEmail()` (cover, month, title, gold "Read the magazine" button, download link) wrapped by `EmailService::wrapHtml($subject, $body, 'Wings Magazine')`. Only the subject and an optional plain-text message are typed per send.
+
+- **Audience** — `WingsSendService::audience()`: `LOWER(members.status) = 'active'` with a usable `members.email` (skips blanks, invalid addresses, `+stub@` roster stubs and `@goldwing.invalid` placeholders). `wings_preference` is ignored on purpose: club policy is that everyone gets the emailed copy (same rule as `export.php?list=email_pdf`), and that column's print values are unreliable. Members sharing an address collapse into one entry keyed by the full member's id. Anyone on that inbox with a user account whose prefs fail `shouldReceive($userId, 'wings')` marks the entry `opted_out`.
+- **Send** — the form posts the ticked keys; `createSend()` re-reads the audience and freezes it into `wings_sends` + `wings_send_recipients` (`queued` / `removed` / `opted_out`, each with a random 32-hex `token`), so a posted key can only select from the list, never add to it. A session nonce stops a double-click from creating two sends, and the POST passes `require_stepup()`.
+- **Batches** — the report page loops AJAX `action=batch` → `sendBatch()` (`BATCH_SIZE` 10, 0.5 s between emails, so at most 2 a second: inside Resend's 10/s team limit and the 2/s older accounts had) until nothing is `queued`. Batches are serialised with MySQL `GET_LOCK('wings_send_batch', 30)`. Each row is claimed by flipping `queued → sent` before mailing and set to `failed` if `EmailService::send()` returns false: at most once, so parallel tabs or a crash never double-send. `retryFailed()` re-queues failures. A batch where every email failed comes back `stalled` and the loop stops, so a refused quota doesn't burn through the whole list.
+- **Daily limit** — `wings.daily_send_limit` (default `DEFAULT_DAILY_LIMIT` = 80, 0 = off, set with **Change** on the review screen). `sendBatch()` sends at most `limit − sentLast24h()`; past it, the counts carry `paused_until` (`nextSendAt()`: when the oldest send in the window turns 24 hours old, computed as seconds-from-now in SQL so the DB server's clock zone can't skew it) and the page waits for a person to press Resume. The window is rolling 24 hours, so no calendar day can exceed the limit, including Resend's free-plan quota, which resets at midnight UTC. It only counts Wings emails, so keep it below the provider's daily quota to leave room for the site's other mail. There is no cron: a capped send carries on when someone presses Resume.
+- **Personal links** — `read_wings.php?t=` and `download_wings.php?t=` accept a token in place of a login (`recipientForToken()`; only rows with `status = 'sent'` work) and fall back to `require_login()` otherwise. `enforce_page_access()` in `includes/access_control.php` lets those two paths through when `?t=` is present, because the `/member/*` registry row would otherwise bounce them to `/login.php` before the page runs. Opening sets `opened_at` and logs `wings.read` / `wings.download` with `via: email_link` against the member, which feeds the Reports page.
+- **Tables** — Migration 056 ([Chapter 03](view.php?slug=03-database-migrations)).
 
 #### SMS and the Admin Notification Hub
 
@@ -213,6 +248,7 @@ One hub type is **informational only**: "Details Updated" (`profile_update`, tab
 - **Default sender, admin recipients, master kill-switch:** top of the Notifications tab (writes to `notifications.from_*`, `notifications.admin_emails`, `notifications.enabled`).
 - **SMTP host / port / user / password / encryption / Resend API key:** Admin → Settings → **Integrations** → Email card. The password input is write-only and shows "Configured - leave blank to keep" once set.
 - **Member-facing opt-outs:** Member → Settings → Notifications, or any unsubscribe link in an email footer.
+- **Wings issue email:** layout in `WingsSendService::renderEmail()`; audience rule in `WingsSendService::audience()`; the review/send/report screens in `public_html/admin/wings-send.php`.
 - **Admin security-alert recipient + which alert types fire:** Admin → Settings → Security → Alerting (`security_settings.alert_email`, `alerts.*`).
 
 ### Settings
@@ -240,6 +276,8 @@ One hub type is **informational only**: "Details Updated" (`profile_update`, tab
 - **If SMTP fails, the email is dropped silently.** `EmailService::send()` returns `false` and logs `email.smtp_failed` to ActivityLogger; almost no caller checks the return. **Admin alerts that depend on the same SMTP will also fail** — if `SecurityAlertService` is the alarm and SMTP is broken, the alarm itself never rings. Use the FIM cron log or `email_log.sent = 0` queries to spot a transport outage.
 - **`from_email` is validated against `goldwing.org.au`.** `EmailService::normalizeSenderEmail()` rejects anything that isn't `*@goldwing.org.au` and falls back to the default — deliberate anti-spoof guard so a hijacked admin can't change the From to a third-party domain.
 - **Preference tokens are encrypted, not signed.** `EmailPreferencesTokenService` puts a `CryptoService`-encrypted blob in the URL with a 7-day `expires_at`. No server-side revocation list; rotating `APP_KEY` invalidates every outstanding token at once.
+- **Wings "sent" means handed to the mailer, not delivered.** With `php_mail`, `mail()` returns true once the local MTA accepts the message; a host's per-hour cap can still discard it later without the site knowing. SMTP and Resend report refusals, which land as `failed` and can be retried.
+- **Wings personal links don't expire.** A forwarded email lets whoever has it read that one issue (the same as forwarding a PDF, which is how Wings went out before). The test email has no recipient row, so its buttons point at the login-protected reader instead.
 - **`SmsService` is a stub.** It logs to `sms_log` and returns `true`. Flows that "send SMS" aren't actually sending anything yet — useful to know if a member complains they didn't get the renewal SMS.
 
 </details>

@@ -16,6 +16,7 @@ Most committee members have **one** role. Some people wear several hats and hold
 - **Treasurer** — payments-and-refunds focus. Can issue refunds, see payment history, run financial reports. Doesn't need access to content editing or site settings.
 - **Store Manager** — store CRUD only. Adds products, fulfils orders, manages stock. Doesn't see members or settings. Good for a quartermaster volunteer.
 - **Area Rep** — chapter-scoped. Sees only their own chapter's members, not the whole national list. Used by chapter leaders.
+- **Wings Distributor** — sends each new Wings issue to members: the Wings page and "Email to members", nothing else in the admin area. Give it to the Wings editor or whoever is in charge of getting the magazine out. "View as Admin" takes them straight to the Wings page.
 - **Member** — the default for every paying member. Gates the member portal and the store. This is what the public-facing members hold.
 
 ### Who's allowed to change roles
@@ -75,7 +76,7 @@ Everyone keeps seeing every page by default — nothing is hidden until you deli
 ### What can go wrong (and what to do)
 
 - **You remove your own admin role and lock yourself out.** The system *tries* to stop you (you'll usually see a warning), but it's possible. Recovery means another admin restoring your role, or a developer fixing it in the database. **Always have at least two Admin accounts** so you never have a single point of failure.
-- **You give someone too much access.** Easily fixed — go to Accounts & Roles, untick the role. The next time they load a page, they'll lose access. No harm done as long as you catch it quickly. Check the activity log to see what they did in the meantime.
+- **You give someone too much access.** Easily fixed — open their member profile → Roles & Access and untick the role. **It takes effect the next time they log in**, because a person's roles are read at login. If it's urgent, ask your developer to sign them out. Check the activity log to see what they did in the meantime. (The same goes the other way: someone given a new role must log out and back in once to get it.)
 - **Two roles conflict.** Roles always *combine* (most permissive wins). So if someone has both "Store Manager" and "Treasurer", they get the union of both. There's no way for one role to *block* another. If you need to take an ability away, remove the role that grants it.
 - **An Area Rep sees no members at all.** Their account isn't linked to a member row, so the system doesn't know which chapter they belong to. Edit their user record and link it to their member profile.
 - **An empty custom role can do nothing.** Not even view the dashboard. If you create a new role and forget to tick any permissions, anyone assigned to it will see a blank admin area. Tick at least `admin.dashboard.view`.
@@ -151,6 +152,7 @@ At login, `App\Services\AuthService::getUserRoles()` queries the join and stuffs
 | `area_rep` | Chapter-scoped: sees only their own chapter's members. See [Chapter 21](view.php?slug=21-chapters-area-reps). |
 | `member` | Every logged-in member. Gates `/member/` and the store. |
 | `committee` | Alias for `admin`. Old data may still hold this string. |
+| `wings_distributor` | Seeded by Migration 057 as an ordinary (editable, deletable) Role Builder role with only `admin.wings_magazine.manage`. Reaches `/admin/index.php?page=wings` and `/admin/wings-send.php` through `access_control_self_gated_permission()` (see Gotchas). Also listed in `admin_default_role_permissions()` for the no-tables fallback. |
 
 #### Permission keys
 
@@ -218,6 +220,8 @@ This chapter doesn't own any `settings_global` keys. The role/permission tables 
 - **`committee` lingers in old data.** A migration dropped `committee`, `treasurer`, `webmaster`, `super_admin`, `membership_admin`, `store_admin`, `content_admin` from `roles`, but imports and integrations may still send these strings. `normalize_access_roles()` is what saves us.
 - **An empty custom role can do nothing** — not even see the dashboard.
 - **`require_role(['admin'])` ignores the permission registry.** Intentional — it's the backstop for the highest-stakes pages. But a custom "Membership Admin" role with every `admin.*` permission ticked will still *not* pass a `require_role(['admin'])` check. Use `require_permission()` for fine-grained gating; reserve `require_role()` for break-glass pages.
+- **Role Builder roles hit the Access Control registry first.** `enforce_page_access()` runs in `bootstrap.php` before any page code, and `pages_registry` / `page_role_access` only know the five built-in roles (`access_control_roles()`). So a custom role (e.g. `agm_manager`) is sent to `/locked-out` from any `/admin/*` page even when it holds that page's permission, and `can_access_path()` hides its sidebar links. `access_control_self_gated_permission()` lists the admin URLs that check their own permission with `require_permission()` and lets a holder of that permission through, for both the gate and the sidebar. Today that's the Wings page (`/admin/index.php?page=wings`) and `/admin/wings-send.php`. Only add a URL there if the page calls `require_permission()` itself and every POST handler it runs is tied to that page.
+- **Roles are read at login.** `$_SESSION['user']['roles']` is set by `AuthService` at sign-in and never reloaded, so assigning or removing a role takes effect at the person's next login. Editing a role's *permissions* in the Role Builder is immediate (`current_admin_can()` reads `role_permissions` on every check).
 - **`area_rep` scoping depends on `users.member_id`.** If the area-rep account isn't linked to a member row, `getChapterRestrictionId()` returns `null` and they see *no* members at all.
 
 </details>

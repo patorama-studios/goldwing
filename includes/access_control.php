@@ -761,6 +761,11 @@ function can_access_path($rolesOrUser, string $path): bool
         $roles = ['public'];
     }
 
+    $selfGated = access_control_self_gated_permission($path);
+    if ($selfGated !== null && function_exists('current_admin_can') && current_admin_can($selfGated, ['roles' => $roles])) {
+        return true;
+    }
+
     $path = access_control_normalize_path($path);
     if (access_control_is_always_allowed($path)) {
         return true;
@@ -778,6 +783,27 @@ function can_access_path($rolesOrUser, string $path): bool
     return (bool) array_intersect($roles, $allowedRoles);
 }
 
+/**
+ * Admin pages that check their own Role Builder permission with
+ * require_permission(). The registry only knows the five built-in roles, so
+ * without this a Role Builder role holding the permission (e.g. Wings
+ * Distributor) is bounced before the page's own check runs, and its sidebar
+ * link is hidden. Returns the permission for a URL, or null.
+ */
+function access_control_self_gated_permission(string $url): ?string
+{
+    $parts = parse_url($url);
+    $path = $parts['path'] ?? '';
+    if ($path === '/admin/index.php') {
+        parse_str($parts['query'] ?? '', $query);
+        $path .= '?page=' . (is_string($query['page'] ?? null) ? $query['page'] : '');
+    }
+    return [
+        '/admin/wings-send.php' => 'admin.wings_magazine.manage',
+        '/admin/index.php?page=wings' => 'admin.wings_magazine.manage',
+    ][$path] ?? null;
+}
+
 function enforce_page_access(): void
 {
     if (PHP_SAPI === 'cli') {
@@ -785,6 +811,16 @@ function enforce_page_access(): void
     }
     $path = access_control_normalize_path($_SERVER['REQUEST_URI'] ?? '/');
     if (access_control_is_always_allowed($path)) {
+        return;
+    }
+    // Wings email links (?t=<token>) open one issue without a login, so the
+    // '/member/*' row must not bounce them. Both pages verify the token
+    // themselves and fall back to require_login() when it isn't valid.
+    if (isset($_GET['t']) && in_array($path, ['/member/read_wings.php', '/member/download_wings.php'], true)) {
+        return;
+    }
+    $selfGated = access_control_self_gated_permission($_SERVER['REQUEST_URI'] ?? '/');
+    if ($selfGated !== null && function_exists('current_admin_can') && current_admin_can($selfGated)) {
         return;
     }
     if (!access_control_tables_ready()) {

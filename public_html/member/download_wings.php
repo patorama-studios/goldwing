@@ -1,8 +1,15 @@
 <?php
 require_once __DIR__ . '/../../app/bootstrap.php';
-require_login();
 
-$id = (int) ($_GET['id'] ?? 0);
+use App\Services\WingsSendService;
+
+// Same rule as read_wings.php: a Wings email link (?t=) needs no login.
+$recipient = WingsSendService::recipientForToken((string) ($_GET['t'] ?? ''));
+if (!$recipient) {
+    require_login();
+}
+
+$id = $recipient ? (int) $recipient['issue_id'] : (int) ($_GET['id'] ?? 0);
 if (!$id) {
     http_response_code(400);
     echo "Issue ID required.";
@@ -29,10 +36,15 @@ if (!$viewOnly) {
     // Per-member attribution for the daily summary's Wings leaderboard. The
     // counter above is per-issue only and can't say who read what.
     $u = current_user();
-    if ($u && !empty($u['member_id'])) {
-        \App\Services\ActivityLogger::log('member', (int) $u['id'], (int) $u['member_id'], 'wings.download', [
+    $readerMemberId = $recipient ? (int) $recipient['member_id'] : (int) ($u['member_id'] ?? 0);
+    if ($recipient) {
+        WingsSendService::markOpened((int) $recipient['id']);
+    }
+    if ($readerMemberId > 0) {
+        \App\Services\ActivityLogger::log('member', $u ? (int) $u['id'] : null, $readerMemberId, 'wings.download', [
             'issue_id' => $id,
             'title' => $issue['title'] ?? '',
+            'via' => $recipient ? 'email_link' : 'portal',
         ]);
     }
 }

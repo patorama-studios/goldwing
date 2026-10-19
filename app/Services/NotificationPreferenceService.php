@@ -11,6 +11,7 @@ class NotificationPreferenceService
         'orders' => 'Order updates',
         'payments' => 'Payment updates',
         'admin' => 'General admin announcements',
+        'wings' => 'Wings magazine (new issue emails)',
         'security' => 'Security / authentication',
     ];
 

@@ -127,7 +127,7 @@ class EmailService
         return self::wrapHtml($subject, $message);
     }
 
-    public static function wrapHtml(string $subject, string $bodyHtml): string
+    public static function wrapHtml(string $subject, string $bodyHtml, string $eyebrow = 'Member Portal'): string
     {
         $siteName = (string) SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
         $logoUrl = trim((string) SettingsService::getGlobal('site.logo_url', ''));
@@ -158,7 +158,7 @@ class EmailService
         // Logo header (cream)
         $html .= '<tr><td style="background:#f4f1e8;padding:32px 40px;text-align:center;border-bottom:1px solid #e8e3d7;">';
         $html .= $logoHtml;
-        $html .= '<p style="margin:0;font-size:13px;color:#9e9140;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Member Portal</p>';
+        $html .= '<p style="margin:0;font-size:13px;color:#9e9140;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">' . htmlspecialchars($eyebrow, ENT_QUOTES, 'UTF-8') . '</p>';
         $html .= '</td></tr>';
 
         // Body content

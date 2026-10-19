@@ -164,8 +164,11 @@ if (!empty($member)) {
         <p class="text-sm text-gray-500">Welcome <?= e($user['name'] ?? 'Member') ?></p>
       </div>
     </div>
-    <?php if ($hasAdminAccess): ?>
-      <a href="/admin/index.php" class="mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors bg-primary text-gray-900 hover:bg-primary/90">
+    <?php if ($hasAdminAccess):
+      // Wings Distributors can't open the dashboard, so send them straight to Wings.
+      $adminHome = !current_admin_can('admin.dashboard.view', $user) && current_admin_can('admin.wings_magazine.manage', $user)
+          ? '/admin/index.php?page=wings' : '/admin/index.php'; ?>
+      <a href="<?= e($adminHome) ?>" class="mt-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors bg-primary text-gray-900 hover:bg-primary/90">
         <span class="material-icons-outlined text-base">admin_panel_settings</span>
         View as Admin
       </a>

@@ -1482,7 +1482,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               'source_record_id' => $issueId,
             ]);
           }
-          $alerts[] = ['type' => 'success', 'message' => 'Wings issue uploaded.'];
+          $alerts[] = ['type' => 'success', 'message' => 'Wings issue uploaded. When it\'s ready to go out, press "Email to members" on it.'];
         } else {
           $alerts[] = ['type' => 'error', 'message' => 'PDF upload failed.'];
         }
@@ -4701,6 +4701,7 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
       <?php elseif ($page === 'wings'): ?>
         <?php
         $issues = $pdo->query('SELECT * FROM wings_issues ORDER BY published_at DESC')->fetchAll();
+        $wingsSends = \App\Services\WingsSendService::latestSendByIssue();
         $latestIssue = null;
         $archiveIssues = [];
         foreach ($issues as $iss) {
@@ -4855,10 +4856,30 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                     </div>
                   </div>
 
-                  <p class="text-gray-600 text-base leading-relaxed mb-8 max-w-3xl">
+                  <p class="text-gray-600 text-base leading-relaxed mb-5 max-w-3xl">
                     View the latest issue of Wings Magazine. Keep up to date on all things Goldwing, touring events,
                     maintenance guides, and community stories.
                   </p>
+
+                  <?php $latestSend = $wingsSends[(int) $latestIssue['id']] ?? null; ?>
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mb-8">
+                    <a href="/admin/wings-send.php?issue=<?= (int) $latestIssue['id'] ?>"
+                      class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#EB5E28] hover:bg-[#D95322] text-white text-sm font-semibold transition-colors shadow-sm">
+                      <span class="material-icons-outlined text-base">forward_to_inbox</span>
+                      <?= $latestSend ? 'Email again' : 'Email to members' ?>
+                    </a>
+                    <span class="text-sm text-gray-500">
+                      <?php if (!$latestSend): ?>
+                        Not emailed to members yet.
+                      <?php elseif ((int) $latestSend['queued'] > 0): ?>
+                        Sending paused with <?= (int) $latestSend['queued'] ?> still to go.
+                        <a class="font-semibold text-gray-900 underline" href="/admin/wings-send.php?send=<?= (int) $latestSend['id'] ?>">Resume</a>
+                      <?php else: ?>
+                        Emailed <?= e(date('j M', strtotime($latestSend['created_at']))) ?> to <?= (int) $latestSend['sent'] ?> members, <?= (int) $latestSend['opened'] ?> opened.
+                        <a class="font-semibold text-gray-900 underline" href="/admin/wings-send.php?send=<?= (int) $latestSend['id'] ?>">Report</a>
+                      <?php endif; ?>
+                    </span>
+                  </div>
 
                   <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
@@ -4948,6 +4969,11 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                             </path>
                           </svg>
                         </button>
+                        <a href="/admin/wings-send.php?issue=<?= (int) $issue['id'] ?>"
+                          class="w-10 h-10 rounded-full bg-white text-gray-900 flex items-center justify-center hover:scale-110 transition-transform"
+                          title="<?= isset($wingsSends[(int) $issue['id']]) ? 'Emailed ' . e(date('j M Y', strtotime($wingsSends[(int) $issue['id']]['created_at']))) . ', email again' : 'Email to members' ?>">
+                          <span class="material-icons-outlined text-base">forward_to_inbox</span>
+                        </a>
                         <a href="<?= e($issue['pdf_url']) ?>" target="_blank"
                           class="w-10 h-10 rounded-full bg-white text-gray-900 flex items-center justify-center hover:scale-110 transition-transform"
                           title="View PDF">

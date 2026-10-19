@@ -4298,6 +4298,105 @@ if ($alreadyRun) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Migration 056 — monthly Wings magazine email (Oct 2026). wings_sends holds
+// each reviewed send of an issue; wings_send_recipients holds one row per inbox
+// with its status and the personal no-login link token. Admin → Wings →
+// "Email to members" stays switched off until this runs. Same DDL as
+// database/migrations/2026_10_19_wings_sends.sql — keep the two in sync.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_056_wings_sends';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 056 — Wings magazine email', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS wings_sends (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  issue_id INT NOT NULL,
+  subject VARCHAR(200) NOT NULL,
+  message TEXT NULL,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL,
+  finished_at DATETIME NULL,
+  INDEX idx_wings_sends_issue (issue_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS wings_send_recipients (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  send_id INT UNSIGNED NOT NULL,
+  member_id INT NULL,
+  email VARCHAR(255) NOT NULL,
+  greeting VARCHAR(255) NOT NULL DEFAULT \'\',
+  token CHAR(32) NOT NULL,
+  status VARCHAR(10) NOT NULL DEFAULT \'queued\',
+  sent_at DATETIME NULL,
+  opened_at DATETIME NULL,
+  UNIQUE KEY uq_wings_recipient_token (token),
+  INDEX idx_wings_recipient_send_status (send_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $notes[] = 'wings_sends + wings_send_recipients ready.';
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'CREATE: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $notes[] = 'Open Admin → Wings → Email to members.';
+    }
+    $results[] = ['label' => 'Migration 056 — Wings magazine email', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration 057 — Wings Distributor role (Oct 2026). A ready-made Role Builder
+// role holding only admin.wings_magazine.manage, so the committee can hand the
+// monthly Wings email to one person (Wings page + Email to members) without
+// opening the rest of the admin area. Created only when no role of that name
+// exists; an existing one is left exactly as the committee set it. Same SQL as
+// database/migrations/2026_10_19_wings_distributor_role.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+$migrationKey = 'migration_057_wings_distributor_role';
+$alreadyRun   = SettingsService::getGlobal('migrations.' . $migrationKey, false);
+
+if ($alreadyRun) {
+    $results[] = ['label' => 'Migration 057 — Wings Distributor role', 'status' => 'skipped', 'note' => 'Already applied.'];
+} else {
+    $pdo   = db();
+    $ok    = true;
+    $notes = [];
+    try {
+        $find = $pdo->prepare('SELECT id FROM roles WHERE name = :name LIMIT 1');
+        $find->execute(['name' => 'wings_distributor']);
+        if ($find->fetchColumn()) {
+            $notes[] = 'wings_distributor role already exists (left as is).';
+        } else {
+            $pdo->prepare('INSERT INTO roles (name, slug, description, is_system, is_active, created_at, updated_at)
+                VALUES (:name, :slug, :description, 0, 1, NOW(), NOW())')
+                ->execute([
+                    'name' => 'wings_distributor',
+                    'slug' => 'wings_distributor',
+                    'description' => 'Sends each new Wings issue to members: the Wings page and Email to members, nothing else.',
+                ]);
+            $pdo->prepare('INSERT INTO role_permissions (role_id, permission_key, allowed, created_at, updated_at)
+                VALUES (:role_id, :permission_key, 1, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE allowed = 1, updated_at = NOW()')
+                ->execute(['role_id' => (int) $pdo->lastInsertId(), 'permission_key' => 'admin.wings_magazine.manage']);
+            $notes[] = 'Wings Distributor role created with "Manage Wings magazine".';
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+        $notes[] = 'Error: ' . $e->getMessage();
+    }
+    if ($ok) {
+        SettingsService::setGlobal((int) $user['id'], 'migrations.' . $migrationKey, true);
+        $notes[] = 'Give it to someone from their member profile → Roles.';
+    }
+    $results[] = ['label' => 'Migration 057 — Wings Distributor role', 'status' => $ok ? 'applied' : 'error', 'note' => implode(' ', $notes)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Add future migrations above this line in the same pattern.
 // ─────────────────────────────────────────────────────────────────────────────
 

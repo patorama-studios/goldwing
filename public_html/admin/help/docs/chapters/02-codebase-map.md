@@ -147,7 +147,7 @@ Autoloader maps `App\Services\Foo` to `app/Services/Foo.php`. Looking for "how d
 | `EventService.php`, `EventRsvpRepository.php` | Public events + RSVPs. |
 | `DownloadLogRepository.php` | Wings PDF download tracking. |
 
-**Notifications & Comms** — `NotificationService.php` (what gets sent, to whom), `NotificationPreferenceService.php` (opt-outs), `EmailService.php` (templated render + send), `SmtpMailer.php` (raw transport), `EmailPreferencesTokenService.php` (one-click unsubscribe), `SmsService.php` (placeholder), `NoticeService.php` (on-site banners).
+**Notifications & Comms** — `NotificationService.php` (what gets sent, to whom), `NotificationPreferenceService.php` (opt-outs), `EmailService.php` (templated render + send), `SmtpMailer.php` (raw transport), `EmailPreferencesTokenService.php` (one-click unsubscribe), `WingsSendService.php` (the monthly Wings issue email: recipient list, batched send, personal no-login reader links, open tracking), `SmsService.php` (placeholder), `NoticeService.php` (on-site banners).
 
 **AI** — `AiProviderKeyService.php` (encrypted keys) and `AiProviders/` holding `AiProviderInterface.php`, `AiProviderFactory.php`, and `OpenRouterProvider.php` (the only provider; prompt-building lives in `public_html/admin/page-builder/api.php`).
 
@@ -189,6 +189,7 @@ Top-level: `index.php`, `login.php`, `logout.php`, `apply.php`, `become-a-member
 | `index.php` | Dashboard — section-switcher by `?section=`. |
 | `navigation.php` | Menu builder UI. |
 | `ai_editor.php` | AI page-builder entry. |
+| `wings-send.php` | "Email Wings to members": review list, compose + preview, batched send and the per-send report ([Chapter 22](view.php?slug=22-notifications-email)). |
 | `members/` | List/view/actions, `add.php` (add-member wizard), import, export, `merge_suburbs.php`, `backfill_member_baseline.php`. |
 | `store/` | Products, `product_form.php`, categories, tags, discounts, orders, low-stock, import, merge, settings. |
 | `settings/` | Settings Hub (`index.php` by `?section=`), `roles.php`, `access-control.php`, `ai.php`, `*-save.php` handlers. |

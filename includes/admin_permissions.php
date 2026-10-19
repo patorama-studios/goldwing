@@ -153,6 +153,10 @@ function admin_default_role_permissions(): array
             'admin.agm.settings',
             'admin.agm.refund',
         ],
+        // Seeded by Migration 057; the Wings page + Email to members only.
+        'wings_distributor' => [
+            'admin.wings_magazine.manage',
+        ],
     ];
 }
 

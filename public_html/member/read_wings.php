@@ -1,10 +1,17 @@
 <?php
 require_once __DIR__ . '/../../app/bootstrap.php';
-require_login();
 
 use App\Services\SettingsService;
+use App\Services\WingsSendService;
 
-$id = (int) ($_GET['id'] ?? 0);
+// The personal link in the Wings email (?t=) opens that one issue without a
+// login; everything else still needs a signed-in member.
+$recipient = WingsSendService::recipientForToken((string) ($_GET['t'] ?? ''));
+if (!$recipient) {
+    require_login();
+}
+
+$id = $recipient ? (int) $recipient['issue_id'] : (int) ($_GET['id'] ?? 0);
 if (!$id) {
     header('Location: /member/index.php?page=wings');
     exit;
@@ -24,17 +31,24 @@ if (!$issue) {
 // the flipbook is the read; download_wings.php?view=1 below is just the PDF
 // fetch that feeds it, so only this page logs a read.
 $u = current_user();
-if ($u && !empty($u['member_id'])) {
-    \App\Services\ActivityLogger::log('member', (int) $u['id'], (int) $u['member_id'], 'wings.read', [
+$readerMemberId = $recipient ? (int) $recipient['member_id'] : (int) ($u['member_id'] ?? 0);
+if ($recipient) {
+    WingsSendService::markOpened((int) $recipient['id']);
+}
+if ($readerMemberId > 0) {
+    \App\Services\ActivityLogger::log('member', $u ? (int) $u['id'] : null, $readerMemberId, 'wings.read', [
         'issue_id' => $id,
         'title' => $issue['title'] ?? '',
+        'via' => $recipient ? 'email_link' : 'portal',
     ]);
 }
 
 $appName    = SettingsService::getGlobal('site.name', 'Australian Goldwing Association');
 $faviconUrl = SettingsService::getGlobal('site.favicon_url', '');
 $pageTitle  = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8') . ' — Wings Magazine';
-$pdfUrl     = '/member/download_wings.php?id=' . $id . '&view=1';
+// Link-based readers carry their token through to the PDF fetch and download.
+$issueQuery = $recipient ? 't=' . $recipient['token'] : 'id=' . $id;
+$pdfUrl     = '/member/download_wings.php?' . $issueQuery . '&view=1';
 $issueTitle = htmlspecialchars($issue['title'], ENT_QUOTES, 'UTF-8');
 
 // Cache-bust the reader assets so updates land without a hard refresh.
@@ -298,7 +312,7 @@ $asset = function (string $path): string {
   <button id="mobile-next" class="mobile-nav-arrow" aria-label="Next page" disabled>
     <span class="material-icons-outlined">chevron_right</span>
   </button>
-  <a id="download-btn" data-tour="wings-download" href="/member/download_wings.php?id=<?= $id ?>" download>
+  <a id="download-btn" data-tour="wings-download" href="/member/download_wings.php?<?= e($issueQuery) ?>" download>
     <span class="material-icons-outlined">download</span>
     <span class="dl-label">Download PDF</span>
   </a>
@@ -385,7 +399,7 @@ $asset = function (string $path): string {
     document.getElementById('loading-title').style.display = 'none';
     errorMsg.style.display = 'block';
     errorMsg.innerHTML = 'Sorry, we couldn\'t load this magazine.<br>' +
-      '<a href="/member/download_wings.php?id=<?= $id ?>" style="color:#F2C94C;text-decoration:underline">Download the PDF instead</a>';
+      '<a href="/member/download_wings.php?<?= e($issueQuery) ?>" style="color:#F2C94C;text-decoration:underline">Download the PDF instead</a>';
   });
 })();
 </script>
