@@ -252,7 +252,20 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
         $audience = WingsSendService::audience();
         $sendable = array_values(array_filter($audience, fn ($g) => !$g['opted_out']));
         $optedOut = array_values(array_filter($audience, fn ($g) => $g['opted_out']));
-        $noEmail = WingsSendService::noEmailCount();
+        // How the active-member total breaks down, so the count below adds up:
+        // active = emails + partners sharing an inbox + opted out + no email.
+        $activeTotal = WingsSendService::activeCount();
+        $noEmail = WingsSendService::noEmailMembers();
+        $sharedInbox = array_sum(array_map(fn ($g) => count($g['member_ids']) - 1, $sendable));
+        $optedOutMembers = array_sum(array_map(fn ($g) => count($g['member_ids']), $optedOut));
+        $emailedIds = array_flip(array_merge([], ...array_column($sendable, 'member_ids')));
+        $coveredBy = static function (array $m) use ($emailedIds): string {
+            if (!empty($m['full_member_id']) && isset($emailedIds[(int) $m['full_member_id']])) {
+                return 'household'; // a partner whose main member gets the email
+            }
+            return in_array(strtolower((string) $m['wings_preference']), ['print', 'both'], true) ? 'post' : 'none';
+        };
+        $noEmailBy = array_count_values(array_map($coveredBy, $noEmail)) + ['household' => 0, 'post' => 0, 'none' => 0];
         $previous = WingsSendService::sendsForIssue((int) $issue['id']);
         $missing = array_keys(array_filter(['a cover image' => empty($issue['cover_image_url']), 'a PDF' => empty($issue['pdf_url'])]));
         $posted = $_SERVER['REQUEST_METHOD'] === 'POST';
@@ -377,7 +390,21 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 <h2 class="font-semibold text-gray-900">Who gets it</h2>
                 <span class="rounded-full bg-primary/20 px-3 py-1 text-xs font-bold text-gray-900"><span data-selected-count><?= count($sendable) ?></span> of <?= count($sendable) ?> ticked</span>
               </div>
-              <p class="text-xs text-gray-500">Every current member with an email address, print and digital alike (everyone gets the emailed copy). Couples sharing an inbox get one email.</p>
+              <p class="text-xs text-gray-500">Every Active member with an email address, print and digital alike (everyone gets the emailed copy).</p>
+              <?php
+                $n = static fn (int $count, string $one, string $many): string => $count . ' ' . ($count === 1 ? $one : $many);
+                $gap = array_filter([
+                    count($noEmail) ? $n(count($noEmail), 'has', 'have') . ' no email address on file'
+                        . ($noEmailBy['household'] ? ' (' . $n($noEmailBy['household'], 'a partner', 'of them partners') . ' whose household gets the email)' : '') : '',
+                    $optedOutMembers ? $optedOutMembers . ' turned off Wings emails' : '',
+                    $sharedInbox ? $n($sharedInbox, 'shares', 'share') . ' an inbox with their partner' : '',
+                ]);
+              ?>
+              <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <strong class="text-gray-900"><?= $activeTotal ?> Active members, <?= $n(count($sendable), 'email', 'emails') ?>.</strong>
+                <?php if ($gap): ?>The difference: <?= e(implode(', ', $gap)) ?>.<?php endif; ?>
+                <?php if ($noEmailBy['none']): ?><span class="text-red-600 font-semibold"><?= $n($noEmailBy['none'], 'gets', 'get') ?> no Wings at all (see below).</span><?php endif; ?>
+              </p>
               <input type="search" data-recipient-search aria-label="Search recipients" placeholder="Search name, email, number or chapter" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
               <div class="flex gap-4 text-xs font-semibold">
                 <button type="button" data-tick="1" class="text-primary-strong hover:underline">Tick all</button>
@@ -416,7 +443,24 @@ require __DIR__ . '/../../app/Views/partials/backend_head.php';
                 </details>
               <?php endif; ?>
               <?php if ($noEmail): ?>
-                <p><?= (int) $noEmail ?> current member<?= $noEmail === 1 ? ' has' : 's have' ?> no email address, so they can't be emailed. They're on the printed mailing list.</p>
+                <details <?= $noEmailBy['none'] ? 'open' : '' ?>>
+                  <summary class="cursor-pointer font-semibold text-gray-700"><?= $n(count($noEmail), 'has', 'have') ?> no email address on file</summary>
+                  <p class="mt-2">They can't be emailed. Add an email address on their member profile and they'll be on next month's list.</p>
+                  <ul class="mt-2 space-y-1">
+                    <?php foreach ($noEmail as $m): $how = $coveredBy($m); ?>
+                      <li>
+                        <?= e(trim($m['first_name'] . ' ' . $m['last_name'])) ?>
+                        <?php if ($how === 'household'): ?>
+                          <span class="text-gray-400">· partner, household gets the email</span>
+                        <?php elseif ($how === 'post'): ?>
+                          <span class="text-gray-400">· printed copy posted</span>
+                        <?php else: ?>
+                          <span class="text-red-600 font-semibold">· gets no Wings at all</span>
+                        <?php endif; ?>
+                      </li>
+                    <?php endforeach; ?>
+                  </ul>
+                </details>
               <?php endif; ?>
             </div>
           </section>

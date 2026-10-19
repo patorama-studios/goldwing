@@ -108,6 +108,7 @@ class WingsSendService
                     'names' => [],
                     'first_names' => [],
                     'last_names' => [],
+                    'member_ids' => [],
                     'numbers' => [],
                     'chapter' => (string) ($m['chapter_name'] ?? ''),
                     'sort' => strtolower($m['last_name'] . ' ' . $m['first_name']),
@@ -118,6 +119,7 @@ class WingsSendService
             $g['names'][] = trim($m['first_name'] . ' ' . $m['last_name']);
             $g['first_names'][] = trim((string) $m['first_name']);
             $g['last_names'][] = trim((string) $m['last_name']);
+            $g['member_ids'][] = (int) $m['id'];
             if (!empty($m['member_number_base'])) {
                 $g['numbers'][] = MembershipService::displayMembershipNumber((int) $m['member_number_base'], (int) ($m['member_number_suffix'] ?? 0));
             }
@@ -141,13 +143,20 @@ class WingsSendService
         return $groups;
     }
 
-    // ACTIVE members we can't email at all (no address, or a placeholder one).
-    public static function noEmailCount(): int
+    public static function activeCount(): int
     {
-        $emails = Database::connection()
-            ->query("SELECT TRIM(COALESCE(email, '')) FROM members WHERE LOWER(status) = 'active'")
-            ->fetchAll(PDO::FETCH_COLUMN);
-        return count(array_filter($emails, fn ($e) => !self::isDeliverable(strtolower((string) $e))));
+        return (int) Database::connection()->query("SELECT COUNT(*) FROM members WHERE LOWER(status) = 'active'")->fetchColumn();
+    }
+
+    // ACTIVE members we can't email at all (no address, or a placeholder one),
+    // with what the review page needs to say whether they still get Wings.
+    public static function noEmailMembers(): array
+    {
+        $rows = Database::connection()->query(
+            "SELECT id, first_name, last_name, email, full_member_id, wings_preference
+             FROM members WHERE LOWER(status) = 'active' ORDER BY last_name, first_name"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        return array_values(array_filter($rows, fn ($m) => !self::isDeliverable(strtolower(trim((string) $m['email'])))));
     }
 
     // Skips committee-roster stubs (+stub@) and Migration 055's @goldwing.invalid rows.
