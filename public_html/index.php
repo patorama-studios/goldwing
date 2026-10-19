@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
 
-use App\Services\MembershipPricingService;
 use App\Services\PageBuilderService;
 use App\Services\PageService;
 use App\Services\SettingsService;
@@ -61,79 +60,6 @@ if (strlen($heroLead) > 200) {
 }
 
 $heroClass = $pageSlug === 'home' ? 'hero hero--home' : 'hero hero--compact';
-$membershipPricing = $isMembershipPage ? MembershipPricingService::getMembershipPricing() : [];
-$pricingMatrix = $membershipPricing['matrix'] ?? [];
-$pricingCurrency = $membershipPricing['currency'] ?? 'AUD';
-$pricingNote = $isMembershipPage ? MembershipPricingService::pricingNote() : '';
-$formatMembershipPrice = static function (?int $cents, string $currency): string {
-    if ($cents === null) {
-        return 'N/A';
-    }
-    $prefix = $currency === 'AUD' ? '$' : ($currency . ' ');
-    return $prefix . number_format($cents / 100, 2);
-};
-$getMembershipPrice = static function (array $matrix, string $magazine, string $membership, string $period): ?int {
-    return $matrix[$magazine][$membership][$period] ?? null;
-};
-
-// Dynamic data for the public membership partial — reads the live pricing
-// config so admin edits to renewal periods, prices, or pro-rata reflect
-// here immediately without code changes.
-$renewalPeriods = [];
-$renewalPrices = [];
-$proRataEnabled = false;
-$anchorMonthName = 'August';
-$expiryMonthName = 'July';
-$anchorDay = 1;
-$expiryDay = 31;
-$todayProRata = [];
-$monthsRemainingToday = 0;
-$featuredPeriodId = null;
-if ($isMembershipPage) {
-    $pricingConfig = MembershipPricingService::getConfig();
-    $renewalPeriods = array_values(array_filter(
-        $pricingConfig['renewal_periods'] ?? [],
-        static fn($p) => !empty($p['active'])
-    ));
-    usort($renewalPeriods, static fn($a, $b) => (int) $b['duration_months'] <=> (int) $a['duration_months']);
-    $renewalPrices = $pricingConfig['renewal_prices'] ?? [];
-    // Become-a-Member is the public JOIN page → the period cards must show
-    // NEW-member (joining) pricing, not renewal pricing. Flatten the joining
-    // matrix to the current joining window so the cards read it with the same
-    // [magazine][type][periodId] shape as $renewalPrices.
-    $joiningWindow = MembershipPricingService::joiningWindowForDate();
-    $joiningPrices = [];
-    foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
-        foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
-            foreach ($renewalPeriods as $p) {
-                $pid = (string) $p['id'];
-                $joiningPrices[$mt][$tt][$pid] = MembershipPricingService::getJoiningPriceCents($mt, $tt, $pid, $joiningWindow);
-            }
-        }
-    }
-    $proRataEnabled = !empty($pricingConfig['prorata_enabled']);
-    $monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'];
-    $anchorMonthName = $monthNames[(int) ($pricingConfig['anchor_month'] ?? 8)] ?? 'August';
-    $expiryMonthName = $monthNames[(int) ($pricingConfig['expiry_month'] ?? 7)] ?? 'July';
-    $anchorDay = (int) ($pricingConfig['anchor_day'] ?? 1);
-    $expiryDay = (int) ($pricingConfig['expiry_day'] ?? 31);
-    $monthsRemainingToday = MembershipPricingService::monthsRemainingUntilExpiry();
-    foreach (MembershipPricingService::MAGAZINE_TYPES as $mt) {
-        foreach (MembershipPricingService::MEMBERSHIP_TYPES as $tt) {
-            $todayProRata[$mt][$tt] = MembershipPricingService::calculateProRataCents($mt, $tt);
-        }
-    }
-    foreach (array_reverse($renewalPeriods) as $p) {
-        if ((int) $p['duration_months'] >= 12) {
-            $featuredPeriodId = $p['id'];
-            break;
-        }
-    }
-    if ($featuredPeriodId === null && $renewalPeriods) {
-        $featuredPeriodId = $renewalPeriods[count($renewalPeriods) - 1]['id'];
-    }
-}
 $liveHtml = $page ? PageService::liveHtml($page) : '';
 $hasEditableBody = $page && $liveHtml !== '' && strpos($liveHtml, 'data-gw-body') !== false;
 

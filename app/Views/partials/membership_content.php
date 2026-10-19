@@ -1,9 +1,32 @@
 <?php
-$ordinalSuffix = static function ($n): string {
-    $n = (int) $n;
-    if ($n % 100 >= 11 && $n % 100 <= 13) return $n . 'th';
-    return $n . (['th', 'st', 'nd', 'rd'][$n % 10] ?? 'th');
-};
+// Self-contained: reads the live pricing config so admin edits show here
+// immediately, whichever caller (index.php or the page builder) includes it.
+$pricingSvc = \App\Services\MembershipPricingService::class;
+$pricingCfg = $pricingSvc::getConfig();
+$pricePeriods = array_values(array_filter($pricingCfg['renewal_periods'] ?? [], static fn($p) => !empty($p['active'])));
+usort($pricePeriods, static fn($a, $b) => (int) $a['duration_months'] <=> (int) $b['duration_months']);
+$joinWindow = $pricingSvc::joiningWindowForDate();
+$joinFeeCents = $pricingSvc::getJoiningFeeCents();
+$money = static fn(?int $cents): string => $cents === null ? '—' : '$' . number_format($cents / 100, $cents % 100 ? 2 : 0);
+$monthLong = [1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+$monthShort = static fn(int $m): string => substr($monthLong[(($m - 1) % 12 + 12) % 12 + 1], 0, 3);
+$expiryText = (int) $pricingCfg['expiry_day'] . ' ' . $monthLong[(int) $pricingCfg['expiry_month']];
+$priceRows = [
+    ['PRINTED', 'FULL', 'Full member', 'Printed Wings magazine posted to you'],
+    ['PDF', 'FULL', 'Full member', 'Wings magazine as a PDF'],
+    ['PRINTED', 'ASSOCIATE', 'Associate member', 'Added to a full member’s household'],
+];
+// Join windows are thirds of the membership year (see joiningWindowForDate).
+// From the rollover date a joiner pays the start-of-year price for the NEXT
+// year, so the last third ends the month before rollover.
+$anchorMonth = (int) $pricingCfg['anchor_month'];
+$rolloverOn = !empty($pricingCfg['join_rollover_enabled']);
+$lastThirdEnd = $rolloverOn ? (int) $pricingCfg['join_rollover_month'] - 1 : (int) $pricingCfg['expiry_month'];
+$joinWindows = [
+    'FULL' => $monthShort($anchorMonth) . ' – ' . $monthShort($anchorMonth + 3),
+    'DEC' => $monthShort($anchorMonth + 4) . ' – ' . $monthShort($anchorMonth + 7),
+    'APR' => $monthShort($anchorMonth + 8) . ' – ' . $monthShort($lastThirdEnd),
+];
 ?>
 <section class="membership-hero">
   <div class="container membership-hero__inner">
@@ -69,97 +92,93 @@ $ordinalSuffix = static function ($n): string {
 <section class="membership-pricing" id="pricing">
   <div class="container">
     <div class="membership-pricing__intro">
-      <h2>Membership Options</h2>
-      <p>Select the duration and type that best fits your needs. All memberships expire on the <span style="white-space: nowrap;"><?= e($ordinalSuffix($expiryDay ?? 31)) ?> of <?= e($expiryMonthName ?? 'July') ?></span>.</p>
+      <h2>Membership Prices</h2>
+      <p>There are two price lists. Find the one that fits you. Every membership runs to <span style="white-space: nowrap;"><?= e($expiryText) ?></span>.</p>
     </div>
-    <div class="membership-pricing__grid">
-      <?php
-        // One card per active renewal period — admin-defined.
-        $renewalPeriods = $renewalPeriods ?? [];
-        $joiningPrices = $joiningPrices ?? [];
-        $featuredPeriodId = $featuredPeriodId ?? null;
-        $anchorMonthName = $anchorMonthName ?? 'August';
-        $expiryMonthName = $expiryMonthName ?? 'July';
-        foreach ($renewalPeriods as $period):
-          $periodId = (string) $period['id'];
-          $isFeatured = ($periodId === $featuredPeriodId);
-          $headerModifier = $isFeatured ? '' : ' membership-plan__header--dark';
-          $articleModifier = $isFeatured ? ' membership-plan--featured' : '';
-          $printedFull = $joiningPrices['PRINTED']['FULL'][$periodId] ?? null;
-          $pdfFull = $joiningPrices['PDF']['FULL'][$periodId] ?? null;
-          $printedAssociate = $joiningPrices['PRINTED']['ASSOCIATE'][$periodId] ?? null;
-      ?>
-      <article class="membership-plan<?= $articleModifier ?>">
-        <div class="membership-plan__header<?= $headerModifier ?>">
-          <?php if ($isFeatured): ?><span class="membership-plan__tag">Most popular</span><?php endif; ?>
-          <h3><?= e($period['label']) ?></h3>
-          <p>Full term: <?= e($anchorMonthName) ?> to <?= e($expiryMonthName) ?></p>
-        </div>
-        <div class="membership-plan__body">
-          <div class="membership-plan__row">
-            <div>
-              <p class="membership-plan__label">Full - Wings</p>
-              <p class="membership-plan__sub">Includes printed magazine</p>
-            </div>
-            <span class="membership-plan__price"><?= e($formatMembershipPrice($printedFull, $pricingCurrency)) ?></span>
-          </div>
-          <div class="membership-plan__row">
-            <div>
-              <p class="membership-plan__label">Full - PDF magazine</p>
-              <p class="membership-plan__sub">Includes digital magazine</p>
-            </div>
-            <span class="membership-plan__price"><?= e($formatMembershipPrice($pdfFull, $pricingCurrency)) ?></span>
-          </div>
-          <div class="membership-plan__row">
-            <div>
-              <p class="membership-plan__label">Associate</p>
-              <p class="membership-plan__sub">Standard access</p>
-            </div>
-            <span class="membership-plan__price"><?= e($formatMembershipPrice($printedAssociate, $pricingCurrency)) ?></span>
-          </div>
-        </div>
-      </article>
-      <?php endforeach; ?>
 
-      <?php if (!empty($proRataEnabled)): ?>
-      <article class="membership-plan">
-        <div class="membership-plan__header membership-plan__header--mid">
-          <h3>Join Mid-Year</h3>
-          <p>Pro-rata to next expiry</p>
-        </div>
-        <div class="membership-plan__body">
-          <table class="membership-pro-table">
+    <div class="membership-pricing__which">
+      <a class="membership-which membership-which--new" href="#prices-new">
+        <span class="membership-which__q">Joining for the first time?</span>
+        <span class="membership-which__a">See <strong>New member</strong> prices</span>
+      </a>
+      <a class="membership-which membership-which--current" href="#prices-current">
+        <span class="membership-which__q">Already a member?</span>
+        <span class="membership-which__a">See <strong>Current member</strong> prices</span>
+      </a>
+    </div>
+
+    <div class="membership-pricing__grid">
+      <?php foreach ([
+          ['new', 'New members', 'Joining the AGA for the first time', $joinFeeCents > 0 ? 'Includes the one-off ' . $money($joinFeeCents) . ' joining fee' : 'No joining fee'],
+          ['current', 'Current members', 'Renewing your membership', 'No joining fee. You only pay it once'],
+      ] as [$kind, $title, $sub, $badge]): ?>
+      <article class="membership-prices membership-prices--<?= $kind ?>" id="prices-<?= $kind ?>">
+        <header class="membership-prices__header">
+          <h3><?= e($title) ?></h3>
+          <p><?= e($sub) ?></p>
+          <span class="membership-prices__badge"><?= e($badge) ?></span>
+        </header>
+        <table class="membership-prices__table">
+          <caption class="sr-only"><?= e($title) ?> prices<?= $kind === 'new' ? ' if you join today' : '' ?></caption>
+          <thead>
+            <tr>
+              <th scope="col">Membership</th>
+              <?php foreach ($pricePeriods as $period): ?><th scope="col"><?= e($period['label']) ?></th><?php endforeach; ?>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($priceRows as [$mag, $type, $label, $detail]): ?>
+            <tr>
+              <th scope="row"><?= e($label) ?><span><?= e($detail) ?></span></th>
+              <?php foreach ($pricePeriods as $period):
+                $cents = $kind === 'new'
+                    ? $pricingSvc::getJoiningPriceCents($mag, $type, (string) $period['id'], $joinWindow)
+                    : $pricingSvc::getRenewalPriceCents($mag, $type, (string) $period['id']);
+              ?><td><?= e($money($cents)) ?></td><?php endforeach; ?>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+
+        <?php if ($kind === 'new'): ?>
+        <p class="membership-prices__note">Prices if you join today. Your membership runs to <?= e($expiryText) ?>.</p>
+        <details class="membership-prices__later">
+          <summary>Joining later in the year? The price drops.</summary>
+          <table class="membership-prices__table membership-prices__table--compact">
+            <caption class="sr-only">New member prices by the month you join</caption>
             <thead>
               <tr>
-                <th>Category</th>
-                <th>If you join today</th>
+                <th scope="col">Join in</th>
+                <?php foreach ($joinWindows as $wKey => $wLabel): ?>
+                <th scope="col"<?= $wKey === $joinWindow ? ' class="is-now"' : '' ?>><?= e($wLabel) ?><?= $wKey === $joinWindow ? '<span>Now</span>' : '' ?></th>
+                <?php endforeach; ?>
               </tr>
             </thead>
+            <?php foreach ($pricePeriods as $period): ?>
             <tbody>
+              <tr class="membership-prices__group"><th scope="rowgroup" colspan="<?= count($joinWindows) + 1 ?>"><?= e($period['label']) ?></th></tr>
+              <?php foreach ($priceRows as [$mag, $type, $label, $detail]): ?>
               <tr>
-                <td>Full - Wings</td>
-                <td><?= e($formatMembershipPrice($todayProRata['PRINTED']['FULL'] ?? null, $pricingCurrency)) ?></td>
+                <th scope="row"><?= e($label) ?><span><?= e($mag === 'PDF' ? 'PDF Wings' : ($type === 'FULL' ? 'Printed Wings' : '')) ?></span></th>
+                <?php foreach ($joinWindows as $wKey => $wLabel): ?>
+                <td<?= $wKey === $joinWindow ? ' class="is-now"' : '' ?>><?= e($money($pricingSvc::getJoiningPriceCents($mag, $type, (string) $period['id'], $wKey))) ?></td>
+                <?php endforeach; ?>
               </tr>
-              <tr>
-                <td>Full - PDF magazine</td>
-                <td><?= e($formatMembershipPrice($todayProRata['PDF']['FULL'] ?? null, $pricingCurrency)) ?></td>
-              </tr>
-              <tr>
-                <td>Associate</td>
-                <td><?= e($formatMembershipPrice($todayProRata['PRINTED']['ASSOCIATE'] ?? null, $pricingCurrency)) ?></td>
-              </tr>
+              <?php endforeach; ?>
             </tbody>
+            <?php endforeach; ?>
           </table>
-          <p class="membership-pro-note">Price covers the <?= (int) ($monthsRemainingToday ?? 0) ?> month<?= ($monthsRemainingToday ?? 0) === 1 ? '' : 's' ?> until <?= e($ordinalSuffix($expiryDay ?? 31)) ?> <?= e($expiryMonthName) ?>. After that, members renew for whole years.</p>
-        </div>
+          <?php if ($rolloverOn): ?>
+          <p class="membership-prices__note">Join from 1 <?= e($monthLong[(int) $pricingCfg['join_rollover_month']]) ?> and you pay the <?= e($joinWindows['FULL']) ?> price, but your membership runs all the way to <?= e($expiryText) ?> the following year.</p>
+          <?php endif; ?>
+        </details>
+        <a class="button primary membership-prices__cta" href="/apply.php">Apply to join <span aria-hidden="true">&rarr;</span></a>
+        <?php else: ?>
+        <p class="membership-prices__note">Renewals run from 1 <?= e($monthLong[$anchorMonth]) ?> to <?= e($expiryText) ?>. Log in to renew; the member portal shows your exact price.</p>
+        <a class="button membership-prices__cta" href="/member/?page=billing">Log in to renew <span aria-hidden="true">&rarr;</span></a>
+        <?php endif; ?>
       </article>
-      <?php endif; ?>
-    </div>
-    <div class="membership-cta">
-      <a class="button primary membership-cta__button" href="/apply.php">
-        Apply today
-        <span class="membership-cta__arrow" aria-hidden="true">&rarr;</span>
-      </a>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>
@@ -185,9 +204,6 @@ $ordinalSuffix = static function ($n): string {
           <li><span class="membership-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg></span>Embroidered patch</li>
           <li><span class="membership-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg></span>Enamel badge</li>
         </ul>
-        <div class="membership-note">
-          <p><strong>Note:</strong> <?= e($pricingNote) ?> Joining fees are included in the initial pricing shown.</p>
-        </div>
       </div>
     </div>
   </div>

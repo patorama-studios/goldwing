@@ -248,7 +248,11 @@ MembershipPricingService::resolveJoinPriceCents($mag, $type, $key, ?$joinDate);
 MembershipPricingService::calculateProRataCents($mag, $type, ?$joinDate);
 MembershipPricingService::monthsRemainingUntilExpiry(?$from);
 
-// Legacy callers (membership_content.php, migrate.php):
+// Public Membership page (membership_content.php):
+MembershipPricingService::getJoiningPriceCents($mag, $type, $periodId, $window);
+MembershipPricingService::getRenewalPriceCents($mag, $type, $periodId);
+
+// Legacy callers (migrate.php):
 MembershipPricingService::getPriceCents($mag, $type, $legacyKey);
 MembershipPricingService::getMembershipPricing();
 ```
@@ -275,7 +279,7 @@ Membership applications still use a **PaymentIntent** flow (not a Stripe Checkou
   - `public_html/member/index.php` and `public_html/api/index.php` (`/api/payments/membership-intent`) — both resolve renewal amounts via `MembershipPricingService::renewalAmountCents()`.
   - `app/Services/MembershipUpgradeService.php` — `getUpgradePriceCents()` uses the 12-month period.
   - `public_html/migrate.php` — legacy callers (`ONE_YEAR`/`THREE_YEARS`), kept on `getPriceCents()` for compatibility.
-  - `app/Views/partials/membership_content.php` — public showcase, uses `getPriceCents()` with legacy keys.
+  - `app/Views/partials/membership_content.php` — public Membership page (`/?page=membership`). Two side-by-side tables so current members don't mistake the joining price for theirs: **New members** (joining matrix for today's window via `joiningWindowForDate()`, labelled with the joining fee) and **Current members** (renewal prices, no joining fee), plus a "Joining later in the year?" breakdown of all three windows. The partial reads the config itself, so `index.php` and `PageBuilderService::renderMembershipContent()` just include it.
 
 ### Settings
 
