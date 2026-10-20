@@ -978,6 +978,15 @@ if ($resource === 'stripe') {
         if ($firstName === '' || $lastName === '' || $email === '') {
             json_response(['error' => 'Primary member name and email are required.'], 422);
         }
+        // Same email checks apply.php runs on the final POST — run them BEFORE
+        // the invoice exists. Checked only afterwards, an existing member who
+        // used the join form was charged, then refused, leaving no order.
+        if (!MemberRepository::isEmailAvailable($email)) {
+            json_response(['error' => 'That email address already belongs to a member. Please log in and renew from your member dashboard instead.'], 409);
+        }
+        if ($associateSelected && $associateAdd === 'yes' && !MemberRepository::isEmailAvailable(trim((string) ($body['associate_email'] ?? '')))) {
+            json_response(['error' => 'Associate member email is already linked to another member.'], 409);
+        }
 
         // Contact + selection details go into the invoice metadata so a stranded
         // payment can be rebuilt into a full application server-side if the
